@@ -9,13 +9,28 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Current Status
 
-**Implementation State**: Greenfield - only placeholder code exists
+**Implementation State**: Phase 0-2 mostly complete, Phase 3 (Claude) complete, Phase 4 partial
 
-**Existing Code**:
-- `src/vibeusage/__init__.py`: placeholder `main()` function (prints "Hello from vibeusage!")
-- `pyproject.toml`: skeleton with no dependencies, placeholder description
+**Completed** (see checkbox items below for details):
+- ✓ Phase 0: Project setup (dependencies, structure)
+- ✓ Phase 1: Data models and core types (complete)
+- ✓ Phase 2: Infrastructure (config, auth base, orchestration, retry, gate, fetch)
+- ✓ Phase 3: Claude provider (OAuth, Web, CLI strategies, status polling)
+- ✓ Phase 4: CLI framework (ATyper, app, usage command)
+- ✓ Display module (rich.py, json.py)
+- ✓ Error classification (classify.py)
 
-**All phases below are incomplete and require implementation.**
+**Recent Fixes** (v0.0.1):
+- Created missing `errors/classify.py` module - was blocking `core/fetch.py`
+- Fixed Claude OAuth period mapping bug: `seven_day` → `WEEKLY` (was incorrectly `DAILY`)
+- Implemented `display/` module with Rich formatters and JSON output utilities
+
+**Still Incomplete**:
+- Additional providers (Codex, Copilot, Cursor, Gemini)
+- Auth concrete strategy implementations (only base classes exist)
+- Additional CLI commands (auth, config, key, cache, status)
+- Display renderables (UsageDisplay, ProviderPanel)
+- Tests
 
 ---
 
