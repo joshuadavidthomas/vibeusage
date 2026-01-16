@@ -23,11 +23,43 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 > These items differ between specifications and need resolution before/during implementation:
 
+### Previously Identified
+
 1. **Exit Codes**: Spec 05 defines codes 0-4; Spec 07 defines codes 0-5 (adds CONFIG_ERROR, PARTIAL_FAILURE). **Use Spec 07's definition.**
 
 2. **JSON Output Modules**: Plan lists both `cli/json.py` and `display/json.py`. **Consolidate to `display/json.py` only**, with CLI importing from there.
 
 3. **Browser Cookie Dependency**: Spec 03 mentions `browser_cookie3` or `pycookiecheat` but neither is in dependencies. **Add to pyproject.toml if browser cookie extraction is implemented** (currently stubbed).
+
+### Newly Identified
+
+4. **Cache Module Location**: Spec 01 shows `cache/` as separate top-level package with `snapshots.py` and `org_ids.py`; Spec 06 and this plan show `config/cache.py`. **Use `config/cache.py` as single module.**
+
+5. **FetchPipelineResult vs FetchOutcome**: Spec 07 defines `FetchPipelineResult`; Spec 01 and this plan use `FetchOutcome`. **Standardize on `FetchOutcome`.**
+
+6. **Exit Code 4 Naming**: Spec 05 calls it `INVALID_INPUT`; Spec 07 calls it `CONFIG_ERROR`. **Use `CONFIG_ERROR` (Spec 07).**
+
+7. **Display Module Split**: Both `cli/display.py` and `display/rich.py` exist. **Clarify: `cli/display.py` for Rich renderables (UsageDisplay, ProviderPanel), `display/rich.py` for formatting utilities.**
+
+8. **pace_to_color Location**: Spec 02 defines in data models section; this plan places in `display/colors.py`. **Keep in `display/colors.py` (presentation concern).**
+
+9. **format_reset_time vs format_reset_countdown**: Different names for same function. **Use `format_reset_time()` in this plan.**
+
+---
+
+## Implementation Notes
+
+> Recommendations based on spec analysis:
+
+1. **Early Testing Recommended**: Consider adding basic unit tests after Phase 1 (data models) rather than deferring all testing to Phase 6. Model validation and error classification are easily testable.
+
+2. **HTTP Client Dependency**: `core/http.py` is required by fetch, retry, and all provider strategies. Ensure it's implemented early in Phase 2.
+
+3. **End-to-End Testing Gap**: The provider protocol (Phase 2) cannot be integration tested until Phase 3 (Claude provider). Plan for this gap.
+
+4. **Display Module Clarity**: `cli/display.py` contains Rich renderables (UsageDisplay, ProviderPanel); `display/rich.py` contains utility functions. Keep this separation clear.
+
+5. **msgspec Version**: Requires `msgspec>=0.18` for `indent` parameter in JSON encoding. Verify version in pyproject.toml.
 
 ---
 
@@ -72,6 +104,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
   │   └── local_process.py     # LocalProcessStrategy
   ├── core/
   │   ├── __init__.py
+  │   ├── http.py              # HTTP client with connection pooling
   │   ├── fetch.py             # execute_fetch_pipeline
   │   ├── orchestrator.py      # fetch_all_providers, fetch_single_provider
   │   ├── aggregate.py         # AggregatedResult
@@ -179,6 +212,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - [ ] `CredentialsConfig` - use_keyring, reuse_provider_credentials
   - [ ] `ProviderConfig` - auth_source, preferred_browser, enabled
   - [ ] `Config` - enabled_providers, display, fetch, credentials, providers dict
+    - [ ] `get_provider_config(provider_id)` method - returns config with defaults
+    - [ ] `is_provider_enabled(provider_id)` method - checks if provider enabled
   - [ ] `Config.load()` - load from TOML with msgspec.convert()
   - [ ] `Config.save()` - save to TOML with msgspec.to_builtins()
   - [ ] `get_config()` singleton
@@ -195,6 +230,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - [ ] `read_credential()` - read credential file
   - [ ] `delete_credential()` - delete credential file
   - [ ] `check_credential_permissions()` - verify secure permissions
+  - [ ] `check_provider_credentials(provider_id)` - returns (status, source) tuple
 
 - [ ] **Cache management** (`cache.py`)
   - [ ] `snapshot_path()` - path for provider snapshot
@@ -206,6 +242,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 - [ ] **Optional keyring** (`keyring.py`)
   - [ ] `use_keyring()` - check if enabled and available
+  - [ ] `keyring_key(provider_id, credential_type)` - generate keyring key
   - [ ] `store_in_keyring()`, `get_from_keyring()`, `delete_from_keyring()`
 
 ### Authentication Layer (`vibeusage/auth/`)
@@ -278,12 +315,14 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - [ ] Return FetchOutcome
 
 - [ ] **Orchestrator** (`core/orchestrator.py`)
-  - [ ] `fetch_all_providers()` - concurrent fetch with semaphore
+  - [ ] `fetch_all_providers()` - concurrent fetch with semaphore (max_concurrent=5)
   - [ ] `fetch_single_provider()` - single provider fetch
   - [ ] `on_complete` callback for progress
 
 - [ ] **Result aggregation** (`core/aggregate.py`)
   - [ ] `AggregatedResult` struct - snapshots dict, errors dict, fetched_at
+    - [ ] `successful_providers()` method - returns list of successful provider IDs
+    - [ ] `failed_providers()` method - returns list of failed provider IDs
   - [ ] `aggregate_results()` function
 
 - [ ] **Retry logic** (`core/retry.py`)
@@ -294,9 +333,13 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 - [ ] **Failure gate** (`core/gate.py`)
   - [ ] `FailureRecord` struct - timestamp, error_category, message
-  - [ ] `FailureGate` class - MAX_CONSECUTIVE_FAILURES, GATE_DURATION, WINDOW_DURATION
+  - [ ] `FailureGate` class with constants:
+    - [ ] `MAX_CONSECUTIVE_FAILURES = 3`
+    - [ ] `GATE_DURATION = timedelta(minutes=5)`
+    - [ ] `WINDOW_DURATION = timedelta(minutes=10)`
   - [ ] `record_failure()`, `record_success()`, `is_gated()`, `gate_remaining()`
-  - [ ] `_failure_gate` singleton
+  - [ ] `recent_failures()` - returns recent failures for diagnostics
+  - [ ] `get_failure_gate()` - global singleton accessor
 
 - [ ] **HTTP client** (`core/http.py`)
   - [ ] `get_http_client()` context manager with connection pooling
@@ -310,6 +353,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 - [ ] **Multi-provider fetch** (`core/orchestrator.py`)
   - [ ] `MultiProviderResult` struct - successes, failures, stale dicts
+    - [ ] `has_any_data` property - checks if any data available
+    - [ ] `all_failed` property - checks if all providers failed
   - [ ] `fetch_all_with_partial_failure()`
 
 ---
@@ -522,13 +567,17 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ### Error Handling Refinement
 - [ ] **Exception classification** (`errors/classify.py`)
   - [ ] `classify_exception()` - any exception to VibeusageError
+  - [ ] `classify_network_error()` - httpx-specific error handling
   - [ ] Handle httpx, JSON, file errors
 - [ ] **HTTP error handling** (`errors/http.py`)
-  - [ ] `handle_http_request()` - with retry logic
+  - [ ] `handle_http_request()` - async function with automatic retry
   - [ ] `classify_http_status_error()`
 - [ ] **Provider error messages** (`errors/messages.py`)
   - [ ] `AUTH_ERROR_TEMPLATES` dict per provider
   - [ ] `get_auth_error_message()` function
+- [ ] **Helper utilities** (`errors/` or `display/`)
+  - [ ] `format_timedelta()` - format timedelta for gate messages
+  - [ ] `calculate_age_minutes()` - calculate snapshot age
 
 ### Reliability
 - [ ] **Offline mode** - serve cached data when network unavailable
@@ -547,6 +596,9 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - [ ] List credential status per provider
   - [ ] Show failure gate status
   - [ ] Display recent fetch attempt history
+- [ ] **Stale data display**
+  - [ ] `display_with_staleness()` - display with yellow staleness warning
+  - [ ] `display_multi_provider_result()` - display partial results with failures
 - [ ] **Legacy migration** - `migrate_legacy_config()` for ccusage users
 
 ### JSON Output
