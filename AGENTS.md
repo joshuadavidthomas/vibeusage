@@ -1,6 +1,5 @@
-## Build & Run
-
-Succinct rules for how to BUILD the project:
+## Commands
+- `uv sync`: Sync the project's dependencies with the environment.
 
 ## Validation
 

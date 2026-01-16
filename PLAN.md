@@ -23,15 +23,11 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 > These items differ between specifications and need resolution before/during implementation:
 
-### Previously Identified
-
 1. **Exit Codes**: Spec 05 defines codes 0-4; Spec 07 defines codes 0-5 (adds CONFIG_ERROR, PARTIAL_FAILURE). **Use Spec 07's definition.**
 
 2. **JSON Output Modules**: Plan lists both `cli/json.py` and `display/json.py`. **Consolidate to `display/json.py` only**, with CLI importing from there.
 
 3. **Browser Cookie Dependency**: Spec 03 mentions `browser_cookie3` or `pycookiecheat` but neither is in dependencies. **Add to pyproject.toml if browser cookie extraction is implemented** (currently stubbed).
-
-### Newly Identified
 
 4. **Cache Module Location**: Spec 01 shows `cache/` as separate top-level package with `snapshots.py` and `org_ids.py`; Spec 06 and this plan show `config/cache.py`. **Use `config/cache.py` as single module.**
 
@@ -60,6 +56,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
 4. **Display Module Clarity**: `cli/display.py` contains Rich renderables (UsageDisplay, ProviderPanel); `display/rich.py` contains utility functions. Keep this separation clear.
 
 5. **msgspec Version**: Requires `msgspec>=0.18` for `indent` parameter in JSON encoding. Verify version in pyproject.toml.
+
+6. **Use ty for type-checking**: Use `ty`, a new blazingly-fast Python type checker from Astral the team behind `uv` and `ruff`. Do not use `mypy` or `pyright` -- if either are found in `pyproject.toml` or elsewhere in the codebase, they should be replaced with `ty`.
 
 ---
 
