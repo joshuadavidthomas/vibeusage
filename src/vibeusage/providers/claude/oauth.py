@@ -167,7 +167,7 @@ class ClaudeOAuthStrategy(FetchStrategy):
         # Parse standard periods
         period_mapping = {
             "five_hour": ("5-hour session", PeriodType.SESSION, 5 * 3600),
-            "seven_day": ("7-day period", PeriodType.DAILY, 7 * 86400),
+            "seven_day": ("7-day period", PeriodType.WEEKLY, 7 * 86400),
             "monthly": ("Monthly", PeriodType.MONTHLY, 30 * 86400),
         }
 
