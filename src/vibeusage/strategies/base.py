@@ -49,6 +49,10 @@ class FetchOutcome(msgspec.Struct):
     source: str | None  # Which strategy succeeded
     attempts: list[FetchAttempt]  # All attempts for debugging
     error: str | None = None  # Final error if all failed
+    cached: bool = False  # Whether result came from cache
+    gated: bool = False  # Whether provider is failure-gated
+    fatal: bool = False  # Whether error was fatal (stop fallback)
+    gate_remaining: str | None = None  # Human-readable gate duration
 
 
 class FetchStrategy(ABC):

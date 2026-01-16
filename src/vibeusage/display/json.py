@@ -25,10 +25,15 @@ def output_json_pretty(data: object, indent: int = 2) -> None:
         data: Any msgspec-serializable object
         indent: Number of spaces for indentation
     """
-    encoder = msgspec.json.Encoder(indent=indent)
-    json_bytes = encoder.encode(data)
-    sys.stdout.buffer.write(json_bytes)
-    sys.stdout.buffer.write(b"\n")
+    import json
+
+    # Convert msgspec data to dict/list for json module
+    # Use msgspec to decode, then json module for pretty printing
+    json_bytes = msgspec.json.encode(data)
+    python_obj = msgspec.json.decode(json_bytes)
+    json_str = json.dumps(python_obj, indent=indent)
+    sys.stdout.write(json_str)
+    sys.stdout.write("\n")
 
 
 def encode_json(data: object) -> bytes:

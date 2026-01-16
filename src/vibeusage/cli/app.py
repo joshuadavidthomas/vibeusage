@@ -73,3 +73,20 @@ async def run_default_usage(ctx: typer.Context) -> None:
 def run_app() -> None:
     """Run the CLI app."""
     app()
+
+
+# Import commands to register them with the app
+# These imports must come after app is defined
+from vibeusage.cli.commands import (
+    cache_clear_command,
+    cache_show_command,
+    config_edit_command,
+    config_path_command,
+    config_reset_command,
+    config_show_command,
+    key_command,
+    key_delete_command,
+    key_set_command,
+    status_command,
+    usage_command,
+)  # noqa: E402,F401

@@ -11,7 +11,7 @@ from vibeusage.core.http import cleanup
 from vibeusage.providers import create_provider, list_provider_ids
 
 
-@app.command()
+@app.command("usage")
 async def usage_command(
     provider: str = typer.Argument(
         None,
