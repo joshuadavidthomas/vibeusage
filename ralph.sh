@@ -59,56 +59,54 @@ pretty_stream_json() {
         type=$(printf '%s' "$line" | jq -r '.type // empty' 2>/dev/null || true)
 
         case "$type" in
-            assistant)
-                local item item_type item_text item_name item_id item_input
-                while IFS= read -r item; do
-                    item_type=$(printf '%s' "$item" | jq -r '.type // empty' 2>/dev/null || true)
-                    case "$item_type" in
-                        text)
-                            item_text=$(printf '%s' "$item" | jq -r '.text // empty' 2>/dev/null || true)
-                            [ -n "$item_text" ] && printf "assistant: %s\n" "$item_text"
-                            ;;
-                        tool_use)
-                            item_name=$(printf '%s' "$item" | jq -r '.name // "tool"' 2>/dev/null || true)
-                            item_id=$(printf '%s' "$item" | jq -r '.id // empty' 2>/dev/null || true)
-                            item_input=$(printf '%s' "$item" | jq -c '.input // empty' 2>/dev/null || true)
-                            if [ -n "$item_id" ]; then
-                                printf "tool: %s (%s)\n" "$item_name" "$item_id"
-                            else
-                                printf "tool: %s\n" "$item_name"
-                            fi
-                            if [ -n "$item_input" ] && [ "$item_input" != "null" ]; then
-                                printf "tool_input: %s\n" "$item_input"
-                            fi
-                            ;;
-                        *)
-                            ;;
-                    esac
-                done < <(printf '%s' "$line" | jq -c '.message.content[]?' 2>/dev/null || true)
-                ;;
-            user)
-                local item item_type item_text item_content
-                while IFS= read -r item; do
-                    item_type=$(printf '%s' "$item" | jq -r '.type // empty' 2>/dev/null || true)
-                    case "$item_type" in
-                        text)
-                            item_text=$(printf '%s' "$item" | jq -r '.text // empty' 2>/dev/null || true)
-                            [ -n "$item_text" ] && printf "user: %s\n" "$item_text"
-                            ;;
-                        tool_result)
-                            item_content=$(printf '%s' "$item" | jq -r '.content // empty' 2>/dev/null || true)
-                            [ -n "$item_content" ] && printf "tool_result: %s\n" "$item_content"
-                            ;;
-                        *)
-                            ;;
-                    esac
-                done < <(printf '%s' "$line" | jq -c '.message.content[]?' 2>/dev/null || true)
-                ;;
-            content_block_start)
-                block_type=$(printf '%s' "$line" | jq -r '.content_block.type // empty' 2>/dev/null || true)
-                if [ "$block_type" = "text" ]; then
-                    if [ "$in_text" = false ]; then
-                        [ "$printed" = true ] && printf "\n"
+        assistant)
+            local item item_type item_text item_name item_id item_input
+            while IFS= read -r item; do
+                item_type=$(printf '%s' "$item" | jq -r '.type // empty' 2>/dev/null || true)
+                case "$item_type" in
+                text)
+                    item_text=$(printf '%s' "$item" | jq -r '.text // empty' 2>/dev/null || true)
+                    [ -n "$item_text" ] && printf "assistant: %s\n" "$item_text"
+                    ;;
+                tool_use)
+                    item_name=$(printf '%s' "$item" | jq -r '.name // "tool"' 2>/dev/null || true)
+                    item_id=$(printf '%s' "$item" | jq -r '.id // empty' 2>/dev/null || true)
+                    item_input=$(printf '%s' "$item" | jq -c '.input // empty' 2>/dev/null || true)
+                    if [ -n "$item_id" ]; then
+                        printf "tool: %s (%s)\n" "$item_name" "$item_id"
+                    else
+                        printf "tool: %s\n" "$item_name"
+                    fi
+                    if [ -n "$item_input" ] && [ "$item_input" != "null" ]; then
+                        printf "tool_input: %s\n" "$item_input"
+                    fi
+                    ;;
+                *) ;;
+                esac
+            done < <(printf '%s' "$line" | jq -c '.message.content[]?' 2>/dev/null || true)
+            ;;
+        user)
+            local item item_type item_text item_content
+            while IFS= read -r item; do
+                item_type=$(printf '%s' "$item" | jq -r '.type // empty' 2>/dev/null || true)
+                case "$item_type" in
+                text)
+                    item_text=$(printf '%s' "$item" | jq -r '.text // empty' 2>/dev/null || true)
+                    [ -n "$item_text" ] && printf "user: %s\n" "$item_text"
+                    ;;
+                tool_result)
+                    item_content=$(printf '%s' "$item" | jq -r '.content // empty' 2>/dev/null || true)
+                    [ -n "$item_content" ] && printf "tool_result: %s\n" "$item_content"
+                    ;;
+                *) ;;
+                esac
+            done < <(printf '%s' "$line" | jq -c '.message.content[]?' 2>/dev/null || true)
+            ;;
+        content_block_start)
+            block_type=$(printf '%s' "$line" | jq -r '.content_block.type // empty' 2>/dev/null || true)
+            if [ "$block_type" = "text" ]; then
+                if [ "$in_text" = false ]; then
+                    [ "$printed" = true ] && printf "\n"
                     printf "assistant: "
                     in_text=true
                     printed=true
@@ -200,7 +198,7 @@ while true; do
     #               Can use 'sonnet' in build mode for speed if plan is clear and tasks well-defined
     # --verbose: Detailed execution logging
     if [ "$PRETTY_STREAM" = true ] && command -v jq >/dev/null 2>&1; then
-        cat "$PROMPT_FILE" | claude -p \
+        cat "$PROMPT_FILE" | claude-glm -p \
             --dangerously-skip-permissions \
             --output-format=stream-json \
             --model opus \
@@ -209,7 +207,7 @@ while true; do
         if [ "$PRETTY_STREAM" = true ] && ! command -v jq >/dev/null 2>&1; then
             echo "Note: jq not found; falling back to raw stream-json output." >&2
         fi
-        cat "$PROMPT_FILE" | claude -p \
+        cat "$PROMPT_FILE" | claude-glm -p \
             --dangerously-skip-permissions \
             --output-format=stream-json \
             --model opus \
