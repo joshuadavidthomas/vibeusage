@@ -72,11 +72,13 @@ from vibeusage.providers.base import Provider, ProviderMetadata
 from vibeusage.providers.claude import ClaudeProvider
 from vibeusage.providers.codex import CodexProvider
 from vibeusage.providers.copilot import CopilotProvider
+from vibeusage.providers.cursor import CursorProvider
 
 # Register providers
 register_provider(ClaudeProvider)
 register_provider(CodexProvider)
 register_provider(CopilotProvider)
+register_provider(CursorProvider)
 
 __all__ = [
     "Provider",

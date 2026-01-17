@@ -9,7 +9,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Current Status
 
-**Implementation State**: Phase 0-4 complete (Claude MVP functional), Phase 5-6 in progress (Claude, Codex, Copilot providers implemented)
+**Implementation State**: Phase 0-4 complete (Claude MVP functional), Phase 5-6 in progress (Claude, Codex, Copilot, Cursor providers implemented)
 
 **Completed** (100% functional):
 - ✓ Phase 0: Project setup (dependencies, structure, entry points)
@@ -24,7 +24,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Provider registry and base protocol
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
-- ✓ Test suite (414 passing tests, 47% coverage, 3 test ordering issues in test_providers.py)
+- ✓ Cursor provider (web session strategy, status polling)
+- ✓ Test suite (455 passing tests, 47% coverage, 3 test ordering issues in test_providers.py)
 
 **Investigation** (2026-01-16):
 - **Usage command "No usage data available" investigation**
@@ -266,32 +267,35 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ---
 
-### Priority 4: Cursor Provider
+### Priority 4: Cursor Provider ✅ COMPLETED
 **Goal**: Add Cursor IDE usage tracking
 
-- [ ] **Create provider module** (providers/cursor/)
-  - [ ] `__init__.py` - CursorProvider with metadata
-    - [ ] status_url="https://status.cursor.com"
-    - [ ] dashboard_url="https://cursor.com/settings/usage"
-  - [ ] `web.py` - CursorWebStrategy
-    - [ ] Cookie names: `WorkosCursorSessionToken`, `__Secure-next-auth.session-token`, `next-auth.session-token`
-    - [ ] Domains: `cursor.com`, `cursor.sh`
-    - [ ] Usage: `POST https://www.cursor.com/api/usage-summary`
-    - [ ] User info: `GET https://www.cursor.com/api/auth/me`
-    - [ ] Parse: premium_requests, billing_cycle, on_demand_spend (overage)
+- [x] **Create provider module** (providers/cursor/)
+  - [x] `__init__.py` - CursorProvider with metadata
+    - [x] status_url="https://status.cursor.com"
+    - [x] dashboard_url="https://cursor.com/settings/usage"
+  - [x] `web.py` - CursorWebStrategy
+    - [x] Cookie names: `WorkosCursorSessionToken`, `__Secure-next-auth.session-token`, `next-auth.session-token`
+    - [x] Domains: `cursor.com`, `cursor.sh`
+    - [x] Usage: `POST https://www.cursor.com/api/usage-summary`
+    - [x] User info: `GET https://www.cursor.com/api/auth/me`
+    - [x] Parse: premium_requests, billing_cycle, on_demand_spend (overage)
 
-- [ ] **Add auth support**
-  - [ ] Session key extraction from browser cookies
-  - [ ] Manual session key entry fallback
-  - [ ] Cookie file management
+- [x] **Add auth support**
+  - [x] Session key extraction from browser cookies (CursorBrowserCookieStrategy)
+  - [x] Manual session key entry fallback
+  - [x] Cookie file management
 
-- [ ] **Register and test**
-  - [ ] Add to provider registry
-  - [ ] Test `vibeusage usage cursor` command
+- [x] **Register and test**
+  - [x] Add to provider registry
+  - [x] Test `vibeusage usage cursor` command
+  - [x] 41 comprehensive tests (all passing)
 
 **Value**: Medium - Growing user base among AI developers
 
 **Dependencies**: Priority 1 (auth command infrastructure + cookie handling)
+
+**Completed**: 2026-01-16
 
 ---
 
@@ -540,12 +544,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
 3. **Priority 3**: Copilot provider ✅
 
 ### Short-term (Expand Provider Coverage)
-4. **Priority 4**: Cursor provider
+4. **Priority 4**: Cursor provider ✅
 5. **Priority 5**: Gemini provider
 
 ### Medium-term (Production Readiness)
 6. **Priority 6**: Polish & robustness (UX, error handling, reliability)
-7. **Priority 7**: Test suite (mostly complete - 399 tests passing, 48% coverage, 3 ordering issues)
+7. **Priority 7**: Test suite (mostly complete - 455 tests passing, 47% coverage, 3 ordering issues)
 
 ### Long-term (Documentation & Release)
 8. **Priority 8**: Documentation (README, provider guides, config reference)
