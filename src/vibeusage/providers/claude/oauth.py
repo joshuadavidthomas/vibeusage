@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from pathlib import Path
 
 from vibeusage.config.credentials import read_credential
@@ -128,11 +128,11 @@ class ClaudeOAuthStrategy(FetchStrategy):
             if snake_key == "expires_at":
                 if isinstance(value, (int, float)):
                     # Convert millisecond timestamp to ISO string
+                    from datetime import UTC
                     from datetime import datetime
-                    from datetime import timezone
 
                     value = datetime.fromtimestamp(
-                        value / 1000, tz=timezone.utc
+                        value / 1000, tz=UTC
                     ).isoformat()
 
             result[snake_key] = value
@@ -148,7 +148,7 @@ class ClaudeOAuthStrategy(FetchStrategy):
         try:
             expiry = datetime.fromisoformat(expires_at)
             # Refresh if expires within 5 minutes
-            return datetime.now(timezone.utc) >= expiry
+            return datetime.now(UTC) >= expiry
         except (ValueError, TypeError):
             return True
 
@@ -180,7 +180,7 @@ class ClaudeOAuthStrategy(FetchStrategy):
 
         # Update expires_at
         if "expires_in" in data:
-            expires_at = datetime.now(timezone.utc) + data["expires_in"]
+            expires_at = datetime.now(UTC) + data["expires_in"]
             data["expires_at"] = expires_at.isoformat()
 
         # Save updated credentials
@@ -291,7 +291,7 @@ class ClaudeOAuthStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="claude",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=tuple(periods),
             overage=overage,
             identity=None,  # OAuth doesn't provide identity

@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from decimal import Decimal
 
 from vibeusage.config.credentials import credential_path
@@ -160,7 +160,7 @@ class CursorWebStrategy(FetchStrategy):
                         elif isinstance(end_date, int):
                             # Unix timestamp in milliseconds
                             resets_at = datetime.fromtimestamp(
-                                end_date / 1000, tz=timezone.utc
+                                end_date / 1000, tz=UTC
                             )
                     except (ValueError, TypeError):
                         pass
@@ -203,7 +203,7 @@ class CursorWebStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="cursor",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=tuple(periods),
             overage=overage,
             identity=identity,

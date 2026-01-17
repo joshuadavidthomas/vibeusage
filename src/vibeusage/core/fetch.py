@@ -130,7 +130,7 @@ async def execute_fetch_pipeline(
                     )
                 )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             duration_ms = (time.monotonic() - start_time) * 1000
             attempts.append(
                 FetchAttempt(

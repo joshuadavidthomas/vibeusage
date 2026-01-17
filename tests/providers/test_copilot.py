@@ -1,9 +1,9 @@
 """Tests for Copilot (GitHub) provider."""
 from __future__ import annotations
 
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from pathlib import Path
 from unittest.mock import AsyncMock
 from unittest.mock import Mock
@@ -100,9 +100,11 @@ class TestCopilotDeviceFlowStrategy:
         """is_available returns True when credentials exist."""
         strategy = CopilotDeviceFlowStrategy()
 
-        with patch(
-            "vibeusage.providers.copilot.device_flow.Path.exists", return_value=True
-        ):
+        # Create a mock Path that exists
+        mock_path = Mock()
+        mock_path.exists.return_value = True
+
+        with patch.object(strategy, "CREDENTIAL_FILE", mock_path):
             result = strategy.is_available()
             assert result is True
 
@@ -362,7 +364,7 @@ class TestCopilotDeviceFlowStrategy:
         """_needs_refresh returns False when token expires well after threshold."""
         strategy = CopilotDeviceFlowStrategy()
         credentials = {
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=2)).isoformat(),
         }
 
         result = strategy._needs_refresh(credentials)
@@ -375,7 +377,7 @@ class TestCopilotDeviceFlowStrategy:
         strategy = CopilotDeviceFlowStrategy()
         credentials = {
             "expires_at": (
-                datetime.now(timezone.utc) + timedelta(hours=12)
+                datetime.now(UTC) + timedelta(hours=12)
             ).isoformat(),
         }
 

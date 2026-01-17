@@ -1,8 +1,6 @@
 """Provider registry for vibeusage."""
 from __future__ import annotations
 
-from typing import Protocol
-
 # Provider registry
 _PROVIDERS: dict[str, type] = {}
 
@@ -69,13 +67,13 @@ def create_provider(provider_id: str):
 
 
 # Import and register providers
-from vibeusage.providers.base import Provider
-from vibeusage.providers.base import ProviderMetadata
-from vibeusage.providers.claude import ClaudeProvider
-from vibeusage.providers.codex import CodexProvider
-from vibeusage.providers.copilot import CopilotProvider
-from vibeusage.providers.cursor import CursorProvider
-from vibeusage.providers.gemini import GeminiProvider
+from vibeusage.providers.base import Provider  # noqa: E402
+from vibeusage.providers.base import ProviderMetadata  # noqa: E402
+from vibeusage.providers.claude import ClaudeProvider  # noqa: E402
+from vibeusage.providers.codex import CodexProvider  # noqa: E402
+from vibeusage.providers.copilot import CopilotProvider  # noqa: E402
+from vibeusage.providers.cursor import CursorProvider  # noqa: E402
+from vibeusage.providers.gemini import GeminiProvider  # noqa: E402
 
 # Register providers
 register_provider(ClaudeProvider)

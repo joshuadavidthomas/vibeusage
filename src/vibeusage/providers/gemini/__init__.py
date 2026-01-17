@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from vibeusage.models import ProviderStatus
-from vibeusage.models import StatusLevel
 from vibeusage.providers.base import Provider
 from vibeusage.providers.base import ProviderMetadata
 from vibeusage.providers.gemini.api_key import GeminiApiKeyStrategy

@@ -1,8 +1,8 @@
 """Tests for provider registry and Claude provider."""
 from __future__ import annotations
 
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -353,7 +353,7 @@ class TestProviderStatus:
             mock_fetch.return_value = ProviderStatus(
                 level=StatusLevel.OPERATIONAL,
                 description="All systems operational",
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
             provider = ClaudeProvider()

@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 
 from vibeusage.core.http import fetch_url
 from vibeusage.models import ProviderStatus
@@ -71,7 +71,7 @@ async def fetch_gemini_status() -> ProviderStatus:
         return ProviderStatus(
             level=StatusLevel.OPERATIONAL,
             description="All systems operational",
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
 
     # Check severity of most recent incident
@@ -85,7 +85,7 @@ async def fetch_gemini_status() -> ProviderStatus:
     return ProviderStatus(
         level=level,
         description=description,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(UTC),
     )
 
 

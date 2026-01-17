@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 
 from vibeusage.core.http import fetch_url
 from vibeusage.models import ProviderStatus
@@ -40,7 +40,7 @@ async def fetch_statuspage_status(url: str) -> ProviderStatus:
     return ProviderStatus(
         level=level,
         description=description,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(UTC),
     )
 
 

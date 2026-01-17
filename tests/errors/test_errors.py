@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 
@@ -50,7 +50,7 @@ class TestVibeusageError:
 
     def test_create_full_error(self):
         """Can create error with all fields."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         error = VibeusageError(
             message="Auth failed",
             category=ErrorCategory.AUTHENTICATION,
@@ -71,13 +71,13 @@ class TestVibeusageError:
 
     def test_default_timestamp(self):
         """Default timestamp is current time."""
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         error = VibeusageError(
             message="Test",
             category=ErrorCategory.UNKNOWN,
             severity=ErrorSeverity.WARNING,
         )
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         assert before <= error.timestamp <= after
 
@@ -320,7 +320,7 @@ class TestClassifyException:
 
     def test_classify_asyncio_timeout_error(self):
         """asyncio.TimeoutError is classified as transient network error."""
-        error = asyncio.TimeoutError()
+        error = TimeoutError()
         result = classify_exception(error)
 
         assert result.category == ErrorCategory.NETWORK

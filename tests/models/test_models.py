@@ -1,9 +1,9 @@
 """Tests for vibeusage.models data structures."""
 from __future__ import annotations
 
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from decimal import Decimal
 
 import pytest
@@ -53,7 +53,7 @@ class TestUsagePeriod:
 
     def test_create_usage_period(self):
         """Can create a UsagePeriod with required fields."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         period = UsagePeriod(
             name="Session (5h)",
             utilization=50,
@@ -90,7 +90,7 @@ class TestUsagePeriod:
 
     def test_elapsed_ratio_with_reset_time(self):
         """elapsed_ratio() calculates time correctly."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reset_time = now + timedelta(hours=12)
         period = UsagePeriod(
             name="Daily",
@@ -112,7 +112,7 @@ class TestUsagePeriod:
 
     def test_elapsed_ratio_bounds(self):
         """elapsed_ratio() is bounded between 0 and 1."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reset_time = now - timedelta(hours=1)
         period = UsagePeriod(
             name="Daily",
@@ -126,7 +126,7 @@ class TestUsagePeriod:
 
     def test_pace_ratio_with_elapsed(self):
         """pace_ratio() calculates usage pace."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reset_time = now + timedelta(hours=12)
         period = UsagePeriod(
             name="Daily",
@@ -141,7 +141,7 @@ class TestUsagePeriod:
 
     def test_pace_ratio_early_period(self):
         """pace_ratio() returns None for early period (<10% elapsed)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reset_time = now + timedelta(hours=23)
         period = UsagePeriod(
             name="Daily",
@@ -162,7 +162,7 @@ class TestUsagePeriod:
 
     def test_pace_ratio_over_pace(self):
         """pace_ratio() > 1.0 when using too fast."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reset_time = now + timedelta(hours=6)
         period = UsagePeriod(
             name="Daily",
@@ -180,7 +180,7 @@ class TestUsagePeriod:
 
     def test_time_until_reset(self):
         """time_until_reset() returns correct timedelta."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         reset_time = now + timedelta(hours=3, minutes=30)
         period = UsagePeriod(
             name="Session",
@@ -340,7 +340,7 @@ class TestProviderStatus:
 
     def test_create_status(self):
         """Can create status."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         status = ProviderStatus(
             level=StatusLevel.OPERATIONAL,
             description="All systems normal",
@@ -416,7 +416,7 @@ class TestUsageSnapshot:
     def test_primary_period_none(self):
         """primary_period() returns None when no periods."""
         snapshot = UsageSnapshot(
-            provider="claude", fetched_at=datetime.now(timezone.utc)
+            provider="claude", fetched_at=datetime.now(UTC)
         )
         assert snapshot.primary_period() is None
 
@@ -430,7 +430,7 @@ class TestUsageSnapshot:
         """secondary_period() returns None with only one period."""
         snapshot = UsageSnapshot(
             provider="claude",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=(sample_period,),
         )
         assert snapshot.secondary_period() is None
@@ -445,14 +445,14 @@ class TestUsageSnapshot:
         """model_periods() returns empty tuple when none."""
         snapshot = UsageSnapshot(
             provider="claude",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=(sample_period,),
         )
         assert snapshot.model_periods() == ()
 
     def test_is_stale_fresh(self):
         """is_stale() returns False for fresh data."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = UsageSnapshot(
             provider="claude",
             fetched_at=now - timedelta(minutes=5),
@@ -464,7 +464,7 @@ class TestUsageSnapshot:
 
     def test_is_stale_old(self):
         """is_stale() returns True for old data."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = UsageSnapshot(
             provider="claude",
             fetched_at=now - timedelta(minutes=15),
@@ -476,7 +476,7 @@ class TestUsageSnapshot:
 
     def test_is_stale_custom_threshold(self):
         """is_stale() respects custom threshold."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = UsageSnapshot(
             provider="claude",
             fetched_at=now - timedelta(minutes=5),

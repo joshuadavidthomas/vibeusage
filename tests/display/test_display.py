@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from decimal import Decimal
 
+import msgspec
 import pytest
+from rich.console import Console
 
+from vibeusage.cli.display import ProviderPanel
+from vibeusage.cli.display import SingleProviderDisplay
 from vibeusage.display.json import ErrorData
 from vibeusage.display.json import ErrorResponse
 from vibeusage.display.json import create_error_response
@@ -25,6 +29,7 @@ from vibeusage.display.rich import render_usage_bar
 from vibeusage.models import OverageUsage
 from vibeusage.models import PeriodType
 from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
 
 
 class TestRenderUsageBar:
@@ -355,12 +360,12 @@ class TestDecodeJson:
         """Invalid JSON raises exception."""
         json_bytes = b"{invalid json}"
 
-        with pytest.raises(Exception):  # msgspec.DecodeError
+        with pytest.raises(msgspec.DecodeError):
             decode_json(json_bytes)
 
     def test_decode_unicode(self):
         """Handle unicode characters."""
-        json_bytes = '"Hello World"'.encode("utf-8")
+        json_bytes = b'"Hello World"'
         result = decode_json(json_bytes)
 
         assert "Hello" in result
@@ -368,20 +373,13 @@ class TestDecodeJson:
 
 # Import io for BytesIO
 
-# Import for CLI display tests
-from rich.console import Console
-
-from vibeusage.cli.display import ProviderPanel
-from vibeusage.cli.display import SingleProviderDisplay
-from vibeusage.models import UsageSnapshot
-
 
 class TestSingleProviderDisplay:
     """Tests for SingleProviderDisplay class."""
 
     def test_title_is_capitalized(self):
         """Provider name should be capitalized in title per spec 05."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = UsageSnapshot(
             provider="claude",  # lowercase input
             periods=[],
@@ -402,7 +400,7 @@ class TestSingleProviderDisplay:
 
     def test_shows_model_specific_periods(self):
         """Single provider view should show model-specific periods per spec 05."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         periods = [
             UsagePeriod(
                 name="Session (5h)",
@@ -437,7 +435,7 @@ class TestSingleProviderDisplay:
 
     def test_title_separator_format(self):
         """Single provider view should use title+separator format per spec 05."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = UsageSnapshot(
             provider="claude",
             periods=[],
@@ -457,7 +455,7 @@ class TestSingleProviderDisplay:
 
     def test_overage_panel_rendered(self):
         """Overage should be rendered in a Panel per spec 05."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         overage = OverageUsage(
             used=Decimal("5.50"),
             limit=Decimal("100.00"),
@@ -489,7 +487,7 @@ class TestProviderPanel:
 
     def test_filters_model_specific_periods(self):
         """Multi-provider view should NOT show model-specific periods per spec 05."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         periods = [
             UsagePeriod(
                 name="Session (5h)",
@@ -542,7 +540,7 @@ class TestProviderPanel:
 
     def test_panel_title_is_capitalized(self):
         """Provider panel title should be capitalized per spec 05."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = UsageSnapshot(
             provider="claude",  # lowercase input
             periods=[],
@@ -560,7 +558,7 @@ class TestProviderPanel:
 
     def test_no_source_row_in_compact_view(self):
         """Compact multi-provider view should not show source row per spec 05."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot = UsageSnapshot(
             provider="claude",
             periods=[
@@ -590,7 +588,7 @@ class TestProviderPanel:
         """Compact view should use period type names (Weekly, Daily, Monthly) per spec 05.
         Session periods use their specific name (e.g., "Session (5h)") per spec.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         periods = [
             UsagePeriod(
                 name="Session (5h)",  # Session periods use their specific name per spec

@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from pathlib import Path
 
 from vibeusage.config.credentials import read_credential
@@ -145,7 +145,7 @@ class GeminiOAuthStrategy(FetchStrategy):
             if isinstance(expiry, (int, float)):
                 # Convert millisecond timestamp to ISO string
                 result["expires_at"] = datetime.fromtimestamp(
-                    expiry / 1000, tz=timezone.utc
+                    expiry / 1000, tz=UTC
                 ).isoformat()
             elif isinstance(expiry, str):
                 # Already a string, might be ISO or other format
@@ -158,7 +158,7 @@ class GeminiOAuthStrategy(FetchStrategy):
                     try:
                         ts = int(expiry)
                         result["expires_at"] = datetime.fromtimestamp(
-                            ts / 1000, tz=timezone.utc
+                            ts / 1000, tz=UTC
                         ).isoformat()
                     except (ValueError, OSError):
                         pass
@@ -174,7 +174,7 @@ class GeminiOAuthStrategy(FetchStrategy):
         try:
             expiry = datetime.fromisoformat(expires_at)
             # Refresh if expires within REFRESH_THRESHOLD_MINUTES
-            threshold = datetime.now(timezone.utc) + timedelta(
+            threshold = datetime.now(UTC) + timedelta(
                 minutes=self.REFRESH_THRESHOLD_MINUTES
             )
             return threshold >= expiry
@@ -208,7 +208,7 @@ class GeminiOAuthStrategy(FetchStrategy):
 
         # Update expires_at
         if "expires_in" in data:
-            expires_at = datetime.now(timezone.utc) + timedelta(
+            expires_at = datetime.now(UTC) + timedelta(
                 seconds=data["expires_in"]
             )
             data["expires_at"] = expires_at.isoformat()
@@ -319,12 +319,12 @@ class GeminiOAuthStrategy(FetchStrategy):
                     # Try ISO format first
                     resets_at = datetime.fromisoformat(reset_time_str)
                     if resets_at.tzinfo is None:
-                        resets_at = resets_at.replace(tzinfo=timezone.utc)
+                        resets_at = resets_at.replace(tzinfo=UTC)
                 except (ValueError, TypeError):
                     # Try Unix timestamp
                     try:
                         resets_at = datetime.fromtimestamp(
-                            float(reset_time_str), tz=timezone.utc
+                            float(reset_time_str), tz=UTC
                         )
                     except (ValueError, OSError, TypeError):
                         pass
@@ -363,7 +363,7 @@ class GeminiOAuthStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="gemini",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=tuple(periods),
             overage=None,  # No overage info from Gemini API
             identity=identity,
@@ -373,7 +373,7 @@ class GeminiOAuthStrategy(FetchStrategy):
 
     def _next_midnight_utc(self) -> datetime:
         """Calculate next midnight UTC for daily reset."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
             days=1
         )

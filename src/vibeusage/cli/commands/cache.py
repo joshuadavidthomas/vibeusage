@@ -66,7 +66,8 @@ def cache_show_command(
                 else:
                     snap_status = "stale"
 
-                from datetime import UTC, datetime
+                from datetime import UTC
+                from datetime import datetime
 
                 now = datetime.now(UTC)
                 if snapshot.fetched_at.tzinfo is None:

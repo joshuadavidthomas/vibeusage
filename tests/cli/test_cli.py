@@ -237,8 +237,8 @@ class TestJsonOutput:
     def test_output_json_usage_with_success(self):
         """output_json_usage outputs correct JSON for successful outcomes."""
         import sys
+        from datetime import UTC
         from datetime import datetime
-        from datetime import timezone
         from io import StringIO
 
         from vibeusage.cli.commands.usage import output_json_usage
@@ -252,7 +252,7 @@ class TestJsonOutput:
         period = UsagePeriod(
             name="Test Period",
             utilization=50,
-            resets_at=datetime.now(timezone.utc),
+            resets_at=datetime.now(UTC),
             period_type=PeriodType.DAILY,
         )
         identity = ProviderIdentity(
@@ -262,7 +262,7 @@ class TestJsonOutput:
         )
         snapshot = UsageSnapshot(
             provider="test",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             identity=identity,
             periods=[period],
             overage=None,
@@ -334,8 +334,8 @@ class TestJsonOutput:
     def test_output_json_usage_multiple_providers(self):
         """output_json_usage handles multiple providers with mixed results."""
         import sys
+        from datetime import UTC
         from datetime import datetime
-        from datetime import timezone
         from io import StringIO
 
         from vibeusage.cli.commands.usage import output_json_usage
@@ -348,12 +348,12 @@ class TestJsonOutput:
         period = UsagePeriod(
             name="Period 1",
             utilization=80,
-            resets_at=datetime.now(timezone.utc),
+            resets_at=datetime.now(UTC),
             period_type=PeriodType.DAILY,
         )
         snapshot = UsageSnapshot(
             provider="provider1",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             identity=None,
             periods=[period],
             overage=None,
@@ -403,8 +403,8 @@ class TestJsonOutput:
     def test_output_json_usage_with_overage(self):
         """output_json_usage includes overage data when present."""
         import sys
+        from datetime import UTC
         from datetime import datetime
-        from datetime import timezone
         from decimal import Decimal
         from io import StringIO
 
@@ -419,7 +419,7 @@ class TestJsonOutput:
         period = UsagePeriod(
             name="Period 1",
             utilization=120,
-            resets_at=datetime.now(timezone.utc),
+            resets_at=datetime.now(UTC),
             period_type=PeriodType.MONTHLY,
         )
         overage = OverageUsage(
@@ -430,7 +430,7 @@ class TestJsonOutput:
         )
         snapshot = UsageSnapshot(
             provider="test",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             identity=None,
             periods=[period],
             overage=overage,

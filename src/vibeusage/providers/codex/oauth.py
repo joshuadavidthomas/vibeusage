@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from pathlib import Path
 
 from vibeusage.config.credentials import read_credential
@@ -126,7 +126,7 @@ class CodexOAuthStrategy(FetchStrategy):
         try:
             expiry = datetime.fromisoformat(expires_at)
             # Refresh if expires within REFRESH_THRESHOLD_DAYS
-            threshold = datetime.now(timezone.utc) + timedelta(
+            threshold = datetime.now(UTC) + timedelta(
                 days=self.REFRESH_THRESHOLD_DAYS
             )
             return threshold >= expiry
@@ -159,7 +159,7 @@ class CodexOAuthStrategy(FetchStrategy):
 
         # Update expires_at (OpenAI uses expires_in seconds)
         if "expires_in" in data:
-            expires_at = datetime.now(timezone.utc) + timedelta(
+            expires_at = datetime.now(UTC) + timedelta(
                 seconds=data["expires_in"]
             )
             data["expires_at"] = expires_at.isoformat()
@@ -242,7 +242,7 @@ class CodexOAuthStrategy(FetchStrategy):
             reset_ts = primary.get("reset_at") or primary.get("reset_timestamp")
             if reset_ts is not None:
                 try:
-                    resets_at = datetime.fromtimestamp(reset_ts, tz=timezone.utc)
+                    resets_at = datetime.fromtimestamp(reset_ts, tz=UTC)
                 except (ValueError, TypeError, OSError):
                     pass
 
@@ -263,7 +263,7 @@ class CodexOAuthStrategy(FetchStrategy):
             reset_ts = secondary.get("reset_at") or secondary.get("reset_timestamp")
             if reset_ts is not None:
                 try:
-                    resets_at = datetime.fromtimestamp(reset_ts, tz=timezone.utc)
+                    resets_at = datetime.fromtimestamp(reset_ts, tz=UTC)
                 except (ValueError, TypeError, OSError):
                     pass
 
@@ -299,7 +299,7 @@ class CodexOAuthStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="codex",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=tuple(periods),
             overage=overage,
             identity=identity,

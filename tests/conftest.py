@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Generator
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -33,7 +33,7 @@ from vibeusage.models import UsageSnapshot
 @pytest.fixture
 def utc_now() -> datetime:
     """Fixed UTC datetime for consistent testing."""
-    return datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+    return datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -119,7 +119,7 @@ def sample_status() -> ProviderStatus:
     return ProviderStatus(
         level=StatusLevel.OPERATIONAL,
         description=None,
-        updated_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -265,7 +265,7 @@ def mock_response() -> MagicMock:
 
 
 @pytest.fixture
-def temp_config_dir(tmp_path: Path) -> Generator[Path, None, None]:
+def temp_config_dir(tmp_path: Path) -> Generator[Path]:
     """Temporary config directory for testing."""
     config_dir = tmp_path / "config"
     cache_dir = tmp_path / "cache"
@@ -318,7 +318,7 @@ def auth_credentials_dict() -> dict:
         "access_token": "test_access_token",
         "refresh_token": "test_refresh_token",
         "token_type": "Bearer",
-        "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+        "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
         "scope": "usage.read",
     }
 

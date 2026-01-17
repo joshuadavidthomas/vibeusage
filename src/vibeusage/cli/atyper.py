@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from collections.abc import Callable
 from functools import wraps
 from typing import Any
-from typing import Callable
 
 import typer
 from typer.core import TyperCommand
@@ -91,7 +91,7 @@ class ATyper(typer.Typer):
         *,
         help: str | None = None,  # noqa: A002
         **kwargs: Any,
-    ) -> "ATyper":
+    ) -> ATyper:
         """Create a nested command group with async support.
 
         Returns a new ATyper instance that can be used to define subcommands.

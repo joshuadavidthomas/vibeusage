@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 
 from vibeusage.config.cache import cache_org_id
 from vibeusage.config.cache import load_cached_org_id
@@ -223,7 +223,7 @@ class ClaudeWebStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="claude",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=periods,
             overage=overage,
             identity=identity,

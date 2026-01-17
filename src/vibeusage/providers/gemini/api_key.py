@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 
 import httpx
 
@@ -190,7 +190,7 @@ class GeminiApiKeyStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="gemini",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=tuple(periods),
             overage=None,  # No overage info from simple API key
             identity=identity,
@@ -218,7 +218,7 @@ class GeminiApiKeyStrategy(FetchStrategy):
         """Calculate next midnight UTC for daily reset."""
         from datetime import timedelta
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
             days=1
         )

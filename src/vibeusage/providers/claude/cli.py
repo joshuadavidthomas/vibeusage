@@ -4,8 +4,8 @@ from __future__ import annotations
 import asyncio
 import re
 import shutil
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 
 from vibeusage.models import PeriodType
 from vibeusage.models import UsagePeriod
@@ -111,7 +111,7 @@ class ClaudeCLIStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="claude",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=periods,
             overage=None,  # CLI doesn't provide overage
             identity=None,

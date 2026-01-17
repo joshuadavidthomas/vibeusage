@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -207,7 +208,7 @@ class TestGeminiOAuthStrategy:
         strategy = GeminiOAuthStrategy()
 
         # Token expired in the past
-        past_expiry = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        past_expiry = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
         assert strategy._needs_refresh({"expires_at": past_expiry}) is True
 
     def test_needs_refresh_returns_true_for_near_expiry(self):
@@ -215,7 +216,7 @@ class TestGeminiOAuthStrategy:
         strategy = GeminiOAuthStrategy()
 
         # Token expires within threshold
-        near_expiry = (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat()
+        near_expiry = (datetime.now(UTC) + timedelta(minutes=2)).isoformat()
         assert strategy._needs_refresh({"expires_at": near_expiry}) is True
 
     def test_needs_refresh_returns_false_for_valid_token(self):
@@ -223,7 +224,7 @@ class TestGeminiOAuthStrategy:
         strategy = GeminiOAuthStrategy()
 
         # Token expires far in future
-        future_expiry = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        future_expiry = (datetime.now(UTC) + timedelta(days=1)).isoformat()
         assert strategy._needs_refresh({"expires_at": future_expiry}) is False
 
     @pytest.mark.asyncio
@@ -388,7 +389,3 @@ class TestGeminiProviderIntegration:
 
         ids = list_provider_ids()
         assert "gemini" in ids
-
-
-# Import os for environment variable tests
-import os

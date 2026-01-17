@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from decimal import Decimal
 from io import StringIO
 
@@ -24,7 +24,7 @@ class TestSingleProviderJsonOutput:
         period = UsagePeriod(
             name="Session",
             utilization=50,
-            resets_at=datetime.now(timezone.utc),
+            resets_at=datetime.now(UTC),
             period_type=PeriodType.SESSION,
         )
         identity = ProviderIdentity(
@@ -34,7 +34,7 @@ class TestSingleProviderJsonOutput:
         )
         snapshot = UsageSnapshot(
             provider="claude",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             identity=identity,
             periods=[period],
             overage=None,
@@ -74,7 +74,7 @@ class TestSingleProviderJsonOutput:
         period = UsagePeriod(
             name="Monthly",
             utilization=120,
-            resets_at=datetime.now(timezone.utc),
+            resets_at=datetime.now(UTC),
             period_type=PeriodType.MONTHLY,
         )
         overage = OverageUsage(
@@ -85,7 +85,7 @@ class TestSingleProviderJsonOutput:
         )
         snapshot = UsageSnapshot(
             provider="claude",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             identity=None,
             periods=[period],
             overage=overage,
@@ -195,12 +195,12 @@ class TestJsonOutputFormat:
         period = UsagePeriod(
             name="Test",
             utilization=75,
-            resets_at=datetime.now(timezone.utc),
+            resets_at=datetime.now(UTC),
             period_type=PeriodType.DAILY,
         )
         snapshot = UsageSnapshot(
             provider="test",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             identity=None,
             periods=[period],
             overage=None,
@@ -233,12 +233,12 @@ class TestJsonOutputFormat:
         period = UsagePeriod(
             name="Test",
             utilization=75,
-            resets_at=datetime.now(timezone.utc),
+            resets_at=datetime.now(UTC),
             period_type=PeriodType.DAILY,
         )
         snapshot = UsageSnapshot(
             provider="test",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             identity=None,
             periods=[period],
             overage=None,

@@ -168,12 +168,12 @@ def format_status_updated(dt):
     if dt is None:
         return "unknown"
 
+    from datetime import UTC
     from datetime import datetime
-    from datetime import timezone
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
     delta = now - dt
 

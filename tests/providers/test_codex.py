@@ -1,9 +1,9 @@
 """Tests for Codex (OpenAI) provider."""
 from __future__ import annotations
 
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 from pathlib import Path
 from unittest.mock import AsyncMock
 from unittest.mock import patch
@@ -125,7 +125,7 @@ class TestCodexOAuthStrategy:
         credentials = {
             "access_token": "test_token",
             "refresh_token": "test_refresh",
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
         }
 
         api_response = {
@@ -180,7 +180,7 @@ class TestCodexOAuthStrategy:
         credentials = {
             "access_token": "expired_token",
             "refresh_token": "test_refresh",
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
         }
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
@@ -213,7 +213,7 @@ class TestCodexOAuthStrategy:
         credentials = {
             "access_token": "unauthorized_token",
             "refresh_token": "test_refresh",
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
         }
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
@@ -242,7 +242,7 @@ class TestCodexOAuthStrategy:
         """_needs_refresh returns True when token expires within threshold."""
         strategy = CodexOAuthStrategy()
         credentials = {
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
         }
 
         result = strategy._needs_refresh(credentials)
@@ -252,7 +252,7 @@ class TestCodexOAuthStrategy:
         """_needs_refresh returns False when token expires well after threshold."""
         strategy = CodexOAuthStrategy()
         credentials = {
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=15)).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=15)).isoformat(),
         }
 
         result = strategy._needs_refresh(credentials)
@@ -474,7 +474,7 @@ class TestCodexProviderIntegration:
             mock_fetch.return_value = ProviderStatus(
                 level=StatusLevel.OPERATIONAL,
                 description="All systems operational",
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
             )
 
             provider = CodexProvider()

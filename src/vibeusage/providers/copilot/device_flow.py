@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
-from datetime import timezone
 
 from vibeusage.config.credentials import read_credential
 from vibeusage.config.credentials import write_credential
@@ -132,7 +132,7 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
         try:
             expiry = datetime.fromisoformat(expires_at)
             # Refresh if expires within 1 day
-            threshold = datetime.now(timezone.utc) + timedelta(days=1)
+            threshold = datetime.now(UTC) + timedelta(days=1)
             return threshold >= expiry
         except (ValueError, TypeError):
             return False
@@ -285,7 +285,7 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
 
         return UsageSnapshot(
             provider="copilot",
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             periods=tuple(periods),
             overage=overage,
             identity=identity,
