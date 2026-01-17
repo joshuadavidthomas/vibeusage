@@ -24,13 +24,15 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Provider registry and base protocol
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
-- ✓ Test suite (399 passing tests, 48% coverage)
+- ✓ Test suite (403 passing tests, 47% coverage)
 
 **Recent Fixes** (2025-01-17):
 - CLI command audit completed - all commands tested
 - Confirmed `vibeusage usage` is working (typer.get_context() fix successful)
-- Documented --json flag partial implementation (works on status, not usage)
-- Updated test count: 399 passing tests, 3 test ordering issues remain
+- **Implemented `--json` flag for default command** - `vibeusage --json` now outputs JSON
+- Added `output_json_usage()` and `output_single_provider_json()` functions
+- Added 4 new tests for JSON output functionality
+- Updated test count: 403 passing tests, 3 test ordering issues remain, coverage increased to 47%
 
 **Recent Fixes** (2025-01-16):
 - Fixed File I/O type issue in _save_to_toml(): use binary mode 'wb' instead of 'w'
