@@ -189,6 +189,20 @@ class TestProviderRegistry:
         import vibeusage.providers as providers_module
         providers_module._PROVIDERS.clear()
 
+    def teardown_method(self):
+        """Restore registry after each test."""
+        import vibeusage.providers as providers_module
+        from vibeusage.providers.claude import ClaudeProvider
+        from vibeusage.providers.codex import CodexProvider
+        from vibeusage.providers.copilot import CopilotProvider
+        from vibeusage.providers.cursor import CursorProvider
+
+        # Re-register the default providers
+        providers_module._PROVIDERS["claude"] = ClaudeProvider
+        providers_module._PROVIDERS["codex"] = CodexProvider
+        providers_module._PROVIDERS["copilot"] = CopilotProvider
+        providers_module._PROVIDERS["cursor"] = CursorProvider
+
     def test_register_provider_decorator(self):
         """register_provider decorator registers provider."""
         import vibeusage.providers as providers_module

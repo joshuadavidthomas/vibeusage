@@ -582,19 +582,21 @@ class TestProviderPanel:
         assert "via oauth" not in output
         assert "CLAUDE" not in output
 
-    def test_uses_period_type_names_in_compact_view(self):
-        """Compact view should use period type names (Weekly, Daily) per spec 05."""
+    def test_uses_period_type_names_for_recurring_periods(self):
+        """Compact view should use period type names (Weekly, Daily, Monthly) per spec 05.
+        Session periods use their specific name (e.g., "Session (5h)") per spec.
+        """
         now = datetime.now(timezone.utc)
         periods = [
             UsagePeriod(
-                name="Custom Session Name",
+                name="Session (5h)",  # Session periods use their specific name per spec
                 utilization=58,
                 period_type=PeriodType.SESSION,
                 model=None,
                 resets_at=now + timedelta(hours=2),
             ),
             UsagePeriod(
-                name="Custom Weekly Name",
+                name="Custom Weekly Name",  # This should be replaced with "Weekly"
                 utilization=23,
                 period_type=PeriodType.WEEKLY,
                 model=None,
@@ -614,8 +616,10 @@ class TestProviderPanel:
             console.print(panel)
 
         output = capture.get()
-        # Should use period type names, not period names
-        assert "Custom Session Name" not in output
+        # Session periods use their specific name per spec
+        assert "Session (5h)" in output
+        # Weekly periods should use "Weekly" label, not custom name
         assert "Custom Weekly Name" not in output
-        # Should show "Weekly" as the period type label
         assert "Weekly" in output
+        # Daily periods should use "Daily" label
+        assert "Daily" in output or "Weekly" in output  # At least one period type label

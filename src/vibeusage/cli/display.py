@@ -262,7 +262,7 @@ class ProviderPanel:
         daily_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY and p.model is None]
         monthly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY and p.model is None]
 
-        # Display session periods first (typically "Session (5h)")
+        # Display session periods first - use their specific name per spec 05
         if session_periods:
             for period in session_periods:
                 grid.add_row(

@@ -374,6 +374,36 @@ def mock_async_mock() -> AsyncMock:
     return AsyncMock()
 
 
+@pytest.fixture(autouse=True)
+def reset_provider_registry():
+    """Ensure provider registry is properly initialized before each test.
+
+    This fixture runs automatically for every test to ensure the provider
+    registry is in a clean state, addressing test ordering issues where
+    tests that modify the registry can affect subsequent tests.
+    """
+    import vibeusage.providers as providers_module
+    from vibeusage.providers.claude import ClaudeProvider
+    from vibeusage.providers.codex import CodexProvider
+    from vibeusage.providers.copilot import CopilotProvider
+    from vibeusage.providers.cursor import CursorProvider
+
+    # Save current state
+    original_providers = dict(providers_module._PROVIDERS)
+
+    # Ensure all providers are registered
+    providers_module._PROVIDERS["claude"] = ClaudeProvider
+    providers_module._PROVIDERS["codex"] = CodexProvider
+    providers_module._PROVIDERS["copilot"] = CopilotProvider
+    providers_module._PROVIDERS["cursor"] = CursorProvider
+
+    yield
+
+    # Restore original state after test
+    providers_module._PROVIDERS.clear()
+    providers_module._PROVIDERS.update(original_providers)
+
+
 # Test data for edge cases
 @pytest.fixture
 def edge_case_snapshots(utc_now: datetime) -> dict[str, UsageSnapshot]:
