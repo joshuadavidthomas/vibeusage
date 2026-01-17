@@ -293,16 +293,20 @@ Codex authentication uses OAuth or session cookies.
   [dim]codex auth login[/dim]
 
 [dim]Or set credentials manually:[/dim]
-  [dim]vibeusage key set codex --type oauth[/dim]""",
+  [dim]vibeusage key codex set --type oauth[/dim]""",
         "copilot": """[bold cyan]GitHub Copilot Authentication[/bold cyan]
 
-GitHub Copilot uses GitHub device flow OAuth.
+GitHub Copilot uses OAuth credentials (separate from GitHub CLI).
 
-[dim]Run the official Copilot CLI to authenticate:[/dim]
-  [dim]gh auth login[/dim]
+[dim]To authenticate, use one of these methods:[/dim]
 
-[dim]Or set credentials manually:[/dim]
-  [dim]vibeusage key set copilot --type oauth[/dim]""",
+[dim]1. Use VS Code with Copilot extension, then copy the OAuth token from:[/dim]
+   [dim]~/.config/github-copilot/hosts.json[/dim]
+
+[dim]2. Set credentials manually with your OAuth token:[/dim]
+   [dim]vibeusage key copilot set[/dim]
+
+[dim]Note: [italic]gh auth login[/italic] authenticates the GitHub CLI, not Copilot.[/dim]""",
         "cursor": """[bold cyan]Cursor Authentication[/bold cyan]
 
 Cursor uses session cookies from the browser.
@@ -310,7 +314,7 @@ Cursor uses session cookies from the browser.
 [dim]1. Open https://cursor.com in your browser
 2. Extract session cookies manually
 3. Set credential:[/dim]
-  [dim]vibeusage key set cursor --type session[/dim]""",
+  [dim]vibeusage key cursor set[/dim]""",
         "gemini": """[bold cyan]Gemini Authentication[/bold cyan]
 
 Gemini uses Google OAuth credentials.
@@ -319,12 +323,12 @@ Gemini uses Google OAuth credentials.
   [dim]gemini auth login[/dim]
 
 [dim]Or set credentials manually:[/dim]
-  [dim]vibeusage key set gemini --type oauth[/dim]""",
+  [dim]vibeusage key gemini set --type oauth[/dim]""",
     }
 
     instructions = instructions_map.get(
         provider,
-        f"[bold cyan]{provider.title()} Authentication[/bold cyan]\n\n[dim]Set credentials manually:[/dim]\n  [dim]vibeusage key set {provider}[/dim]",
+        f"[bold cyan]{provider.title()} Authentication[/bold cyan]\n\n[dim]Set credentials manually:[/dim]\n  [dim]vibeusage key {provider} set[/dim]",
     )
 
     console.print(Panel(instructions, title="Instructions", border_style="cyan"))
