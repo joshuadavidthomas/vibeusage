@@ -1,6 +1,7 @@
 """Provider status command for vibeusage."""
 
 import asyncio
+import time
 
 import typer
 from rich.console import Console
@@ -24,22 +25,30 @@ async def status_command(
     """Show health status for all providers."""
     console = Console()
 
+    # Get verbose/quiet from context
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
+
     try:
-        # Fetch all provider statuses
+        # Fetch all provider statuses with timing
+        start_time = time.monotonic()
         statuses = await fetch_all_statuses()
+        duration_ms = (time.monotonic() - start_time) * 1000
 
         # Check for JSON mode (from global flag or local option)
         json_mode = json_output or ctx.meta.get("json", False)
         if json_mode:
             output_json_status(statuses)
         else:
-            display_status_table(console, statuses)
+            display_status_table(console, statuses, verbose=verbose, quiet=quiet, duration_ms=duration_ms)
 
     except KeyboardInterrupt:
-        console.print("\n[yellow]Interrupted[/yellow]")
+        if not quiet:
+            console.print("\n[yellow]Interrupted[/yellow]")
         raise typer.Exit(ExitCode.GENERAL_ERROR)
     except Exception as e:
-        console.print(f"[red]Unexpected error:[/red] {e}")
+        if not quiet:
+            console.print(f"[red]Unexpected error:[/red] {e}")
         raise typer.Exit(ExitCode.GENERAL_ERROR)
     finally:
         await cleanup()
@@ -67,8 +76,17 @@ async def fetch_all_statuses():
     return statuses
 
 
-def display_status_table(console, statuses):
+def display_status_table(console, statuses, verbose: bool = False, quiet: bool = False, duration_ms: float = 0):
     """Display provider statuses in a table."""
+    from rich.text import Text
+
+    # Quiet mode: minimal output
+    if quiet:
+        for provider_id, status in statuses.items():
+            symbol = status_symbol(status.level)
+            console.print(f"{provider_id}: {symbol} {status.level.value}")
+        return
+
     table = Table(title="Provider Status", show_header=True, header_style="bold")
     table.add_column("Provider", style="cyan")
     table.add_column("Status", style="bold")
@@ -88,6 +106,10 @@ def display_status_table(console, statuses):
         )
 
     console.print(table)
+
+    # Verbose: show timing
+    if verbose and duration_ms > 0:
+        console.print(f"\n[dim]Fetched in {duration_ms:.0f}ms[/dim]")
 
 
 def output_json_status(statuses):

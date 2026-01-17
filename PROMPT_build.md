@@ -23,3 +23,29 @@
 99999999999999. If you find inconsistencies in the specs/* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 999999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Before ending: verify tests exist for modules you touched. No tests = add to @PLAN.md.
+
+<next>
+**IMPORTANT** This is your next task.
+
+The usage commands are not to spec. They should be fixed so they actually show the usage for the configured providers. Please update the @PLAN.md to note this. This is the highest priority.
+Consult the specs for how usage should be rendered.
+
+Please see @ccusage_example.py for an example of how to render the blocks similar to the spec. Launch a subagent to thoroughly investigate that file.
+
+Current output:
+➜ vibeusage
+╭────────────────────── claude Usage ──────────────────────╮
+│ CLAUDE via oauth                                         │
+│ █░░░░░░░░░░░░░░░░░░░ 5% 5-hour session • resets in 4h 5m │
+│ █████░░░░░░░░░░░░░░░ 28% 7-day period • resets in 5d 16h │
+│ ░░░░░░░░░░░░░░░░░░░░ 3% 7-day: Sonnet • resets in 6d 16h │
+╰──────────────────────────────────────────────────────────╯
+╭──────────────────── codex Usage ────────────────────╮
+│ CODEX via oauth                                     │
+│ █████░░░░░░░░░░░░░░░ 25% Session • resets in 1h 3m  │
+│ █████████░░░░░░░░░░░ 46% Weekly • resets in 16h 21m │
+│ plus plan                                           │
+╰─────────────────────────────────────────────────────╯
+
+After fixing this, please delete this block and @ccusage_example.py.
+</next>

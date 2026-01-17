@@ -41,6 +41,8 @@ def config_show_command(
     config = get_config()
     config_path = config_file()
     json_mode = ctx.meta.get("json", False)
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
 
     if json_mode:
         from vibeusage.display.json import output_json_pretty
@@ -67,9 +69,22 @@ def config_show_command(
         output_json_pretty(config_dict)
         return
 
+    # Quiet mode: minimal output
+    if quiet:
+        console.print(str(config_path))
+        return
+
     # Format as TOML
     toml_data = msgspec.toml.encode(config)
     console.print(Panel(Syntax(toml_data.decode(), "toml"), title=f"Config: {config_path}"))
+
+    # Verbose: show additional info
+    if verbose:
+        console.print(f"\n[dim]Config file location: {config_path}[/dim]")
+        if config_path.exists():
+            console.print(f"[dim]File size: {config_path.stat().st_size} bytes[/dim]")
+        else:
+            console.print("[dim]Using default configuration (file not created yet)[/dim]")
 
 
 @config_app.command("path")
@@ -83,6 +98,8 @@ def config_path_command(
     """Show directory paths used by vibeusage."""
     console = Console()
     json_mode = ctx.meta.get("json", False)
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
 
     if json_mode:
         from vibeusage.display.json import output_json_pretty
@@ -101,15 +118,35 @@ def config_path_command(
             output_json_pretty(paths)
         return
 
+    # Quiet mode: just the path, no labels
+    if quiet:
+        if cache:
+            console.print(str(cache_dir()))
+        elif credentials:
+            console.print(str(credentials_dir()))
+        else:
+            console.print(str(config_dir()))
+        return
+
+    # Verbose mode: show existence info
     if cache:
         console.print(str(cache_dir()))
+        if verbose:
+            console.print(f"[dim]Exists: {cache_dir().exists()}[/dim]")
     elif credentials:
         console.print(str(credentials_dir()))
+        if verbose:
+            console.print(f"[dim]Exists: {credentials_dir().exists()}[/dim]")
     else:
         console.print(f"Config dir:    {config_dir()}")
         console.print(f"Config file:   {config_file()}")
         console.print(f"Cache dir:     {cache_dir()}")
         console.print(f"Credentials:   {credentials_dir()}")
+        if verbose:
+            console.print("\n[dim]Directory status:[/dim]")
+            console.print(f"  Config dir exists: {config_dir().exists()}")
+            console.print(f"  Cache dir exists: {cache_dir().exists()}")
+            console.print(f"  Credentials dir exists: {credentials_dir().exists()}")
 
 
 @config_app.command("reset")

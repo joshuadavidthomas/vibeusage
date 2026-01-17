@@ -37,7 +37,9 @@ def key_callback(
 
     # Show all providers
     json_mode = ctx.meta.get("json", False)
-    display_all_credential_status(console, json_mode=json_mode)
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
+    display_all_credential_status(console, json_mode=json_mode, verbose=verbose, quiet=quiet)
 
 
 @key_app.command("set")
@@ -132,7 +134,7 @@ def key_delete_command(
             console.print(f"[yellow]No credentials found for {provider}[/yellow]")
 
 
-def display_all_credential_status(console: Console, json_mode: bool = False) -> None:
+def display_all_credential_status(console: Console, json_mode: bool = False, verbose: bool = False, quiet: bool = False) -> None:
     """Display credential status for all providers."""
     all_status = get_all_credential_status()
 
@@ -147,6 +149,13 @@ def display_all_credential_status(console: Console, json_mode: bool = False) -> 
             for provider_id, status_info in all_status.items()
         }
         output_json_pretty(data)
+        return
+
+    # Quiet mode: minimal output
+    if quiet:
+        for provider_id, status_info in all_status.items():
+            status = "configured" if status_info["has_credentials"] else "not configured"
+            console.print(f"{provider_id}: {status}")
         return
 
     table = Table(title="Credential Status", show_header=True, header_style="bold")
@@ -167,6 +176,16 @@ def display_all_credential_status(console: Console, json_mode: bool = False) -> 
     console.print(table)
     console.print("\nSet credentials with:")
     console.print("  vibeusage key set <provider>")
+
+    # Verbose: show credential paths
+    if verbose:
+        console.print("\n[bold]Credential Paths:[/bold]")
+        for provider_id in all_status.keys():
+            found, src, path = find_provider_credential(provider_id)
+            if path:
+                console.print(f"  {provider_id}: {path}")
+            else:
+                console.print(f"  {provider_id}: [dim]none[/dim]")
 
 
 def display_provider_credential_status(

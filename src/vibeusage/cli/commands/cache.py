@@ -49,6 +49,8 @@ def cache_show_command(
     config = get_config()
     stale_threshold = config.fetch.stale_threshold_minutes
     json_mode = ctx.meta.get("json", False)
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
 
     # Build cache status data
     cache_data = {}
@@ -96,6 +98,12 @@ def cache_show_command(
         output_json_pretty(cache_data)
         return
 
+    # Quiet mode: minimal output
+    if quiet:
+        for provider_id, data in cache_data.items():
+            console.print(f"{provider_id}: {data['snapshot']}")
+        return
+
     # Display table
     table = Table(title="Cache Status", show_header=True, header_style="bold")
     table.add_column("Provider", style="cyan")
@@ -130,6 +138,11 @@ def cache_show_command(
 
     console.print(table)
     console.print(f"\nCache directory: {cache_dir()}")
+
+    # Verbose: show stale threshold
+    if verbose:
+        console.print(f"\n[dim]Stale threshold: {stale_threshold} minutes[/dim]")
+        console.print(f"[dim]Snapshots older than this are considered stale.[/dim]")
 
 
 @cache_app.command("clear")

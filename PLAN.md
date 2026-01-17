@@ -42,6 +42,14 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - Test suite: 414 passing tests, 47% coverage (3 known test ordering issues in test_providers.py)
 
 **Recent Fixes** (2026-01-17):
+- **Implemented `--verbose` and `--quiet` flags across all commands**
+  - Problem: Flags were defined but had no effect on output
+  - Solution: Added full verbose/quiet support to all CLI commands (usage, status, auth, config, key, cache)
+  - Verbose mode shows: fetch timing, account identity, credential paths, model info
+  - Quiet mode suppresses: headers, tables, informational messages, setup instructions
+  - Conflict resolution: quiet takes precedence when both flags specified
+  - All commands now respect these flags for consistent UX
+
 - **Fixed multi-provider usage display to use panel-based layout per spec 05**
   - Problem: `vibeusage usage` was showing a simple summary table instead of the spec-compliant panel-based display with progress bars
   - Root cause: `display_multiple_snapshots()` was using a Table instead of Panel-based display; Rich renderable classes had `__rich_console__` methods that `return` instead of `yield`
@@ -187,10 +195,21 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - The global --json flag works for all commands
   - Tests have been updated and pass
 
-- [ ] **Implement `--verbose` and `--quiet` flags**
-  - Current: Flags accepted but no effect on output
-  - Verbose: Show diagnostic info, fetch timing, failure details
-  - Quiet: Suppress headers, tables, only show data/errors
+- [x] **Implement `--verbose` and `--quiet` flags** ✅ (2025-01-17)
+  - **Completed**: Both flags now fully functional across all commands
+  - Verbose mode shows:
+    - Fetch timing (e.g., "Fetched in 1045ms")
+    - Account identity info (email for usage)
+    - Credential paths (for auth/key commands)
+    - Model info (when applicable for usage periods)
+    - Additional diagnostic info
+  - Quiet mode suppresses:
+    - Headers, tables, borders
+    - Informational messages
+    - Setup instructions
+    - Only shows essential data/errors
+  - Conflict resolution: quiet takes precedence when both flags specified
+  - All commands respect these flags: usage, status, auth, config, key, cache
 
 - [ ] **Fix minor type issues**
   - [ ] Fix ProviderStatus factory method return type hints

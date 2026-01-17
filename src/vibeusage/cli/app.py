@@ -44,6 +44,11 @@ def main(
         typer.echo(f"vibeusage {__version__}")
         raise typer.Exit()
 
+    # Resolve conflicts: verbose and quiet are mutually exclusive, quiet takes precedence
+    if verbose and quiet:
+        quiet = True
+        verbose = False
+
     # Store options in context
     ctx.meta["json"] = json
     ctx.meta["no_color"] = no_color
@@ -57,14 +62,25 @@ def main(
 
 async def run_default_usage(ctx: typer.Context) -> None:
     """Run the default usage command."""
+    import time
+
     from rich.console import Console
     from vibeusage.cli.commands.usage import fetch_all_usage, display_multiple_snapshots
     from vibeusage.core.http import cleanup
 
     console = Console()
     refresh = False  # Default to not refresh
+
+    # Fetch with timing
+    start_time = time.monotonic()
     outcomes = await fetch_all_usage(refresh)
-    display_multiple_snapshots(console, outcomes, ctx)
+    duration_ms = (time.monotonic() - start_time) * 1000
+
+    # Get verbose/quiet from context
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
+
+    display_multiple_snapshots(console, outcomes, ctx, verbose=verbose, quiet=quiet, total_duration_ms=duration_ms)
 
     # Cleanup HTTP client
     await cleanup()

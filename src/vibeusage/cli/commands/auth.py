@@ -49,33 +49,38 @@ def auth_command(
     """
     console = Console()
 
+    # Get verbose/quiet from context
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
+
     # Check for JSON mode (from global flag or local option)
     json_mode = json_output or ctx.meta.get("json", False)
 
     # Handle --status flag (deprecated, use --all instead)
     if status:
-        auth_status_command(show_all=True, json_mode=json_mode)
+        auth_status_command(show_all=True, json_mode=json_mode, verbose=verbose, quiet=quiet)
         return
 
     # No provider - show status
     if provider is None:
-        auth_status_command(show_all=show_all, json_mode=json_mode)
+        auth_status_command(show_all=show_all, json_mode=json_mode, verbose=verbose, quiet=quiet)
         return
 
     # Validate provider
     if provider not in list_provider_ids():
-        console.print(f"[red]Unknown provider:[/red] {provider}")
-        console.print(f"Available providers: {', '.join(sorted(list_provider_ids()))}")
+        if not quiet:
+            console.print(f"[red]Unknown provider:[/red] {provider}")
+            console.print(f"Available providers: {', '.join(sorted(list_provider_ids()))}")
         raise typer.Exit(ExitCode.CONFIG_ERROR)
 
     # Provider-specific auth flows
     if provider == "claude":
-        auth_claude_command()
+        auth_claude_command(verbose=verbose, quiet=quiet)
     else:
-        auth_generic_command(provider)
+        auth_generic_command(provider, verbose=verbose, quiet=quiet)
 
 
-def auth_status_command(show_all: bool = False, json_mode: bool = False) -> None:
+def auth_status_command(show_all: bool = False, json_mode: bool = False, verbose: bool = False, quiet: bool = False) -> None:
     """Show authentication status for all providers."""
     console = Console()
 
@@ -102,6 +107,14 @@ def auth_status_command(show_all: bool = False, json_mode: bool = False) -> None
             }
 
         output_json_pretty(data)
+        return
+
+    # Quiet mode: minimal output
+    if quiet:
+        for provider_id in sorted(all_providers):
+            has_creds, source = check_provider_credentials(provider_id)
+            status = "authenticated" if has_creds else "not configured"
+            console.print(f"{provider_id}: {status}")
         return
 
     table = Table(title="Authentication Status", show_header=True, header_style="bold")
@@ -142,8 +155,18 @@ def auth_status_command(show_all: bool = False, json_mode: bool = False) -> None
         for provider_id in unconfigured:
             console.print(f"  [dim]vibeusage auth {provider_id}[/dim]")
 
+    # Verbose: show credential paths
+    if verbose:
+        console.print("\n[bold]Credential Paths:[/bold]")
+        for provider_id in sorted(all_providers):
+            _, _, cred_path = find_provider_credential(provider_id)
+            if cred_path:
+                console.print(f"  {provider_id}: {cred_path}")
+            else:
+                console.print(f"  {provider_id}: [dim]none[/dim]")
 
-def auth_claude_command(session_key: str | None = None) -> None:
+
+def auth_claude_command(session_key: str | None = None, verbose: bool = False, quiet: bool = False) -> None:
     """Authenticate with Claude using a session key.
 
     The session key can be found in browser cookies at claude.ai.
@@ -153,12 +176,13 @@ def auth_claude_command(session_key: str | None = None) -> None:
 
     # Show instructions if no session key provided
     if session_key is None:
-        _show_claude_auth_instructions(console)
+        _show_claude_auth_instructions(console, quiet=quiet)
         session_key = typer.prompt("Session key", hide_input=True)
 
     # Validate session key format
     if not session_key.startswith("sk-ant-sid01-"):
-        console.print("[yellow]Warning:[/yellow] Session key doesn't match expected format (sk-ant-sid01-...)")
+        if not quiet:
+            console.print("[yellow]Warning:[/yellow] Session key doesn't match expected format (sk-ant-sid01-...)")
         if not typer.confirm("Save anyway?"):
             raise typer.Exit(ExitCode.AUTH_ERROR)
 
@@ -169,20 +193,25 @@ def auth_claude_command(session_key: str | None = None) -> None:
 
     try:
         write_credential(cred_path, content)
-        console.print("[green]Success:[/green] Claude session key saved")
-        console.print(f"  Location: {cred_path}")
+        if not quiet:
+            console.print("[green]Success:[/green] Claude session key saved")
+            console.print(f"  Location: {cred_path}")
+        if verbose:
+            console.print(f"[dim]Session key prefix: {session_key[:20]}...[/dim]")
     except Exception as e:
-        console.print(f"[red]Error saving credential:[/red] {e}")
+        if not quiet:
+            console.print(f"[red]Error saving credential:[/red] {e}")
         raise typer.Exit(ExitCode.GENERAL_ERROR)
 
 
-def auth_generic_command(provider: str) -> None:
+def auth_generic_command(provider: str, verbose: bool = False, quiet: bool = False) -> None:
     """Generic auth handler for providers without specific auth flows."""
     console = Console()
 
     if provider not in list_provider_ids():
-        console.print(f"[red]Unknown provider:[/red] {provider}")
-        console.print(f"Available providers: {', '.join(sorted(list_provider_ids()))}")
+        if not quiet:
+            console.print(f"[red]Unknown provider:[/red] {provider}")
+            console.print(f"Available providers: {', '.join(sorted(list_provider_ids()))}")
         raise typer.Exit(ExitCode.CONFIG_ERROR)
 
     # Check if already authenticated
@@ -194,19 +223,23 @@ def auth_generic_command(provider: str) -> None:
             "provider_cli": "provider CLI",
             "env": "environment variable",
         }.get(source or "", source or "unknown")
-        console.print(f"[green]✓[/green] {provider} is already authenticated ({source_label})")
+        if not quiet:
+            console.print(f"[green]✓[/green] {provider} is already authenticated ({source_label})")
 
-        _, _, cred_path = find_provider_credential(provider)
-        if cred_path:
-            console.print(f"  Location: {cred_path}")
+        if verbose:
+            _, _, cred_path = find_provider_credential(provider)
+            if cred_path:
+                console.print(f"  Location: {cred_path}")
         return
 
     # Show provider-specific instructions
-    _show_provider_auth_instructions(console, provider)
+    _show_provider_auth_instructions(console, provider, quiet=quiet)
 
 
-def _show_claude_auth_instructions(console: Console) -> None:
+def _show_claude_auth_instructions(console: Console, quiet: bool = False) -> None:
     """Display instructions for getting Claude session key."""
+    if quiet:
+        return
     instructions = Panel(
         """[bold cyan]Claude Authentication[/bold cyan]
 
@@ -225,8 +258,10 @@ Get your session key from claude.ai:
     console.print(instructions)
 
 
-def _show_provider_auth_instructions(console: Console, provider: str) -> None:
+def _show_provider_auth_instructions(console: Console, provider: str, quiet: bool = False) -> None:
     """Display auth instructions for providers without specific flows."""
+    if quiet:
+        return
     instructions_map = {
         "codex": """[bold cyan]Codex (ChatGPT) Authentication[/bold cyan]
 

@@ -1,9 +1,11 @@
 """Usage display commands for vibeusage."""
 
 import asyncio
+import time
 
 import typer
 from rich.console import Console
+from rich.text import Text
 
 from vibeusage.cli.app import app, ExitCode
 from vibeusage.config.settings import get_config
@@ -41,28 +43,47 @@ async def usage_command(
 
     # Check for JSON mode (from global flag or local option)
     json_mode = json_output or ctx.meta.get("json", False)
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
 
     try:
         if provider:
             # Single provider
+            start_time = time.monotonic()
             result = await fetch_provider_usage(provider, refresh)
+            duration_ms = (time.monotonic() - start_time) * 1000
+
             if json_mode:
                 output_single_provider_json(result)
             elif result.success:
-                display_snapshot(console, result.snapshot, result.source, result.cached)
+                display_snapshot(
+                    console,
+                    result.snapshot,
+                    result.source,
+                    result.cached,
+                    verbose=verbose,
+                    quiet=quiet,
+                    duration_ms=duration_ms,
+                )
             else:
-                console.print(f"[red]Error:[/red] {result.error}")
+                if not quiet:
+                    console.print(f"[red]Error:[/red] {result.error}")
                 raise typer.Exit(ExitCode.GENERAL_ERROR)
         else:
             # All enabled providers
+            start_time = time.monotonic()
             results = await fetch_all_usage(refresh)
-            display_multiple_snapshots(console, results, ctx, json_mode)
+            duration_ms = (time.monotonic() - start_time) * 1000
+
+            display_multiple_snapshots(console, results, ctx, json_mode, verbose=verbose, quiet=quiet, total_duration_ms=duration_ms)
 
     except KeyboardInterrupt:
-        console.print("\n[yellow]Interrupted[/yellow]")
+        if not quiet:
+            console.print("\n[yellow]Interrupted[/yellow]")
         raise typer.Exit(ExitCode.GENERAL_ERROR)
     except Exception as e:
-        console.print(f"[red]Unexpected error:[/red] {e}")
+        if not quiet:
+            console.print(f"[red]Unexpected error:[/red] {e}")
         raise typer.Exit(ExitCode.GENERAL_ERROR)
     finally:
         await cleanup()
@@ -113,10 +134,16 @@ async def fetch_all_usage(refresh: bool):
     return outcomes
 
 
-def display_snapshot(console, snapshot, source, cached):
+def display_snapshot(console, snapshot, source, cached, verbose: bool = False, quiet: bool = False, duration_ms: float = 0):
     """Display a single usage snapshot."""
     from rich.panel import Panel
     from rich.text import Text
+
+    # In quiet mode, show minimal output
+    if quiet:
+        for period in snapshot.periods:
+            console.print(f"{snapshot.provider} {period.name}: {period.utilization}%")
+        return
 
     # Build output
     lines = []
@@ -129,9 +156,16 @@ def display_snapshot(console, snapshot, source, cached):
     header.append(f"via {source}", style="dim")
     lines.append(header)
 
+    # Verbose: add timing and source info
+    if verbose:
+        if duration_ms > 0:
+            lines.append(Text(f"Fetched in {duration_ms:.0f}ms", style="dim"))
+        if snapshot.identity and snapshot.identity.email:
+            lines.append(Text(f"Account: {snapshot.identity.email}", style="dim"))
+
     # Periods
     for period in snapshot.periods:
-        period_text = format_period(period)
+        period_text = format_period(period, verbose=verbose)
         lines.append(period_text)
 
     # Overage
@@ -237,7 +271,7 @@ def output_json_usage(outcomes: dict) -> None:
     output_json_pretty(data)
 
 
-def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = None, json_mode: bool = False):
+def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = None, json_mode: bool = False, verbose: bool = False, quiet: bool = False, total_duration_ms: float = 0):
     """Display multiple provider outcomes using panel-based layout per spec."""
     # Check for JSON mode (from parameter or context)
     if json_mode or (ctx and ctx.meta.get("json")):
@@ -248,38 +282,57 @@ def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = No
     has_data = any(o.success and o.snapshot for o in outcomes.values())
 
     if not has_data:
-        console.print("[yellow]No usage data available[/yellow]")
-        console.print("\nConfigure credentials with:")
-        console.print("  vibeusage key <provider> set")
+        if not quiet:
+            console.print("[yellow]No usage data available[/yellow]")
+            console.print("\nConfigure credentials with:")
+            console.print("  vibeusage key <provider> set")
         return
 
-    # Import UsageDisplay for panel-based display
-    from vibeusage.cli.display import UsageDisplay
+    # Import ProviderPanel for spec-compliant panel-based display
+    from vibeusage.cli.display import ProviderPanel
 
     errors = []
 
     for provider_id, outcome in outcomes.items():
         if outcome.success and outcome.snapshot:
-            # Create and print display for this provider
-            display = UsageDisplay(
-                outcome.snapshot,
-                cached=outcome.cached,
-            )
-            console.print(display)
+            # Quiet mode: minimal output
+            if quiet:
+                for period in outcome.snapshot.periods:
+                    console.print(f"{provider_id} {period.name}: {period.utilization}%")
+            else:
+                # Create and print provider panel for this provider
+                panel = ProviderPanel(
+                    outcome.snapshot,
+                    cached=outcome.cached,
+                )
+                console.print(panel)
+
+                # Verbose: add timing and source info per provider
+                if verbose:
+                    if outcome.attempts:
+                        duration = sum(a.duration_ms for a in outcome.attempts)
+                        console.print(Text(f"Fetched in {duration:.0f}ms via {outcome.source}", style="dim"))
         else:
             # Track errors for verbose output
             if outcome.error:
                 errors.append((provider_id, outcome.error))
 
-    # Show errors if verbose or if all providers failed
-    if (ctx and ctx.meta.get("verbose")) or (not has_data and errors):
+    # Verbose: show total fetch time and errors
+    if verbose and not quiet:
+        if total_duration_ms > 0:
+            console.print(f"\n[dim]Total fetch time: {total_duration_ms:.0f}ms[/dim]")
         if errors:
             console.print("\n[red]Errors:[/red]")
             for provider_id, error in errors:
                 console.print(f"  {provider_id}: {error}")
+    # Show errors if all providers failed (even without verbose)
+    elif not has_data and errors and not quiet:
+        console.print("\n[red]Errors:[/red]")
+        for provider_id, error in errors:
+            console.print(f"  {provider_id}: {error}")
 
 
-def format_period(period):
+def format_period(period, verbose: bool = False):
     """Format a usage period for display."""
     from rich.text import Text
 
@@ -296,6 +349,10 @@ def format_period(period):
     text.append(f"{bar} ", style=color)
     text.append(f"{period.utilization}% ", style="bold")
     text.append(period.name, style="dim")
+
+    # Verbose: show model info
+    if verbose and period.model:
+        text.append(f" ({period.model})", style="dim")
 
     # Reset time
     if period.resets_at:

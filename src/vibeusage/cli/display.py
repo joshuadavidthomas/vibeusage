@@ -93,43 +93,64 @@ class ProviderPanel:
         self.show_age = show_age
 
     def __rich_console__(self, console: Console, options: dict) -> RenderableType:
-        """Render the provider panel."""
-        lines = []
+        """Render the provider panel using grid layout per spec."""
+        # Create a grid with 3 columns: period name, bar+percentage, reset time
+        grid = Table.grid(padding=(0, 2))
+        grid.add_column(justify="left")  # Period name
+        grid.add_column(justify="left")  # Bar + percentage
+        grid.add_column(justify="right")  # Reset time
 
-        # Title line
-        title = Text()
-        title.append(f"{self.snapshot.provider.upper()} ", style="bold cyan")
-
-        if self.cached:
-            title.append("(cached)", style="yellow")
-
-        if self.show_age:
-            age = self._get_age()
-            if age:
-                title.append(f" • {age} old", style="dim")
-
-        lines.append(title)
-
-        # Periods
+        # Add periods
         for period in self.snapshot.periods:
-            period_text = format_period(period)
-            lines.append(period_text)
+            # Format per spec: "Name  bar  percentage%    resets in time"
+            grid.add_row(
+                Text(period.name, style="bold"),
+                self._format_bar_and_percentage(period),
+                self._format_reset_time(period),
+            )
 
-        # Overage
+        # Add overage if enabled
         if self.snapshot.overage and self.snapshot.overage.is_enabled:
             overage = self.snapshot.overage
-            overage_text = format_overage_used(overage.used, overage.limit, overage.currency)
-            lines.append(overage_text)
+            overage_text = Text()
+            symbol = "$" if overage.currency == "USD" else ""
+            overage_text.append(f"Extra Usage: {symbol}{overage.used:.2f} / {symbol}{overage.limit:.2f} {overage.currency}")
+            grid.add_row(
+                overage_text,
+                Text(),
+                Text(),
+            )
 
-        yield Panel.fit(
-            "\n".join(str(line) for line in lines),
-            border_style="cyan" if not self.cached else "yellow",
+        # Create panel with provider name as title
+        title = f"─ {self.snapshot.provider.title()} ─"
+        yield Panel(
+            grid,
+            title=title,
+            border_style="dim",
+            padding=(0, 1),
         )
 
-    def _get_age(self) -> str | None:
-        """Calculate human-readable age of snapshot."""
-        age = datetime.now(self.snapshot.fetched_at.tzinfo) - self.snapshot.fetched_at
-        return format_timedelta(age)
+    def _format_bar_and_percentage(self, period) -> Text:
+        """Format the progress bar and percentage column."""
+        from vibeusage.display.rich import render_usage_bar
+        from vibeusage.models import pace_to_color
+
+        text = Text()
+        pace_ratio = period.pace_ratio() if hasattr(period, 'pace_ratio') else None
+        color = pace_to_color(pace_ratio, period.utilization)
+        bar = render_usage_bar(period.utilization, color=color)
+        text.append_text(bar)
+        text.append(f" {period.utilization}%", style=color)
+        return text
+
+    def _format_reset_time(self, period) -> Text:
+        """Format the reset time column."""
+        text = Text()
+        time_until = period.time_until_reset() if hasattr(period, 'time_until_reset') else None
+        if time_until is not None:
+            time_str = format_reset_countdown(time_until)
+            text.append(f"resets in {time_str}", style="dim")
+        return text
 
 
 class ErrorDisplay:
