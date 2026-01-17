@@ -26,6 +26,20 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Test suite (414 passing tests, 47% coverage, 3 test ordering issues in test_providers.py)
 
+**Investigation** (2026-01-16):
+- **Usage command "No usage data available" investigation**
+  - Issue: User reported `vibeusage` and `vibeusage usage` showing "No usage data available"
+  - Investigation results:
+    1. Commands are working correctly when credentials are available (Claude CLI, Codex CLI credentials)
+    2. The "No usage data available" message is shown when:
+       - No cached data exists in `~/.cache/vibeusage/snapshots/`
+       - No provider credentials are available (no CLI credentials, no vibeusage credentials)
+    3. This is the CORRECT behavior for first-time users or when credentials haven't been configured
+    4. The message includes helpful instructions: `vibeusage key <provider> set`
+  - Root cause of user's issue: Likely first-run scenario before credentials were configured
+  - Verification: `vibeusage usage` works correctly (< 1s) when credentials exist
+  - Test suite: 414 passing tests, 47% coverage (3 known test ordering issues in test_providers.py)
+
 **Recent Fixes** (2026-01-17):
 - **Fixed multi-provider usage display to use panel-based layout per spec 05**
   - Problem: `vibeusage usage` was showing a simple summary table instead of the spec-compliant panel-based display with progress bars
