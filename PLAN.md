@@ -25,7 +25,10 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
-- ✓ Test suite (455 passing tests, 45% coverage, 3 test ordering issues in test_providers.py)
+- ✓ Test suite (455 passing tests, 47% coverage, 3 test ordering issues in test_providers.py)
+- ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
+- ✓ SingleProviderDisplay with title+separator format per spec 05
+- ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
 
 ---
 
