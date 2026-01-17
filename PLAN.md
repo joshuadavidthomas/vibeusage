@@ -27,12 +27,15 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Test suite (403 passing tests, 47% coverage)
 
 **Recent Fixes** (2025-01-17):
+- **Implemented `--json` flag for all commands** - Full JSON support across all commands
+  - `usage`, `status`, `auth`, `key`, `cache`, `config` commands all support JSON output
+  - Both `--json` flag before and after command name work (e.g., `--json usage` and `usage --json`)
+  - Added `output_single_provider_json()` function for single provider usage
+  - Fixed config.py JSON output to use correct attribute names
+  - Added 8 new tests for JSON functionality in tests/cli/test_json_commands.py
 - CLI command audit completed - all commands tested
 - Confirmed `vibeusage usage` is working (typer.get_context() fix successful)
-- **Implemented `--json` flag for default command** - `vibeusage --json` now outputs JSON
-- Added `output_json_usage()` and `output_single_provider_json()` functions
-- Added 4 new tests for JSON output functionality
-- Updated test count: 403 passing tests, 3 test ordering issues remain, coverage increased to 47%
+- Updated test count: 411 passing tests (403 + 8 new), 3 test ordering issues remain, coverage ~47%
 
 **Recent Fixes** (2025-01-16):
 - Fixed File I/O type issue in _save_to_toml(): use binary mode 'wb' instead of 'w'
@@ -50,16 +53,18 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - Fixed with_retry to accept callable that returns coroutine for retries
 - Reduced test failures from 38 to 3 (only test ordering issues remain)
 
-## CLI Command Testing Results (2026-01-17)
+## CLI Command Testing Results (2025-01-17)
 
 ### WORKING Commands (✓)
 
 **Core Commands:**
 - `vibeusage --help` - Shows all commands correctly ✓
 - `vibeusage` (default) - Shows "No usage data available" message ✓
+- `vibeusage --json` - JSON output works ✓
 - `vibeusage --version` - Shows "vibeusage 0.1.0" ✓
 - `vibeusage --no-color` - Works (disables color output) ✓
-- `vibeusage usage` - NOW WORKS (was broken in earlier notes) ✓
+- `vibeusage usage` - Works ✓
+- `vibeusage usage --json` - JSON output works ✓
 - `vibeusage usage --refresh` - Works ✓
 
 **Provider-Specific Usage (Expected Behavior):**
@@ -70,32 +75,27 @@ A CLI application to track usage stats from all LLM providers to understand sess
 **Status & Auth Commands:**
 - `vibeusage status` - Shows provider status table ✓
 - `vibeusage status --json` - JSON output works ✓
+- `vibeusage --json status` - JSON output works ✓
 - `vibeusage auth` - Shows auth status table ✓
+- `vibeusage auth --json` - JSON output works ✓
+- `vibeusage --json auth` - JSON output works ✓
 - `vibeusage auth claude` - Interactive auth flow works (hangs waiting for input - expected) ✓
 
 **Cache Commands:**
 - `vibeusage cache show` - Shows cache status table ✓
+- `vibeusage --json cache show` - JSON output works ✓
 - `vibeusage cache clear` - Clears cache ✓
 
 **Config Commands:**
 - `vibeusage config show` - Shows config file contents ✓
+- `vibeusage --json config show` - JSON output works ✓
 - `vibeusage config path` - Shows config/cache/credentials directory paths ✓
+- `vibeusage --json config path` - JSON output works ✓
 
 **Key Commands:**
 - `vibeusage key` - Shows credential status for all providers ✓
-- `vibeusage key <provider>` - Shows credential status for specific provider ✓
-
-### MINOR Issues
-
-**1. `--json` flag not working on default command:**
-- `vibeusage --json` - Does NOT output JSON (only plain text) ⚠️
-- Expected: Output JSON for the default command
-- Actual: The global --json flag doesn't affect the default command output
-
-**2. `--json` flag NOT supported on auth command:**
-- `vibeusage auth --json` - NOT SUPPORTED ⚠️
-- The auth command doesn't accept the --json flag despite earlier plans saying it should
-- Workaround: Use other auth commands without JSON output
+- `vibeusage --json key` - JSON output works ✓
+- `vibeusage key set <provider>` - Sets credential for provider ✓
 
 ### NOT IMPLEMENTED (Expected)
 

@@ -48,12 +48,19 @@ def config_show_command(
         # Convert Config to dict for JSON output
         config_dict = {
             "fetch": {
-                "timeout_seconds": config.fetch.timeout_seconds,
+                "timeout": config.fetch.timeout,
                 "stale_threshold_minutes": config.fetch.stale_threshold_minutes,
-                "concurrent_limit": config.fetch.concurrent_limit,
+                "max_concurrent": config.fetch.max_concurrent,
             },
-            "providers": {
-                "enabled": list(config.providers.enabled) if config.providers.enabled else [],
+            "enabled_providers": config.enabled_providers,
+            "display": {
+                "show_remaining": config.display.show_remaining,
+                "pace_colors": config.display.pace_colors,
+                "reset_format": config.display.reset_format,
+            },
+            "credentials": {
+                "use_keyring": config.credentials.use_keyring,
+                "reuse_provider_credentials": config.credentials.reuse_provider_credentials,
             },
             "path": str(config_path),
         }
