@@ -37,6 +37,15 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-17: Documentation (Priority 8) ✅ COMPLETED
+- **Added comprehensive user documentation**
+  - README.md with installation, quick start, provider setup, command reference, troubleshooting
+  - Provider-specific setup guides (docs/providers/claude.md, codex.md, copilot.md, cursor.md, gemini.md)
+  - Configuration reference (docs/config.md) with all options and environment variables
+  - Each provider doc includes authentication methods, credential storage, troubleshooting
+  - Configuration reference covers display, fetch, credential settings, and provider-specific options
+- All 724 tests pass (61% coverage)
+
 ### 2026-01-16: Usage Command Tests (Priority 7)
 - **Added 39 comprehensive tests for CLI usage commands (tests/cli/test_usage_commands.py)**
   - Tests for usage_command (main entry point) with single/multiple provider paths
@@ -364,13 +373,13 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ---
 
-### Priority 8: Documentation
-**Goal**: Enable users to install, configure, and use vibeusage effectively
+### Priority 8: Documentation ✅ COMPLETED
 
-- [ ] README.md (installation, quick start, troubleshooting)
-- [ ] Provider setup docs (docs/providers/*.md)
-- [ ] Config reference (docs/config.md)
-- [ ] Update AGENTS.md with test/lint/typecheck commands
+**Completed**:
+- [x] README.md (installation, quick start, troubleshooting, command reference)
+- [x] Provider setup docs (docs/providers/claude.md, codex.md, copilot.md, cursor.md, gemini.md)
+- [x] Config reference (docs/config.md with all configuration options)
+- [x] AGENTS.md already contains test/lint/typecheck commands
 
 **Value**: Medium - Important for adoption
 

@@ -529,7 +529,7 @@ class TestGeminiStatus:
 
         incidents = [
             {
-                "title": "Vertex API latency",
+                "title": "Vertex AI service degradation",
                 "severity": "critical",
             },
         ]
