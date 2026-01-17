@@ -28,7 +28,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (512 passing tests, 49% coverage)
+- ✓ Test suite (543 passing tests, 51% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -36,6 +36,14 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ## Recent Fixes
+
+### 2026-01-16: Stale Warning Config Threshold Fix
+- **Fixed stale warnings to use configured threshold instead of hardcoded value**
+  - Changed `display_snapshot()` and `display_multiple_snapshots()` to read `stale_threshold_minutes` from config
+  - Previous implementation used hardcoded 10-minute threshold instead of configured 60-minute default
+  - Added blank line after stale warning for better readability
+  - Fixed type annotation: use `collections.abc.Callable` instead of bare `callable`
+  - Fixed FetchOutcome error type: use `str` instead of `Exception`
 
 ### 2026-01-16: Progress Module Tests & Type Fixes
 - **Added comprehensive test suite for cli/progress.py (31 new tests, 100% coverage)**
@@ -277,8 +285,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
 #### User Experience Improvements
 - [x] Progress indicators (spinners during fetches)
 - [ ] First-run experience wizard
-- [x] Stale data display warnings
-- [ ] Offline mode and graceful degradation
+- [x] Stale data display warnings (with configurable threshold)
+- [x] Offline mode and graceful degradation (automatic cache fallback)
 
 #### JSON Output Enhancement
 - [x] ErrorResponse struct for JSON error output
@@ -289,7 +297,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ### Priority 7: Test Suite
-**Status**: MOSTLY COMPLETE (50% coverage, 512 passing tests, 0 test ordering issues)
+**Status**: MOSTLY COMPLETE (51% coverage, 543 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)
