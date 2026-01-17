@@ -123,10 +123,10 @@ A CLI application to track usage stats from all LLM providers to understand sess
 **Goal**: Fix remaining interface issues and polish UX
 
 **Remaining Issues:**
-- [ ] **Fix `key set` command interface**
-  - Issue: `vibeusage key set --help` shows parent `key` group help instead of `set` subcommand help
-  - The key group has optional provider arg, and set command has required provider arg
-  - This creates confusion for users trying to understand the command
+- [x] **Fix `key set` command interface**
+  - Fixed: Command now accepts provider as a direct argument
+  - `vibeusage key set claude` works correctly
+  - Resolved help display confusion between key group and set subcommand
 
 - [ ] **Implement `--json` flag for default command**
   - Current: `vibeusage --json` does NOT output JSON (only plain text)
