@@ -68,3 +68,23 @@ class ATyper(typer.Typer):
             return typer.Typer.command(self, name, **kwargs)(f)
 
         return decorator
+
+    def group(
+        self,
+        name: str | None = None,
+        *,
+        help: str | None = None,  # noqa: A002
+        **kwargs: Any,
+    ) -> "ATyper":
+        """Create a nested command group with async support.
+
+        Returns a new ATyper instance that can be used to define subcommands.
+        """
+        if help is not None:
+            kwargs["help"] = help
+        # Create new ATyper instance for the group
+        group_app = ATyper(**kwargs)
+        # Register it as a command with this app
+        if name is not None:
+            self.add_typer(group_app, name=name)
+        return group_app

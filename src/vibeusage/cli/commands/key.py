@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.table import Table
 
 from vibeusage.cli.app import app, ExitCode
+from vibeusage.cli.atyper import ATyper
 from vibeusage.config.credentials import (
     check_provider_credentials,
     credential_path,
@@ -15,16 +16,27 @@ from vibeusage.config.credentials import (
 )
 from vibeusage.providers import list_provider_ids
 
+# Create key group
+key_app = ATyper(help="Manage credentials for providers.")
 
-@app.command("key")
-def key_command(
+
+@key_app.callback(invoke_without_command=True)
+def key_callback(
+    ctx: typer.Context,
     provider: str = typer.Argument(
         None,
-        help="Provider to manage keys for",
+        help="Provider to show credentials for",
     ),
 ) -> None:
-    """Show credential status for all providers or a specific provider."""
+    """Show credential status for all providers or a specific provider.
+
+    If no subcommand is provided, shows credential status.
+    """
     console = Console()
+
+    # If a subcommand was invoked, don't run the default behavior
+    if ctx.invoked_subcommand is not None:
+        return
 
     if provider is None:
         # Show all providers
@@ -40,7 +52,7 @@ def key_command(
         display_provider_credential_status(console, provider, has_creds, source)
 
 
-@app.command("key-set")
+@key_app.command("set")
 def key_set_command(
     provider: str = typer.Argument(
         ...,
@@ -83,7 +95,7 @@ def key_set_command(
         raise typer.Exit(ExitCode.GENERAL_ERROR)
 
 
-@app.command("key-delete")
+@key_app.command("delete")
 def key_delete_command(
     provider: str = typer.Argument(
         ...,
@@ -153,7 +165,7 @@ def display_all_credential_status(console: Console) -> None:
 
     console.print(table)
     console.print("\nSet credentials with:")
-    console.print("  vibeusage key <provider> set")
+    console.print("  vibeusage key set <provider>")
 
 
 def display_provider_credential_status(
@@ -179,4 +191,8 @@ def display_provider_credential_status(
     else:
         console.print(f"[yellow]✗[/yellow] {provider_id} not configured")
         console.print("\nSet credentials with:")
-        console.print(f"  vibeusage key {provider_id} set")
+        console.print(f"  vibeusage key set {provider_id}")
+
+
+# Register the key group with the main app
+app.add_typer(key_app, name="key")

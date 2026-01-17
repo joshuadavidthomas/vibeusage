@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from vibeusage.cli.app import app, ExitCode
+from vibeusage.cli.atyper import ATyper
 from vibeusage.config.cache import (
     cache_org_id,
     cache_snapshot,
@@ -22,8 +23,11 @@ from vibeusage.config.paths import cache_dir, snapshots_dir
 from vibeusage.config.settings import get_config
 from vibeusage.providers import list_provider_ids
 
+# Create cache group
+cache_app = ATyper(help="Manage cached usage data.")
 
-@app.command("cache-show")
+
+@cache_app.command("show")
 def cache_show_command() -> None:
     """Show cache status per provider."""
     console = Console()
@@ -82,7 +86,7 @@ def cache_show_command() -> None:
     console.print(f"\nCache directory: {cache_dir()}")
 
 
-@app.command("cache-clear")
+@cache_app.command("clear")
 def cache_clear_command(
     provider: str = typer.Argument(
         None,
@@ -118,3 +122,7 @@ def cache_clear_command(
         else:
             clear_provider_cache(provider)
             console.print(f"[green]✓[/green] Cleared cache for {provider}")
+
+
+# Register the cache group with the main app
+app.add_typer(cache_app, name="cache")

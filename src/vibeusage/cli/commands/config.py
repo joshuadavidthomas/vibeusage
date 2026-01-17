@@ -10,11 +10,15 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 
 from vibeusage.cli.app import app, ExitCode
+from vibeusage.cli.atyper import ATyper
 from vibeusage.config.paths import cache_dir, config_dir, config_file, credentials_dir
 from vibeusage.config.settings import Config, get_config
 
+# Create config group
+config_app = ATyper(help="Manage configuration settings.")
 
-@app.command("config-show")
+
+@config_app.command("show")
 def config_show_command() -> None:
     """Display current settings."""
     console = Console()
@@ -29,7 +33,7 @@ def config_show_command() -> None:
     console.print(Panel(Syntax(toml_data.decode(), "toml"), title=f"Config: {config_path}"))
 
 
-@app.command("config-path")
+@config_app.command("path")
 def config_path_command(
     cache: bool = typer.Option(False, "--cache", "-c", help="Show cache directory"),
     credentials: bool = typer.Option(
@@ -50,7 +54,7 @@ def config_path_command(
         console.print(f"Credentials:   {credentials_dir()}")
 
 
-@app.command("config-reset")
+@config_app.command("reset")
 def config_reset_command(
     confirm: bool = typer.Option(
         False,
@@ -82,7 +86,7 @@ def config_reset_command(
         console.print("[yellow]No custom configuration to reset[/yellow]")
 
 
-@app.command("config-edit")
+@config_app.command("edit")
 def config_edit_command() -> None:
     """Open configuration in editor."""
     console = Console()
@@ -116,3 +120,7 @@ def config_edit_command() -> None:
         console.print(f"[red]Editor not found: {editor}[/red]")
         console.print("Set EDITOR environment variable to your preferred editor")
         raise typer.Exit(ExitCode.CONFIG_ERROR)
+
+
+# Register the config group with the main app
+app.add_typer(config_app, name="config")

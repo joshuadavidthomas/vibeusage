@@ -77,17 +77,17 @@ def run_app() -> None:
 
 # Import commands to register them with the app
 # These imports must come after app is defined
+# Note: key, config, and cache groups register themselves via add_typer()
 from vibeusage.cli.commands import (
-    cache_clear_command,
-    cache_show_command,
-    config_edit_command,
-    config_path_command,
-    config_reset_command,
-    config_show_command,
-    key_command,
-    key_delete_command,
-    key_set_command,
     status_command,
     usage_command,
 )  # noqa: E402,F401
-from vibeusage.cli.commands.auth import auth_command  # noqa: E402,F401
+from vibeusage.cli.commands import (
+    auth_command,
+)  # noqa: E402,F401
+# Import key, config, cache modules to trigger their self-registration
+from vibeusage.cli.commands import (
+    cache,
+    config,
+    key,
+)  # noqa: E402,F401
