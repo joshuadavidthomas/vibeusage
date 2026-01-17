@@ -6,6 +6,7 @@ import json
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+from pathlib import Path  # noqa: F401 - used by tests for patching
 
 from vibeusage.config.credentials import read_credential
 from vibeusage.config.credentials import write_credential

@@ -23,11 +23,3 @@
 99999999999999. If you find inconsistencies in the specs/* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 999999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Before ending: verify tests exist for modules you touched. No tests = add to @PLAN.md.
-
-<next>
-**IMPORTANT** This is your next task.
-
-Linting has not been run in a while. Please run `uvx ruff check` and fix the errors.
-
-Once you are finished, please delete this <next> block.
-</next>
