@@ -9,7 +9,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Current Status
 
-**Implementation State**: Phase 0-4 complete (Claude MVP functional), Phase 5-6 in progress
+**Implementation State**: Phase 0-4 complete (Claude MVP functional), Phase 5-6 in progress (Claude, Codex, Copilot providers implemented)
 
 **Completed** (100% functional):
 - ✓ Phase 0: Project setup (dependencies, structure, entry points)
@@ -23,7 +23,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Error messages (errors/messages.py with provider templates)
 - ✓ Provider registry and base protocol
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
-- ✓ Test suite (328 passing tests, 45% coverage)
+- ✓ Copilot provider (device flow OAuth strategy, status polling)
+- ✓ Test suite (359 passing tests, 45% coverage)
 
 **Recent Fixes** (v0.0.1):
 - Created missing `errors/classify.py` module
@@ -33,9 +34,11 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - Implemented `errors/messages.py` with AUTH_ERROR_TEMPLATES for 5 providers
 - Implemented `errors/http.py` with handle_http_request() retry logic
 - Implemented `errors/network.py` with network error classification
+- Implemented `providers/codex/` with OAuth strategy (25 tests)
+- Implemented `providers/copilot/` with device flow OAuth strategy (31 tests)
 - Implemented `tests/` suite with pytest infrastructure
-  - 303 passing tests covering models, errors, config, display, core, CLI, and providers
-  - 44% code coverage with pytest-cov
+  - 359 passing tests covering models, errors, config, display, core, CLI, and providers
+  - 45% code coverage with pytest-cov
   - Comprehensive fixtures in conftest.py
   - Tests organized by module (unit, integration, CLI, error scenarios)
 
@@ -43,7 +46,6 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ⚠️ auth/base.py: Base classes only - concrete strategies implemented in provider modules
 
 **NOT Implemented** (blocking full release):
-- ❌ providers/copilot/ - Entire provider (device flow strategy)
 - ❌ providers/cursor/ - Entire provider (web strategy)
 - ❌ providers/gemini/ - Entire provider (OAuth strategy)
 
@@ -122,30 +124,34 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ---
 
-### Priority 3: Copilot Provider
+### Priority 3: Copilot Provider ✅ COMPLETED
 **Goal**: Add GitHub Copilot support for developers
 
-- [ ] **Create provider module** (providers/copilot/)
-  - [ ] `__init__.py` - CopilotProvider with metadata
-    - [ ] status_url="https://www.githubstatus.com"
-    - [ ] dashboard_url="https://github.com/settings/copilot"
-  - [ ] `device_flow.py` - CopilotDeviceFlowStrategy
-    - [ ] Client ID: `Iv1.b507a08c87ecfe98` (VS Code client ID)
-    - [ ] Scope: `read:user`
-    - [ ] Device code endpoint + token polling
-    - [ ] Usage endpoint: `GET https://api.github.com/copilot_internal/user`
-    - [ ] Parse: premium_interactions, chat quotas (MONTHLY periods)
-    - [ ] Map to UsageSnapshot
+- [x] **Create provider module** (providers/copilot/)
+  - [x] `__init__.py` - CopilotProvider with metadata
+    - [x] status_url="https://www.githubstatus.com"
+    - [x] dashboard_url="https://github.com/settings/copilot"
+  - [x] `device_flow.py` - CopilotDeviceFlowStrategy
+    - [x] Client ID: `Iv1.b507a08c87ecfe98` (VS Code client ID)
+    - [x] Scope: `read:user`
+    - [x] Device code endpoint + token polling
+    - [x] Usage endpoint: `GET https://api.github.com/copilot_internal/user`
+    - [x] Parse: premium_interactions, chat quotas (MONTHLY periods)
+    - [x] Map to UsageSnapshot
 
-- [ ] **Add auth support**
-  - [ ] GitHub device flow in auth command
-  - [ ] Spinner/polling UI during auth
-  - [ ] Credential storage
+- [x] **Add auth support**
+  - [x] GitHub device flow in auth command
+  - [x] Spinner/polling UI during auth
+  - [x] Credential storage
 
-- [ ] **Register and test**
-  - [ ] Add to provider registry
-  - [ ] Test `vibeusage copilot` command
-  - [ ] Verify auth flow completes
+- [x] **Register and test**
+  - [x] Add to provider registry
+  - [x] Test `vibeusage copilot` command
+  - [x] Verify auth flow completes
+
+**Completed**: 2025-01-16
+
+- 31 tests added for Copilot provider (tests/providers/test_copilot.py)
 
 **Value**: Medium-High - Popular developer tool
 
@@ -290,7 +296,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ### Priority 7: Test Suite
 **Goal**: Ensure reliability and prevent regressions
 
-#### Status: IN PROGRESS (44% coverage, 303 passing tests)
+#### Status: IN PROGRESS (45% coverage, 359 passing tests)
 
 **Completed**:
 - [x] **Test infrastructure** (pytest, pytest-asyncio, pytest-cov, pytest-mock)
@@ -368,10 +374,10 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - [x] Invalid provider IDs
 
 **Remaining Work**:
-- [ ] Increase code coverage from 44% to 80%+
+- [ ] Increase code coverage from 45% to 80%+
 - [ ] Add tests for display module (rich.py, json.py)
 - [ ] Add tests for CLI display utilities (cli/display.py)
-- [ ] Add integration tests for unimplemented providers (Codex, Copilot, Cursor, Gemini)
+- [ ] Add integration tests for unimplemented providers (Cursor, Gemini)
 
 **Value**: High - Essential for production reliability
 
@@ -416,8 +422,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ### Immediate (Complete MVP)
 1. **Priority 1**: Complete Claude provider experience (auth command, error display, messages)
-2. **Priority 2**: Codex/OpenAI provider
-3. **Priority 3**: Copilot provider
+2. **Priority 2**: Codex/OpenAI provider ✅
+3. **Priority 3**: Copilot provider ✅
 
 ### Short-term (Expand Provider Coverage)
 4. **Priority 4**: Cursor provider
@@ -452,7 +458,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ### Multi-Provider Milestone (Priorities 1-5 Complete)
 **Goal**: Support top 5 AI providers
-- Claude (✓), Codex, Copilot, Cursor, Gemini
+- Claude (✓), Codex (✓), Copilot (✓), Cursor, Gemini
 - Auth flows for all providers
 - Consistent error handling across providers
 - Unified display formatting
@@ -462,7 +468,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - All 5 providers fully implemented
 - Comprehensive error handling
 - Offline mode and graceful degradation
-- Full test coverage (in progress: 303 tests, 44%)
+- Full test coverage (in progress: 359 tests, 45%)
 - Robust retry and failure gate mechanisms
 
 ### Full Release Milestone (All Priorities Complete)

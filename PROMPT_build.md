@@ -23,3 +23,40 @@
 99999999999999. If you find inconsistencies in the specs/* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 999999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Before ending: verify tests exist for modules you touched. No tests = add to @PLAN.md.
+
+**IMPORTANT:** This is your next task, to fix the commands. Currently this is the output:
+
+vibeusage on  main [!] is 󰏗 v0.1.0  v3.14.0 (vibeusage)
+➜ vibeusage --help
+
+ Usage: vibeusage [OPTIONS] COMMAND [ARGS]...
+
+ Track usage across agentic LLM providers
+
+╭─ Options ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --json                -j        Enable JSON output mode                                                │
+│ --no-color                      Disable colored output                                                 │
+│ --verbose             -v        Enable verbose output                                                  │
+│ --quiet               -q        Enable quiet mode                                                      │
+│ --version                       Show version and exit                                                  │
+│ --install-completion            Install completion for the current shell.                              │
+│ --show-completion               Show completion for the current shell, to copy it or customize the     │
+│                                 installation.                                                          │
+│ --help                          Show this message and exit.                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────╮
+│ auth           Authenticate with a provider or show auth status.                                       │
+│ cache-show     Show cache status per provider.                                                         │
+│ cache-clear    Clear cache data.                                                                       │
+│ config-show    Display current settings.                                                               │
+│ config-path    Show directory paths used by vibeusage.                                                 │
+│ config-reset   Reset configuration to defaults.                                                        │
+│ config-edit    Open configuration in editor.                                                           │
+│ key            Show credential status for all providers or a specific provider.                        │
+│ key-set        Set a credential for a provider.                                                        │
+│ key-delete     Delete a credential for a provider.                                                     │
+│ status         Show health status for all providers.                                                   │
+│ usage          Show usage statistics for all enabled providers or a specific provider.                 │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+The cache, config, and key commands are not configured correctly. PLease correct this so the commands are vibeusage key set instead of vibeusage key-set.

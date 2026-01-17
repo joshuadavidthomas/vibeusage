@@ -71,10 +71,12 @@ def create_provider(provider_id: str):
 from vibeusage.providers.base import Provider, ProviderMetadata
 from vibeusage.providers.claude import ClaudeProvider
 from vibeusage.providers.codex import CodexProvider
+from vibeusage.providers.copilot import CopilotProvider
 
 # Register providers
 register_provider(ClaudeProvider)
 register_provider(CodexProvider)
+register_provider(CopilotProvider)
 
 __all__ = [
     "Provider",

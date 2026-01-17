@@ -9,8 +9,8 @@
 
 Run these after implementing to get immediate feedback:
 
-- Tests: `uv run pytest tests/ -v` (308 passing tests, 44% coverage)
-- Coverage: `uv run pytest tests/ --cov` (htmlcov/ for HTML report)
+- Tests: `uv run pytest tests/ -v`
+- Coverage: `uv run pytest tests/ --cov`
 - Typecheck: `uv run python -c "from vibeusage.errors.classify import classify_exception"`
 - Lint: Not configured
 
@@ -21,8 +21,8 @@ Succinct learnings about how to RUN the project:
 - CLI entry point: `uv run vibeusage [OPTIONS] COMMAND [ARGS]`
 - Test suite: 308 passing tests covering models, errors, config, display, core, CLI, providers
 - Coverage: 44% (target: 80%+)
-- Use `pytest -x` to stop at first failure
-- Use `pytest -k "test_name"` to run specific tests
+- Use `uv run pytest -x` to stop at first failure
+- Use `uv run pytest -k "test_name"` to run specific tests
 
 ### Codebase Patterns
 
