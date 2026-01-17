@@ -42,7 +42,8 @@ def format_period(period: UsagePeriod) -> Text:
     text = Text()
 
     # Progress bar colored by pace
-    color = pace_to_color(period)
+    pace_ratio = period.pace_ratio() if hasattr(period, 'pace_ratio') else None
+    color = pace_to_color(pace_ratio, period.utilization)
     bar = render_usage_bar(period.utilization, color=color)
 
     text.append_text(bar)
@@ -51,8 +52,9 @@ def format_period(period: UsagePeriod) -> Text:
     text.append(f" {period.name}", style="dim")
 
     # Reset time
-    if period.resets_at:
-        time_str = format_reset_countdown(period.resets_at)
+    time_until = period.time_until_reset() if hasattr(period, 'time_until_reset') else None
+    if time_until is not None:
+        time_str = format_reset_countdown(time_until)
         text.append(f" • resets in {time_str}", style="dim")
 
     return text

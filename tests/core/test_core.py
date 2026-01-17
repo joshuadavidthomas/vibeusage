@@ -187,7 +187,7 @@ class TestWithRetry:
             "success",
         ])
 
-        result = await with_retry(coro(), config=RetryConfig(max_attempts=3, base_delay=0.01))
+        result = await with_retry(coro, config=RetryConfig(max_attempts=3, base_delay=0.01))
         assert result == "success"
         assert coro.call_count == 3
 
@@ -197,7 +197,7 @@ class TestWithRetry:
         coro = AsyncMock(side_effect=httpx.NetworkError("Failed"))
 
         with pytest.raises(httpx.NetworkError):
-            await with_retry(coro(), config=RetryConfig(max_attempts=3, base_delay=0.01))
+            await with_retry(coro, config=RetryConfig(max_attempts=3, base_delay=0.01))
 
         assert coro.call_count == 3
 
@@ -338,7 +338,8 @@ class TestGatePath:
 
     def test_gate_path_format(self):
         """gate_path returns correct format."""
-        with patch("vibeusage.core.gate.gate_dir", return_value="/tmp/gates"):
+        from pathlib import Path
+        with patch("vibeusage.core.gate.gate_dir", return_value=Path("/tmp/gates")):
             result = gate_path("claude")
             assert result == "/tmp/gates/claude.json"
 

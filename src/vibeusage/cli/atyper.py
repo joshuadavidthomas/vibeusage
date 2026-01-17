@@ -15,7 +15,21 @@ def _async_command_wrapper(f: Callable) -> Callable:
 
     @wraps(f)
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        return asyncio.run(f(*args, **kwargs))
+        # For sync functions, just call them directly
+        if not inspect.iscoroutinefunction(f):
+            return f(*args, **kwargs)
+
+        # For async functions, run them in an event loop
+        coro = f(*args, **kwargs)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop, use asyncio.run()
+            return asyncio.run(coro)
+        else:
+            # Already in a running loop - this shouldn't happen in normal CLI usage
+            # but can happen in tests. Return the coroutine for the caller to handle.
+            return coro
 
     return sync_wrapper
 

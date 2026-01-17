@@ -73,8 +73,6 @@ class TestProviderBase:
         )
 
         class TestProvider(Provider):
-            metadata = metadata
-
             def fetch_strategies(self):
                 return []
 
@@ -82,6 +80,7 @@ class TestProviderBase:
                 from vibeusage.models import ProviderStatus
                 return ProviderStatus.unknown()
 
+        TestProvider.metadata = metadata
         provider = TestProvider()
         assert provider.id == "test_provider"
 
@@ -95,11 +94,10 @@ class TestProviderBase:
         )
 
         class TestProvider(Provider):
-            metadata = metadata
-
             def fetch_strategies(self):
                 return []
 
+        TestProvider.metadata = metadata
         provider = TestProvider()
         assert provider.name == "Test Provider"
 

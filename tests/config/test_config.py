@@ -371,7 +371,7 @@ class TestLoadConfig:
 
     def test_load_default_config(self, tmp_path):
         """Load config with no file returns defaults."""
-        with patch("vibeusage.config.settings.config_file", return_value=tmp_path / "config.toml"):
+        with patch("vibeusage.config.paths.config_file", return_value=tmp_path / "config.toml"):
             config = load_config()
             assert isinstance(config, Config)
             assert config.enabled_providers == []
@@ -381,7 +381,7 @@ class TestLoadConfig:
         config_file = tmp_path / "config.toml"
         _save_to_toml({"enabled_providers": ["claude", "codex"]}, config_file)
 
-        with patch("vibeusage.config.settings.config_file", return_value=config_file):
+        with patch("vibeusage.config.paths.config_file", return_value=config_file):
             config = load_config()
             assert config.enabled_providers == ["claude", "codex"]
 
@@ -419,7 +419,7 @@ class TestConfigSingleton:
 
     def test_get_config_returns_singleton(self, tmp_path):
         """get_config returns same instance on subsequent calls."""
-        with patch("vibeusage.config.settings.config_file", return_value=tmp_path / "config.toml"):
+        with patch("vibeusage.config.paths.config_file", return_value=tmp_path / "config.toml"):
             # Reset singleton
             import vibeusage.config.settings as settings_module
             settings_module._config = None
@@ -433,7 +433,7 @@ class TestConfigSingleton:
         config_file = tmp_path / "config.toml"
         _save_to_toml({"enabled_providers": ["claude"]}, config_file)
 
-        with patch("vibeusage.config.settings.config_file", return_value=config_file):
+        with patch("vibeusage.config.paths.config_file", return_value=config_file):
             import vibeusage.config.settings as settings_module
             settings_module._config = None
 
@@ -648,10 +648,12 @@ class TestFindProviderCredential:
 
     def test_finds_env_var_credential(self):
         """Finds credential in environment variable."""
+        # Disable provider CLI reuse to ensure env var is checked
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}), patch(
             "vibeusage.config.credentials.credentials_dir", return_value=Path("/tmp/credentials")
         ), patch("vibeusage.config.settings.get_config") as mock_get_config:
-            mock_get_config.return_value = Config()
+            mock_get_config.return_value = config
 
             found, source, path = find_provider_credential("claude")
             assert found is True
@@ -660,10 +662,12 @@ class TestFindProviderCredential:
 
     def test_no_credential_found(self, tmp_path):
         """Returns not found when no credential exists."""
+        # Disable provider CLI reuse to ensure no credentials are found
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
         with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
             "vibeusage.config.settings.get_config"
         ) as mock_get_config:
-            mock_get_config.return_value = Config()
+            mock_get_config.return_value = config
 
             found, source, path = find_provider_credential("claude")
             assert found is False
@@ -707,10 +711,12 @@ class TestCheckProviderCredentials:
 
     def test_no_credentials(self, tmp_path):
         """Returns False when no credentials exist."""
+        # Disable provider CLI reuse to ensure no credentials are found
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
         with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
             "vibeusage.config.settings.get_config"
         ) as mock_get_config:
-            mock_get_config.return_value = Config()
+            mock_get_config.return_value = config
 
             has_creds, source = check_provider_credentials("claude")
             assert has_creds is False

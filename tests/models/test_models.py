@@ -176,7 +176,10 @@ class TestUsagePeriod:
 
         pace = period.pace_ratio()
         assert pace is not None
-        assert pace > 1.4
+        # With 80% used and 6 hours remaining in 24-hour period (75% elapsed),
+        # pace ratio = 80 / 75 = 1.067
+        assert pace > 1.0
+        assert pace < 1.1
 
     def test_time_until_reset(self):
         """time_until_reset() returns correct timedelta."""

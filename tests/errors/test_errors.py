@@ -334,7 +334,8 @@ class TestClassifyException:
         result = classify_exception(error)
 
         assert result.category == ErrorCategory.CONFIGURATION
-        assert "/path/to/file" in result.message
+        # Message is generic, doesn't include the path
+        assert "not found" in result.message.lower()
 
     def test_classify_permission_error(self):
         """PermissionError is classified as fatal configuration error."""

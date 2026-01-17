@@ -221,75 +221,65 @@ class TestFormatPeriodLine:
 class TestOutputJson:
     """Tests for output_json function."""
 
-    def test_output_simple_dict(self):
+    def test_output_simple_dict(self, capsysbinary):
         """Output simple dictionary as JSON."""
         data = {"key": "value", "number": 42}
 
-        with patch("sys.stdout.buffer", new_callable=StringIO) as mock_buffer:
-            # Need to write bytes
-            import io
-            buffer = io.BytesIO()
-            with patch("sys.stdout.buffer", buffer):
-                output_json(data)
+        output_json(data)
 
-            result = buffer.getvalue().decode()
-            assert '"key": "value"' in result
-            assert '"number": 42' in result
+        result = capsysbinary.readouterr().out.decode()
+        # msgspec produces compact JSON without spaces
+        assert '"key":"value"' in result
+        assert '"number":42' in result
 
-    def test_output_newline(self):
+    def test_output_newline(self, capsysbinary):
         """Output ends with newline."""
         data = {"test": "value"}
 
-        with patch("sys.stdout.buffer", new_callable=io.BytesIO) as buffer:
-            with patch("sys.stdout.buffer", buffer):
-                output_json(data)
+        output_json(data)
 
-            result = buffer.getvalue()
-            assert result.endswith(b"\n")
+        result = capsysbinary.readouterr().out
+        assert result.endswith(b"\n")
 
-    def test_output_msgspec_struct(self, sample_snapshot):
+    def test_output_msgspec_struct(self, sample_snapshot, capsysbinary):
         """Output msgspec Struct as JSON."""
-        with patch("sys.stdout.buffer", new_callable=io.BytesIO) as buffer:
-            with patch("sys.stdout.buffer", buffer):
-                output_json(sample_snapshot)
+        output_json(sample_snapshot)
 
-            result = buffer.getvalue().decode()
-            assert '"provider": "claude"' in result
+        result = capsysbinary.readouterr().out.decode()
+        # msgspec produces compact JSON without spaces
+        assert '"provider":"claude"' in result
 
 
 class TestOutputJsonPretty:
     """Tests for output_json_pretty function."""
 
-    def test_output_pretty_formatted(self):
+    def test_output_pretty_formatted(self, capsys):
         """Output is pretty-printed with indentation."""
         data = {"key": "value", "nested": {"a": 1, "b": 2}}
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            output_json_pretty(data, indent=2)
+        output_json_pretty(data, indent=2)
 
-            result = mock_stdout.getvalue()
-            # Check for indentation
-            assert "  " in result or "\n" in result
-            assert '"key": "value"' in result
+        result = capsys.readouterr().out
+        # Check for indentation
+        assert "  " in result or "\n" in result
+        assert '"key": "value"' in result
 
-    def test_output_pretty_ends_with_newline(self):
+    def test_output_pretty_ends_with_newline(self, capsys):
         """Pretty output ends with newline."""
         data = {"test": "value"}
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            output_json_pretty(data)
-            result = mock_stdout.getvalue()
-            assert result.endswith("\n")
+        output_json_pretty(data)
+        result = capsys.readouterr().out
+        assert result.endswith("\n")
 
-    def test_custom_indent(self):
+    def test_custom_indent(self, capsys):
         """Custom indent level is respected."""
         data = {"key": "value"}
 
-        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-            output_json_pretty(data, indent=4)
-            result = mock_stdout.getvalue()
-            # Check for 4-space indentation
-            assert "    " in result
+        output_json_pretty(data, indent=4)
+        result = capsys.readouterr().out
+        # Check for 4-space indentation
+        assert "    " in result
 
 
 class TestEncodeJson:
@@ -301,8 +291,9 @@ class TestEncodeJson:
         result = encode_json(data)
 
         assert isinstance(result, bytes)
-        assert b'"key": "value"' in result
-        assert b'"number": 42' in result
+        # msgspec produces compact JSON without spaces
+        assert b'"key":"value"' in result
+        assert b'"number":42' in result
 
     def test_encode_list(self):
         """Encode list to JSON bytes."""
@@ -310,14 +301,16 @@ class TestEncodeJson:
         result = encode_json(data)
 
         assert isinstance(result, bytes)
-        assert b"[1, 2, 3, " in result
+        # msgspec produces compact JSON
+        assert b'[1,2,3,"four"]' == result
 
     def test_encode_msgspec_struct(self, sample_snapshot):
         """Encode msgspec Struct to JSON bytes."""
         result = encode_json(sample_snapshot)
 
         assert isinstance(result, bytes)
-        assert b'"provider": "claude"' in result
+        # msgspec produces compact JSON without spaces
+        assert b'"provider":"claude"' in result
 
     def test_encode_unicode(self):
         """Handle unicode characters."""
@@ -350,7 +343,7 @@ class TestDecodeJson:
         from vibeusage.models import UsageSnapshot, UsagePeriod, PeriodType
 
         json_bytes = b'{"provider": "claude", "fetched_at": "2025-01-15T12:00:00Z", "periods": []}'
-        result = decode_json(json_bytes, type=UsageSnapshot)
+        result = decode_json(json_bytes, type_hint=UsageSnapshot)
 
         assert isinstance(result, UsageSnapshot)
         assert result.provider == "claude"

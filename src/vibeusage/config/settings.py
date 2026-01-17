@@ -98,7 +98,7 @@ def _save_to_toml(data: dict, path: Path) -> None:
     import tomli_w
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w") as f:
+    with path.open("wb") as f:
         tomli_w.dump(data, f)
 
 

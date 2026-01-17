@@ -65,13 +65,14 @@ def should_retry_exception(exc: Exception) -> bool:
 
 
 async def with_retry(
-    coro,
+    coro_or_factory,
     config: RetryConfig | None = None,
 ) -> any:
     """Execute a coroutine with retry logic.
 
     Args:
-        coro: Coroutine to execute
+        coro_or_factory: Coroutine to execute, or a callable that returns a coroutine
+                        (useful for retries where a fresh coroutine is needed each attempt)
         config: Retry configuration (uses defaults if None)
 
     Returns:
@@ -86,6 +87,12 @@ async def with_retry(
     last_exception = None
 
     for attempt in range(config.max_attempts):
+        # Create/get the coroutine for this attempt
+        if callable(coro_or_factory):
+            coro = coro_or_factory()
+        else:
+            coro = coro_or_factory
+
         try:
             return await coro
         except Exception as e:
