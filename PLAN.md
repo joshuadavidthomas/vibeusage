@@ -25,7 +25,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
-- ✓ Test suite (463 passing tests, 49% coverage, 3 known test ordering issues in test_providers.py)
+- ✓ Test suite (466 passing tests, 49% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -39,7 +39,6 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - SingleProviderDisplay now capitalizes provider name in title ("Claude" not "claude")
   - ProviderPanel removed source row for cleaner compact view per spec 05
   - Added 8 new tests for SingleProviderDisplay and ProviderPanel spec compliance
-  - All 463 tests pass (3 known test ordering issues in test_providers.py remain)
 
 ### 2026-01-17: Test Ordering Fix
 - **Fixed test ordering issues in test_providers.py**
@@ -95,6 +94,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - Fixed camelCase to snake_case conversion for `accessToken`, `refreshToken`, `expiresAt`
   - Fixed OAuth usage API parsing for `utilization` and `resets_at` fields
   - Fixed `pace_to_color()` and `format_period()` function calls
+
+### 2026-01-16: Provider Registry Test Fix
+- **Fixed provider registry test ordering issues**
+  - Added autouse fixture in conftest.py to automatically restore provider registry state
+  - Previously tests that modified the registry could affect subsequent tests
+  - All 466 tests now pass with 0 test ordering issues
 
 ### 2025-01-16: Test Suite Fixes
 - Fixed File I/O type issue in _save_to_toml(): use binary mode 'wb' instead of 'w'
@@ -223,7 +228,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ### Priority 7: Test Suite
-**Status**: MOSTLY COMPLETE (45% coverage, 455 passing tests, 3 test ordering issues)
+**Status**: MOSTLY COMPLETE (49% coverage, 466 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)
