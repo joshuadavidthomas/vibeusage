@@ -314,8 +314,10 @@ def format_period(period):
     if period.resets_at:
         from vibeusage.models import format_reset_countdown
 
-        time_str = format_reset_countdown(period.resets_at)
-        text.append(f" • resets in {time_str}", style="dim")
+        time_until = period.time_until_reset() if hasattr(period, 'time_until_reset') else None
+        if time_until is not None:
+            time_str = format_reset_countdown(time_until)
+            text.append(f" • resets in {time_str}", style="dim")
 
     return text
 
@@ -338,5 +340,6 @@ def get_pace_color(period):
     """Get color for a period based on utilization pace."""
     from vibeusage.models import pace_to_color
 
-    color_name = pace_to_color(period)
+    pace_ratio = period.pace_ratio() if hasattr(period, 'pace_ratio') else None
+    color_name = pace_to_color(pace_ratio, period.utilization)
     return color_name

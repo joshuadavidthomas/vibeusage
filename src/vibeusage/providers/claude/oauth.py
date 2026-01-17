@@ -81,15 +81,55 @@ class ClaudeOAuthStrategy(FetchStrategy):
         return FetchResult.ok(snapshot)
 
     def _load_credentials(self) -> dict | None:
-        """Load OAuth credentials from file."""
+        """Load OAuth credentials from file.
+
+        Handles two formats:
+        1. Claude CLI format: {"claudeAiOauth": {"accessToken": "...", ...}}
+        2. Vibeusage format: {"access_token": "...", ...}
+        """
         for path in self.CREDENTIAL_PATHS:
             content = read_credential(path)
             if content:
                 try:
-                    return json.loads(content)
+                    data = json.loads(content)
                 except json.JSONDecodeError:
                     continue
+
+                # Handle Claude CLI format with nested claudeAiOauth key
+                if "claudeAiOauth" in data:
+                    data = data["claudeAiOauth"]
+                    # Convert camelCase to snake_case
+                    data = self._convert_claude_cli_format(data)
+
+                return data
         return None
+
+    def _convert_claude_cli_format(self, data: dict) -> dict:
+        """Convert Claude CLI credential format to standard format.
+
+        Claude CLI uses camelCase keys, convert to snake_case:
+        - accessToken -> access_token
+        - refreshToken -> refresh_token
+        - expiresAt -> expires_at
+        """
+        result = {}
+        for key, value in data.items():
+            # Convert camelCase to snake_case
+            snake_key = "".join(
+                "_" + c.lower() if c.isupper() else c
+                for c in key
+            ).lstrip("_")
+
+            # Handle expiresAt timestamp -> expires_at ISO string
+            if snake_key == "expires_at":
+                if isinstance(value, (int, float)):
+                    # Convert millisecond timestamp to ISO string
+                    from datetime import datetime, timezone
+                    value = datetime.fromtimestamp(value / 1000, tz=timezone.utc).isoformat()
+
+            result[snake_key] = value
+
+        return result
 
     def _needs_refresh(self, credentials: dict) -> bool:
         """Check if token needs refresh."""
@@ -149,85 +189,102 @@ class ClaudeOAuthStrategy(FetchStrategy):
     def _parse_usage_response(self, data: dict) -> UsageSnapshot | None:
         """Parse usage response from OAuth endpoint.
 
-        Expected format:
+        Actual API format (2025-01):
         {
-            "usage": {
-                "five_hour": { "usage": 45, "limit": 100 },
-                "seven_day": { "usage": 320, "limit": 1000 },
-                ...
-            }
+            "five_hour": { "utilization": 0.0, "resets_at": "2026-01-17T06:59:59.846865+00:00" },
+            "seven_day": { "utilization": 27.0, "resets_at": "2026-01-22T18:59:59.846886+00:00" },
+            "seven_day_sonnet": { "utilization": 3.0, "resets_at": "..." },
+            "extra_usage": { "is_enabled": false, ... }
         }
         """
-        usage_data = data.get("usage", {})
-        if not usage_data:
-            return None
-
         periods = []
 
-        # Parse standard periods
+        # Parse standard periods (top-level keys that aren't extra_usage or null)
         period_mapping = {
-            "five_hour": ("5-hour session", PeriodType.SESSION, 5 * 3600),
-            "seven_day": ("7-day period", PeriodType.WEEKLY, 7 * 86400),
-            "monthly": ("Monthly", PeriodType.MONTHLY, 30 * 86400),
+            "five_hour": ("5-hour session", PeriodType.SESSION),
+            "seven_day": ("7-day period", PeriodType.WEEKLY),
+            "monthly": ("Monthly", PeriodType.MONTHLY),
         }
 
-        for key, (name, period_type, seconds) in period_mapping.items():
-            if key in usage_data:
-                period_data = usage_data[key]
-                usage = period_data.get("usage")
-                limit = period_data.get("limit")
+        for key, (name, period_type) in period_mapping.items():
+            if key in data:
+                period_data = data[key]
+                if period_data is None:
+                    continue
 
-                if usage is not None and limit is not None:
-                    utilization = int((usage / limit) * 100) if limit > 0 else 0
+                utilization = period_data.get("utilization")
+                resets_at_str = period_data.get("resets_at")
 
-                    # Calculate reset time (approximate)
-                    resets_at = None  # OAuth doesn't provide exact reset time
+                if utilization is not None:
+                    # Parse reset time
+                    resets_at = None
+                    if resets_at_str:
+                        try:
+                            resets_at = datetime.fromisoformat(resets_at_str)
+                        except (ValueError, TypeError):
+                            pass
 
                     periods.append(
                         UsagePeriod(
                             name=name,
-                            utilization=utilization,
+                            utilization=int(utilization),
                             period_type=period_type,
                             resets_at=resets_at,
                         )
                     )
 
-        # Parse model-specific usage if available
-        for key in usage_data:
-            if key.startswith("model:"):
-                model_name = key.split(":", 1)[1]
-                period_data = usage_data[key]
-                usage = period_data.get("usage")
-                limit = period_data.get("limit")
+        # Parse model-specific usage (keys like seven_day_sonnet, seven_day_opus)
+        model_prefixes = {
+            "seven_day_sonnet": "Sonnet",
+            "seven_day_opus": "Opus",
+            "seven_day_haiku": "Haiku",
+        }
 
-                if usage is not None and limit is not None:
-                    utilization = int((usage / limit) * 100) if limit > 0 else 0
+        for key, model_name in model_prefixes.items():
+            if key in data:
+                period_data = data[key]
+                if period_data is None:
+                    continue
+
+                utilization = period_data.get("utilization")
+                resets_at_str = period_data.get("resets_at")
+
+                if utilization is not None:
+                    resets_at = None
+                    if resets_at_str:
+                        try:
+                            resets_at = datetime.fromisoformat(resets_at_str)
+                        except (ValueError, TypeError):
+                            pass
 
                     periods.append(
                         UsagePeriod(
-                            name=f"Model: {model_name}",
-                            utilization=utilization,
-                            period_type=PeriodType.SESSION,
-                            resets_at=None,
-                            model=model_name,
+                            name=f"7-day: {model_name}",
+                            utilization=int(utilization),
+                            period_type=PeriodType.WEEKLY,
+                            resets_at=resets_at,
+                            model=model_name.lower(),
                         )
                     )
 
-        # Parse overage if available
+        # Parse extra_usage (overage)
         overage = None
-        if "overage" in usage_data:
-            overage_data = usage_data["overage"]
-            overage = OverageUsage(
-                used=float(overage_data.get("used", 0)),
-                limit=float(overage_data.get("limit", 0)),
-                currency="USD",
-                is_enabled=overage_data.get("enabled", False),
-            )
+        extra_usage = data.get("extra_usage", {})
+        if extra_usage and extra_usage.get("is_enabled"):
+            used_credits = extra_usage.get("used_credits")
+            monthly_limit = extra_usage.get("monthly_limit")
+            if used_credits is not None and monthly_limit is not None:
+                overage = OverageUsage(
+                    used=float(used_credits),
+                    limit=float(monthly_limit),
+                    currency="USD",
+                    is_enabled=True,
+                )
 
         return UsageSnapshot(
             provider="claude",
             fetched_at=datetime.now(timezone.utc),
-            periods=periods,
+            periods=tuple(periods),
             overage=overage,
             identity=None,  # OAuth doesn't provide identity
             status=None,

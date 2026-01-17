@@ -26,6 +26,18 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Test suite (403 passing tests, 47% coverage)
 
+**Recent Fixes** (2026-01-16):
+- **Fixed Claude OAuth credential loading and usage response parsing**
+  - Problem: `vibeusage` and `vibeusage usage` showed "No usage data available" even when Claude credentials existed
+  - Root causes:
+    1. Credential format mismatch: Claude CLI stores credentials in camelCase (`accessToken`, `refreshToken`, `expiresAt`) wrapped in a `claudeAiOauth` key, but code expected snake_case
+    2. API response format mismatch: OAuth usage API returns different format than expected
+  - Fixes applied:
+    1. Modified `ClaudeOAuthStrategy._load_credentials()` to extract `claudeAiOauth` key and convert camelCase to snake_case with timestamp conversion
+    2. Rewrote `ClaudeOAuthStrategy._parse_usage_response()` to handle actual API response format with `utilization` and `resets_at` fields
+    3. Fixed `get_pace_color()` in usage.py to pass correct arguments to `pace_to_color()`
+    4. Fixed `format_period()` in usage.py to call `period.time_until_reset()` instead of passing datetime directly
+
 **Recent Fixes** (2025-01-17):
 - **Implemented `--json` flag for all commands** - Full JSON support across all commands
   - `usage`, `status`, `auth`, `key`, `cache`, `config` commands all support JSON output
@@ -35,7 +47,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - Added 8 new tests for JSON functionality in tests/cli/test_json_commands.py
 - CLI command audit completed - all commands tested
 - Confirmed `vibeusage usage` is working (typer.get_context() fix successful)
-- Updated test count: 411 passing tests (403 + 8 new), 3 test ordering issues remain, coverage ~47%
+- Updated test count: 411 passing tests (403 + 8 new), 3 test ordering issues remain in test_providers.py, coverage ~47%
 
 **Recent Fixes** (2025-01-16):
 - Fixed File I/O type issue in _save_to_toml(): use binary mode 'wb' instead of 'w'

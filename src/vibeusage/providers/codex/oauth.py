@@ -87,14 +87,25 @@ class CodexOAuthStrategy(FetchStrategy):
         return FetchResult.ok(snapshot)
 
     def _load_credentials(self) -> dict | None:
-        """Load OAuth credentials from file."""
+        """Load OAuth credentials from file.
+
+        Handles two formats:
+        1. Codex CLI format: {"tokens": {"access_token": "...", ...}}
+        2. Vibeusage format: {"access_token": "...", ...}
+        """
         for path in self.CREDENTIAL_PATHS:
             content = read_credential(path)
             if content:
                 try:
-                    return json.loads(content)
+                    data = json.loads(content)
                 except json.JSONDecodeError:
                     continue
+
+                # Handle Codex CLI format with nested tokens key
+                if "tokens" in data and isinstance(data["tokens"], dict):
+                    data = data["tokens"]
+
+                return data
         return None
 
     def _needs_refresh(self, credentials: dict) -> bool:
@@ -179,28 +190,47 @@ class CodexOAuthStrategy(FetchStrategy):
     def _parse_usage_response(self, data: dict) -> UsageSnapshot | None:
         """Parse usage response from Codex API.
 
-        Expected format:
+        Actual API format (2025-01):
+        {
+            "rate_limit": {
+                "primary_window": {
+                    "used_percent": 24,
+                    "reset_at": 1768622273
+                },
+                "secondary_window": {
+                    "used_percent": 46,
+                    "reset_at": 1768677366
+                }
+            },
+            "credits": { "has_credits": false, "balance": "0" },
+            "plan_type": "plus"
+        }
+
+        Legacy format (for compatibility):
         {
             "rate_limits": {
                 "primary": { "used_percent": 58, "reset_timestamp": 1234567890 },
                 "secondary": { "used_percent": 23, "reset_timestamp": 1234567890 }
             },
-            "credits": { "has_credits": true, "balance": 10.50 },
-            "plan_type": "plus"
+            ...
         }
         """
         periods = []
 
-        rate_limits = data.get("rate_limits", {})
+        # Support both rate_limit (actual) and rate_limits (legacy) keys
+        rate_limits = data.get("rate_limit") or data.get("rate_limits", {})
 
-        # Parse primary (session) limit
-        if primary := rate_limits.get("primary"):
+        # Parse primary (session) limit - support both naming variants
+        primary = rate_limits.get("primary_window") or rate_limits.get("primary")
+        if primary:
             utilization = int(primary.get("used_percent", 0))
             resets_at = None
-            if reset_ts := primary.get("reset_timestamp"):
+            # Support both reset_at (actual) and reset_timestamp (legacy) keys
+            reset_ts = primary.get("reset_at") or primary.get("reset_timestamp")
+            if reset_ts is not None:
                 try:
                     resets_at = datetime.fromtimestamp(reset_ts, tz=timezone.utc)
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, OSError):
                     pass
 
             periods.append(
@@ -212,14 +242,16 @@ class CodexOAuthStrategy(FetchStrategy):
                 )
             )
 
-        # Parse secondary (weekly) limit
-        if secondary := rate_limits.get("secondary"):
+        # Parse secondary (weekly) limit - support both naming variants
+        secondary = rate_limits.get("secondary_window") or rate_limits.get("secondary")
+        if secondary:
             utilization = int(secondary.get("used_percent", 0))
             resets_at = None
-            if reset_ts := secondary.get("reset_timestamp"):
+            reset_ts = secondary.get("reset_at") or secondary.get("reset_timestamp")
+            if reset_ts is not None:
                 try:
                     resets_at = datetime.fromtimestamp(reset_ts, tz=timezone.utc)
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, OSError):
                     pass
 
             periods.append(
