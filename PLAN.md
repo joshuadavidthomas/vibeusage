@@ -240,14 +240,13 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - [x] Fetch pipeline tests
 - [x] Orchestrator tests
 - [x] CLI command behavior tests
-- [x] Output format tests
+- [x] Output format tests (including SingleProviderDisplay and ProviderPanel spec compliance)
 - [x] Exit code tests
 - [x] Error scenario tests
 
 **Remaining Issues**:
 - [ ] Increase code coverage from 49% to 80%+
-- [ ] Add tests for display module (rich.py, json.py)
-- [ ] Add tests for CLI display utilities (cli/display.py)
+- [ ] Add more display module tests (rich.py, json.py have partial coverage)
 
 **Value**: High - Essential for production reliability
 
