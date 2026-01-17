@@ -37,6 +37,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-17: Incorrect Key Command Syntax in Auth Instructions ✅ RESOLVED
+- **Issue**: Auth instructions suggested `vibeusage key copilot set --type oauth` but the correct syntax is `vibeusage key set copilot --type oauth`
+- **Root Cause**: The `key` command has `set` as a subcommand that takes `provider` as an argument, not as a subcommand
+- **Resolution**: Fixed auth command instructions in `src/vibeusage/cli/commands/auth.py` and updated documentation in `README.md` and `docs/providers/cursor.md`
+- **Verification**: Auth instructions now show correct syntax, all 1055 tests pass
+
 ### 2026-01-17: ProviderStatus Type Hint Fix ✅ RESOLVED
 - **Issue**: `ProviderStatus.operational()` and `ProviderStatus.unknown()` factory methods had incorrect return type hints
 - **Root Cause**: Type hints declared as `type[ProviderStatus]` instead of `ProviderStatus`

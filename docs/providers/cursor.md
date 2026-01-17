@@ -58,7 +58,7 @@ pip install pycookiecheat
 7. Set the credential:
 
 ```bash
-vibeusage key cursor set
+vibeusage key set cursor
 ```
 
 8. Paste the session token when prompted

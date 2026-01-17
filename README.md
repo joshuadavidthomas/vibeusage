@@ -139,7 +139,7 @@ The tool will attempt to extract your session token from your browser automatica
 
 1. Open https://cursor.com in your browser
 2. Extract your session cookie
-3. Run `vibeusage key cursor set` and paste the token
+3. Run `vibeusage key set cursor` and paste the token
 
 ### Gemini
 
@@ -219,8 +219,8 @@ vibeusage config reset
 vibeusage key
 
 # Set a credential manually
-vibeusage key claude set
-vibeusage key codex set
+vibeusage key set claude
+vibeusage key set codex
 
 # Delete credentials
 vibeusage key claude delete
@@ -404,7 +404,7 @@ pip install browser-cookie3
 pip install pycookiecheat
 ```
 
-Alternatively, manually extract cookies and use `vibeusage key cursor set`.
+Alternatively, manually extract cookies and use `vibeusage key set cursor`.
 
 ## Development
 
