@@ -149,23 +149,29 @@ class TestCopilotDeviceFlowStrategy:
         }
 
         api_response = {
-            "premium_interactions": {
-                "total": 1000,
-                "used": 450,
-                "reset_at": "2026-01-23T00:00:00Z",
+            "quota_snapshots": {
+                "premium_interactions": {
+                    "entitlement": 300,
+                    "remaining": 150,
+                    "percent_remaining": 50.0,
+                    "unlimited": False,
+                    "quota_remaining": 150.0,
+                },
+                "chat": {
+                    "entitlement": 0,
+                    "remaining": 0,
+                    "percent_remaining": 100.0,
+                    "unlimited": True,
+                },
+                "completions": {
+                    "entitlement": 0,
+                    "remaining": 0,
+                    "percent_remaining": 100.0,
+                    "unlimited": True,
+                },
             },
-            "chat_quotas": [
-                {
-                    "model": "gpt-4",
-                    "limit": 30,
-                    "used": 15,
-                    "reset_at": "2026-01-23T00:00:00Z",
-                }
-            ],
-            "billing_cycle": {
-                "start": "2026-01-16T00:00:00Z",
-                "end": "2026-02-16T00:00:00Z",
-            },
+            "quota_reset_date_utc": "2026-02-01T00:00:00.000Z",
+            "copilot_plan": "individual",
         }
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
@@ -196,18 +202,30 @@ class TestCopilotDeviceFlowStrategy:
         assert result.snapshot.source == "device_flow"
 
     @pytest.mark.asyncio
-    async def test_fetch_success_with_alternative_quota_format(self):
-        """fetch succeeds with alternative quota format."""
+    async def test_fetch_success_with_unlimited_quotas(self):
+        """fetch succeeds with unlimited quota format."""
         strategy = CopilotDeviceFlowStrategy()
         credentials = {
             "access_token": "test_token",
         }
 
         api_response = {
-            "quota": {
-                "total": 500,
-                "used": 250,
-            }
+            "quota_snapshots": {
+                "chat": {
+                    "entitlement": 0,
+                    "remaining": 0,
+                    "percent_remaining": 100.0,
+                    "unlimited": True,
+                },
+                "completions": {
+                    "entitlement": 0,
+                    "remaining": 0,
+                    "percent_remaining": 100.0,
+                    "unlimited": True,
+                },
+            },
+            "quota_reset_date_utc": "2026-02-01T00:00:00.000Z",
+            "copilot_plan": "free",
         }
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
@@ -451,30 +469,28 @@ class TestCopilotDeviceFlowStrategy:
         strategy = CopilotDeviceFlowStrategy()
 
         data = {
-            "premium_interactions": {
-                "total": 1000,
-                "used": 450,
-                "reset_at": "2026-01-23T00:00:00Z",
-            },
-            "chat_quotas": [
-                {
-                    "model": "gpt-4",
-                    "limit": 30,
-                    "used": 15,
-                    "reset_at": "2026-01-23T00:00:00Z",
+            "quota_snapshots": {
+                "premium_interactions": {
+                    "entitlement": 300,
+                    "remaining": 165,
+                    "percent_remaining": 55.0,
+                    "unlimited": False,
                 },
-                {
-                    "model": "gpt-3.5-turbo",
-                    "limit": 100,
-                    "used": 80,
-                    "reset_at": "2026-01-23T00:00:00Z",
+                "chat": {
+                    "entitlement": 100,
+                    "remaining": 50,
+                    "percent_remaining": 50.0,
+                    "unlimited": False,
                 },
-            ],
-            "account": {
-                "plan": "pro",
-                "organization": "Acme Corp",
-                "email": "user@example.com",
+                "completions": {
+                    "entitlement": 500,
+                    "remaining": 100,
+                    "percent_remaining": 20.0,
+                    "unlimited": False,
+                },
             },
+            "quota_reset_date_utc": "2026-02-01T00:00:00.000Z",
+            "copilot_plan": "individual",
         }
 
         snapshot = strategy._parse_usage_response(data)
@@ -483,47 +499,54 @@ class TestCopilotDeviceFlowStrategy:
         assert snapshot.provider == "copilot"
         assert len(snapshot.periods) == 3
 
-        # Check monthly period
-        monthly = next(
-            (p for p in snapshot.periods if p.period_type == PeriodType.MONTHLY), None
+        # Check premium interactions period
+        premium = next(
+            (p for p in snapshot.periods if "Premium" in p.name), None
         )
-        assert monthly is not None
-        assert monthly.name == "Monthly"
-        assert monthly.utilization == 45  # 450/1000
+        assert premium is not None
+        assert premium.name == "Monthly (Premium)"
+        assert premium.utilization == 45  # (300-165)/300 = 135/300 = 45%
+        assert premium.period_type == PeriodType.MONTHLY
 
-        # Check daily chat quotas
-        daily_gpt4 = next((p for p in snapshot.periods if p.model == "gpt-4"), None)
-        assert daily_gpt4 is not None
-        assert daily_gpt4.utilization == 50  # 15/30
+        # Check chat quota
+        chat = next((p for p in snapshot.periods if "Chat" in p.name), None)
+        assert chat is not None
+        assert chat.name == "Monthly (Chat)"
+        assert chat.utilization == 50  # (100-50)/100 = 50%
 
-        daily_gpt35 = next(
-            (p for p in snapshot.periods if p.model == "gpt-3.5-turbo"), None
+        # Check completions quota
+        completions = next(
+            (p for p in snapshot.periods if "Completions" in p.name), None
         )
-        assert daily_gpt35 is not None
-        assert daily_gpt35.utilization == 80  # 80/100
+        assert completions is not None
+        assert completions.name == "Monthly (Completions)"
+        assert completions.utilization == 80  # (500-100)/500 = 80%
 
         # Check identity
         assert snapshot.identity is not None
-        assert snapshot.identity.plan == "pro"
-        assert snapshot.identity.organization == "Acme Corp"
-        assert snapshot.identity.email == "user@example.com"
+        assert snapshot.identity.plan == "individual"
 
     def test_parse_usage_response_minimal(self):
         """_parse_usage_response handles minimal response."""
         strategy = CopilotDeviceFlowStrategy()
 
         data = {
-            "premium_interactions": {
-                "total": 500,
-                "used": 250,
-            }
+            "quota_snapshots": {
+                "premium_interactions": {
+                    "entitlement": 300,
+                    "remaining": 150,
+                    "percent_remaining": 50.0,
+                    "unlimited": False,
+                }
+            },
+            "quota_reset_date_utc": "2026-02-01T00:00:00.000Z",
         }
 
         snapshot = strategy._parse_usage_response(data)
 
         assert snapshot is not None
         assert len(snapshot.periods) == 1
-        assert snapshot.periods[0].utilization == 50  # 250/500
+        assert snapshot.periods[0].utilization == 50  # (300-150)/300 = 50%
         assert snapshot.periods[0].period_type == PeriodType.MONTHLY
         assert snapshot.identity is None
 
@@ -532,17 +555,20 @@ class TestCopilotDeviceFlowStrategy:
         strategy = CopilotDeviceFlowStrategy()
 
         data = {
-            "premium_interactions": {
-                "total": 1000,
-                "used": 600,
-            },
-            "chat_quotas": [
-                {
-                    "model": "gpt-4",
-                    "limit": 30,
-                    "used": 20,
-                }
-            ],
+            "quota_snapshots": {
+                "premium_interactions": {
+                    "entitlement": 300,
+                    "remaining": 120,
+                    "percent_remaining": 40.0,
+                    "unlimited": False,
+                },
+                "chat": {
+                    "entitlement": 50,
+                    "remaining": 30,
+                    "percent_remaining": 60.0,
+                    "unlimited": False,
+                },
+            }
         }
 
         snapshot = strategy._parse_usage_response(data)
@@ -557,7 +583,7 @@ class TestCopilotDeviceFlowStrategy:
         """_parse_usage_response returns None when no quota data."""
         strategy = CopilotDeviceFlowStrategy()
 
-        data = {"account": {"plan": "free"}}
+        data = {"copilot_plan": "free"}
 
         snapshot = strategy._parse_usage_response(data)
         assert snapshot is None

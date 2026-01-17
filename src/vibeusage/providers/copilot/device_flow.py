@@ -384,115 +384,144 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
     def _parse_usage_response(self, data: dict) -> UsageSnapshot | None:
         """Parse usage response from Copilot API.
 
-        Expected format (GitHub Copilot API):
+        Expected format (GitHub Copilot API - actual as of 2026-01):
         {
-            "premium_interactions": {
-                "total": 1000,
-                "used": 450,
-                "reset_at": "2026-01-23T00:00:00Z"
-            },
-            "chat_quotas": [
-                {
-                    "model": "gpt-4",
-                    "limit": 30,
-                    "used": 15,
-                    "reset_at": "2026-01-23T00:00:00Z"
+            "quota_snapshots": {
+                "premium_interactions": {
+                    "entitlement": 300,
+                    "remaining": 300,
+                    "percent_remaining": 100.0,
+                    "unlimited": false,
+                    "quota_remaining": 300.0
+                },
+                "chat": {
+                    "entitlement": 0,
+                    "remaining": 0,
+                    "percent_remaining": 100.0,
+                    "unlimited": true
+                },
+                "completions": {
+                    "entitlement": 0,
+                    "remaining": 0,
+                    "percent_remaining": 100.0,
+                    "unlimited": true
                 }
-            ],
-            "billing_cycle": {
-                "start": "2026-01-16T00:00:00Z",
-                "end": "2026-02-16T00:00:00Z"
-            }
+            },
+            "quota_reset_date_utc": "2026-02-01T00:00:00.000Z",
+            "copilot_plan": "individual"
         }
         """
         periods = []
 
-        # Parse premium interactions (monthly quota)
-        if premium := data.get("premium_interactions"):
-            total = premium.get("total", 0)
-            used = premium.get("used", 0)
-            if total > 0:
-                utilization = int((used / total) * 100)
-                resets_at = None
-                if reset_str := premium.get("reset_at"):
-                    try:
-                        resets_at = datetime.fromisoformat(
-                            reset_str.replace("Z", "+00:00")
-                        )
-                    except (ValueError, TypeError):
-                        pass
-
-                periods.append(
-                    UsagePeriod(
-                        name="Monthly",
-                        utilization=utilization,
-                        period_type=PeriodType.MONTHLY,
-                        resets_at=resets_at,
-                    )
+        # Parse reset date (shared across all quotas)
+        resets_at = None
+        if reset_str := data.get("quota_reset_date_utc") or data.get("quota_reset_date"):
+            try:
+                resets_at = datetime.fromisoformat(
+                    reset_str.replace("Z", "+00:00")
                 )
+            except (ValueError, TypeError):
+                pass
 
-        # Parse chat quotas (model-specific daily quotas)
-        if chat_quotas := data.get("chat_quotas"):
-            for quota in chat_quotas:
-                model = quota.get("model", "unknown")
-                limit = quota.get("limit", 0)
-                used = quota.get("used", 0)
+        # Parse quota_snapshots
+        if quota_snapshots := data.get("quota_snapshots"):
+            # Parse premium interactions (monthly quota)
+            if premium := quota_snapshots.get("premium_interactions"):
+                entitlement = premium.get("entitlement", 0)
+                remaining = premium.get("remaining", 0)
+                unlimited = premium.get("unlimited", False)
 
-                if limit > 0:
-                    utilization = int((used / limit) * 100)
-                    resets_at = None
-                    if reset_str := quota.get("reset_at"):
-                        try:
-                            resets_at = datetime.fromisoformat(
-                                reset_str.replace("Z", "+00:00")
-                            )
-                        except (ValueError, TypeError):
-                            pass
+                # Only add period if there's an actual quota (not unlimited with 0 entitlement)
+                if unlimited and entitlement == 0:
+                    # Unlimited quota, show as 0% utilization
+                    utilization = 0
+                elif entitlement > 0:
+                    # Calculate used from entitlement - remaining
+                    used = entitlement - remaining
+                    utilization = int((used / entitlement) * 100) if entitlement > 0 else 0
+                else:
+                    # No quota at all, skip
+                    pass
 
+                if unlimited or entitlement > 0:
                     periods.append(
                         UsagePeriod(
-                            name=f"{model} (Daily)",
+                            name="Monthly (Premium)",
                             utilization=utilization,
-                            period_type=PeriodType.DAILY,
+                            period_type=PeriodType.MONTHLY,
                             resets_at=resets_at,
-                            model=model,
                         )
                     )
 
-        # If no periods found, create a default monthly period
-        if not periods:
-            # Try to extract from alternative format
-            if "quota" in data:
-                quota = data["quota"]
-                if isinstance(quota, dict):
-                    total = quota.get("total", 0)
-                    used = quota.get("used", 0)
-                    if total > 0:
-                        utilization = int((used / total) * 100)
-                        periods.append(
-                            UsagePeriod(
-                                name="Monthly",
-                                utilization=utilization,
-                                period_type=PeriodType.MONTHLY,
-                            )
+            # Parse chat quota
+            if chat := quota_snapshots.get("chat"):
+                entitlement = chat.get("entitlement", 0)
+                remaining = chat.get("remaining", 0)
+                unlimited = chat.get("unlimited", False)
+
+                if unlimited and entitlement == 0:
+                    # Unlimited chat, show as 0% utilization
+                    periods.append(
+                        UsagePeriod(
+                            name="Monthly (Chat)",
+                            utilization=0,
+                            period_type=PeriodType.MONTHLY,
+                            resets_at=resets_at,
                         )
+                    )
+                elif entitlement > 0:
+                    used = entitlement - remaining
+                    utilization = int((used / entitlement) * 100)
+                    periods.append(
+                        UsagePeriod(
+                            name="Monthly (Chat)",
+                            utilization=utilization,
+                            period_type=PeriodType.MONTHLY,
+                            resets_at=resets_at,
+                        )
+                    )
+
+            # Parse completions quota
+            if completions := quota_snapshots.get("completions"):
+                entitlement = completions.get("entitlement", 0)
+                remaining = completions.get("remaining", 0)
+                unlimited = completions.get("unlimited", False)
+
+                if unlimited and entitlement == 0:
+                    # Unlimited completions, show as 0% utilization
+                    periods.append(
+                        UsagePeriod(
+                            name="Monthly (Completions)",
+                            utilization=0,
+                            period_type=PeriodType.MONTHLY,
+                            resets_at=resets_at,
+                        )
+                    )
+                elif entitlement > 0:
+                    used = entitlement - remaining
+                    utilization = int((used / entitlement) * 100)
+                    periods.append(
+                        UsagePeriod(
+                            name="Monthly (Completions)",
+                            utilization=utilization,
+                            period_type=PeriodType.MONTHLY,
+                            resets_at=resets_at,
+                        )
+                    )
 
         if not periods:
             return None
 
-        # Parse overage (Copilot doesn't have traditional overage, but we check)
+        # Parse overage (Copilot doesn't have traditional overage)
         overage = None
 
         # Parse identity
         from vibeusage.models import ProviderIdentity
 
         identity = None
-        if account := data.get("account"):
-            if isinstance(account, dict):
-                plan = account.get("plan") or account.get("subscription_tier")
-                org = account.get("organization")
-                email = account.get("email")
-                identity = ProviderIdentity(email=email, organization=org, plan=plan)
+        plan = data.get("copilot_plan")
+        # Extract email/org if available (not in current API response)
+        identity = ProviderIdentity(plan=plan) if plan else None
 
         return UsageSnapshot(
             provider="copilot",

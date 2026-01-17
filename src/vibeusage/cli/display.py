@@ -119,10 +119,24 @@ class SingleProviderDisplay:
             # Add header row
             yield Text(header_name, style="bold")
 
-            # Add general periods - show "All Models" for non-model-specific periods per spec
+            # Add general periods
             for period in general_periods:
+                # If period name has detail in parentheses (e.g., "Monthly (Premium)"),
+                # extract just the detail since the header already shows "Monthly"
+                if "(" in period.name and ")" in period.name:
+                    start = period.name.index("(") + 1
+                    end = period.name.index(")")
+                    detail = period.name[start:end]
+                    display_name = f"  {detail}"
+                # Otherwise, if period name matches the header (e.g., "Weekly" under "Weekly"),
+                # show "All Models" as a generic label
+                elif period.name == header_name:
+                    display_name = "  All Models"
+                # Otherwise use the period name as-is
+                else:
+                    display_name = f"  {period.name}"
                 grid.add_row(
-                    Text("  All Models", style="bold"),
+                    Text(display_name, style="bold"),
                     self._format_bar_and_percentage(period),
                     self._format_reset_time(period),
                 )
@@ -316,25 +330,29 @@ class ProviderPanel:
                 )
 
         # Display longer periods (compact view - no model-specific breakdown)
-        # Use period type name (e.g., "Weekly") instead of period name per spec 05
+        # For most providers, show period type. For Copilot with details, show period name with context
         if weekly_periods:
             for period in weekly_periods:
+                # If name has detail context like "Weekly (Model)", show it; otherwise show type
+                display = period.name if "(" in period.name else "Weekly"
                 grid.add_row(
-                    Text("Weekly", style="bold"),
+                    Text(display, style="bold"),
                     self._format_bar_and_percentage(period),
                     self._format_reset_time(period),
                 )
         if daily_periods:
             for period in daily_periods:
+                display = period.name if "(" in period.name else "Daily"
                 grid.add_row(
-                    Text("Daily", style="bold"),
+                    Text(display, style="bold"),
                     self._format_bar_and_percentage(period),
                     self._format_reset_time(period),
                 )
         if monthly_periods:
             for period in monthly_periods:
+                display = period.name if "(" in period.name else "Monthly"
                 grid.add_row(
-                    Text("Monthly", style="bold"),
+                    Text(display, style="bold"),
                     self._format_bar_and_percentage(period),
                     self._format_reset_time(period),
                 )
