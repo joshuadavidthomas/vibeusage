@@ -24,7 +24,19 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Provider registry and base protocol
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
-- ✓ Test suite (403 passing tests, 47% coverage)
+- ✓ Test suite (406 passing tests, 47% coverage)
+
+**Recent Fixes** (2026-01-17):
+- **Fixed Codex OAuth credential loading and API response parsing**
+  - Problem: `vibeusage usage codex` showed "Invalid credentials: missing access_token" error
+  - Root causes:
+    1. Credential format mismatch: Codex CLI stores OAuth tokens in nested `tokens` object (`{"tokens": {"access_token": "...", "refresh_token": "..."}}`), but code expected flat structure
+    2. API response format mismatch: Actual API returns `rate_limit` (singular), `primary_window`, `secondary_window`, `reset_at` but code expected `rate_limits` (plural), `primary`, `secondary`, `reset_timestamp`
+  - Fixes applied:
+    1. Modified `CodexOAuthStrategy._load_credentials()` to extract nested `tokens` key when present
+    2. Rewrote `CodexOAuthStrategy._parse_usage_response()` to support both actual API format and legacy format for backward compatibility
+  - Added 3 new tests for credential format handling and actual API response parsing
+  - All commands now work correctly: `vibeusage usage`, `vibeusage usage claude`, `vibeusage usage codex`
 
 **Recent Fixes** (2026-01-16):
 - **Fixed Claude OAuth credential loading and usage response parsing**

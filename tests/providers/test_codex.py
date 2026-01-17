@@ -332,6 +332,96 @@ class TestCodexOAuthStrategy:
         snapshot = strategy._parse_usage_response(data)
         assert snapshot is None
 
+    def test_parse_usage_response_actual_api_format(self):
+        """_parse_usage_response handles actual API response format.
+
+        Actual Codex API returns rate_limit (singular), primary_window,
+        secondary_window, and reset_at (not reset_timestamp).
+        """
+        strategy = CodexOAuthStrategy()
+
+        data = {
+            "rate_limit": {
+                "primary_window": {
+                    "used_percent": 24,
+                    "reset_at": 1768622273,
+                },
+                "secondary_window": {
+                    "used_percent": 46,
+                    "reset_at": 1768677366,
+                },
+            },
+            "credits": {
+                "has_credits": False,
+                "balance": "0",
+            },
+            "plan_type": "plus",
+        }
+
+        snapshot = strategy._parse_usage_response(data)
+
+        assert snapshot is not None
+        assert snapshot.provider == "codex"
+        assert len(snapshot.periods) == 2
+
+        # Check primary (session) period
+        primary = snapshot.periods[0]
+        assert primary.name == "Session"
+        assert primary.utilization == 24
+        assert primary.period_type == PeriodType.SESSION
+        assert primary.resets_at is not None
+
+        # Check secondary (weekly) period
+        secondary = snapshot.periods[1]
+        assert secondary.name == "Weekly"
+        assert secondary.utilization == 46
+        assert secondary.period_type == PeriodType.WEEKLY
+        assert secondary.resets_at is not None
+
+        # No credits when has_credits is False
+        assert snapshot.overage is None
+
+        # Check identity
+        assert snapshot.identity is not None
+        assert snapshot.identity.plan == "plus"
+
+    def test_load_credentials_handles_nested_tokens_format(self):
+        """_load_credentials handles Codex CLI format with nested tokens key.
+
+        The actual ~/.codex/auth.json format is:
+        {
+            "tokens": {
+                "access_token": "...",
+                "refresh_token": "..."
+            }
+        }
+        """
+        strategy = CodexOAuthStrategy()
+
+        # Mock read_credential to return Codex CLI format
+        with patch("vibeusage.providers.codex.oauth.read_credential") as mock_read:
+            mock_read.return_value = '{"tokens": {"access_token": "test_token", "refresh_token": "rt_"}}'
+
+            credentials = strategy._load_credentials()
+
+            assert credentials is not None
+            assert credentials.get("access_token") == "test_token"
+            assert credentials.get("refresh_token") == "rt_"
+
+    def test_load_credentials_handles_standard_format(self):
+        """_load_credentials handles standard Vibeusage format."""
+        strategy = CodexOAuthStrategy()
+
+        # Mock read_credential to return standard format
+        with patch("vibeusage.providers.codex.oauth.read_credential") as mock_read:
+            mock_read.return_value = '{"access_token": "test_token", "refresh_token": "rt_"}'
+
+            credentials = strategy._load_credentials()
+
+            assert credentials is not None
+            assert credentials.get("access_token") == "test_token"
+            assert credentials.get("refresh_token") == "rt_"
+
 
 class TestCodexProviderIntegration:
     """Integration tests for Codex provider with registry."""
