@@ -325,10 +325,10 @@ class TestJsonOutput:
 
         # Verify JSON is valid
         data = json.loads(output)
+        assert "errors" in data
+        assert "test" in data["errors"]
+        assert data["errors"]["test"] == "Test error message"
         assert "providers" in data
-        assert "test" in data["providers"]
-        assert data["providers"]["test"]["success"] is False
-        assert data["providers"]["test"]["error"] == "Test error message"
 
     def test_output_json_usage_multiple_providers(self):
         """output_json_usage handles multiple providers with mixed results."""
@@ -388,11 +388,12 @@ class TestJsonOutput:
 
         # Verify JSON is valid
         data = json.loads(output)
-        assert "provider1" in data
-        assert data["provider1"]["provider"] == "provider1"
-        assert "provider2" in data
-        assert data["provider2"]["success"] is False
-        assert data["provider2"]["error"] == "Auth failed"
+        assert "providers" in data
+        assert "provider1" in data["providers"]
+        assert data["providers"]["provider1"]["provider"] == "provider1"
+        assert "errors" in data
+        assert "provider2" in data["errors"]
+        assert data["errors"]["provider2"] == "Auth failed"
 
     def test_output_json_usage_with_overage(self):
         """output_json_usage includes overage data when present."""
@@ -449,8 +450,10 @@ class TestJsonOutput:
 
         # Verify JSON includes overage
         data = json.loads(output)
-        assert data["test"]["overage"] is not None
-        assert data["test"]["overage"]["limit"] == 50.0
-        assert data["test"]["overage"]["used"] == 20.0
-        assert data["test"]["overage"]["remaining"] == 30.0
-        assert data["test"]["overage"]["currency"] == "USD"
+        assert "providers" in data
+        assert "test" in data["providers"]
+        assert data["providers"]["test"]["overage"] is not None
+        assert data["providers"]["test"]["overage"]["limit"] == 50.0
+        assert data["providers"]["test"]["overage"]["used"] == 20.0
+        assert data["providers"]["test"]["overage"]["remaining"] == 30.0
+        assert data["providers"]["test"]["overage"]["currency"] == "USD"

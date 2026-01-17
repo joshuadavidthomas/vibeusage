@@ -37,6 +37,16 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-17: JSON Error Response Standardization (Priority 6)
+- **Implemented standardized ErrorResponse struct for JSON error output per spec 07**
+  - Added ErrorResponse and ErrorData msgpack.Structs to display/json.py
+  - Added output_json_error() function for consistent error JSON output
+  - Added from_vibeusage_error() helper to convert VibeusageError to ErrorResponse
+  - Updated multi-provider JSON format to use providers/errors dict structure per spec
+  - Single provider errors now include full error metadata (category, severity, provider, remediation)
+  - Added 14 new tests for ErrorResponse functionality
+  - All 512 tests pass (49% coverage)
+
 ### 2026-01-17: Gemini Provider Implementation
 - **Implemented complete Gemini provider with OAuth and API key strategies**
   - OAuth strategy uses Google Cloud Code API (retrieveUserQuota, loadCodeAssist endpoints)
@@ -222,8 +232,8 @@ A CLI application to track usage stats from all LLM providers to understand sess
 **Goal**: Production-ready error handling and UX
 
 #### Error Handling Enhancement
-- [ ] HTTP error classification (errors/http.py)
-- [ ] Network error handling (errors/network.py)
+- [x] HTTP error classification (errors/http.py)
+- [x] Network error handling (errors/network.py)
 
 #### User Experience Improvements
 - [ ] Progress indicators (spinners during fetches)
@@ -232,15 +242,15 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - [ ] Offline mode and graceful degradation
 
 #### JSON Output Enhancement
-- [ ] ErrorResponse struct for JSON error output
-- [ ] Multi-provider response struct
+- [x] ErrorResponse struct for JSON error output
+- [x] Multi-provider response struct
 
 **Value**: High - Makes tool production-ready
 
 ---
 
 ### Priority 7: Test Suite
-**Status**: MOSTLY COMPLETE (48% coverage, 498 passing tests, 0 test ordering issues)
+**Status**: MOSTLY COMPLETE (49% coverage, 512 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)
