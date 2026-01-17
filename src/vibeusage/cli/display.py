@@ -65,7 +65,7 @@ class UsageDisplay:
                 identity_text.append(" • ".join(identity_parts), style="dim")
                 lines.append(identity_text)
 
-        return Panel.fit(
+        yield Panel.fit(
             "\n".join(str(line) for line in lines),
             title=f"{self.snapshot.provider} Usage",
             border_style="cyan" if not self.cached else "yellow",
@@ -121,7 +121,7 @@ class ProviderPanel:
             overage_text = format_overage_used(overage.used, overage.limit, overage.currency)
             lines.append(overage_text)
 
-        return Panel.fit(
+        yield Panel.fit(
             "\n".join(str(line) for line in lines),
             border_style="cyan" if not self.cached else "yellow",
         )
@@ -171,7 +171,7 @@ class ErrorDisplay:
         if self.error.category != ErrorCategory.UNKNOWN:
             title = f"{title} [{self.error.category}]"
 
-        return Panel(
+        yield Panel(
             content,
             title=title,
             border_style=color,

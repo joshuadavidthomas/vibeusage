@@ -238,10 +238,7 @@ def output_json_usage(outcomes: dict) -> None:
 
 
 def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = None, json_mode: bool = False):
-    """Display multiple provider outcomes."""
-    from rich.panel import Panel
-    from rich.table import Table
-
+    """Display multiple provider outcomes using panel-based layout per spec."""
     # Check for JSON mode (from parameter or context)
     if json_mode or (ctx and ctx.meta.get("json")):
         output_json_usage(outcomes)
@@ -256,40 +253,30 @@ def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = No
         console.print("  vibeusage key <provider> set")
         return
 
-    # Create summary table
-    table = Table(title="Usage Summary", show_header=True, header_style="bold")
-    table.add_column("Provider", style="cyan")
-    table.add_column("Usage", style="green")
-    table.add_column("Status", style="yellow")
+    # Import UsageDisplay for panel-based display
+    from vibeusage.cli.display import UsageDisplay
+
+    errors = []
 
     for provider_id, outcome in outcomes.items():
         if outcome.success and outcome.snapshot:
-            snapshot = outcome.snapshot
-            primary = snapshot.primary_period() if snapshot.periods else None
-
-            if primary:
-                usage_text = f"{primary.utilization}%"
-                if outcome.cached:
-                    usage_text += " (cached)"
-            else:
-                usage_text = "N/A"
-
-            status = "✓" if not outcome.cached else "⚠"
+            # Create and print display for this provider
+            display = UsageDisplay(
+                outcome.snapshot,
+                cached=outcome.cached,
+            )
+            console.print(display)
         else:
-            usage_text = "Error"
-            status = "✗"
+            # Track errors for verbose output
+            if outcome.error:
+                errors.append((provider_id, outcome.error))
 
-        table.add_row(provider_id, usage_text, status)
-
-    console.print(table)
-
-    # Show errors if verbose
-    if ctx and ctx.meta.get("verbose"):
-        errors = [(pid, o.error) for pid, o in outcomes.items() if o.error]
+    # Show errors if verbose or if all providers failed
+    if (ctx and ctx.meta.get("verbose")) or (not has_data and errors):
         if errors:
             console.print("\n[red]Errors:[/red]")
-            for pid, error in errors:
-                console.print(f"  {pid}: {error}")
+            for provider_id, error in errors:
+                console.print(f"  {provider_id}: {error}")
 
 
 def format_period(period):

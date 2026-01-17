@@ -23,26 +23,3 @@
 99999999999999. If you find inconsistencies in the specs/* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 999999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Before ending: verify tests exist for modules you touched. No tests = add to @PLAN.md.
-
-<next>
-**IMPORTANT** This is your next task.
-
-vibeusage on  main [!] is 󰏗 v0.1.0  v3.14.0 (vibeusage) took 33s
-➜ vibeusage
-No usage data available
-
-Configure credentials with:
-  vibeusage key <provider> set
-
-vibeusage on  main [!] is 󰏗 v0.1.0  v3.14.0 (vibeusage)
-➜ vibeusage usage
-No usage data available
-
-Configure credentials with:
-  vibeusage key <provider> set
-
-The usage commands do not work. They should be fixed so they actually show the usage for the configured providers. Please update the @PLAN.md to note this. This is the highest priority.
-Consult the specs for how usage should be rendered.
-
-After fixing this, please delete this block.
-</next>

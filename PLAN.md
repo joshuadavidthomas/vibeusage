@@ -24,9 +24,18 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Provider registry and base protocol
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
-- ✓ Test suite (406 passing tests, 47% coverage)
+- ✓ Test suite (414 passing tests, 47% coverage, 3 test ordering issues in test_providers.py)
 
 **Recent Fixes** (2026-01-17):
+- **Fixed multi-provider usage display to use panel-based layout per spec 05**
+  - Problem: `vibeusage usage` was showing a simple summary table instead of the spec-compliant panel-based display with progress bars
+  - Root cause: `display_multiple_snapshots()` was using a Table instead of Panel-based display; Rich renderable classes had `__rich_console__` methods that `return` instead of `yield`
+  - Fixes applied:
+    1. Updated `display_multiple_snapshots()` to use `UsageDisplay` class for panel-based output
+    2. Fixed `UsageDisplay.__rich_console__()`, `ProviderPanel.__rich_console__()`, and `ErrorDisplay.__rich_console__()` to use `yield` instead of `return` for Rich renderable protocol
+    3. Multi-provider view now shows panels with provider names, progress bars, multiple periods, and reset times per spec
+  - Output now matches spec 05-cli-interface.md with proper panel formatting
+
 - **Fixed Codex OAuth credential loading and API response parsing**
   - Problem: `vibeusage usage codex` showed "Invalid credentials: missing access_token" error
   - Root causes:
@@ -83,17 +92,17 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 **Core Commands:**
 - `vibeusage --help` - Shows all commands correctly ✓
-- `vibeusage` (default) - Shows "No usage data available" message ✓
+- `vibeusage` (default) - Shows panel-based usage display per spec 05 ✓
 - `vibeusage --json` - JSON output works ✓
 - `vibeusage --version` - Shows "vibeusage 0.1.0" ✓
 - `vibeusage --no-color` - Works (disables color output) ✓
-- `vibeusage usage` - Works ✓
+- `vibeusage usage` - Shows panel-based usage display per spec 05 ✓
 - `vibeusage usage --json` - JSON output works ✓
 - `vibeusage usage --refresh` - Works ✓
 
-**Provider-Specific Usage (Expected Behavior):**
-- `vibeusage usage claude` - Gives "Invalid credentials: missing access_token" error (expected behavior, command works) ✓
-- `vibeusage usage codex` - Gives "Invalid credentials: missing access_token" error (expected) ✓
+**Provider-Specific Usage:**
+- `vibeusage usage claude` - Shows Claude usage data (OAuth credential loading fixed) ✓
+- `vibeusage usage codex` - Shows Codex usage data (OAuth credential loading fixed) ✓
 - `vibeusage usage copilot` - Gives "Strategy not available" error (expected, provider needs auth) ✓
 
 **Status & Auth Commands:**
@@ -139,7 +148,11 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 **CLI Design Note**: Provider-specific usage is accessed via `vibeusage usage <provider>`, NOT via top-level `vibeusage <provider>` commands. The providers (Claude, Codex, Copilot) ARE implemented and functional.
 
-**KEY FINDING**: The CRITICAL BUG with `typer.get_context()` that was blocking `vibeusage usage` has been FIXED. The command now works correctly.
+**KEY FINDING**: The CRITICAL BUG with `typer.get_context()` that was blocking `vibeusage usage` has been FIXED. Additionally, OAuth credential loading issues for both Claude and Codex providers have been FIXED. The usage commands now fully work:
+- `vibeusage` shows panel-based usage display for all enabled providers (per spec 05-cli-interface.md)
+- `vibeusage usage <provider>` shows detailed usage for specific provider
+- Both Claude and Codex providers correctly load OAuth credentials and display usage data
+- Fixed Rich renderable `__rich_console__` methods to use `yield` instead of `return` for Panel objects (2026-01-16)
 
 ---
 
