@@ -1,5 +1,6 @@
 """CLI commands for vibeusage."""
 
+from vibeusage.cli.commands.auth import auth_command
 from vibeusage.cli.commands.cache import cache_clear_command, cache_show_command
 from vibeusage.cli.commands.config import (
     config_edit_command,
@@ -14,6 +15,7 @@ from vibeusage.cli.commands.usage import usage_command
 __all__ = [
     "usage_command",
     "status_command",
+    "auth_command",
     "key_command",
     "key_set_command",
     "key_delete_command",

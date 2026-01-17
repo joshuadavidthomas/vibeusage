@@ -90,3 +90,4 @@ from vibeusage.cli.commands import (
     status_command,
     usage_command,
 )  # noqa: E402,F401
+from vibeusage.cli.commands.auth import auth_command  # noqa: E402,F401

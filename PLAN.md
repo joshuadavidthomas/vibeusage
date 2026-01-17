@@ -45,7 +45,6 @@ A CLI application to track usage stats from all LLM providers to understand sess
 **Minor Issues** (non-blocking):
 - ProviderStatus factory methods have wrong return type hints (returns `type[ProviderStatus]` instead of `ProviderStatus`)
 - `pace_to_color()` in models.py instead of display/colors.py (functional but location differs from spec)
-- `classify_exception()` not exported from errors/__init__.py
 
 ---
 
@@ -54,12 +53,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ### Priority 1: Complete Claude Provider Experience (MVP++)
 **Goal**: Make Claude provider fully functional with auth management
 
-- [ ] **Implement auth command** (cli/commands/auth.py)
-  - [ ] `vibeusage auth <provider>` - trigger provider-specific auth flow
-  - [ ] `vibeusage auth --status` - show auth status for all providers
-  - [ ] Claude: session key prompt with validation
-  - [ ] Integrate with ClaudeWebStrategy to save session credentials
-  - [ ] Rich table output with auth status indicators
+- [x] **Implement auth command** (cli/commands/auth.py)
+  - [x] `vibeusage auth <provider>` - trigger provider-specific auth flow
+  - [x] `vibeusage auth --status` - show auth status for all providers
+  - [x] Claude: session key prompt with validation
+  - [x] Integrate with ClaudeWebStrategy to save session credentials
+  - [x] Rich table output with auth status indicators
 
 - [ ] **Implement error display utilities** (cli/display.py errors/)
   - [ ] `UsageDisplay` class - __rich_console__ renderable for single provider
@@ -76,7 +75,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 - [ ] **Fix minor type issues**
   - [ ] Fix ProviderStatus factory method return type hints
-  - [ ] Export `classify_exception` from errors/__init__.py
+  - [x] Export `classify_exception` from errors/__init__.py
   - [ ] Consider moving `pace_to_color()` to display/colors.py for consistency
 
 **Value**: Completes end-to-end Claude experience with proper auth flow and error handling
