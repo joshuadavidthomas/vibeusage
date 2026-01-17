@@ -13,6 +13,7 @@ from vibeusage.providers import create_provider, list_provider_ids
 
 @app.command("usage")
 async def usage_command(
+    ctx: typer.Context,
     provider: str = typer.Argument(
         None,
         help="Provider to show (default: all enabled)",
@@ -31,7 +32,6 @@ async def usage_command(
 
     # Get console, respecting no-color option
     console = Console()
-    ctx = typer.get_context()
 
     try:
         if provider:
@@ -45,7 +45,7 @@ async def usage_command(
         else:
             # All enabled providers
             results = await fetch_all_usage(refresh)
-            display_multiple_snapshots(console, results)
+            display_multiple_snapshots(console, results, ctx)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted[/yellow]")
@@ -133,7 +133,7 @@ def display_snapshot(console, snapshot, source, cached):
     console.print(Panel.fit(content, title=f"{snapshot.provider} Usage"))
 
 
-def display_multiple_snapshots(console, outcomes):
+def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = None):
     """Display multiple provider outcomes."""
     from rich.panel import Panel
     from rich.table import Table
@@ -175,8 +175,7 @@ def display_multiple_snapshots(console, outcomes):
     console.print(table)
 
     # Show errors if verbose
-    ctx = typer.get_context()
-    if ctx.meta.get("verbose"):
+    if ctx and ctx.meta.get("verbose"):
         errors = [(pid, o.error) for pid, o in outcomes.items() if o.error]
         if errors:
             console.print("\n[red]Errors:[/red]")

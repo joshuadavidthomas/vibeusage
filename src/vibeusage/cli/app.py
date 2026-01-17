@@ -64,7 +64,7 @@ async def run_default_usage(ctx: typer.Context) -> None:
     console = Console()
     refresh = False  # Default to not refresh
     outcomes = await fetch_all_usage(refresh)
-    display_multiple_snapshots(console, outcomes)
+    display_multiple_snapshots(console, outcomes, ctx)
 
     # Cleanup HTTP client
     await cleanup()
