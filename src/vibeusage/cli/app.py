@@ -6,6 +6,7 @@ import asyncio
 from enum import IntEnum
 
 import typer
+from rich.console import Console
 
 from vibeusage.cli.atyper import ATyper
 
@@ -68,23 +69,28 @@ async def run_default_usage(ctx: typer.Context) -> None:
     """Run the default usage command."""
     import time
 
-    from rich.console import Console
-
     from vibeusage.cli.commands.usage import display_multiple_snapshots
     from vibeusage.cli.commands.usage import fetch_all_usage
+    from vibeusage.config.credentials import is_first_run
     from vibeusage.core.http import cleanup
 
     console = Console()
     refresh = False  # Default to not refresh
 
+    # Get verbose/quiet from context
+    verbose = ctx.meta.get("verbose", False)
+    quiet = ctx.meta.get("quiet", False)
+    json_mode = ctx.meta.get("json", False)
+
+    # Check for first run and show helpful message
+    if is_first_run() and not json_mode and not quiet:
+        _show_first_run_message(console)
+        raise typer.Exit(ExitCode.SUCCESS)
+
     # Fetch with timing
     start_time = time.monotonic()
     outcomes = await fetch_all_usage(refresh)
     duration_ms = (time.monotonic() - start_time) * 1000
-
-    # Get verbose/quiet from context
-    verbose = ctx.meta.get("verbose", False)
-    quiet = ctx.meta.get("quiet", False)
 
     display_multiple_snapshots(
         console,
@@ -97,6 +103,40 @@ async def run_default_usage(ctx: typer.Context) -> None:
 
     # Cleanup HTTP client
     await cleanup()
+
+
+def _show_first_run_message(console: Console) -> None:
+    """Show first-run welcome message."""
+    from rich.panel import Panel
+
+    from vibeusage.providers import list_provider_ids
+
+    console.print()
+    welcome = Panel(
+        """[bold cyan]Welcome to vibeusage![/bold cyan]
+
+[dim]No providers are configured yet.[/dim]
+
+[dim]Track your usage across AI providers in one place.[/dim]""",
+        title="✨ First-Time Setup",
+        border_style="cyan",
+        padding=(1, 2),
+    )
+    console.print(welcome)
+    console.print()
+
+    console.print("[bold]Quick start:[/bold]")
+    console.print("  [cyan]vibeusage init[/cyan] - Run the setup wizard")
+    console.print("  [cyan]vibeusage init --quick[/cyan] - Quick setup with Claude")
+    console.print()
+    console.print("[bold]Or set up a provider directly:[/bold]")
+
+    for provider_id in sorted(list_provider_ids())[:3]:  # Show first 3
+        console.print(f"  [dim]vibeusage auth {provider_id}[/dim]")
+
+    console.print()
+    console.print("[dim]Run 'vibeusage init' to see all available providers.[/dim]")
+    console.print()
 
 
 def run_app() -> None:

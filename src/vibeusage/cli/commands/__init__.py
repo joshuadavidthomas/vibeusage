@@ -8,6 +8,7 @@ from vibeusage.cli.commands import cache
 from vibeusage.cli.commands import config
 from vibeusage.cli.commands import key
 from vibeusage.cli.commands.auth import auth_command
+from vibeusage.cli.commands.init import init_command
 from vibeusage.cli.commands.status import status_command
 from vibeusage.cli.commands.usage import usage_command
 
@@ -16,6 +17,7 @@ __all__ = [
     "usage_command",
     "status_command",
     "auth_command",
+    "init_command",
     # Command groups
     "cache",
     "config",

@@ -152,3 +152,30 @@ def get_all_credential_status() -> dict[str, dict]:
             "source": source,
         }
     return status
+
+
+def is_first_run() -> bool:
+    """Check if this is the first run (no providers configured).
+
+    Returns:
+        True if no provider credentials are found, False otherwise
+    """
+    for provider_id in PROVIDER_CREDENTIAL_PATHS:
+        has_creds, _ = check_provider_credentials(provider_id)
+        if has_creds:
+            return False
+    return True
+
+
+def count_configured_providers() -> int:
+    """Count how many providers have credentials configured.
+
+    Returns:
+        Number of providers with credentials
+    """
+    count = 0
+    for provider_id in PROVIDER_CREDENTIAL_PATHS:
+        has_creds, _ = check_provider_credentials(provider_id)
+        if has_creds:
+            count += 1
+    return count

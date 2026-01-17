@@ -10,10 +10,12 @@ from unittest.mock import patch
 from vibeusage.config.credentials import _expand_path
 from vibeusage.config.credentials import check_credential_permissions
 from vibeusage.config.credentials import check_provider_credentials
+from vibeusage.config.credentials import count_configured_providers
 from vibeusage.config.credentials import credential_path
 from vibeusage.config.credentials import delete_credential
 from vibeusage.config.credentials import find_provider_credential
 from vibeusage.config.credentials import get_all_credential_status
+from vibeusage.config.credentials import is_first_run
 from vibeusage.config.credentials import read_credential
 from vibeusage.config.credentials import write_credential
 from vibeusage.config.paths import PACKAGE_NAME
@@ -801,3 +803,132 @@ class TestGetAllCredentialStatus:
             for provider_status in status.values():
                 assert "has_credentials" in provider_status
                 assert "source" in provider_status
+
+
+class TestIsFirstRun:
+    """Tests for is_first_run function."""
+
+    def test_returns_true_when_no_credentials(self, tmp_path):
+        """Returns True when no providers have credentials."""
+        # Disable provider CLI reuse to ensure no credentials are found
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            mock_get_config.return_value = config
+
+            assert is_first_run() is True
+
+    def test_returns_false_when_has_credentials(self, tmp_path):
+        """Returns False when at least one provider has credentials."""
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
+            mock_get_config.return_value = Config()
+
+            # Create a credential file
+            cred_path = tmp_path / "credentials" / "claude" / "oauth.json"
+            cred_path.parent.mkdir(parents=True, exist_ok=True)
+            cred_path.write_bytes(b'{"token": "test"}')
+
+            assert is_first_run() is False
+
+    def test_detects_env_var_credentials(self):
+        """Returns False when credentials exist in environment."""
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=Path("/tmp/credentials"),
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}),
+        ):
+            mock_get_config.return_value = config
+
+            assert is_first_run() is False
+
+
+class TestCountConfiguredProviders:
+    """Tests for count_configured_providers function."""
+
+    def test_returns_zero_when_none_configured(self, tmp_path):
+        """Returns 0 when no providers have credentials."""
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            mock_get_config.return_value = config
+
+            assert count_configured_providers() == 0
+
+    def test_counts_single_provider(self, tmp_path):
+        """Returns 1 when one provider has credentials."""
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            mock_get_config.return_value = config
+
+            # Create a credential file for claude
+            cred_path = tmp_path / "credentials" / "claude" / "oauth.json"
+            cred_path.parent.mkdir(parents=True, exist_ok=True)
+            cred_path.write_bytes(b'{"token": "test"}')
+
+            assert count_configured_providers() == 1
+
+    def test_counts_multiple_providers(self, tmp_path):
+        """Returns correct count when multiple providers have credentials."""
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            mock_get_config.return_value = config
+
+            # Create credential files for multiple providers
+            for provider in ["claude", "codex", "gemini"]:
+                cred_path = tmp_path / "credentials" / provider / "oauth.json"
+                cred_path.parent.mkdir(parents=True, exist_ok=True)
+                cred_path.write_bytes(b'{"token": "test"}')
+
+            assert count_configured_providers() == 3
+
+    def test_includes_env_var_credentials(self):
+        """Counts credentials from environment variables."""
+        config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=Path("/tmp/credentials"),
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}),
+        ):
+            mock_get_config.return_value = config
+
+            assert count_configured_providers() >= 1
+

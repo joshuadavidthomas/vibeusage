@@ -37,6 +37,14 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-16: First-Run Experience Wizard (Priority 6)
+- **Added first-run experience wizard with `vibeusage init` command**
+  - Added `is_first_run()` and `count_configured_providers()` functions to config/credentials.py
+  - Added first-run detection to default command that shows welcome message when no providers configured
+  - Created init.py command with interactive wizard, --quick flag, --skip flag, and JSON output support
+  - Added 25 new tests for first-run detection and init command functionality
+  - All 677 tests pass (54% coverage)
+
 ### 2026-01-16: Auth Module Tests (Priority 7)
 - **Added comprehensive test suite for auth/base.py (71 new tests, 96% coverage)**
   - Tests for all credential types: OAuth2Credentials, SessionCredentials, APIKeyCredentials, CLICredentials, LocalProcessCredentials
@@ -296,7 +304,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 #### User Experience Improvements
 - [x] Progress indicators (spinners during fetches)
-- [ ] First-run experience wizard
+- [x] First-run experience wizard
 - [x] Stale data display warnings (with configurable threshold)
 - [x] Offline mode and graceful degradation (automatic cache fallback)
 

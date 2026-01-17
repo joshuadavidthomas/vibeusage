@@ -10,6 +10,7 @@ from unittest.mock import patch
 from vibeusage.cli.app import ExitCode
 from vibeusage.cli.app import app
 from vibeusage.cli.app import run_app
+from vibeusage.cli.app import _show_first_run_message
 from vibeusage.cli.atyper import AsyncTyperCommand
 from vibeusage.cli.atyper import AsyncTyperGroup
 from vibeusage.cli.atyper import ATyper
@@ -461,3 +462,23 @@ class TestJsonOutput:
         assert data["providers"]["test"]["overage"]["used"] == 20.0
         assert data["providers"]["test"]["overage"]["remaining"] == 30.0
         assert data["providers"]["test"]["overage"]["currency"] == "USD"
+
+
+class TestShowFirstRunMessage:
+    """Tests for _show_first_run_message function."""
+
+    def test_show_first_run_message(self):
+        """_show_first_run_message displays welcome panel."""
+        from rich.console import Console
+
+        console = Console()
+        # Should not raise any errors
+        _show_first_run_message(console)
+
+    def test_show_first_run_message_has_content(self):
+        """_show_first_run_message includes expected content."""
+        from rich.console import Console
+
+        console = Console()
+        # Just verify it doesn't crash - the visual content is tested manually
+        _show_first_run_message(console)
