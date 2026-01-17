@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import time
+from datetime import UTC
+from datetime import datetime
 
 import typer
 from rich.console import Console
@@ -168,9 +170,6 @@ def format_status_updated(dt):
     """Format status updated time."""
     if dt is None:
         return "unknown"
-
-    from datetime import UTC
-    from datetime import datetime
 
     now = datetime.now(UTC)
     if dt.tzinfo is None:
