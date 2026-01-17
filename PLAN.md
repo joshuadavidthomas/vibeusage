@@ -37,6 +37,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-17: Missing CLI Subcommands Issue ✅ RESOLVED
+- **Issue**: Core CLI subcommands (auth, init, status, usage, key, cache, config) were missing from --help output
+- **Root Cause**: Stale cached build - the virtual environment had an outdated binary
+- **Resolution**: Ran `uv sync --reinstall` to rebuild the package
+- **Verification**: All 12 commands now showing correctly, all 1055 tests pass (82% coverage)
+
 ### 2026-01-17: CLI Subcommands Investigation
 
 **Issue Reported**: CLI subcommands (auth, init, status, usage, cache, config, key) were missing from `vibeusage --help`. Only provider commands (claude, codex, copilot, cursor, gemini) were showing.
