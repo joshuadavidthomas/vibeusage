@@ -46,8 +46,8 @@ class SingleProviderDisplay:
 
     def __rich_console__(self, console: Console, options: dict) -> RenderableType:
         """Render the single provider usage display."""
-        # Title line with provider name
-        title = Text(self.snapshot.provider, style="bold")
+        # Title line with provider name (capitalized per spec)
+        title = Text(self.snapshot.provider.title(), style="bold")
         yield title
 
         # Separator line (80 dashes)
@@ -104,20 +104,18 @@ class SingleProviderDisplay:
             # Add header row
             yield Text(header_name, style="bold")
 
-            # Add general periods (e.g., "All Models") - indented
+            # Add general periods - show "All Models" for non-model-specific periods per spec
             for period in general_periods:
-                display_name = period.model.title() if period.model else "All Models"
                 grid.add_row(
-                    Text(f"  {display_name}", style="bold"),
+                    Text("  All Models", style="bold"),
                     self._format_bar_and_percentage(period),
                     self._format_reset_time(period),
                 )
 
             # Add model-specific periods (e.g., "Opus", "Sonnet") - indented
             for period in model_periods:
-                display_name = period.model.title() if period.model else period.name
                 grid.add_row(
-                    Text(f"  {display_name}"),
+                    Text(f"  {period.name}"),
                     self._format_bar_and_percentage(period),
                     self._format_reset_time(period),
                 )
@@ -257,13 +255,6 @@ class ProviderPanel:
         grid.add_column(min_width=22, justify="left")  # Bar + percentage
         grid.add_column(justify="right")  # Reset time
 
-        # Add source row (e.g., "CLAUDE via oauth")
-        source_text = Text()
-        source_text.append(f"{self.snapshot.provider.upper()} ", style="bold")
-        if self.snapshot.source:
-            source_text.append(f"via {self.snapshot.source}", style="dim")
-        grid.add_row(source_text, Text(), Text())
-
         # In multi-provider (compact) view, skip model-specific periods
         # Only show general periods where model is None
         session_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION and p.model is None]
@@ -279,18 +270,30 @@ class ProviderPanel:
                     self._format_bar_and_percentage(period),
                     self._format_reset_time(period),
                 )
-            # Add separator if we have other periods to show
-            if weekly_periods or daily_periods or monthly_periods:
-                grid.add_row(Text(), Text(), Text())
 
         # Display longer periods (compact view - no model-specific breakdown)
-        all_longer_periods = weekly_periods + daily_periods + monthly_periods
-        for period in all_longer_periods:
-            grid.add_row(
-                Text(period.name, style="bold"),
-                self._format_bar_and_percentage(period),
-                self._format_reset_time(period),
-            )
+        # Use period type name (e.g., "Weekly") instead of period name per spec 05
+        if weekly_periods:
+            for period in weekly_periods:
+                grid.add_row(
+                    Text("Weekly", style="bold"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+        if daily_periods:
+            for period in daily_periods:
+                grid.add_row(
+                    Text("Daily", style="bold"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+        if monthly_periods:
+            for period in monthly_periods:
+                grid.add_row(
+                    Text("Monthly", style="bold"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
 
         # Add any remaining periods (not session/weekly/daily/monthly) - skip model-specific
         handled_types = {PeriodType.SESSION, PeriodType.WEEKLY, PeriodType.DAILY, PeriodType.MONTHLY}

@@ -34,6 +34,13 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-17: Usage Display Formatting Fix
+- **Fixed usage display formatting to match spec 05-cli-interface.md**
+  - Single provider view shows "All Models" for general periods with indented model-specific periods
+  - Multi-provider view shows period type names ("Weekly", "Daily") instead of period names ("All Models")
+  - Multi-provider view filters out model-specific periods for compact display
+  - Removed extra blank line in multi-provider view
+
 ### 2026-01-17: Verbose/Quiet Flags
 - **Implemented `--verbose` and `--quiet` flags across all commands**
   - Verbose mode shows: fetch timing, account identity, credential paths, model info
