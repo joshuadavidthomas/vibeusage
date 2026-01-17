@@ -37,6 +37,20 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-16: Progress Indicators & Stale Data Warnings
+- **Implemented progress indicators for concurrent fetch operations per Priority 6**
+  - Added `cli/progress.py` module with ProgressTracker and ProgressCallback classes
+  - Rich progress bar shows fetch status for all providers during concurrent fetches
+  - Respects `--quiet` flag to suppress progress output
+  - Integrates with orchestrator's `on_complete` callback pattern
+- **Wired up stale data warnings that were previously implemented but unused**
+  - `display_snapshot()` now shows stale warning for cached single provider data
+  - `display_multiple_snapshots()` shows stale warnings per provider
+  - Warnings respect `--quiet` flag
+  - Existing `show_stale_warning()` function in `cli/display.py` now properly integrated
+- All 512 tests pass (50% coverage)
+- Lint passes
+
 ### 2026-01-16: Linting Fixes
 - **Fixed linting issues across the codebase**
   - Ran ruff format on all files (60 files reformatted)
@@ -246,9 +260,9 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - [x] Network error handling (errors/network.py)
 
 #### User Experience Improvements
-- [ ] Progress indicators (spinners during fetches)
+- [x] Progress indicators (spinners during fetches)
 - [ ] First-run experience wizard
-- [ ] Stale data display warnings
+- [x] Stale data display warnings
 - [ ] Offline mode and graceful degradation
 
 #### JSON Output Enhancement
@@ -260,7 +274,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ### Priority 7: Test Suite
-**Status**: MOSTLY COMPLETE (49% coverage, 512 passing tests, 0 test ordering issues)
+**Status**: MOSTLY COMPLETE (50% coverage, 512 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)

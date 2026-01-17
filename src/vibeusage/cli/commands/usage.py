@@ -71,7 +71,26 @@ async def usage_command(
         else:
             # All enabled providers
             start_time = time.monotonic()
-            results = await fetch_all_usage(refresh)
+
+            # Set up progress tracking for concurrent fetches
+            from vibeusage.cli.progress import create_progress
+            from vibeusage.cli.progress import create_progress_callback
+            from vibeusage.providers import get_all_providers
+
+            provider_ids = list(get_all_providers().keys())
+
+            # Use context manager for progress tracking
+            with create_progress(console, quiet=quiet) as progress_tracker:
+                callback = create_progress_callback(progress_tracker)
+
+                if progress_tracker and not quiet:
+                    progress_tracker.start(provider_ids)
+
+                results = await fetch_all_usage(refresh, on_complete=callback)
+
+                if progress_tracker:
+                    progress_tracker.stop()
+
             duration_ms = (time.monotonic() - start_time) * 1000
 
             display_multiple_snapshots(
@@ -127,7 +146,7 @@ async def fetch_provider_usage(provider_id: str, refresh: bool):
     return outcome
 
 
-async def fetch_all_usage(refresh: bool):
+async def fetch_all_usage(refresh: bool, on_complete: callable | None = None):
     """Fetch usage for all enabled providers."""
     from vibeusage.core.orchestrator import fetch_enabled_providers
     from vibeusage.providers import get_all_providers
@@ -139,7 +158,7 @@ async def fetch_all_usage(refresh: bool):
         provider_map[provider_id] = provider.fetch_strategies()
 
     # Fetch all
-    outcomes = await fetch_enabled_providers(provider_map)
+    outcomes = await fetch_enabled_providers(provider_map, on_complete=on_complete)
     return outcomes
 
 
@@ -154,12 +173,17 @@ def display_snapshot(
 ):
     """Display a single usage snapshot with spec-compliant format."""
     from vibeusage.cli.display import SingleProviderDisplay
+    from vibeusage.cli.display import show_stale_warning
 
     # In quiet mode, show minimal output
     if quiet:
         for period in snapshot.periods:
             console.print(f"{snapshot.provider} {period.name}: {period.utilization}%")
         return
+
+    # Show stale warning if data is cached and old
+    if cached:
+        show_stale_warning(snapshot, console=console)
 
     # Verbose: add timing and source info before the main display
     if verbose:
@@ -338,11 +362,16 @@ def display_multiple_snapshots(
 
     # Import ProviderPanel for spec-compliant panel-based display
     from vibeusage.cli.display import ProviderPanel
+    from vibeusage.cli.display import show_stale_warning
 
     errors = []
 
     for provider_id, outcome in outcomes.items():
         if outcome.success and outcome.snapshot:
+            # Show stale warning if data is cached and old
+            if outcome.cached and not quiet:
+                show_stale_warning(outcome.snapshot, console=console)
+
             # Quiet mode: minimal output
             if quiet:
                 for period in outcome.snapshot.periods:
