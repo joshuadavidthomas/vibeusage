@@ -28,7 +28,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (860 passing tests, 73% coverage)
+- ✓ Test suite (888 passing tests, 74% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -36,6 +36,19 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ## Recent Fixes
+
+### 2026-01-16: CLI Command Tests Integration (Priority 7)
+- **Integrated 91 new CLI command tests** (previously untracked)
+  - 15 tests for cache commands (test_cache_commands.py)
+  - 20 tests for config commands (test_config_commands.py)
+  - 17 tests for key commands (test_key_commands.py)
+  - 39 tests for status commands (test_status_commands.py)
+  - 529 tests for core fetch pipeline (test_core_fetch.py)
+- **Fixed timestamp formatting tests** by moving datetime imports to module level in status.py
+  - Tests were failing because datetime was imported locally inside format_status_updated()
+  - Moving imports to module level enables proper mocking with patch decorators
+- **Test suite now shows 888 passing tests** (up from 860)
+- **Coverage improved to 74%** (up from 73%)
 
 ### 2026-01-16: Cache Module Tests (Priority 7)
 - **Added comprehensive test suite for config/cache.py (42 new tests, 97% coverage)**
@@ -381,7 +394,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ### Priority 7: Test Suite
-**Status**: GOOD PROGRESS (63% coverage, 741 passing tests, 0 test ordering issues)
+**Status**: GOOD PROGRESS (74% coverage, 888 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)
@@ -399,7 +412,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - [x] Status module tests (copilot/status.py, gemini/status.py at 100% coverage)
 
 **Remaining Issues**:
-- [ ] Increase code coverage from 48% to 80%+
+- [ ] Increase code coverage from 74% to 80%+
 - [ ] Add more display module tests (rich.py, json.py have partial coverage)
 
 **Value**: High - Essential for production reliability
