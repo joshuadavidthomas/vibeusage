@@ -1,0 +1,374 @@
+"""Tests for display utilities."""
+
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from io import StringIO
+from unittest.mock import patch
+
+import pytest
+from rich.text import Text
+
+from vibeusage.display.rich import (
+    render_usage_bar,
+    format_period,
+    format_overage_used,
+    format_period_line,
+)
+from vibeusage.display.json import (
+    output_json,
+    output_json_pretty,
+    encode_json,
+    decode_json,
+)
+from vibeusage.models import (
+    UsagePeriod,
+    PeriodType,
+    OverageUsage,
+)
+
+
+class TestRenderUsageBar:
+    """Tests for render_usage_bar function."""
+
+    def test_zero_utilization(self):
+        """Zero utilization renders empty bar."""
+        result = render_usage_bar(0, width=10)
+        plain = result.plain
+        assert plain == "░" * 10
+
+    def test_full_utilization(self):
+        """Full utilization renders full bar."""
+        result = render_usage_bar(100, width=10)
+        plain = result.plain
+        assert plain == "█" * 10
+
+    def test_half_utilization(self):
+        """Half utilization renders half-filled bar."""
+        result = render_usage_bar(50, width=10)
+        plain = result.plain
+        assert plain == "██████████"[:5] + "░" * 5
+
+    def test_custom_width(self):
+        """Custom width affects bar length."""
+        result = render_usage_bar(50, width=20)
+        plain = result.plain
+        assert len(plain) == 20
+
+    def test_default_width(self):
+        """Default width is 20."""
+        result = render_usage_bar(50)
+        plain = result.plain
+        assert len(plain) == 20
+
+    def test_color_override(self):
+        """Color override sets the color."""
+        result = render_usage_bar(50, color="red")
+        # The color is a Rich style attribute
+        assert result.spans[0].style == "red"
+
+    def test_no_color(self):
+        """No color uses default style."""
+        result = render_usage_bar(50)
+        # Should have a span
+        assert len(result.spans) > 0
+
+
+class TestFormatPeriod:
+    """Tests for format_period function."""
+
+    def test_format_basic_period(self, utc_now):
+        """Basic period formatting."""
+        period = UsagePeriod(
+            name="Daily",
+            utilization=65,
+            period_type=PeriodType.DAILY,
+            resets_at=utc_now + timedelta(hours=12),
+        )
+
+        result = format_period(period)
+        plain = result.plain
+
+        assert "65%" in plain
+        assert "Daily" in plain
+        assert "resets in" in plain
+
+    def test_format_without_reset_time(self):
+        """Period without reset time omits reset info."""
+        period = UsagePeriod(
+            name="Session", utilization=50, period_type=PeriodType.SESSION, resets_at=None
+        )
+
+        result = format_period(period)
+        plain = result.plain
+
+        assert "50%" in plain
+        assert "Session" in plain
+        assert "resets in" not in plain
+
+    def test_format_with_model(self, utc_now):
+        """Model-specific period includes model name."""
+        period = UsagePeriod(
+            name="Opus",
+            utilization=80,
+            period_type=PeriodType.DAILY,
+            model="opus",
+            resets_at=utc_now + timedelta(hours=6),
+        )
+
+        result = format_period(period)
+        plain = result.plain
+
+        assert "80%" in plain
+        assert "Opus" in plain
+
+    def test_progress_bar_included(self, utc_now):
+        """Progress bar is included in output."""
+        period = UsagePeriod(
+            name="Weekly", utilization=30, period_type=PeriodType.WEEKLY
+        )
+
+        result = format_period(period)
+        plain = result.plain
+
+        # Should have some block characters
+        assert "█" in plain or "░" in plain
+
+
+class TestFormatOverageUsed:
+    """Tests for format_overage_used function."""
+
+    def test_format_usd(self):
+        """Format USD with dollar symbol."""
+        result = format_overage_used(2.50, 15.00, "USD")
+        plain = result.plain
+
+        assert "$2.50" in plain
+        assert "$15.00" in plain
+        assert "Overage" in plain
+        assert "remaining" in plain
+
+    def test_format_non_usd(self):
+        """Format non-USD currency."""
+        result = format_overage_used(100, 500, "credits")
+        plain = result.plain
+
+        # No dollar sign for non-USD
+        assert "$" not in plain
+        assert "100.00" in plain or "100" in plain
+
+    def test_format_remaining(self):
+        """Calculates remaining correctly."""
+        result = format_overage_used(5.00, 20.00, "USD")
+        plain = result.plain
+
+        assert "15.00" in plain  # Remaining
+
+    def test_format_zero_remaining(self):
+        """Handles zero remaining."""
+        result = format_overage_used(20.00, 20.00, "USD")
+        plain = result.plain
+
+        assert "0.00" in plain
+
+
+class TestFormatPeriodLine:
+    """Tests for format_period_line function."""
+
+    def test_format_basic_line(self):
+        """Basic period line formatting."""
+        result = format_period_line("Session", 50)
+        plain = result.plain
+
+        assert "Session" in plain
+        assert "50%" in plain
+        assert "█" in plain or "░" in plain
+
+    def test_format_with_reset(self):
+        """Period line with reset time."""
+        result = format_period_line("Daily", 75, resets_at_str="2h 30m")
+        plain = result.plain
+
+        assert "Daily" in plain
+        assert "75%" in plain
+        assert "2h 30m" in plain
+
+    def test_format_with_indent(self):
+        """Period line with indentation."""
+        result = format_period_line("Weekly", 30, indent=4)
+        plain = result.plain
+
+        assert plain.startswith("    ")
+
+    def test_coloring_low_utilization(self):
+        """Low utilization gets green color."""
+        result = format_period_line("Session", 30)
+        # Should have green span
+        assert any(span.style == "green" for span in result.spans if span.style)
+
+    def test_coloring_medium_utilization(self):
+        """Medium utilization gets yellow color."""
+        result = format_period_line("Session", 65)
+        # Should have yellow span
+        assert any(span.style == "yellow" for span in result.spans if span.style)
+
+    def test_coloring_high_utilization(self):
+        """High utilization gets red color."""
+        result = format_period_line("Session", 85)
+        # Should have red span
+        assert any(span.style == "red" for span in result.spans if span.style)
+
+
+class TestOutputJson:
+    """Tests for output_json function."""
+
+    def test_output_simple_dict(self):
+        """Output simple dictionary as JSON."""
+        data = {"key": "value", "number": 42}
+
+        with patch("sys.stdout.buffer", new_callable=StringIO) as mock_buffer:
+            # Need to write bytes
+            import io
+            buffer = io.BytesIO()
+            with patch("sys.stdout.buffer", buffer):
+                output_json(data)
+
+            result = buffer.getvalue().decode()
+            assert '"key": "value"' in result
+            assert '"number": 42' in result
+
+    def test_output_newline(self):
+        """Output ends with newline."""
+        data = {"test": "value"}
+
+        with patch("sys.stdout.buffer", new_callable=io.BytesIO) as buffer:
+            with patch("sys.stdout.buffer", buffer):
+                output_json(data)
+
+            result = buffer.getvalue()
+            assert result.endswith(b"\n")
+
+    def test_output_msgspec_struct(self, sample_snapshot):
+        """Output msgspec Struct as JSON."""
+        with patch("sys.stdout.buffer", new_callable=io.BytesIO) as buffer:
+            with patch("sys.stdout.buffer", buffer):
+                output_json(sample_snapshot)
+
+            result = buffer.getvalue().decode()
+            assert '"provider": "claude"' in result
+
+
+class TestOutputJsonPretty:
+    """Tests for output_json_pretty function."""
+
+    def test_output_pretty_formatted(self):
+        """Output is pretty-printed with indentation."""
+        data = {"key": "value", "nested": {"a": 1, "b": 2}}
+
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            output_json_pretty(data, indent=2)
+
+            result = mock_stdout.getvalue()
+            # Check for indentation
+            assert "  " in result or "\n" in result
+            assert '"key": "value"' in result
+
+    def test_output_pretty_ends_with_newline(self):
+        """Pretty output ends with newline."""
+        data = {"test": "value"}
+
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            output_json_pretty(data)
+            result = mock_stdout.getvalue()
+            assert result.endswith("\n")
+
+    def test_custom_indent(self):
+        """Custom indent level is respected."""
+        data = {"key": "value"}
+
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
+            output_json_pretty(data, indent=4)
+            result = mock_stdout.getvalue()
+            # Check for 4-space indentation
+            assert "    " in result
+
+
+class TestEncodeJson:
+    """Tests for encode_json function."""
+
+    def test_encode_dict(self):
+        """Encode dictionary to JSON bytes."""
+        data = {"key": "value", "number": 42}
+        result = encode_json(data)
+
+        assert isinstance(result, bytes)
+        assert b'"key": "value"' in result
+        assert b'"number": 42' in result
+
+    def test_encode_list(self):
+        """Encode list to JSON bytes."""
+        data = [1, 2, 3, "four"]
+        result = encode_json(data)
+
+        assert isinstance(result, bytes)
+        assert b"[1, 2, 3, " in result
+
+    def test_encode_msgspec_struct(self, sample_snapshot):
+        """Encode msgspec Struct to JSON bytes."""
+        result = encode_json(sample_snapshot)
+
+        assert isinstance(result, bytes)
+        assert b'"provider": "claude"' in result
+
+    def test_encode_unicode(self):
+        """Handle unicode characters."""
+        data = {"message": "Hello World"}
+        result = encode_json(data)
+
+        assert isinstance(result, bytes)
+        assert b"Hello" in result
+
+
+class TestDecodeJson:
+    """Tests for decode_json function."""
+
+    def test_decode_dict(self):
+        """Decode JSON bytes to dictionary."""
+        json_bytes = b'{"key": "value", "number": 42}'
+        result = decode_json(json_bytes)
+
+        assert result == {"key": "value", "number": 42}
+
+    def test_decode_list(self):
+        """Decode JSON bytes to list."""
+        json_bytes = b'[1, 2, 3, "four"]'
+        result = decode_json(json_bytes)
+
+        assert result == [1, 2, 3, "four"]
+
+    def test_decode_with_type_hint(self, utc_now):
+        """Decode with type hint validates structure."""
+        from vibeusage.models import UsageSnapshot, UsagePeriod, PeriodType
+
+        json_bytes = b'{"provider": "claude", "fetched_at": "2025-01-15T12:00:00Z", "periods": []}'
+        result = decode_json(json_bytes, type=UsageSnapshot)
+
+        assert isinstance(result, UsageSnapshot)
+        assert result.provider == "claude"
+
+    def test_decode_invalid_json(self):
+        """Invalid JSON raises exception."""
+        json_bytes = b'{invalid json}'
+
+        with pytest.raises(Exception):  # msgspec.DecodeError
+            decode_json(json_bytes)
+
+    def test_decode_unicode(self):
+        """Handle unicode characters."""
+        json_bytes = '"Hello World"'.encode("utf-8")
+        result = decode_json(json_bytes)
+
+        assert "Hello" in result
+
+
+# Import io for BytesIO
+import io

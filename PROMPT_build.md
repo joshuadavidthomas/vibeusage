@@ -3,11 +3,13 @@
 0c. For reference, the application source code is in `src/*`.
 0d. For reference, the test suite is in `tests/*`.
 
-1. Your task is to implement functionality per the specifications using parallel subagents. Follow @PLAN.md and choose the most important item to address. Before making changes, search the codebase (don't assume not implemented) using Sonnet subagents. You may use parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions).
-2. After implementing functionality or resolving problems, run the tests for that unit of code that was improved. If functionality is missing then it's your job to add it as per the application specifications. Ultrathink.
-3. Write quality tests for every implementation. Tests that mock everything or assert nothing don't count. Ask: "Would this fail if the code broke?"
-4. When you discover issues, immediately update @PLAN.md with your findings using a subagent. When resolved, update and remove the item.
-5. When the tests pass, update @PLAN.md, then `git add -A` then `git commit` with a message describing the changes. After the commit, `git push`.
+1. Your task is to implement functionality per the specifications using parallel subagents. 
+2. Follow @PLAN.md and choose the most important item to address. **PICK ONLY ONE ITEM.**
+3. Before making changes, search the codebase (don't assume not implemented) using Sonnet subagents. You may use parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions).
+4. After implementing functionality or resolving problems, run the tests for that unit of code that was improved. If functionality is missing then it's your job to add it as per the application specifications. Ultrathink.
+5. Write quality tests for every implementation. Tests that mock everything or assert nothing don't count. Ask: "Would this fail if the code broke?"
+6. When you discover issues, immediately update @PLAN.md with your findings using a subagent. When resolved, update and remove the item.
+7. When the tests pass, update @PLAN.md, then `git add -A` then `git commit` with a message describing the changes. After the commit, `git push`.
 
 99999. Important: When authoring documentation, capture the why — tests and implementation importance.
 999999. Important: Single sources of truth, no migrations/adapters. If tests unrelated to your work fail, resolve them as part of the increment.
