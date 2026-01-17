@@ -12,7 +12,14 @@ import msgspec
 import pytest
 from rich.console import Console
 
+from vibeusage.cli.display import ErrorDisplay
 from vibeusage.cli.display import ProviderPanel
+from vibeusage.cli.display import calculate_age_minutes
+from vibeusage.cli.display import format_timedelta
+from vibeusage.cli.display import show_diagnostic_info
+from vibeusage.cli.display import show_error
+from vibeusage.cli.display import show_partial_failures
+from vibeusage.cli.display import show_stale_warning
 from vibeusage.cli.display import SingleProviderDisplay
 from vibeusage.display.json import ErrorData
 from vibeusage.display.json import ErrorResponse
@@ -886,3 +893,377 @@ class TestFromVibeusageError:
         assert result["error"]["message"] == "Test"
         assert result["error"]["category"] == "network"
         assert result["error"]["provider"] == "codex"
+
+
+class TestErrorDisplay:
+    """Tests for ErrorDisplay Rich renderable."""
+
+    def test_error_display_renders_message(self):
+        """ErrorDisplay renders error message."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        error = VibeusageError(
+            message="Test error",
+            category=ErrorCategory.AUTHENTICATION,
+            severity=ErrorSeverity.RECOVERABLE,
+        )
+
+        display = ErrorDisplay(error)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        assert "Test error" in output
+
+    def test_error_display_includes_provider_in_title(self):
+        """ErrorDisplay includes provider name in title."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        error = VibeusageError(
+            message="Auth failed",
+            category=ErrorCategory.AUTHENTICATION,
+            severity=ErrorSeverity.RECOVERABLE,
+            provider="claude",
+        )
+
+        display = ErrorDisplay(error)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        assert "Claude" in output
+
+    def test_error_display_includes_remediation(self):
+        """ErrorDisplay includes remediation steps."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        error = VibeusageError(
+            message="Token expired",
+            category=ErrorCategory.AUTHENTICATION,
+            severity=ErrorSeverity.RECOVERABLE,
+            remediation="Run: vibeusage auth claude",
+        )
+
+        display = ErrorDisplay(error)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        assert "Run: vibeusage auth claude" in output
+
+    def test_error_display_unknown_category_not_shown(self):
+        """Unknown category is not shown in title."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        error = VibeusageError(
+            message="Unknown error",
+            category=ErrorCategory.UNKNOWN,
+            severity=ErrorSeverity.WARNING,
+        )
+
+        display = ErrorDisplay(error)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        # Unknown category should not appear in brackets
+        assert "[unknown]" not in output.lower()
+
+
+class TestShowError:
+    """Tests for show_error function."""
+
+    def test_show_error_with_vibeusage_error(self, capsys):
+        """show_error displays VibeusageError."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        error = VibeusageError(
+            message="Test error",
+            category=ErrorCategory.NETWORK,
+            severity=ErrorSeverity.TRANSIENT,
+        )
+
+        show_error(error)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "Test error" in output
+
+    def test_show_error_with_exception(self, capsys):
+        """show_error converts Exception to VibeusageError."""
+        error = ValueError("Invalid value")
+
+        show_error(error)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        # Should show error message
+        assert "Invalid value" in output
+
+    def test_show_error_with_custom_console(self, capsys):
+        """show_error uses custom console."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        console = Console()
+        error = VibeusageError(
+            message="Custom console error",
+            category=ErrorCategory.CONFIGURATION,
+            severity=ErrorSeverity.FATAL,
+        )
+
+        show_error(error, console=console)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "Custom console error" in output
+
+
+class TestShowPartialFailures:
+    """Tests for show_partial_failures function."""
+
+    def test_show_partial_failures_with_errors(self, capsys):
+        """show_partial_failures displays multiple provider errors."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        errors = {
+            "claude": VibeusageError(
+                message="Auth failed",
+                category=ErrorCategory.AUTHENTICATION,
+                severity=ErrorSeverity.RECOVERABLE,
+                remediation="Run: vibeusage auth claude",
+            ),
+            "codex": ValueError("Connection timeout"),
+        }
+
+        show_partial_failures(errors)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "Errors" in output
+        assert "claude" in output
+        assert "Auth failed" in output
+        assert "codex" in output
+
+    def test_show_partial_failures_empty(self, capsys):
+        """show_partial_failures does nothing with empty dict."""
+        show_partial_failures({})
+        captured = capsys.readouterr()
+        output = captured.out
+
+        # Should not print anything
+        assert output == ""
+
+    def test_show_partial_failures_includes_remediation(self, capsys):
+        """show_partial_failures includes remediation steps."""
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
+
+        errors = {
+            "copilot": VibeusageError(
+                message="Rate limited",
+                category=ErrorCategory.RATE_LIMITED,
+                severity=ErrorSeverity.TRANSIENT,
+                remediation="Wait 10 minutes before retrying",
+            ),
+        }
+
+        show_partial_failures(errors)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "Wait 10 minutes" in output
+
+
+class TestShowStaleWarning:
+    """Tests for show_stale_warning function."""
+
+    def test_show_stale_warning_with_old_data(self, capsys):
+        """show_stale_warning shows warning for old cached data."""
+        now = datetime.now(UTC)
+        old_time = now - timedelta(minutes=15)
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            fetched_at=old_time,
+        )
+
+        show_stale_warning(snapshot, max_age_minutes=10)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "cached data" in output
+        assert "15 minute" in output
+
+    def test_show_stale_warning_with_hours(self, capsys):
+        """show_stale_warning formats age in hours."""
+        now = datetime.now(UTC)
+        old_time = now - timedelta(hours=2)
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            fetched_at=old_time,
+        )
+
+        show_stale_warning(snapshot, max_age_minutes=60)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "2 hour" in output
+
+    def test_show_stale_warning_no_warning_for_fresh_data(self, capsys):
+        """show_stale_warning does not warn for fresh data."""
+        now = datetime.now(UTC)
+        fresh_time = now - timedelta(minutes=5)
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            fetched_at=fresh_time,
+        )
+
+        show_stale_warning(snapshot, max_age_minutes=10)
+        captured = capsys.readouterr()
+        output = captured.out
+
+        # Should not print anything
+        assert "cached data" not in output
+
+
+class TestFormatTimedelta:
+    """Tests for format_timedelta function."""
+
+    def test_format_zero_seconds(self):
+        """Format zero or negative timedelta as 'now'."""
+        result = format_timedelta(timedelta(seconds=0))
+        assert result == "now"
+
+        result = format_timedelta(timedelta(seconds=-1))
+        assert result == "now"
+
+    def test_format_minutes_only(self):
+        """Format timedelta with only minutes."""
+        result = format_timedelta(timedelta(minutes=5))
+        assert result == "5m"
+
+        result = format_timedelta(timedelta(minutes=1))
+        assert result == "1m"
+
+    def test_format_hours_and_minutes(self):
+        """Format timedelta with hours and minutes."""
+        result = format_timedelta(timedelta(hours=2, minutes=30))
+        assert result == "2h 30m"
+
+    def test_format_days_and_hours(self):
+        """Format timedelta with days and hours."""
+        result = format_timedelta(timedelta(days=1, hours=4))
+        assert result == "1d 4h"
+
+    def test_format_days_only(self):
+        """Format timedelta with only days."""
+        result = format_timedelta(timedelta(days=3))
+        assert result == "3d 0h"
+
+
+class TestCalculateAgeMinutes:
+    """Tests for calculate_age_minutes function."""
+
+    def test_calculate_age_recent(self):
+        """Calculate age of recent snapshot."""
+        now = datetime.now(UTC)
+        recent = now - timedelta(minutes=5)
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            fetched_at=recent,
+        )
+
+        age = calculate_age_minutes(snapshot)
+        assert age == 5
+
+    def test_calculate_age_old(self):
+        """Calculate age of old snapshot."""
+        now = datetime.now(UTC)
+        old = now - timedelta(hours=2, minutes=30)
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            fetched_at=old,
+        )
+
+        age = calculate_age_minutes(snapshot)
+        assert age == 150
+
+    def test_calculate_age_future(self):
+        """Calculate age handles future timestamps (timezone edge case)."""
+        now = datetime.now(UTC)
+        future = now + timedelta(seconds=30)
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            fetched_at=future,
+        )
+
+        age = calculate_age_minutes(snapshot)
+        # Should be 0 or negative, converted to int
+        assert age <= 0
+
+
+class TestShowDiagnosticInfo:
+    """Tests for show_diagnostic_info function."""
+
+    def test_show_diagnostic_info_displays_version(self, capsys):
+        """show_diagnostic_info displays version info."""
+        show_diagnostic_info()
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "vibeusage version:" in output
+
+    def test_show_diagnostic_info_displays_paths(self, capsys):
+        """show_diagnostic_info displays config and cache paths."""
+        show_diagnostic_info()
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "Config directory:" in output
+        assert "Cache directory:" in output
+
+    def test_show_diagnostic_info_displays_credential_status(self, capsys):
+        """show_diagnostic_info displays credential status."""
+        show_diagnostic_info()
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "Credential Status:" in output
+
+    def test_show_diagnostic_info_displays_gate_status(self, capsys):
+        """show_diagnostic_info displays failure gate status."""
+        show_diagnostic_info()
+        captured = capsys.readouterr()
+        output = captured.out
+
+        assert "Failure Gate Status:" in output

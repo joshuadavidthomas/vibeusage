@@ -551,8 +551,8 @@ def show_diagnostic_info(console: Console | None = None) -> None:
     import sys
 
     from vibeusage import __version__
-    from vibeusage.config.paths import get_cache_dir
-    from vibeusage.config.paths import get_config_dir
+    from vibeusage.config.paths import cache_dir
+    from vibeusage.config.paths import config_dir
     from vibeusage.core.gate import get_failure_gate
     from vibeusage.providers import list_provider_ids
 
@@ -567,8 +567,8 @@ def show_diagnostic_info(console: Console | None = None) -> None:
     console.print(f"Platform: {platform.platform()}")
     console.print()
 
-    console.print(f"Config directory: {get_config_dir()}")
-    console.print(f"Cache directory: {get_cache_dir()}")
+    console.print(f"Config directory: {config_dir()}")
+    console.print(f"Cache directory: {cache_dir()}")
     console.print()
 
     # Show credential status
@@ -583,7 +583,6 @@ def show_diagnostic_info(console: Console | None = None) -> None:
     console.print()
 
     # Show failure gate status
-    get_failure_gate()
     console.print("[dim]Failure Gate Status:[/dim]")
     for provider_id in list_provider_ids():
         provider_gate = get_failure_gate(provider_id)
