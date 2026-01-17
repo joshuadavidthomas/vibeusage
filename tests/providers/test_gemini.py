@@ -13,6 +13,7 @@ from unittest.mock import patch
 import pytest
 
 from vibeusage.models import PeriodType
+from vibeusage.models import StatusLevel
 from vibeusage.providers.gemini import GeminiProvider
 from vibeusage.providers.gemini.api_key import GeminiApiKeyStrategy
 from vibeusage.providers.gemini.oauth import GeminiOAuthStrategy
@@ -390,3 +391,251 @@ class TestGeminiProviderIntegration:
 
         ids = list_provider_ids()
         assert "gemini" in ids
+
+
+class TestGeminiStatus:
+    """Tests for Gemini status fetching."""
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_returns_unknown_on_empty_fetch(self):
+        """fetch_gemini_status returns unknown when fetch_url returns None."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        with patch("vibeusage.providers.gemini.status.fetch_url", return_value=None):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.UNKNOWN
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_returns_unknown_on_json_error(self):
+        """fetch_gemini_status returns unknown on JSON decode error."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        with patch("vibeusage.providers.gemini.status.fetch_url", return_value=b"invalid"):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.UNKNOWN
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_operational_with_no_incidents(self):
+        """fetch_gemini_status returns operational when no Gemini incidents."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        empty_incidents = json.dumps([]).encode()
+        with patch("vibeusage.providers.gemini.status.fetch_url", return_value=empty_incidents):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.OPERATIONAL
+            assert "operational" in result.description.lower()
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_handles_dict_format(self):
+        """fetch_gemini_status handles dict format with incidents key."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        data = {"incidents": []}
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(data).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.OPERATIONAL
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_filters_ended_incidents(self):
+        """fetch_gemini_status filters out incidents with end_time."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                "title": "Gemini is slow",
+                "severity": "medium",
+                "end_time": "2026-01-15T00:00:00Z",  # Ended
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            # Should be operational since incident ended
+            assert result.level == StatusLevel.OPERATIONAL
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_matches_gemini_keyword(self):
+        """fetch_gemini_status detects Gemini keyword in title."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                "title": "Gemini API experiencing delays",
+                "severity": "medium",
+                # No end_time = active
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.DEGRADED
+            assert "Gemini" in result.description
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_matches_ai_studio_keyword(self):
+        """fetch_gemini_status detects AI Studio keyword."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                "title": "AI Studio is down",
+                "severity": "high",
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.PARTIAL_OUTAGE
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_matches_aistudio_keyword(self):
+        """fetch_gemini_status detects aistudio keyword."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                "title": "aistudio.google.com issues",
+                "severity": "low",
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.DEGRADED
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_matches_vertex_ai_keyword(self):
+        """fetch_gemini_status detects Vertex AI keyword."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                "title": "Vertex API latency",
+                "severity": "critical",
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            assert result.level == StatusLevel.MAJOR_OUTAGE
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_matches_affected_services(self):
+        """fetch_gemini_status checks affected_services for keywords."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                "title": "Google Cloud issues",
+                "severity": "medium",
+                "affected_services": [
+                    {"name": "Cloud Code API"},
+                    {"name": "Generative AI"},
+                ],
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            # Should match because "cloud code" is in affected_services
+            assert result.level == StatusLevel.DEGRADED
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_ignores_unrelated_incidents(self):
+        """fetch_gemini_status ignores incidents without Gemini keywords."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                "title": "Gmail experiencing delays",
+                "severity": "high",
+                "affected_services": [{"name": "Gmail"}],
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            # Should be operational since no Gemini-related incident
+            assert result.level == StatusLevel.OPERATIONAL
+
+    @pytest.mark.asyncio
+    async def test_fetch_gemini_status_handles_missing_fields(self):
+        """fetch_gemini_status handles missing fields gracefully."""
+        from vibeusage.providers.gemini.status import fetch_gemini_status
+
+        incidents = [
+            {
+                # No title
+                "severity": "medium",
+                "affected_services": [{"name": "Gemini"}],
+            },
+        ]
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_url",
+            return_value=json.dumps(incidents).encode(),
+        ):
+            result = await fetch_gemini_status()
+
+            # Should match via affected_services
+            assert result.level == StatusLevel.DEGRADED
+
+    def test_severity_to_level_mapping(self):
+        """_severity_to_level maps severities correctly."""
+        from vibeusage.providers.gemini.status import _severity_to_level
+
+        assert _severity_to_level("low") == StatusLevel.DEGRADED
+        assert _severity_to_level("medium") == StatusLevel.DEGRADED
+        assert _severity_to_level("high") == StatusLevel.PARTIAL_OUTAGE
+        assert _severity_to_level("critical") == StatusLevel.MAJOR_OUTAGE
+        assert _severity_to_level("severe") == StatusLevel.MAJOR_OUTAGE
+        assert _severity_to_level("unknown") == StatusLevel.DEGRADED
+        assert _severity_to_level("") == StatusLevel.DEGRADED
+        assert _severity_to_level(None) == StatusLevel.DEGRADED
+
+    @pytest.mark.asyncio
+    async def test_gemini_provider_fetch_status(self):
+        """GeminiProvider.fetch_status calls fetch_gemini_status."""
+        from vibeusage.models import ProviderStatus
+
+        with patch(
+            "vibeusage.providers.gemini.status.fetch_gemini_status"
+        ) as mock_fetch:
+            mock_fetch.return_value = ProviderStatus(
+                level=StatusLevel.OPERATIONAL,
+                description="All systems operational",
+                updated_at=datetime.now(UTC),
+            )
+
+            provider = GeminiProvider()
+            status = await provider.fetch_status()
+
+            assert status.level == StatusLevel.OPERATIONAL
+            mock_fetch.assert_called_once()

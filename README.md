@@ -1,1 +1,445 @@
 # vibeusage
+
+Track usage across agentic LLM providers from your terminal.
+
+A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, and Gemini with consistent formatting, progress indicators, and offline support.
+
+## Features
+
+- **Unified Interface**: Single command to check usage across all configured providers
+- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini
+- **Concurrent Fetching**: Check all providers in parallel
+- **Offline Support**: Displays cached data when network is unavailable
+- **JSON Output**: Scriptable with `--json` flag
+- **Progress Indicators**: Real-time feedback during fetch operations
+- **Pace-Based Coloring**: Visual indicators show if you're on track to stay within quota
+- **Stale Data Warnings**: Know when your usage data is outdated
+
+## Installation
+
+### Prerequisites
+
+- Python 3.14 or later
+- [uv](https://github.com/astral-sh/uv) (recommended) or pip
+
+### Install with uv (recommended)
+
+```bash
+uv pip install vibeusage
+```
+
+### Install with pip
+
+```bash
+pip install vibeusage
+```
+
+### Install from source
+
+```bash
+git clone https://github.com/joshuadavidthomas/vibeusage.git
+cd vibeusage
+uv pip install -e .
+```
+
+## Quick Start
+
+### First Run
+
+The first time you run vibeusage, you'll be guided through setup:
+
+```bash
+vibeusage
+```
+
+Follow the interactive wizard to configure your providers.
+
+### Check Usage for All Providers
+
+```bash
+vibeusage
+```
+
+### Check a Specific Provider
+
+```bash
+vibeusage claude
+vibeusage codex
+vibeusage copilot
+vibeusage cursor
+vibeusage gemini
+```
+
+### Authenticate with a Provider
+
+```bash
+vibeusage auth claude
+```
+
+## Provider Setup
+
+Each provider requires specific authentication. Follow the guides below:
+
+### Claude
+
+**Required**: Session key from Claude.ai
+
+```bash
+vibeusage auth claude
+```
+
+To get your session key:
+1. Open https://claude.ai in your browser
+2. Open DevTools (F12 or Cmd+Option+I)
+3. Go to Application → Cookies → https://claude.ai
+4. Find the `sessionKey` cookie
+5. Copy its value (starts with `sk-ant-sid01-`)
+6. Paste it when prompted
+
+**Alternative**: If you have the Claude CLI installed, vibeusage will automatically use its credentials from `~/.claude/.credentials.json`.
+
+### Codex (OpenAI)
+
+**Required**: OAuth tokens from Codex CLI
+
+```bash
+# First, authenticate with the Codex CLI
+codex auth login
+
+# Then vibeusage will automatically detect your credentials
+vibeusage codex
+```
+
+**Alternative**: Set the `OPENAI_API_KEY` environment variable.
+
+### GitHub Copilot
+
+**Required**: GitHub OAuth token via device flow
+
+```bash
+vibeusage auth copilot
+```
+
+You'll be prompted to:
+1. Visit a verification URL in your browser
+2. Enter a device code
+3. Authorize the vibeusage application
+
+**Alternative**: If you have the GitHub CLI installed, vibeusage can use your existing `gh auth login` credentials.
+
+### Cursor
+
+**Required**: Session token from browser cookies
+
+```bash
+vibeusage auth cursor
+```
+
+The tool will attempt to extract your session token from your browser automatically. If that fails:
+
+1. Open https://cursor.com in your browser
+2. Extract your session cookie
+3. Run `vibeusage key cursor set` and paste the token
+
+### Gemini
+
+**Required**: API key or OAuth tokens
+
+```bash
+# Option 1: Use API key
+export GEMINI_API_KEY=your_api_key_here
+vibeusage gemini
+
+# Option 2: Use OAuth (recommended for full features)
+vibeusage auth gemini
+```
+
+## Commands
+
+### Global Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--json` | `-j` | Output as JSON for scripting |
+| `--no-color` | | Disable colored output |
+| `--verbose` | `-v` | Show detailed output (fetch timing, account info) |
+| `--quiet` | `-q` | Minimal output (errors only) |
+| `--refresh` | | Force refresh, ignore cache |
+
+### Usage Commands
+
+```bash
+# Show usage for all configured providers
+vibeusage
+
+# Show usage for a specific provider
+vibeusage claude
+vibeusage codex
+vibeusage usage claude    # Same as above
+
+# Force refresh (ignore cache)
+vibeusage --refresh
+
+# JSON output for scripting
+vibeusage --json
+vibeusage claude --json
+```
+
+### Authentication Commands
+
+```bash
+# Authenticate with a provider
+vibeusage auth claude
+vibeusage auth codex
+vibeusage auth copilot
+vibeusage auth cursor
+vibeusage auth gemini
+
+# Show authentication status for all providers
+vibeusage auth --status
+```
+
+### Configuration Commands
+
+```bash
+# Show current configuration
+vibeusage config show
+
+# Show config/cache/credentials directory paths
+vibeusage config path
+
+# Reset to default configuration
+vibeusage config reset
+```
+
+### Key Management Commands
+
+```bash
+# Show credential status for all providers
+vibeusage key
+
+# Set a credential manually
+vibeusage key claude set
+vibeusage key codex set
+
+# Delete credentials
+vibeusage key claude delete
+```
+
+### Cache Commands
+
+```bash
+# Show cache status
+vibeusage cache show
+
+# Clear all cached data
+vibeusage cache clear
+
+# Clear cache for specific provider
+vibeusage cache clear claude
+```
+
+### Status Commands
+
+```bash
+# Show provider health status
+vibeusage status
+
+# JSON output
+vibeusage status --json
+```
+
+## Configuration
+
+### Config File Location
+
+Configuration is stored in:
+- **Linux**: `~/.config/vibeusage/config.toml`
+- **macOS**: `~/Library/Application Support/vibeusage/config.toml`
+- **Windows**: `%APPDATA%\vibeusage\config.toml`
+
+### Default Configuration
+
+```toml
+[display]
+show_remaining = true     # Show remaining % instead of used %
+pace_colors = true        # Use pace-based coloring
+reset_format = "countdown" # "countdown" or "absolute"
+
+[fetch]
+timeout = 30              # Fetch timeout in seconds
+max_concurrent = 5        # Max concurrent provider fetches
+stale_threshold = 60      # Stale data threshold in minutes
+
+[credentials]
+use_keyring = false                    # Use system keyring
+reuse_provider_credentials = true      # Auto-detect CLI credentials
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `VIBEUSAGE_CONFIG_DIR` | Override config directory |
+| `VIBEUSAGE_CACHE_DIR` | Override cache directory |
+| `VIBEUSAGE_ENABLED_PROVIDERS` | Comma-separated provider list |
+| `VIBEUSAGE_NO_COLOR` | Disable colored output |
+| `ANTHROPIC_API_KEY` | Claude API key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `GEMINI_API_KEY` | Gemini API key |
+| `GITHUB_TOKEN` | GitHub token for Copilot |
+
+## Output Format
+
+### Default Display
+
+```
+Claude
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Session (5h)  ████████████░░░░░░░░ 58%    resets in 2h 15m
+
+Weekly
+  All Models  ████░░░░░░░░░░░░░░░░ 23%    resets in 4d 12h
+  Opus        ██░░░░░░░░░░░░░░░░░░ 12%    resets in 4d 12h
+  Sonnet      ██████░░░░░░░░░░░░░░ 31%    resets in 4d 12h
+
+╭─ Overage ──────────────────────────────────────────────╮
+│ Extra Usage: $5.50 / $100.00 USD                       │
+╰────────────────────────────────────────────────────────╯
+```
+
+### Progress Bar Colors
+
+- **Green** (≤ 1.15x pace): On track or under pace
+- **Yellow** (1.15-1.30x pace): Slightly over pace
+- **Red** (> 1.30x pace): Significantly over pace
+
+### JSON Output
+
+```bash
+vibeusage --json
+```
+
+Returns structured data for scripting:
+
+```json
+{
+  "providers": {
+    "claude": {
+      "provider": "claude",
+      "fetched_at": "2025-01-16T12:34:56Z",
+      "periods": [...],
+      "identity": {...},
+      "status": {...}
+    }
+  },
+  "errors": {}
+}
+```
+
+## Troubleshooting
+
+### "Strategy not available" Error
+
+This means vibeusage couldn't find credentials for the provider. Run:
+
+```bash
+vibeusage auth <provider>
+```
+
+### Session Key Expired (Claude)
+
+Claude session keys expire periodically. Re-authenticate:
+
+```bash
+vibeusage auth claude
+```
+
+### Cache Showing Old Data
+
+Force a refresh:
+
+```bash
+vibeusage --refresh
+```
+
+Or clear the cache entirely:
+
+```bash
+vibeusage cache clear
+```
+
+### Permission Errors on Credentials
+
+Check file permissions:
+
+```bash
+ls -la ~/.config/vibeusage/credentials/
+```
+
+Credential files should be `0600` (read/write for owner only). Fix with:
+
+```bash
+chmod 600 ~/.config/vibeusage/credentials/*/*
+```
+
+### Network Timeout
+
+Increase timeout in config.toml:
+
+```toml
+[fetch]
+timeout = 60
+```
+
+Or use the cached data with the `--quiet` flag to suppress stale warnings.
+
+### Browser Cookie Extraction Fails (Cursor)
+
+Some browsers require additional libraries. Install:
+
+```bash
+pip install browser-cookie3
+# or
+pip install pycookiecheat
+```
+
+Alternatively, manually extract cookies and use `vibeusage key cursor set`.
+
+## Development
+
+### Setup Development Environment
+
+```bash
+git clone https://github.com/joshuadavidthomas/vibeusage.git
+cd vibeusage
+uv sync
+```
+
+### Run Tests
+
+```bash
+uv run pytest
+uv run pytest --cov
+```
+
+### Type Checking
+
+```bash
+uvx ty check
+```
+
+### Linting
+
+```bash
+uvx ruff check
+uvx ruff format
+```
+
+## License
+
+MIT
+
+## Author
+
+Josh Thomas - [@joshuadavidthomas](https://github.com/joshuadavidthomas)

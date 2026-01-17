@@ -13,6 +13,7 @@ from unittest.mock import patch
 import pytest
 
 from vibeusage.models import PeriodType
+from vibeusage.models import StatusLevel
 from vibeusage.providers import CopilotProvider
 from vibeusage.providers.copilot import CopilotDeviceFlowStrategy
 
@@ -586,3 +587,69 @@ class TestCopilotProviderIntegration:
 
         ids = list_provider_ids()
         assert "copilot" in ids
+
+
+class TestCopilotStatus:
+    """Tests for Copilot status fetching."""
+
+    @pytest.mark.asyncio
+    async def test_fetch_copilot_status_calls_statuspage(self):
+        """fetch_copilot_status calls fetch_statuspage_status with correct URL."""
+        from vibeusage.providers.copilot.status import fetch_copilot_status
+        from vibeusage.models import ProviderStatus
+
+        with patch(
+            "vibeusage.providers.copilot.status.fetch_statuspage_status"
+        ) as mock_fetch:
+            mock_fetch.return_value = ProviderStatus(
+                level=StatusLevel.OPERATIONAL,
+                description="All systems operational",
+                updated_at=datetime.now(UTC),
+            )
+
+            result = await fetch_copilot_status()
+
+            assert result.level == StatusLevel.OPERATIONAL
+            mock_fetch.assert_called_once_with(
+                "https://www.githubstatus.com/api/v2/status.json"
+            )
+
+    @pytest.mark.asyncio
+    async def test_fetch_copilot_status_propagates_degraded(self):
+        """fetch_copilot_status propagates degraded status."""
+        from vibeusage.providers.copilot.status import fetch_copilot_status
+        from vibeusage.models import ProviderStatus
+
+        with patch(
+            "vibeusage.providers.copilot.status.fetch_statuspage_status"
+        ) as mock_fetch:
+            mock_fetch.return_value = ProviderStatus(
+                level=StatusLevel.DEGRADED,
+                description="Some systems degraded",
+                updated_at=datetime.now(UTC),
+            )
+
+            result = await fetch_copilot_status()
+
+            assert result.level == StatusLevel.DEGRADED
+            assert result.description == "Some systems degraded"
+
+    @pytest.mark.asyncio
+    async def test_copilot_provider_fetch_status(self):
+        """CopilotProvider.fetch_status calls fetch_copilot_status."""
+        from vibeusage.models import ProviderStatus
+
+        with patch(
+            "vibeusage.providers.copilot.status.fetch_copilot_status"
+        ) as mock_fetch:
+            mock_fetch.return_value = ProviderStatus(
+                level=StatusLevel.OPERATIONAL,
+                description="All systems operational",
+                updated_at=datetime.now(UTC),
+            )
+
+            provider = CopilotProvider()
+            status = await provider.fetch_status()
+
+            assert status.level == StatusLevel.OPERATIONAL
+            mock_fetch.assert_called_once()

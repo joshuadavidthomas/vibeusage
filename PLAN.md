@@ -28,7 +28,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (685 passing tests, 58% coverage)
+- ✓ Test suite (724 passing tests, 61% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -36,6 +36,16 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ## Recent Fixes
+
+### 2026-01-16: Usage Command Tests (Priority 7)
+- **Added 39 comprehensive tests for CLI usage commands (tests/cli/test_usage_commands.py)**
+  - Tests for usage_command (main entry point) with single/multiple provider paths
+  - Tests for fetch_provider_usage and fetch_all_usage helper functions
+  - Tests for display_snapshot and display_multiple_snapshots display functions
+  - Tests for format_period, format_overage, and get_pace_color utility functions
+  - Tests for keyboard interrupt, exception handling, and cleanup behavior
+  - Tests for verbose/quiet modes and JSON output
+  - All 724 tests pass (61% coverage, up from 58%)
 
 ### 2026-01-16: First-Run Experience Wizard (Priority 6)
 - **Added first-run experience wizard with `vibeusage init` command**
@@ -330,7 +340,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ### Priority 7: Test Suite
-**Status**: MOSTLY COMPLETE (58% coverage, 685 passing tests, 0 test ordering issues)
+**Status**: GOOD PROGRESS (61% coverage, 724 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)
