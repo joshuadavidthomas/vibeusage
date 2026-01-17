@@ -23,3 +23,51 @@
 99999999999999. If you find inconsistencies in the specs/* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 999999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Before ending: verify tests exist for modules you touched. No tests = add to @PLAN.md.
+
+<next>
+**IMPORTANT** Please fix the following issues.
+
+vibeusage on  main [$!] is 󰏗 v0.1.0  v3.13.11 (vibeusage)
+➜ vibeusage auth
+                               Authentication Status
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Provider ┃ Status         ┃ Source       ┃ Details                              ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ claude   │ Authenticated  │ provider CLI │ /home/josh/.claude/.credentials.json │
+│ codex    │ Authenticated  │ provider CLI │ /home/josh/.codex/auth.json          │
+│ copilot  │ Not configured │ —            │ —                                    │
+│ cursor   │ Not configured │ —            │ —                                    │
+│ gemini   │ Not configured │ —            │ —                                    │
+└──────────┴────────────────┴──────────────┴──────────────────────────────────────┘
+
+To configure a provider, run:
+  vibeusage auth copilot
+  vibeusage auth cursor
+  vibeusage auth gemini
+
+vibeusage on  main [$!] is 󰏗 v0.1.0  v3.13.11 (vibeusage)
+➜ vibeusage auth copilot
+╭───────────────────────────────────────────── Instructions ─────────────────────────────────────────────╮
+│ GitHub Copilot Authentication                                                                          │
+│                                                                                                        │
+│ GitHub Copilot uses GitHub device flow OAuth.                                                          │
+│                                                                                                        │
+│ Run the official Copilot CLI to authenticate:                                                          │
+│   gh auth login                                                                                        │
+│                                                                                                        │
+│ Or set credentials manually:                                                                           │
+│   vibeusage key copilot set --type oauth                                                               │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+vibeusage on  main [$!] is 󰏗 v0.1.0  v3.14.0 (vibeusage)
+➜ vibeusage key copilot set --type oauth
+Usage: vibeusage key [OPTIONS] COMMAND [ARGS]...
+Try 'vibeusage key --help' for help.
+╭─ Error ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ No such command 'copilot'.                                                                                                                                                                                        │
+╰─────────────────────────────
+
+I have authenticated my `gh` cli. This is confusing.
+
+Once you have figured out and fixed this please delete this <next> block.
+</next>

@@ -137,12 +137,12 @@ class ProviderStatus(msgspec.Struct, frozen=True):
     updated_at: datetime | None = None  # When status was last checked
 
     @classmethod
-    def operational(cls) -> type[ProviderStatus]:
+    def operational(cls) -> ProviderStatus:
         """Factory for operational status."""
         return cls(level=StatusLevel.OPERATIONAL)
 
     @classmethod
-    def unknown(cls) -> type[ProviderStatus]:
+    def unknown(cls) -> ProviderStatus:
         """Factory for unknown status."""
         return cls(level=StatusLevel.UNKNOWN)
 
