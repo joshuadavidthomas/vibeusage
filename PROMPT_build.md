@@ -23,39 +23,3 @@
 99999999999999. If you find inconsistencies in the specs/* then use an Opus 4.5 subagent with 'ultrathink' requested to update the specs.
 999999999999999. IMPORTANT: Keep @AGENTS.md operational only — status updates and progress notes belong in `PLAN.md`. A bloated AGENTS.md pollutes every future loop's context.
 9999999999999999. Before ending: verify tests exist for modules you touched. No tests = add to @PLAN.md.
-
-<next>
-**IMPORTANT** This is your next task.
-
-The subcommands are gone. 
-
-vibeusage on  main [$!?] is 󰏗 v0.1.0  v3.14.0 (vibeusage)
-➜ vibeusage --help
-
- Usage: vibeusage [OPTIONS] COMMAND [ARGS]...
-
- Track usage across agentic LLM providers
-
-╭─ Options ──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ --json                -j        Enable JSON output mode                                                │
-│ --no-color                      Disable colored output                                                 │
-│ --verbose             -v        Enable verbose output                                                  │
-│ --quiet               -q        Enable quiet mode                                                      │
-│ --version                       Show version and exit                                                  │
-│ --install-completion            Install completion for the current shell.                              │
-│ --show-completion               Show completion for the current shell, to copy it or customize the     │
-│                                 installation.                                                          │
-│ --help                          Show this message and exit.                                            │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ─────────────────────────────────────────────────────────────────────────────────────────────╮
-│ claude    Show usage statistics for this provider.                                                     │
-│ codex     Show usage statistics for this provider.                                                     │
-│ copilot   Show usage statistics for this provider.                                                     │
-│ cursor    Show usage statistics for this provider.                                                     │
-│ gemini    Show usage statistics for this provider.                                                     │
-╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-Please investigate why all the other subcommands are gone and fix. Update the @PLAN.md with the details.
-
-Once complete delete this <next> block.
-</next>
