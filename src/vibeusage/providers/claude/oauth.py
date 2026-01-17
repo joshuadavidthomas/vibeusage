@@ -201,8 +201,8 @@ class ClaudeOAuthStrategy(FetchStrategy):
 
         # Parse standard periods (top-level keys that aren't extra_usage or null)
         period_mapping = {
-            "five_hour": ("5-hour session", PeriodType.SESSION),
-            "seven_day": ("7-day period", PeriodType.WEEKLY),
+            "five_hour": ("Session (5h)", PeriodType.SESSION),
+            "seven_day": ("All Models", PeriodType.WEEKLY),
             "monthly": ("Monthly", PeriodType.MONTHLY),
         }
 
@@ -259,7 +259,7 @@ class ClaudeOAuthStrategy(FetchStrategy):
 
                     periods.append(
                         UsagePeriod(
-                            name=f"7-day: {model_name}",
+                            name=model_name,
                             utilization=int(utilization),
                             period_type=PeriodType.WEEKLY,
                             resets_at=resets_at,

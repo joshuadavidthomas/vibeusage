@@ -27,25 +27,109 @@
 <next>
 **IMPORTANT** This is your next task.
 
-The usage commands are not to spec. They should be fixed so they actually show the usage for the configured providers. Please update the @PLAN.md to note this. This is the highest priority.
-Consult the specs for how usage should be rendered.
+## Usage Display is NOT to Spec
 
-Please see @ccusage_example.py for an example of how to render the blocks similar to the spec. Launch a subagent to thoroughly investigate that file.
+The usage command output does not match spec `05-cli-interface.md`. There are TWO distinct formats that must be implemented correctly:
 
-Current output:
-➜ vibeusage
-╭────────────────────── claude Usage ──────────────────────╮
-│ CLAUDE via oauth                                         │
-│ █░░░░░░░░░░░░░░░░░░░ 5% 5-hour session • resets in 4h 5m │
-│ █████░░░░░░░░░░░░░░░ 28% 7-day period • resets in 5d 16h │
-│ ░░░░░░░░░░░░░░░░░░░░ 3% 7-day: Sonnet • resets in 6d 16h │
-╰──────────────────────────────────────────────────────────╯
-╭──────────────────── codex Usage ────────────────────╮
-│ CODEX via oauth                                     │
-│ █████░░░░░░░░░░░░░░░ 25% Session • resets in 1h 3m  │
-│ █████████░░░░░░░░░░░ 46% Weekly • resets in 16h 21m │
-│ plus plan                                           │
-╰─────────────────────────────────────────────────────╯
+---
 
-After fixing this, please delete this block and @ccusage_example.py.
+### Issue 1: Missing Provider Commands
+
+Per spec lines 49-56, these top-level commands should exist but DO NOT:
+- `vibeusage claude` → currently "No such command 'claude'"
+- `vibeusage codex` → currently "No such command 'codex'"
+- etc.
+
+These should be **aliases** that behave identically to `vibeusage usage <provider>`.
+
+---
+
+### Issue 2: Single Provider View is Wrong
+
+When showing ONE provider (e.g., `vibeusage claude` or `vibeusage usage claude`), the format should be:
+
+```
+Claude
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Session (5h)  ████████████░░░░░░░░ 58%    resets in 2h 15m
+
+Weekly
+  All Models  ████░░░░░░░░░░░░░░░░ 23%    resets in 4d 12h
+  Opus        ██░░░░░░░░░░░░░░░░░░ 12%    resets in 4d 12h
+  Sonnet      ██████░░░░░░░░░░░░░░ 31%    resets in 4d 12h
+
+╭─ Overage ──────────────────────────────────────────────╮
+│ Extra Usage: $5.50 / $100.00 USD                       │
+╰────────────────────────────────────────────────────────╯
+```
+
+**Key features:**
+- Title line with `━━━` separator (NO panel wrapper for the main content)
+- Session period standalone, then **blank line**
+- "Weekly" section **header** (bold)
+- Model-specific periods are **indented** (`  All Models`, `  Sonnet`)
+- Only overage uses a Panel
+- Grid columns: period name | bar + percentage | reset time
+
+See `ccusage_example.py` `ClaudeUsage.__rich_console__()` for a working reference implementation.
+
+---
+
+### Issue 3: Multi-Provider View Should Be Compact
+
+When showing ALL providers (e.g., `vibeusage` or `vibeusage usage`), the format should be:
+
+```
+╭─ Claude ───────────────────────────────────────────────╮
+│ Session (5h)  ████████████░░░░░░░░ 58%   resets in 2h  │
+│ Weekly        ████░░░░░░░░░░░░░░░░ 23%   resets in 4d  │
+╰────────────────────────────────────────────────────────╯
+╭─ Codex ────────────────────────────────────────────────╮
+│ Session       ██████████░░░░░░░░░░ 50%   resets in 3h  │
+│ Weekly        ██░░░░░░░░░░░░░░░░░░ 12%   resets in 5d  │
+╰────────────────────────────────────────────────────────╯
+```
+
+**Key features:**
+- Uses Panel wrapper with provider name as title
+- **COMPACT** - NO model-specific periods (skip where `period.model is not None`)
+- Only shows main periods (Session, Weekly)
+- Grid columns: period name | bar + percentage | reset time
+
+See spec 05-cli-interface.md lines 386-398:
+```python
+for period in self.snapshot.periods:
+    if period.model is None:  # Skip model-specific in compact view
+```
+
+---
+
+### Current Output (WRONG)
+
+```
+╭────────────────────────────────────────────── ─ Claude ─ ──────────────────────────────────────────────╮
+│ 5-hour session  █░░░░░░░░░░░░░░░░░░░ 6%    resets in 4h 1m                                             │
+│ 7-day period    █████░░░░░░░░░░░░░░░ 28%  resets in 5d 16h                                             │
+│ 7-day: Sonnet   ░░░░░░░░░░░░░░░░░░░░ 3%   resets in 6d 16h  ← SHOULD NOT APPEAR IN MULTI-PROVIDER VIEW │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+Problems:
+1. Multi-provider view shows model-specific periods (7-day: Sonnet) - should be compact
+2. Single provider view uses panels - should use title+separator format
+3. No top-level provider commands exist
+
+---
+
+### Files to Modify
+
+1. `src/vibeusage/cli/app.py` - Add provider command aliases
+2. `src/vibeusage/cli/display.py` - Fix `ProviderPanel` to skip model-specific periods
+3. `src/vibeusage/cli/commands/usage.py` - Fix `display_snapshot` for single provider format
+
+### Reference
+
+See `ccusage_example.py` for a working implementation of the single-provider format. Delete this file after the fix is complete.
+
+After fixing, update PLAN.md and delete this `<next>` block and `ccusage_example.py`.
 </next>

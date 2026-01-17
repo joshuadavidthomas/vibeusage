@@ -94,15 +94,81 @@ class ProviderPanel:
 
     def __rich_console__(self, console: Console, options: dict) -> RenderableType:
         """Render the provider panel using grid layout per spec."""
+        from vibeusage.models import PeriodType
+
         # Create a grid with 3 columns: period name, bar+percentage, reset time
         grid = Table.grid(padding=(0, 2))
-        grid.add_column(justify="left")  # Period name
-        grid.add_column(justify="left")  # Bar + percentage
+        grid.add_column(min_width=12, justify="left")  # Period name
+        grid.add_column(min_width=22, justify="left")  # Bar + percentage
         grid.add_column(justify="right")  # Reset time
 
-        # Add periods
-        for period in self.snapshot.periods:
-            # Format per spec: "Name  bar  percentage%    resets in time"
+        # Add source row (e.g., "CLAUDE via oauth")
+        source_text = Text()
+        source_text.append(f"{self.snapshot.provider.upper()} ", style="bold")
+        if self.snapshot.source:
+            source_text.append(f"via {self.snapshot.source}", style="dim")
+        grid.add_row(source_text, Text(), Text())
+
+        # Group periods by type for proper display per spec
+        session_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION]
+        weekly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.WEEKLY]
+        daily_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY]
+        monthly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY]
+
+        # Display session periods first (typically "Session (5h)")
+        if session_periods:
+            for period in session_periods:
+                grid.add_row(
+                    Text(period.name, style="bold"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+            # Add separator if we have other periods to show
+            if weekly_periods or daily_periods or monthly_periods:
+                grid.add_row(Text(), Text(), Text())
+
+        # Display longer periods with header and indented model-specific periods
+        longer_periods = weekly_periods or daily_periods or monthly_periods
+        if longer_periods:
+            # Determine the header name based on period type
+            if weekly_periods:
+                header_name = "Weekly"
+                model_periods = [p for p in weekly_periods if p.model]
+                general_periods = [p for p in weekly_periods if not p.model]
+            elif daily_periods:
+                header_name = "Daily"
+                model_periods = [p for p in daily_periods if p.model]
+                general_periods = [p for p in daily_periods if not p.model]
+            else:  # monthly_periods
+                header_name = "Monthly"
+                model_periods = [p for p in monthly_periods if p.model]
+                general_periods = [p for p in monthly_periods if not p.model]
+
+            # Add header row
+            grid.add_row(Text(header_name, style="bold"), Text(), Text())
+
+            # Add general periods (e.g., "All Models")
+            for period in general_periods:
+                display_name = period.model.title() if period.model else "All Models"
+                grid.add_row(
+                    Text(f"  {display_name}", style="bold"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+
+            # Add model-specific periods (e.g., "Opus", "Sonnet")
+            for period in model_periods:
+                display_name = period.model.title() if period.model else period.name
+                grid.add_row(
+                    Text(f"  {display_name}"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+
+        # Add any remaining periods (not session/weekly/daily/monthly) as-is
+        handled_types = {PeriodType.SESSION, PeriodType.WEEKLY, PeriodType.DAILY, PeriodType.MONTHLY}
+        remaining_periods = [p for p in self.snapshot.periods if p.period_type not in handled_types]
+        for period in remaining_periods:
             grid.add_row(
                 Text(period.name, style="bold"),
                 self._format_bar_and_percentage(period),
@@ -121,11 +187,10 @@ class ProviderPanel:
                 Text(),
             )
 
-        # Create panel with provider name as title
-        title = f"─ {self.snapshot.provider.title()} ─"
+        # Create panel with provider name as title (e.g., "Claude", "Codex")
         yield Panel(
             grid,
-            title=title,
+            title=self.snapshot.provider.title(),
             border_style="dim",
             padding=(0, 1),
         )

@@ -338,9 +338,9 @@ def format_period(period, verbose: bool = False):
 
     text = Text()
 
-    # Bar based on utilization
+    # Bar based on utilization - using integer division for 5% segments (width=20)
     bar_width = 20
-    filled = int((period.utilization / 100) * bar_width)
+    filled = period.utilization * bar_width // 100
     bar = "█" * filled + "░" * (bar_width - filled)
 
     # Color based on pace

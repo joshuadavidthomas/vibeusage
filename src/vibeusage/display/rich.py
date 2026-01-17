@@ -22,7 +22,10 @@ def render_usage_bar(
     Returns:
         Rich Text with the progress bar
     """
-    filled = int((utilization / 100) * width)
+    # Use integer division for consistent bar segments (5% per segment for width=20)
+    # For width=20: 100% = 20 blocks, 5% = 1 block (utilization // 5)
+    # For general width: scale the calculation proportionally
+    filled = utilization * width // 100
     bar = "█" * filled + "░" * (width - filled)
 
     text = Text()

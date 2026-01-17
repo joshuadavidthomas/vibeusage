@@ -71,6 +71,15 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - All commands now work correctly: `vibeusage usage`, `vibeusage usage claude`, `vibeusage usage codex`
 
 **Recent Fixes** (2026-01-16):
+- **Fixed usage display to match panel-based layout spec**
+  - Problem: Period display showed inconsistent formatting for SESSION vs WEEKLY/DAILY/MONTHLY period types
+  - Fixes applied:
+    1. Updated `ProviderPanel.__rich_console__()` to group periods by type (SESSION vs WEEKLY/DAILY/MONTHLY)
+    2. Added proper "Session (5h)" display followed by empty separator row
+    3. Added "Weekly"/"Daily"/"Monthly" header with indented model-specific periods
+    4. Updated Claude OAuth provider to use "Session (5h)" instead of "5-hour session" and "All Models" instead of "7-day period"
+  - Output now matches spec with clear visual separation between session and recurring periods
+
 - **Fixed Claude OAuth credential loading and usage response parsing**
   - Problem: `vibeusage` and `vibeusage usage` showed "No usage data available" even when Claude credentials existed
   - Root causes:
