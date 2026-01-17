@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 AUTH_ERROR_TEMPLATES: dict[str, dict[str, str]] = {
     "claude": {
         "401": (
@@ -119,7 +118,7 @@ def get_provider_remediation(provider_id: str, category: str) -> str | None:
             f"Check [cyan]https://status.{provider_id}.com[/cyan] for outages."
         ),
         ErrorCategory.CONFIGURATION: (
-            f"Run '[cyan]vibeusage config show[/cyan]' to check your configuration."
+            "Run '[cyan]vibeusage config show[/cyan]' to check your configuration."
         ),
     }
 

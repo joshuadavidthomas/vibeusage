@@ -6,7 +6,8 @@ These models abstract provider-specific API responses into a consistent format.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from decimal import Decimal
 from enum import StrEnum
 

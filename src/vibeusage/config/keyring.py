@@ -1,4 +1,5 @@
 """Optional system keyring integration for secure credential storage."""
+from __future__ import annotations
 
 from functools import lru_cache
 

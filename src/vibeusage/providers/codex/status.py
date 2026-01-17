@@ -1,4 +1,5 @@
 """Status fetching for Codex (OpenAI) provider."""
+from __future__ import annotations
 
 from vibeusage.models import ProviderStatus
 from vibeusage.providers.claude.status import fetch_statuspage_status

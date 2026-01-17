@@ -1,9 +1,9 @@
 """Retry logic with exponential backoff for vibeusage."""
+from __future__ import annotations
 
 import asyncio
 import random
 from dataclasses import dataclass
-from datetime import timedelta
 
 import httpx
 

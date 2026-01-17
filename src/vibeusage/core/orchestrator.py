@@ -1,10 +1,12 @@
 """Orchestration for multi-provider fetch operations."""
+from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
 
 from vibeusage.config.settings import get_config
-from vibeusage.core.aggregate import AggregatedResult, aggregate_results
+from vibeusage.core.aggregate import AggregatedResult
+from vibeusage.core.aggregate import aggregate_results
 from vibeusage.core.fetch import execute_fetch_pipeline
 from vibeusage.strategies.base import FetchOutcome
 

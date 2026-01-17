@@ -1,8 +1,10 @@
 """Failure gate to prevent retry flapping for vibeusage."""
+from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from dataclasses import field
+from datetime import datetime
+from datetime import timedelta
 
 from vibeusage.config.paths import gate_dir
 from vibeusage.errors.types import ErrorCategory

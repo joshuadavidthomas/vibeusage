@@ -2,31 +2,32 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-import pytest
 import httpx
+import pytest
 
-from vibeusage.models import (
-    OverageUsage,
-    PeriodType,
-    ProviderIdentity,
-    ProviderStatus,
-    StatusLevel,
-    UsagePeriod,
-    UsageSnapshot,
-)
-from vibeusage.errors.types import (
-    ErrorCategory,
-    ErrorSeverity,
-    HTTPErrorMapping,
-    VibeusageError,
-)
-from vibeusage.core.gate import FailureGate, FailureRecord
+from vibeusage.core.gate import FailureGate
+from vibeusage.core.gate import FailureRecord
+from vibeusage.errors.types import ErrorCategory
+from vibeusage.errors.types import ErrorSeverity
+from vibeusage.errors.types import HTTPErrorMapping
+from vibeusage.errors.types import VibeusageError
+from vibeusage.models import OverageUsage
+from vibeusage.models import PeriodType
+from vibeusage.models import ProviderIdentity
+from vibeusage.models import ProviderStatus
+from vibeusage.models import StatusLevel
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
 
 
 @pytest.fixture

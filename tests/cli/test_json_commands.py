@@ -1,21 +1,18 @@
 """Tests for JSON output on CLI commands."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from decimal import Decimal
 from io import StringIO
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from vibeusage.cli.commands.usage import output_single_provider_json
-from vibeusage.models import (
-    OverageUsage,
-    PeriodType,
-    ProviderIdentity,
-    UsagePeriod,
-    UsageSnapshot,
-)
+from vibeusage.models import OverageUsage
+from vibeusage.models import PeriodType
+from vibeusage.models import ProviderIdentity
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
 from vibeusage.strategies.base import FetchOutcome
 
 
@@ -158,8 +155,9 @@ class TestJsonCommandOptions:
 
     def test_usage_command_accepts_json_option(self):
         """usage command accepts --json option."""
-        from vibeusage.cli.app import app
         from typer.testing import CliRunner
+
+        from vibeusage.cli.app import app
 
         runner = CliRunner()
         result = runner.invoke(app, ["usage", "--help"])
@@ -168,8 +166,9 @@ class TestJsonCommandOptions:
 
     def test_status_command_accepts_json_option(self):
         """status command accepts --json option."""
-        from vibeusage.cli.app import app
         from typer.testing import CliRunner
+
+        from vibeusage.cli.app import app
 
         runner = CliRunner()
         result = runner.invoke(app, ["status", "--help"])
@@ -178,8 +177,9 @@ class TestJsonCommandOptions:
 
     def test_auth_command_accepts_json_option(self):
         """auth command accepts --json option."""
-        from vibeusage.cli.app import app
         from typer.testing import CliRunner
+
+        from vibeusage.cli.app import app
 
         runner = CliRunner()
         result = runner.invoke(app, ["auth", "--help"])

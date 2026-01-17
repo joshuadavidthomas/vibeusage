@@ -1,16 +1,21 @@
 """OAuth strategy for Claude provider."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 
-import httpx
-
-from vibeusage.config.credentials import read_credential, write_credential
+from vibeusage.config.credentials import read_credential
+from vibeusage.config.credentials import write_credential
 from vibeusage.config.paths import config_dir
 from vibeusage.core.http import get_http_client
-from vibeusage.models import OverageUsage, PeriodType, UsagePeriod, UsageSnapshot
-from vibeusage.strategies.base import FetchResult, FetchStrategy
+from vibeusage.models import OverageUsage
+from vibeusage.models import PeriodType
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
+from vibeusage.strategies.base import FetchResult
+from vibeusage.strategies.base import FetchStrategy
 
 
 class ClaudeOAuthStrategy(FetchStrategy):
@@ -123,7 +128,8 @@ class ClaudeOAuthStrategy(FetchStrategy):
             if snake_key == "expires_at":
                 if isinstance(value, (int, float)):
                     # Convert millisecond timestamp to ISO string
-                    from datetime import datetime, timezone
+                    from datetime import datetime
+                    from datetime import timezone
 
                     value = datetime.fromtimestamp(
                         value / 1000, tz=timezone.utc

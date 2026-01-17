@@ -1,7 +1,10 @@
 """Gemini (Google AI) provider for vibeusage."""
+from __future__ import annotations
 
-from vibeusage.models import ProviderStatus, StatusLevel
-from vibeusage.providers.base import Provider, ProviderMetadata
+from vibeusage.models import ProviderStatus
+from vibeusage.models import StatusLevel
+from vibeusage.providers.base import Provider
+from vibeusage.providers.base import ProviderMetadata
 from vibeusage.providers.gemini.api_key import GeminiApiKeyStrategy
 from vibeusage.providers.gemini.oauth import GeminiOAuthStrategy
 

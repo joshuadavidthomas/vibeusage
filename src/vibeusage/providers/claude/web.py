@@ -1,21 +1,22 @@
 """Web (session key) strategy for Claude provider."""
+from __future__ import annotations
 
 import json
-import re
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime
+from datetime import timezone
 
-import httpx
-
-from vibeusage.config.cache import cache_org_id, load_cached_org_id
-from vibeusage.config.credentials import (
-    credential_path,
-    read_credential,
-    write_credential,
-)
+from vibeusage.config.cache import cache_org_id
+from vibeusage.config.cache import load_cached_org_id
+from vibeusage.config.credentials import credential_path
+from vibeusage.config.credentials import read_credential
+from vibeusage.config.credentials import write_credential
 from vibeusage.core.http import get_http_client
-from vibeusage.models import OverageUsage, PeriodType, UsagePeriod, UsageSnapshot
-from vibeusage.strategies.base import FetchResult, FetchStrategy
+from vibeusage.models import OverageUsage
+from vibeusage.models import PeriodType
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
+from vibeusage.strategies.base import FetchResult
+from vibeusage.strategies.base import FetchStrategy
 
 
 class ClaudeWebStrategy(FetchStrategy):

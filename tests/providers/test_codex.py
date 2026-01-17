@@ -1,12 +1,17 @@
 """Tests for Codex (OpenAI) provider."""
+from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from pathlib import Path
+from unittest.mock import AsyncMock
+from unittest.mock import patch
 
 import pytest
 
-from vibeusage.models import StatusLevel, PeriodType, UsagePeriod, UsageSnapshot
+from vibeusage.models import PeriodType
+from vibeusage.models import StatusLevel
 from vibeusage.providers.codex import CodexProvider
 from vibeusage.providers.codex.oauth import CodexOAuthStrategy
 

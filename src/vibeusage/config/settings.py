@@ -1,11 +1,11 @@
 """Configuration structures and loading for vibeusage."""
+from __future__ import annotations
 
 import os
 from pathlib import Path
 from typing import Literal
 
 import msgspec
-
 
 # Default values
 DEFAULT_TIMEOUT = 30.0

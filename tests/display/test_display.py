@@ -1,36 +1,30 @@
 """Tests for display utilities."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from decimal import Decimal
-from io import StringIO
-from unittest.mock import patch
 
 import pytest
-from rich.text import Text
 
-from vibeusage.display.rich import (
-    render_usage_bar,
-    format_period,
-    format_overage_used,
-    format_period_line,
-)
-from vibeusage.display.json import (
-    output_json,
-    output_json_pretty,
-    encode_json,
-    decode_json,
-    ErrorResponse,
-    ErrorData,
-    create_error_response,
-    output_json_error,
-    from_vibeusage_error,
-)
-from vibeusage.models import (
-    UsagePeriod,
-    PeriodType,
-    OverageUsage,
-)
+from vibeusage.display.json import ErrorData
+from vibeusage.display.json import ErrorResponse
+from vibeusage.display.json import create_error_response
+from vibeusage.display.json import decode_json
+from vibeusage.display.json import encode_json
+from vibeusage.display.json import from_vibeusage_error
+from vibeusage.display.json import output_json
+from vibeusage.display.json import output_json_error
+from vibeusage.display.json import output_json_pretty
+from vibeusage.display.rich import format_overage_used
+from vibeusage.display.rich import format_period
+from vibeusage.display.rich import format_period_line
+from vibeusage.display.rich import render_usage_bar
+from vibeusage.models import OverageUsage
+from vibeusage.models import PeriodType
+from vibeusage.models import UsagePeriod
 
 
 class TestRenderUsageBar:
@@ -349,7 +343,7 @@ class TestDecodeJson:
 
     def test_decode_with_type_hint(self, utc_now):
         """Decode with type hint validates structure."""
-        from vibeusage.models import UsageSnapshot, UsagePeriod, PeriodType
+        from vibeusage.models import UsageSnapshot
 
         json_bytes = b'{"provider": "claude", "fetched_at": "2025-01-15T12:00:00Z", "periods": []}'
         result = decode_json(json_bytes, type_hint=UsageSnapshot)
@@ -373,12 +367,13 @@ class TestDecodeJson:
 
 
 # Import io for BytesIO
-import io
 
 # Import for CLI display tests
 from rich.console import Console
+
+from vibeusage.cli.display import ProviderPanel
+from vibeusage.cli.display import SingleProviderDisplay
 from vibeusage.models import UsageSnapshot
-from vibeusage.cli.display import SingleProviderDisplay, ProviderPanel
 
 
 class TestSingleProviderDisplay:
@@ -835,7 +830,9 @@ class TestFromVibeusageError:
 
     def test_from_vibeusage_error_basic(self):
         """Convert VibeusageError to ErrorResponse."""
-        from vibeusage.errors.types import VibeusageError, ErrorCategory, ErrorSeverity
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
 
         vibe_error = VibeusageError(
             message="Test error",
@@ -851,7 +848,9 @@ class TestFromVibeusageError:
 
     def test_from_vibeusage_error_with_all_fields(self):
         """Convert VibeusageError with all fields to ErrorResponse."""
-        from vibeusage.errors.types import VibeusageError, ErrorCategory, ErrorSeverity
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
 
         vibe_error = VibeusageError(
             message="Token expired",
@@ -871,7 +870,9 @@ class TestFromVibeusageError:
 
     def test_from_vibeusage_error_to_dict(self):
         """from_vibeusage_error result serializes correctly."""
-        from vibeusage.errors.types import VibeusageError, ErrorCategory, ErrorSeverity
+        from vibeusage.errors.types import ErrorCategory
+        from vibeusage.errors.types import ErrorSeverity
+        from vibeusage.errors.types import VibeusageError
 
         vibe_error = VibeusageError(
             message="Test",

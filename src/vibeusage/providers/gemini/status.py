@@ -1,10 +1,13 @@
 """Status page fetching for Gemini provider."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 
 from vibeusage.core.http import fetch_url
-from vibeusage.models import ProviderStatus, StatusLevel
+from vibeusage.models import ProviderStatus
+from vibeusage.models import StatusLevel
 
 
 async def fetch_gemini_status() -> ProviderStatus:

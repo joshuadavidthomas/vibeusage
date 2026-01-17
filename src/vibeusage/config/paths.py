@@ -1,9 +1,12 @@
 """Platform-specific paths for vibeusage configuration and cache."""
+from __future__ import annotations
 
 import os
 from pathlib import Path
 
-from platformdirs import user_config_dir, user_cache_dir, user_state_path
+from platformdirs import user_cache_dir
+from platformdirs import user_config_dir
+from platformdirs import user_state_path
 
 PACKAGE_NAME = "vibeusage"
 

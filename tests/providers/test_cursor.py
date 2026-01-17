@@ -1,19 +1,19 @@
 """Tests for Cursor provider."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from decimal import Decimal
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 
-from vibeusage.models import OverageUsage, PeriodType, UsagePeriod, UsageSnapshot
-from vibeusage.providers import (
-    CursorProvider,
-    create_provider,
-    get_provider,
-    list_provider_ids,
-)
+from vibeusage.models import PeriodType
+from vibeusage.providers import CursorProvider
+from vibeusage.providers import create_provider
+from vibeusage.providers import get_provider
+from vibeusage.providers import list_provider_ids
 from vibeusage.providers.cursor import CursorWebStrategy
 
 

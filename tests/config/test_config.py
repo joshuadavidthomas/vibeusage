@@ -1,51 +1,43 @@
 """Tests for configuration system."""
+from __future__ import annotations
 
 import os
 import stat
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-from vibeusage.config.settings import (
-    Config,
-    DisplayConfig,
-    FetchConfig,
-    ProviderConfig,
-    CredentialsConfig,
-    convert_config,
-    get_config,
-    load_config,
-    reload_config,
-    save_config,
-    _load_from_toml,
-    _save_to_toml,
-    _apply_env_overrides,
-)
-from vibeusage.config.paths import (
-    config_dir,
-    cache_dir,
-    state_dir,
-    credentials_dir,
-    snapshots_dir,
-    org_ids_dir,
-    gate_dir,
-    config_file,
-    ensure_directories,
-    PACKAGE_NAME,
-)
-from vibeusage.config.credentials import (
-    credential_path,
-    find_provider_credential,
-    write_credential,
-    read_credential,
-    delete_credential,
-    check_credential_permissions,
-    check_provider_credentials,
-    get_all_credential_status,
-    PROVIDER_CREDENTIAL_PATHS,
-    _expand_path,
-)
+from vibeusage.config.credentials import _expand_path
+from vibeusage.config.credentials import check_credential_permissions
+from vibeusage.config.credentials import check_provider_credentials
+from vibeusage.config.credentials import credential_path
+from vibeusage.config.credentials import delete_credential
+from vibeusage.config.credentials import find_provider_credential
+from vibeusage.config.credentials import get_all_credential_status
+from vibeusage.config.credentials import read_credential
+from vibeusage.config.credentials import write_credential
+from vibeusage.config.paths import PACKAGE_NAME
+from vibeusage.config.paths import cache_dir
+from vibeusage.config.paths import config_dir
+from vibeusage.config.paths import config_file
+from vibeusage.config.paths import credentials_dir
+from vibeusage.config.paths import ensure_directories
+from vibeusage.config.paths import gate_dir
+from vibeusage.config.paths import org_ids_dir
+from vibeusage.config.paths import snapshots_dir
+from vibeusage.config.paths import state_dir
+from vibeusage.config.settings import Config
+from vibeusage.config.settings import CredentialsConfig
+from vibeusage.config.settings import DisplayConfig
+from vibeusage.config.settings import FetchConfig
+from vibeusage.config.settings import ProviderConfig
+from vibeusage.config.settings import _apply_env_overrides
+from vibeusage.config.settings import _load_from_toml
+from vibeusage.config.settings import _save_to_toml
+from vibeusage.config.settings import convert_config
+from vibeusage.config.settings import get_config
+from vibeusage.config.settings import load_config
+from vibeusage.config.settings import reload_config
+from vibeusage.config.settings import save_config
 
 
 class TestPaths:

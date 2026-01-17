@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import httpx
 
-from vibeusage.errors.types import ErrorCategory, ErrorSeverity, VibeusageError
+from vibeusage.errors.types import ErrorCategory
+from vibeusage.errors.types import ErrorSeverity
+from vibeusage.errors.types import VibeusageError
 from vibeusage.errors.types import classify_http_error as _classify_http_error
 
 

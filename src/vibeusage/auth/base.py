@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from abc import ABC
+from abc import abstractmethod
+from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 from typing import Protocol
 
 import msgspec
-
 
 # Refresh buffer - refresh when this close to expiry
 REFRESH_BUFFER: timedelta = timedelta(minutes=5)

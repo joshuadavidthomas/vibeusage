@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from rich.text import Text
 
-from vibeusage.models import UsagePeriod, format_reset_countdown, pace_to_color
+from vibeusage.models import UsagePeriod
+from vibeusage.models import format_reset_countdown
+from vibeusage.models import pace_to_color
 
 
 def render_usage_bar(

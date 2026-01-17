@@ -1,4 +1,5 @@
 """Main CLI application for vibeusage."""
+from __future__ import annotations
 
 import asyncio
 from enum import IntEnum
@@ -67,7 +68,9 @@ async def run_default_usage(ctx: typer.Context) -> None:
     import time
 
     from rich.console import Console
-    from vibeusage.cli.commands.usage import fetch_all_usage, display_multiple_snapshots
+
+    from vibeusage.cli.commands.usage import display_multiple_snapshots
+    from vibeusage.cli.commands.usage import fetch_all_usage
     from vibeusage.core.http import cleanup
 
     console = Console()
@@ -103,20 +106,8 @@ def run_app() -> None:
 # Import commands to register them with the app
 # These imports must come after app is defined
 # Note: key, config, and cache groups register themselves via add_typer()
-from vibeusage.cli.commands import (
-    status_command,
-    usage_command,
-)  # noqa: E402,F401
-from vibeusage.cli.commands import (
-    auth_command,
-)  # noqa: E402,F401
 
 # Import key, config, cache modules to trigger their self-registration
-from vibeusage.cli.commands import (
-    cache,
-    config,
-    key,
-)  # noqa: E402,F401
 
 
 # Provider command aliases - these provide top-level shortcuts like `vibeusage claude`

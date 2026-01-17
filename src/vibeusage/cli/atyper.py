@@ -1,13 +1,15 @@
 """Async wrapper for Typer to support async commands."""
+from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import Any, Callable
 from functools import wraps
+from typing import Any
+from typing import Callable
 
 import typer
-from typer.core import TyperCommand, TyperGroup
-from typer.models import CommandInfo
+from typer.core import TyperCommand
+from typer.core import TyperGroup
 
 
 def _async_command_wrapper(f: Callable) -> Callable:

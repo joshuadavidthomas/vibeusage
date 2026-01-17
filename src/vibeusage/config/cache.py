@@ -1,12 +1,16 @@
 """Snapshot and org ID caching for vibeusage."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 import msgspec
 
-from vibeusage.config.paths import gate_dir, org_ids_dir, snapshots_dir
+from vibeusage.config.paths import gate_dir
+from vibeusage.config.paths import org_ids_dir
+from vibeusage.config.paths import snapshots_dir
 from vibeusage.models import UsageSnapshot
 
 

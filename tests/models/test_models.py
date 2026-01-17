@@ -1,23 +1,24 @@
 """Tests for vibeusage.models data structures."""
+from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-import pytest
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from decimal import Decimal
 
-from vibeusage.models import (
-    OverageUsage,
-    PeriodType,
-    ProviderIdentity,
-    ProviderStatus,
-    StatusLevel,
-    UsagePeriod,
-    UsageSnapshot,
-    format_reset_countdown,
-    pace_to_color,
-    validate_usage_period,
-    validate_snapshot,
-)
+import pytest
+
+from vibeusage.models import OverageUsage
+from vibeusage.models import PeriodType
+from vibeusage.models import ProviderIdentity
+from vibeusage.models import ProviderStatus
+from vibeusage.models import StatusLevel
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
+from vibeusage.models import format_reset_countdown
+from vibeusage.models import pace_to_color
+from vibeusage.models import validate_snapshot
+from vibeusage.models import validate_usage_period
 
 
 class TestPeriodType:

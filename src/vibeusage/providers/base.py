@@ -1,10 +1,13 @@
 """Base provider protocol and metadata for vibeusage."""
+from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from typing import ClassVar
 
 from msgspec import Struct
-from vibeusage.models import ProviderStatus, StatusLevel, UsageSnapshot
+
+from vibeusage.models import ProviderStatus
 from vibeusage.strategies.base import FetchStrategy
 
 

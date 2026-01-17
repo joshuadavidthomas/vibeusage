@@ -1,12 +1,17 @@
 """Tests for Copilot (GitHub) provider."""
+from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, Mock, patch
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from pathlib import Path
+from unittest.mock import AsyncMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 
-from vibeusage.models import PeriodType, UsagePeriod, UsageSnapshot
+from vibeusage.models import PeriodType
 from vibeusage.providers import CopilotProvider
 from vibeusage.providers.copilot import CopilotDeviceFlowStrategy
 

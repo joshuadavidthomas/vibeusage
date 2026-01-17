@@ -1,14 +1,11 @@
 """Credential file management for vibeusage."""
+from __future__ import annotations
 
 import os
 import stat
 from pathlib import Path
 
-from vibeusage.config.paths import (
-    config_dir,
-    credentials_dir,
-)
-
+from vibeusage.config.paths import credentials_dir
 
 # Provider CLI credential locations
 PROVIDER_CREDENTIAL_PATHS: dict[str, str | list[str]] = {
@@ -39,7 +36,7 @@ def find_provider_credential(provider_id: str) -> tuple[bool, str | None, Path |
     from .settings import get_config
 
     config = get_config()
-    provider_cfg = config.get_provider_config(provider_id)
+    config.get_provider_config(provider_id)
 
     # Check vibeusage storage first
     vibeusage_paths = [

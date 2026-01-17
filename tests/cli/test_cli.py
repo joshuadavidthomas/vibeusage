@@ -1,18 +1,18 @@
 """Tests for CLI components."""
+from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-import pytest
-import typer
-
-from vibeusage.cli.atyper import (
-    _async_command_wrapper,
-    AsyncTyperCommand,
-    AsyncTyperGroup,
-    ATyper,
-)
-from vibeusage.cli.app import ExitCode, app, run_app
+from vibeusage.cli.app import ExitCode
+from vibeusage.cli.app import app
+from vibeusage.cli.app import run_app
+from vibeusage.cli.atyper import AsyncTyperCommand
+from vibeusage.cli.atyper import AsyncTyperGroup
+from vibeusage.cli.atyper import ATyper
+from vibeusage.cli.atyper import _async_command_wrapper
 
 
 class TestAsyncCommandWrapper:
@@ -82,7 +82,7 @@ class TestAsyncTyperCommand:
 
         # Should call without asyncio.run - use parent's invoke
         with patch("vibeusage.cli.atyper.asyncio.run") as mock_run:
-            result = command.invoke(ctx)
+            command.invoke(ctx)
             # For sync functions, we don't use asyncio.run
             assert not mock_run.called
 
@@ -185,7 +185,7 @@ class TestCommandIntegration:
     def test_commands_registered(self):
         """Expected commands are registered with the app."""
         registered = app.registered_commands or {}
-        command_names = (
+        (
             set(registered.keys()) if isinstance(registered, dict) else set()
         )
 
@@ -236,17 +236,17 @@ class TestJsonOutput:
 
     def test_output_json_usage_with_success(self):
         """output_json_usage outputs correct JSON for successful outcomes."""
-        from datetime import datetime, timezone
-        from vibeusage.cli.commands.usage import output_json_usage
-        from vibeusage.models import (
-            UsagePeriod,
-            UsageSnapshot,
-            PeriodType,
-            ProviderIdentity,
-        )
-        from vibeusage.strategies.base import FetchOutcome
         import sys
+        from datetime import datetime
+        from datetime import timezone
         from io import StringIO
+
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.models import PeriodType
+        from vibeusage.models import ProviderIdentity
+        from vibeusage.models import UsagePeriod
+        from vibeusage.models import UsageSnapshot
+        from vibeusage.strategies.base import FetchOutcome
 
         # Create test data
         period = UsagePeriod(
@@ -298,10 +298,11 @@ class TestJsonOutput:
 
     def test_output_json_usage_with_error(self):
         """output_json_usage outputs correct JSON for error outcomes."""
-        from vibeusage.cli.commands.usage import output_json_usage
-        from vibeusage.strategies.base import FetchOutcome
         import sys
         from io import StringIO
+
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.strategies.base import FetchOutcome
 
         # Create test error outcome
         outcome = FetchOutcome(
@@ -332,12 +333,16 @@ class TestJsonOutput:
 
     def test_output_json_usage_multiple_providers(self):
         """output_json_usage handles multiple providers with mixed results."""
-        from datetime import datetime, timezone
-        from vibeusage.cli.commands.usage import output_json_usage
-        from vibeusage.models import UsagePeriod, UsageSnapshot, PeriodType
-        from vibeusage.strategies.base import FetchOutcome
         import sys
+        from datetime import datetime
+        from datetime import timezone
         from io import StringIO
+
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.models import PeriodType
+        from vibeusage.models import UsagePeriod
+        from vibeusage.models import UsageSnapshot
+        from vibeusage.strategies.base import FetchOutcome
 
         # Create successful outcome
         period = UsagePeriod(
@@ -397,18 +402,18 @@ class TestJsonOutput:
 
     def test_output_json_usage_with_overage(self):
         """output_json_usage includes overage data when present."""
-        from datetime import datetime, timezone
-        from decimal import Decimal
-        from vibeusage.cli.commands.usage import output_json_usage
-        from vibeusage.models import (
-            UsagePeriod,
-            UsageSnapshot,
-            OverageUsage,
-            PeriodType,
-        )
-        from vibeusage.strategies.base import FetchOutcome
         import sys
+        from datetime import datetime
+        from datetime import timezone
+        from decimal import Decimal
         from io import StringIO
+
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.models import OverageUsage
+        from vibeusage.models import PeriodType
+        from vibeusage.models import UsagePeriod
+        from vibeusage.models import UsageSnapshot
+        from vibeusage.strategies.base import FetchOutcome
 
         # Create test data with overage
         period = UsagePeriod(

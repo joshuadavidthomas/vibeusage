@@ -1,6 +1,8 @@
 """Result aggregation for multi-provider fetches."""
+from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from datetime import datetime
 
 from vibeusage.models import UsageSnapshot

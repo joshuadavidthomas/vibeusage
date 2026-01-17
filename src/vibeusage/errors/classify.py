@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 
 import httpx
 
-from vibeusage.errors.types import (
-    ErrorCategory,
-    ErrorSeverity,
-    VibeusageError,
-    classify_http_error,
-)
+from vibeusage.errors.types import ErrorCategory
+from vibeusage.errors.types import ErrorSeverity
+from vibeusage.errors.types import VibeusageError
+from vibeusage.errors.types import classify_http_error
 
 
 def classify_http_status_error(error: httpx.HTTPStatusError) -> VibeusageError:

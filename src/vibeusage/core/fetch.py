@@ -1,20 +1,17 @@
 """Fetch pipeline for executing provider fetch strategies."""
+from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
 
 from vibeusage.config.cache import cache_snapshot as save_snapshot
 from vibeusage.config.cache import load_cached_snapshot
 from vibeusage.config.settings import get_config
-from vibeusage.core.gate import get_failure_gate, save_gate
-from vibeusage.models import UsageSnapshot
-from vibeusage.strategies.base import (
-    FetchAttempt,
-    FetchOutcome,
-    FetchResult,
-    FetchStrategy,
-)
+from vibeusage.core.gate import get_failure_gate
+from vibeusage.core.gate import save_gate
+from vibeusage.strategies.base import FetchAttempt
+from vibeusage.strategies.base import FetchOutcome
+from vibeusage.strategies.base import FetchStrategy
 
 
 async def execute_fetch_pipeline(
@@ -157,7 +154,6 @@ async def execute_fetch_pipeline(
             continue
 
     # All strategies failed - record failure
-    from vibeusage.errors.types import ErrorCategory
     from vibeusage.errors.classify import classify_exception
 
     last_error = (

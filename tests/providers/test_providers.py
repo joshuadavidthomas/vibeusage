@@ -1,20 +1,22 @@
 """Tests for provider registry and Claude provider."""
+from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from datetime import timezone
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from vibeusage.providers.base import Provider, ProviderMetadata
-from vibeusage.providers import (
-    register_provider,
-    get_provider,
-    get_all_providers,
-    list_provider_ids,
-    create_provider,
-    ClaudeProvider,
-)
-from vibeusage.models import StatusLevel, PeriodType
+from vibeusage.models import StatusLevel
+from vibeusage.providers import ClaudeProvider
+from vibeusage.providers import create_provider
+from vibeusage.providers import get_all_providers
+from vibeusage.providers import get_provider
+from vibeusage.providers import list_provider_ids
+from vibeusage.providers import register_provider
+from vibeusage.providers.base import Provider
+from vibeusage.providers.base import ProviderMetadata
 
 
 class TestProviderMetadata:
@@ -164,7 +166,6 @@ class TestClaudeProvider:
         provider = ClaudeProvider()
 
         # Should be async
-        import asyncio
         import inspect
 
         assert inspect.iscoroutinefunction(provider.fetch_status)
@@ -231,7 +232,6 @@ class TestProviderRegistry:
 
     def test_register_provider_requires_metadata(self):
         """register_provider raises ValueError if no metadata."""
-        import vibeusage.providers as providers_module
 
         with pytest.raises(ValueError, match="must define metadata"):
 

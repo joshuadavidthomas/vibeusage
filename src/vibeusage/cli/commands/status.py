@@ -1,15 +1,16 @@
 """Provider status command for vibeusage."""
+from __future__ import annotations
 
-import asyncio
 import time
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from vibeusage.cli.app import app, ExitCode
+from vibeusage.cli.app import ExitCode
+from vibeusage.cli.app import app
 from vibeusage.core.http import cleanup
-from vibeusage.providers import get_all_providers, list_provider_ids
+from vibeusage.providers import get_all_providers
 
 
 @app.command("status")
@@ -47,18 +48,19 @@ async def status_command(
     except KeyboardInterrupt:
         if not quiet:
             console.print("\n[yellow]Interrupted[/yellow]")
-        raise typer.Exit(ExitCode.GENERAL_ERROR)
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from None
     except Exception as e:
         if not quiet:
             console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(ExitCode.GENERAL_ERROR)
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from e
     finally:
         await cleanup()
 
 
 async def fetch_all_statuses():
     """Fetch status from all providers."""
-    from vibeusage.models import ProviderStatus, StatusLevel
+    from vibeusage.models import ProviderStatus
+    from vibeusage.models import StatusLevel
 
     statuses = {}
 
@@ -86,7 +88,6 @@ def display_status_table(
     duration_ms: float = 0,
 ):
     """Display provider statuses in a table."""
-    from rich.text import Text
 
     # Quiet mode: minimal output
     if quiet:
@@ -167,7 +168,8 @@ def format_status_updated(dt):
     if dt is None:
         return "unknown"
 
-    from datetime import datetime, timezone
+    from datetime import datetime
+    from datetime import timezone
 
     now = datetime.now(timezone.utc)
     if dt.tzinfo is None:

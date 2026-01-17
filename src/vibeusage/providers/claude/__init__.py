@@ -1,7 +1,10 @@
 """Claude (Anthropic) provider for vibeusage."""
+from __future__ import annotations
 
-from vibeusage.models import ProviderStatus, StatusLevel
-from vibeusage.providers.base import Provider, ProviderMetadata
+from vibeusage.models import ProviderStatus
+from vibeusage.models import StatusLevel
+from vibeusage.providers.base import Provider
+from vibeusage.providers.base import ProviderMetadata
 from vibeusage.providers.claude.cli import ClaudeCLIStrategy
 from vibeusage.providers.claude.oauth import ClaudeOAuthStrategy
 from vibeusage.providers.claude.web import ClaudeWebStrategy

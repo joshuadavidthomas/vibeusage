@@ -1,19 +1,18 @@
 """Key management commands for vibeusage."""
+from __future__ import annotations
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from vibeusage.cli.app import app, ExitCode
+from vibeusage.cli.app import ExitCode
+from vibeusage.cli.app import app
 from vibeusage.cli.atyper import ATyper
-from vibeusage.config.credentials import (
-    check_provider_credentials,
-    credential_path,
-    delete_credential,
-    find_provider_credential,
-    get_all_credential_status,
-    write_credential,
-)
+from vibeusage.config.credentials import credential_path
+from vibeusage.config.credentials import delete_credential
+from vibeusage.config.credentials import find_provider_credential
+from vibeusage.config.credentials import get_all_credential_status
+from vibeusage.config.credentials import write_credential
 from vibeusage.providers import list_provider_ids
 
 # Create key group
@@ -86,7 +85,7 @@ def key_set_command(
         console.print(f"[green]✓[/green] Credential saved for {provider}")
     except Exception as e:
         console.print(f"[red]Error saving credential:[/red] {e}")
-        raise typer.Exit(ExitCode.GENERAL_ERROR)
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from e
 
 
 @key_app.command("delete")
@@ -123,7 +122,6 @@ def key_delete_command(
             )
     else:
         # Delete all credentials for provider
-        from pathlib import Path
 
         from vibeusage.config.paths import credentials_dir
 

@@ -1,25 +1,21 @@
 """Cache management commands for vibeusage."""
-
-from pathlib import Path
+from __future__ import annotations
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from vibeusage.cli.app import app, ExitCode
+from vibeusage.cli.app import ExitCode
+from vibeusage.cli.app import app
 from vibeusage.cli.atyper import ATyper
-from vibeusage.config.cache import (
-    cache_org_id,
-    cache_snapshot,
-    clear_all_cache,
-    clear_org_id_cache,
-    clear_provider_cache,
-    is_snapshot_fresh,
-    load_cached_snapshot,
-    org_id_path,
-    snapshot_path,
-)
-from vibeusage.config.paths import cache_dir, snapshots_dir
+from vibeusage.config.cache import clear_all_cache
+from vibeusage.config.cache import clear_org_id_cache
+from vibeusage.config.cache import clear_provider_cache
+from vibeusage.config.cache import is_snapshot_fresh
+from vibeusage.config.cache import load_cached_snapshot
+from vibeusage.config.cache import org_id_path
+from vibeusage.config.cache import snapshot_path
+from vibeusage.config.paths import cache_dir
 from vibeusage.config.settings import get_config
 from vibeusage.providers import list_provider_ids
 
@@ -70,11 +66,11 @@ def cache_show_command(
                 else:
                     snap_status = "stale"
 
-                from datetime import datetime, timezone
+                from datetime import UTC, datetime
 
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 if snapshot.fetched_at.tzinfo is None:
-                    fetched = snapshot.fetched_at.replace(tzinfo=timezone.utc)
+                    fetched = snapshot.fetched_at.replace(tzinfo=UTC)
                 else:
                     fetched = snapshot.fetched_at
 
@@ -142,7 +138,7 @@ def cache_show_command(
     # Verbose: show stale threshold
     if verbose:
         console.print(f"\n[dim]Stale threshold: {stale_threshold} minutes[/dim]")
-        console.print(f"[dim]Snapshots older than this are considered stale.[/dim]")
+        console.print("[dim]Snapshots older than this are considered stale.[/dim]")
 
 
 @cache_app.command("clear")

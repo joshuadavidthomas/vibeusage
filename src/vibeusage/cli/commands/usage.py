@@ -1,16 +1,17 @@
 """Usage display commands for vibeusage."""
+from __future__ import annotations
 
-import asyncio
 import time
 
 import typer
 from rich.console import Console
 from rich.text import Text
 
-from vibeusage.cli.app import app, ExitCode
-from vibeusage.config.settings import get_config
+from vibeusage.cli.app import ExitCode
+from vibeusage.cli.app import app
 from vibeusage.core.http import cleanup
-from vibeusage.providers import create_provider, list_provider_ids
+from vibeusage.providers import create_provider
+from vibeusage.providers import list_provider_ids
 
 
 @app.command("usage")
@@ -34,9 +35,7 @@ async def usage_command(
     ),
 ) -> None:
     """Show usage statistics for all enabled providers or a specific provider."""
-    import sys
 
-    from rich.console import Console
 
     # Get console, respecting no-color option
     console = Console()
@@ -88,11 +87,11 @@ async def usage_command(
     except KeyboardInterrupt:
         if not quiet:
             console.print("\n[yellow]Interrupted[/yellow]")
-        raise typer.Exit(ExitCode.GENERAL_ERROR)
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from None
     except Exception as e:
         if not quiet:
             console.print(f"[red]Unexpected error:[/red] {e}")
-        raise typer.Exit(ExitCode.GENERAL_ERROR)
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from e
     finally:
         await cleanup()
 
@@ -180,7 +179,8 @@ def display_snapshot(
 
 def output_single_provider_json(outcome) -> None:
     """Output single provider usage data in JSON format."""
-    from vibeusage.display.json import from_vibeusage_error, output_json_pretty
+    from vibeusage.display.json import from_vibeusage_error
+    from vibeusage.display.json import output_json_pretty
     from vibeusage.errors.classify import classify_exception
 
     if outcome.success and outcome.snapshot:
@@ -256,6 +256,7 @@ def output_single_provider_json(outcome) -> None:
 def output_json_usage(outcomes: dict) -> None:
     """Output usage data in JSON format."""
     from datetime import datetime
+
     from vibeusage.display.json import output_json_pretty
 
     data = {

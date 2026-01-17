@@ -1,15 +1,17 @@
 """CLI strategy for Claude provider."""
+from __future__ import annotations
 
 import asyncio
-import json
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 
-from vibeusage.core.http import get_http_client
-from vibeusage.models import OverageUsage, PeriodType, UsagePeriod, UsageSnapshot
-from vibeusage.strategies.base import FetchResult, FetchStrategy
-
+from vibeusage.models import PeriodType
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
+from vibeusage.strategies.base import FetchResult
+from vibeusage.strategies.base import FetchStrategy
 
 # ANSI escape code pattern for stripping
 ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")

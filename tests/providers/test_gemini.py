@@ -1,16 +1,19 @@
 """Tests for Gemini provider."""
+from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 import json
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from vibeusage.models import StatusLevel, PeriodType, UsageSnapshot
+from vibeusage.models import PeriodType
 from vibeusage.providers.gemini import GeminiProvider
-from vibeusage.providers.gemini.oauth import GeminiOAuthStrategy
 from vibeusage.providers.gemini.api_key import GeminiApiKeyStrategy
+from vibeusage.providers.gemini.oauth import GeminiOAuthStrategy
 
 
 class TestGeminiProvider:

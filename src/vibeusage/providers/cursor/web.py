@@ -1,19 +1,21 @@
 """Web (session token) strategy for Cursor provider."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from decimal import Decimal
 
-from vibeusage.config.credentials import credential_path, read_credential
+from vibeusage.config.credentials import credential_path
+from vibeusage.config.credentials import read_credential
 from vibeusage.core.http import get_http_client
-from vibeusage.models import (
-    OverageUsage,
-    PeriodType,
-    ProviderIdentity,
-    UsagePeriod,
-    UsageSnapshot,
-)
-from vibeusage.strategies.base import FetchResult, FetchStrategy
+from vibeusage.models import OverageUsage
+from vibeusage.models import PeriodType
+from vibeusage.models import ProviderIdentity
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
+from vibeusage.strategies.base import FetchResult
+from vibeusage.strategies.base import FetchStrategy
 
 
 class CursorWebStrategy(FetchStrategy):

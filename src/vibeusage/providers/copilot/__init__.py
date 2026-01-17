@@ -1,7 +1,9 @@
 """Copilot (GitHub) provider for vibeusage."""
+from __future__ import annotations
 
 from vibeusage.models import ProviderStatus
-from vibeusage.providers.base import Provider, ProviderMetadata
+from vibeusage.providers.base import Provider
+from vibeusage.providers.base import ProviderMetadata
 from vibeusage.providers.copilot.device_flow import CopilotDeviceFlowStrategy
 
 

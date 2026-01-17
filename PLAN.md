@@ -28,7 +28,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (498 passing tests, 48% coverage)
+- ✓ Test suite (512 passing tests, 49% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05

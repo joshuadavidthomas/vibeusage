@@ -1,8 +1,8 @@
 """Config management commands for vibeusage."""
+from __future__ import annotations
 
 import os
 import subprocess
-from pathlib import Path
 
 import msgspec.toml
 import typer
@@ -10,10 +10,15 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from vibeusage.cli.app import app, ExitCode
+from vibeusage.cli.app import ExitCode
+from vibeusage.cli.app import app
 from vibeusage.cli.atyper import ATyper
-from vibeusage.config.paths import cache_dir, config_dir, config_file, credentials_dir
-from vibeusage.config.settings import Config, get_config
+from vibeusage.config.paths import cache_dir
+from vibeusage.config.paths import config_dir
+from vibeusage.config.paths import config_file
+from vibeusage.config.paths import credentials_dir
+from vibeusage.config.settings import Config
+from vibeusage.config.settings import get_config
 
 # Create config group
 config_app = ATyper(help="Manage configuration settings.")
@@ -203,7 +208,7 @@ def config_reset_command(
             output_json_pretty(result)
             return
 
-        console.print(f"[green]✓[/green] Configuration reset to defaults")
+        console.print("[green]✓[/green] Configuration reset to defaults")
         console.print(f"\nDeleted: {cfg_path}")
     else:
         result["message"] = "No custom configuration to reset"
@@ -242,11 +247,11 @@ def config_edit_command() -> None:
         console.print(f"[green]✓[/green] Configuration file: {cfg_path}")
     except subprocess.CalledProcessError as e:
         console.print(f"[red]Editor exited with error: {e}[/red]")
-        raise typer.Exit(ExitCode.GENERAL_ERROR)
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from e
     except FileNotFoundError:
         console.print(f"[red]Editor not found: {editor}[/red]")
         console.print("Set EDITOR environment variable to your preferred editor")
-        raise typer.Exit(ExitCode.CONFIG_ERROR)
+        raise typer.Exit(ExitCode.CONFIG_ERROR) from None
 
 
 # Register the config group with the main app

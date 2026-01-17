@@ -1,4 +1,5 @@
 """Authentication commands for vibeusage."""
+from __future__ import annotations
 
 import json
 
@@ -7,13 +8,12 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from vibeusage.cli.app import ExitCode, app
-from vibeusage.config.credentials import (
-    check_provider_credentials,
-    credential_path,
-    find_provider_credential,
-    write_credential,
-)
+from vibeusage.cli.app import ExitCode
+from vibeusage.cli.app import app
+from vibeusage.config.credentials import check_provider_credentials
+from vibeusage.config.credentials import credential_path
+from vibeusage.config.credentials import find_provider_credential
+from vibeusage.config.credentials import write_credential
 from vibeusage.providers import list_provider_ids
 
 
@@ -214,7 +214,7 @@ def auth_claude_command(
     except Exception as e:
         if not quiet:
             console.print(f"[red]Error saving credential:[/red] {e}")
-        raise typer.Exit(ExitCode.GENERAL_ERROR)
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from e
 
 
 def auth_generic_command(

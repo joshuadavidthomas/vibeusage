@@ -1,16 +1,20 @@
 """Device flow OAuth strategy for Copilot (GitHub) provider."""
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 
-import httpx
-
-from vibeusage.config.credentials import read_credential, write_credential
+from vibeusage.config.credentials import read_credential
+from vibeusage.config.credentials import write_credential
 from vibeusage.config.paths import config_dir
 from vibeusage.core.http import get_http_client
-from vibeusage.models import OverageUsage, PeriodType, UsagePeriod, UsageSnapshot
-from vibeusage.strategies.base import FetchResult, FetchStrategy
+from vibeusage.models import PeriodType
+from vibeusage.models import UsagePeriod
+from vibeusage.models import UsageSnapshot
+from vibeusage.strategies.base import FetchResult
+from vibeusage.strategies.base import FetchStrategy
 
 
 class CopilotDeviceFlowStrategy(FetchStrategy):

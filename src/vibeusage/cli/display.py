@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
-from rich.console import Console, RenderableType
+from rich.console import Console
+from rich.console import RenderableType
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from vibeusage.display.rich import format_period, format_overage_used
-from vibeusage.errors.types import ErrorCategory, ErrorSeverity, VibeusageError
-from vibeusage.models import UsageSnapshot, format_reset_countdown, PeriodType
+from vibeusage.display.rich import format_overage_used
+from vibeusage.display.rich import format_period
+from vibeusage.errors.types import ErrorCategory
+from vibeusage.errors.types import ErrorSeverity
+from vibeusage.errors.types import VibeusageError
+from vibeusage.models import PeriodType
+from vibeusage.models import UsageSnapshot
+from vibeusage.models import format_reset_countdown
 
 
 class SingleProviderDisplay:
@@ -531,7 +538,7 @@ def show_stale_warning(
             age_str = f"{hours} hour{'s' if hours != 1 else ''}"
 
         console.print(f"[yellow]⚠ Showing cached data from {age_str} ago[/yellow]")
-        console.print(f"[dim]Run with [cyan]--refresh[/cyan] to fetch fresh data[/dim]")
+        console.print("[dim]Run with [cyan]--refresh[/cyan] to fetch fresh data[/dim]")
 
 
 def show_diagnostic_info(console: Console | None = None) -> None:
@@ -540,11 +547,12 @@ def show_diagnostic_info(console: Console | None = None) -> None:
     Args:
         console: Rich console (uses default if None)
     """
-    import sys
     import platform
+    import sys
 
     from vibeusage import __version__
-    from vibeusage.config.paths import get_cache_dir, get_config_dir
+    from vibeusage.config.paths import get_cache_dir
+    from vibeusage.config.paths import get_config_dir
     from vibeusage.core.gate import get_failure_gate
     from vibeusage.providers import list_provider_ids
 
@@ -575,7 +583,7 @@ def show_diagnostic_info(console: Console | None = None) -> None:
     console.print()
 
     # Show failure gate status
-    gate = get_failure_gate()
+    get_failure_gate()
     console.print("[dim]Failure Gate Status:[/dim]")
     for provider_id in list_provider_ids():
         provider_gate = get_failure_gate(provider_id)

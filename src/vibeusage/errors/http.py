@@ -11,7 +11,7 @@ from typing import Callable
 
 import httpx
 
-from vibeusage.errors.types import HTTPErrorMapping, classify_http_error
+from vibeusage.errors.types import classify_http_error
 
 
 async def handle_http_request(

@@ -1,35 +1,33 @@
 """Tests for error classification and handling."""
+from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from datetime import timezone
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
 
-import pytest
 import httpx
+import pytest
 
-from vibeusage.errors.classify import classify_exception, classify_http_status_error
-from vibeusage.errors.http import (
-    extract_error_message,
-    get_retry_after_delay,
-    handle_http_request,
-)
+from vibeusage.errors.classify import classify_exception
+from vibeusage.errors.classify import classify_http_status_error
+from vibeusage.errors.http import extract_error_message
+from vibeusage.errors.http import get_retry_after_delay
+from vibeusage.errors.http import handle_http_request
 from vibeusage.errors.network import (
     classify_http_status_error as classify_http_status_error_network,
-    classify_network_error,
-    is_network_error,
-    is_retryable_error,
 )
-from vibeusage.errors.types import (
-    ErrorCategory,
-    ErrorSeverity,
-    HTTPErrorMapping,
-    HTTP_ERROR_MAPPINGS,
-    VibeusageError,
-    classify_http_error,
-)
-from vibeusage.models import StatusLevel
+from vibeusage.errors.network import classify_network_error
+from vibeusage.errors.network import is_network_error
+from vibeusage.errors.network import is_retryable_error
+from vibeusage.errors.types import HTTP_ERROR_MAPPINGS
+from vibeusage.errors.types import ErrorCategory
+from vibeusage.errors.types import ErrorSeverity
+from vibeusage.errors.types import HTTPErrorMapping
+from vibeusage.errors.types import VibeusageError
+from vibeusage.errors.types import classify_http_error
 
 
 class TestVibeusageError:
