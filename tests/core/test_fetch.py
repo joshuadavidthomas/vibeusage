@@ -134,7 +134,7 @@ class TestExecuteFetchPipeline:
                     assert result.cached is True
 
     @pytest.mark.asyncio
-    async def test_execute_fetch_pipeline_strategy_not_available(self):
+    async def test_execute_fetch_pipeline_strategy_not_available(self, utc_now):
         """Skips strategies that are not available."""
         strategy1 = MockStrategy(name="unavailable", available=False)
         snapshot = UsageSnapshot(provider="claude", periods=[], fetched_at=utc_now)
@@ -186,7 +186,7 @@ class TestExecuteFetchPipeline:
                 assert result.fatal is True
 
     @pytest.mark.asyncio
-    async def test_execute_fetch_pipeline_timeout(self):
+    async def test_execute_fetch_pipeline_timeout(self, utc_now):
         """Timeout is recorded and continues to next strategy."""
         snapshot = UsageSnapshot(provider="claude", periods=[], fetched_at=utc_now)
 

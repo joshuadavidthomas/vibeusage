@@ -101,8 +101,8 @@ async def execute_fetch_pipeline(
                     source=strategy.name,
                     attempts=attempts,
                 )
-            elif result.fatal:
-                # Fatal error - stop trying strategies
+            elif not result.should_fallback:
+                # Fatal error - stop trying strategies (should_fallback=False)
                 attempts.append(
                     FetchAttempt(
                         strategy=strategy.name,
