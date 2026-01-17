@@ -37,6 +37,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-17: ProviderStatus Type Hint Fix ✅ RESOLVED
+- **Issue**: `ProviderStatus.operational()` and `ProviderStatus.unknown()` factory methods had incorrect return type hints
+- **Root Cause**: Type hints declared as `type[ProviderStatus]` instead of `ProviderStatus`
+- **Resolution**: Changed return type annotations from `type[ProviderStatus]` to `ProviderStatus`
+- **Verification**: All 1055 tests pass, type checking passes with `ty check`
+
 ### 2026-01-17: Missing CLI Subcommands Issue ✅ RESOLVED
 - **Issue**: Core CLI subcommands (auth, init, status, usage, key, cache, config) were missing from --help output
 - **Root Cause**: Stale cached build - the virtual environment had an outdated binary
@@ -80,7 +86,6 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - [x] Implement `--verbose` and `--quiet` flags
 
 **Remaining (Optional):**
-- [ ] Fix ProviderStatus factory method return type hints
 - [ ] Consider moving `pace_to_color()` to display/colors.py for consistency
 
 ---
