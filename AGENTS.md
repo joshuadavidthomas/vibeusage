@@ -1,13 +1,17 @@
 ## Commands
 - `uv sync`: Sync the project's dependencies with the environment.
 - `uv run vibeusage --help`: Show CLI help
+- `uv run pytest`: Run all tests
+- `uv run pytest tests/ -v`: Run tests with verbose output
+- `uv run pytest tests/ --cov`: Run tests with coverage report
 
 ## Validation
 
 Run these after implementing to get immediate feedback:
 
-- Tests: No tests exist yet (Phase 6)
-- Typecheck: `uv run python -c "from vibeusage.errors.classify import classify_exception"` (or similar import checks)
+- Tests: `uv run pytest tests/ -v` (308 passing tests, 44% coverage)
+- Coverage: `uv run pytest tests/ --cov` (htmlcov/ for HTML report)
+- Typecheck: `uv run python -c "from vibeusage.errors.classify import classify_exception"`
 - Lint: Not configured
 
 ## Operational Notes
@@ -15,8 +19,10 @@ Run these after implementing to get immediate feedback:
 Succinct learnings about how to RUN the project:
 
 - CLI entry point: `uv run vibeusage [OPTIONS] COMMAND [ARGS]`
-- No test suite exists yet - validate by importing modules and running the CLI
-- All imports should work: `from vibeusage.display import ...`, `from vibeusage.errors.classify import ...`
+- Test suite: 308 passing tests covering models, errors, config, display, core, CLI, providers
+- Coverage: 44% (target: 80%+)
+- Use `pytest -x` to stop at first failure
+- Use `pytest -k "test_name"` to run specific tests
 
 ### Codebase Patterns
 
