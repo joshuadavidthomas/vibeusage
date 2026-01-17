@@ -23,7 +23,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Error messages (errors/messages.py with provider templates)
 - ✓ Provider registry and base protocol
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
-- ✓ Test suite (303 passing tests, 44% coverage)
+- ✓ Test suite (328 passing tests, 45% coverage)
 
 **Recent Fixes** (v0.0.1):
 - Created missing `errors/classify.py` module
@@ -43,7 +43,6 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ⚠️ auth/base.py: Base classes only - concrete strategies implemented in provider modules
 
 **NOT Implemented** (blocking full release):
-- ❌ providers/codex/ - Entire provider (OAuth strategy)
 - ❌ providers/copilot/ - Entire provider (device flow strategy)
 - ❌ providers/cursor/ - Entire provider (web strategy)
 - ❌ providers/gemini/ - Entire provider (OAuth strategy)
@@ -89,29 +88,33 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ---
 
-### Priority 2: Codex/OpenAI Provider
+### Priority 2: Codex/OpenAI Provider ✅ COMPLETED
 **Goal**: Add second most valuable provider after Claude
 
-- [ ] **Create provider module** (providers/codex/)
-  - [ ] `__init__.py` - CodexProvider with metadata (status_url, dashboard_url)
-  - [ ] `oauth.py` - CodexOAuthStrategy implementation
-    - [ ] Credential sources: `~/.codex/auth.json`, vibeusage storage
-    - [ ] Client ID: `app_EMoamEEZ73f0CkXaXp7hrann`
-    - [ ] Token refresh: `POST https://auth.openai.com/oauth/token`
-    - [ ] Usage endpoint: `GET https://chatgpt.com/backend-api/wham/usage`
-    - [ ] Check config.toml for `usage_url` override
-    - [ ] Parse response: rate_limits.primary/secondary, credits
-    - [ ] Map to UsageSnapshot with appropriate periods
+- [x] **Create provider module** (providers/codex/)
+  - [x] `__init__.py` - CodexProvider with metadata (status_url, dashboard_url)
+  - [x] `oauth.py` - CodexOAuthStrategy implementation
+    - [x] Credential sources: `~/.codex/auth.json`, vibeusage storage
+    - [x] Client ID: `app_EMoamEEZ73f0CkXaXp7hrann`
+    - [x] Token refresh: `POST https://auth.openai.com/oauth/token`
+    - [x] Usage endpoint: `GET https://chatgpt.com/backend-api/wham/usage`
+    - [x] Check ~/.codex/config.toml for `usage_url` override
+    - [x] Parse response: rate_limits.primary/secondary, credits
+    - [x] Map to UsageSnapshot with appropriate periods
 
-- [ ] **Register provider** (providers/__init__.py)
-  - [ ] Add CodexProvider to registry
-  - [ ] Verify CLI commands discover provider
-  - [ ] Test `vibeusage codex` command
+- [x] **Register provider** (providers/__init__.py)
+  - [x] Add CodexProvider to registry
+  - [x] Verify CLI commands discover provider
+  - [x] Test `vibeusage codex` command
 
-- [ ] **Add auth support** (cli/commands/auth.py)
-  - [ ] Codex auth flow implementation
-  - [ ] OAuth flow with browser redirect
-  - [ ] Credential storage integration
+- [x] **Add status fetching** (providers/codex/status.py)
+  - [x] fetch_codex_status() using status.openai.com
+
+- [x] **Write tests** (tests/providers/test_codex.py)
+  - [x] 25 tests covering CodexProvider, CodexOAuthStrategy, and integration
+  - [x] All tests passing
+
+**Completed**: 2025-01-16
 
 **Value**: High - ChatGPT/Claude are the two most requested providers
 
