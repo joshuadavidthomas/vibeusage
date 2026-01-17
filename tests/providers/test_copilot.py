@@ -1,4 +1,5 @@
 """Tests for Copilot (GitHub) provider."""
+
 from __future__ import annotations
 
 from datetime import UTC
@@ -98,15 +99,20 @@ class TestCopilotDeviceFlowStrategy:
 
     def test_is_available_returns_true_when_credentials_exist(self):
         """is_available returns True when credentials exist."""
+        import tempfile
+
         strategy = CopilotDeviceFlowStrategy()
 
-        # Create a mock Path that exists
-        mock_path = Mock()
-        mock_path.exists.return_value = True
+        # Create a temporary file that exists
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            temp_path = Path(f.name)
 
-        with patch.object(strategy, "CREDENTIAL_FILE", mock_path):
-            result = strategy.is_available()
-            assert result is True
+        try:
+            with patch.object(strategy, "CREDENTIAL_FILE", temp_path):
+                result = strategy.is_available()
+                assert result is True
+        finally:
+            temp_path.unlink(missing_ok=True)
 
     @pytest.mark.asyncio
     async def test_fetch_fails_with_no_credentials(self):
@@ -376,9 +382,7 @@ class TestCopilotDeviceFlowStrategy:
         """_needs_refresh returns True when token expires within threshold."""
         strategy = CopilotDeviceFlowStrategy()
         credentials = {
-            "expires_at": (
-                datetime.now(UTC) + timedelta(hours=12)
-            ).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(hours=12)).isoformat(),
         }
 
         result = strategy._needs_refresh(credentials)

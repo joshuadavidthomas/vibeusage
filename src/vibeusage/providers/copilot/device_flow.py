@@ -1,4 +1,5 @@
 """Device flow OAuth strategy for Copilot (GitHub) provider."""
+
 from __future__ import annotations
 
 import json

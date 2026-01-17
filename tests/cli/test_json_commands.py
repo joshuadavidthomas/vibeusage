@@ -1,4 +1,5 @@
 """Tests for JSON output on CLI commands."""
+
 from __future__ import annotations
 
 import json

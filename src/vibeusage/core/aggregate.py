@@ -1,4 +1,5 @@
 """Result aggregation for multi-provider fetches."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

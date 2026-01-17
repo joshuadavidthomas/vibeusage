@@ -1,4 +1,5 @@
 """Usage display commands for vibeusage."""
+
 from __future__ import annotations
 
 import time
@@ -35,7 +36,6 @@ async def usage_command(
     ),
 ) -> None:
     """Show usage statistics for all enabled providers or a specific provider."""
-
 
     # Get console, respecting no-color option
     console = Console()

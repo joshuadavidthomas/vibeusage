@@ -1,4 +1,5 @@
 """HTTP client with connection pooling for vibeusage."""
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager

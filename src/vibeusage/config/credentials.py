@@ -1,4 +1,5 @@
 """Credential file management for vibeusage."""
+
 from __future__ import annotations
 
 import os

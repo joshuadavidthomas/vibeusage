@@ -1,4 +1,5 @@
 """OAuth strategy for Gemini (Google AI) provider."""
+
 from __future__ import annotations
 
 import json
@@ -208,9 +209,7 @@ class GeminiOAuthStrategy(FetchStrategy):
 
         # Update expires_at
         if "expires_in" in data:
-            expires_at = datetime.now(UTC) + timedelta(
-                seconds=data["expires_in"]
-            )
+            expires_at = datetime.now(UTC) + timedelta(seconds=data["expires_in"])
             data["expires_at"] = expires_at.isoformat()
 
         # Preserve refresh_token if not in response

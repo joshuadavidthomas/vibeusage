@@ -1,4 +1,5 @@
 """API key strategy for Gemini (Google AI) provider."""
+
 from __future__ import annotations
 
 import json

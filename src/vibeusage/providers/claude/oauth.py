@@ -1,4 +1,5 @@
 """OAuth strategy for Claude provider."""
+
 from __future__ import annotations
 
 import json
@@ -131,9 +132,7 @@ class ClaudeOAuthStrategy(FetchStrategy):
                     from datetime import UTC
                     from datetime import datetime
 
-                    value = datetime.fromtimestamp(
-                        value / 1000, tz=UTC
-                    ).isoformat()
+                    value = datetime.fromtimestamp(value / 1000, tz=UTC).isoformat()
 
             result[snake_key] = value
 

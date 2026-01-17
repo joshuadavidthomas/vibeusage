@@ -1,4 +1,5 @@
 """Web (session token) strategy for Cursor provider."""
+
 from __future__ import annotations
 
 import json
@@ -159,9 +160,7 @@ class CursorWebStrategy(FetchStrategy):
                             )
                         elif isinstance(end_date, int):
                             # Unix timestamp in milliseconds
-                            resets_at = datetime.fromtimestamp(
-                                end_date / 1000, tz=UTC
-                            )
+                            resets_at = datetime.fromtimestamp(end_date / 1000, tz=UTC)
                     except (ValueError, TypeError):
                         pass
 

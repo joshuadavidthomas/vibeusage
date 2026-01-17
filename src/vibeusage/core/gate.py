@@ -1,4 +1,5 @@
 """Failure gate to prevent retry flapping for vibeusage."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

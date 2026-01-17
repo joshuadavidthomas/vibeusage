@@ -1,4 +1,5 @@
 """Provider registry for vibeusage."""
+
 from __future__ import annotations
 
 # Provider registry

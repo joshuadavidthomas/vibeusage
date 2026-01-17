@@ -1,4 +1,5 @@
 """Platform-specific paths for vibeusage configuration and cache."""
+
 from __future__ import annotations
 
 import os

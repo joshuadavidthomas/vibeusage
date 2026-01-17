@@ -1,4 +1,5 @@
 """OAuth strategy for Codex (OpenAI) provider."""
+
 from __future__ import annotations
 
 import json
@@ -126,9 +127,7 @@ class CodexOAuthStrategy(FetchStrategy):
         try:
             expiry = datetime.fromisoformat(expires_at)
             # Refresh if expires within REFRESH_THRESHOLD_DAYS
-            threshold = datetime.now(UTC) + timedelta(
-                days=self.REFRESH_THRESHOLD_DAYS
-            )
+            threshold = datetime.now(UTC) + timedelta(days=self.REFRESH_THRESHOLD_DAYS)
             return threshold >= expiry
         except (ValueError, TypeError):
             return True
@@ -159,9 +158,7 @@ class CodexOAuthStrategy(FetchStrategy):
 
         # Update expires_at (OpenAI uses expires_in seconds)
         if "expires_in" in data:
-            expires_at = datetime.now(UTC) + timedelta(
-                seconds=data["expires_in"]
-            )
+            expires_at = datetime.now(UTC) + timedelta(seconds=data["expires_in"])
             data["expires_at"] = expires_at.isoformat()
 
         # Preserve refresh_token if not in response

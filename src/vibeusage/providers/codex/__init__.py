@@ -1,4 +1,5 @@
 """Codex (OpenAI/ChatGPT) provider for vibeusage."""
+
 from __future__ import annotations
 
 from vibeusage.models import ProviderStatus

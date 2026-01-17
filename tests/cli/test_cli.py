@@ -1,4 +1,5 @@
 """Tests for CLI components."""
+
 from __future__ import annotations
 
 import json
@@ -185,9 +186,7 @@ class TestCommandIntegration:
     def test_commands_registered(self):
         """Expected commands are registered with the app."""
         registered = app.registered_commands or {}
-        (
-            set(registered.keys()) if isinstance(registered, dict) else set()
-        )
+        (set(registered.keys()) if isinstance(registered, dict) else set())
 
         # Check that some expected commands might be registered
         # Note: Typer's internal structure may vary

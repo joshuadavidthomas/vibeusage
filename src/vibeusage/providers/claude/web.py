@@ -1,4 +1,5 @@
 """Web (session key) strategy for Claude provider."""
+
 from __future__ import annotations
 
 import json

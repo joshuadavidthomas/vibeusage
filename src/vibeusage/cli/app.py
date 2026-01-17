@@ -1,4 +1,5 @@
 """Main CLI application for vibeusage."""
+
 from __future__ import annotations
 
 import asyncio

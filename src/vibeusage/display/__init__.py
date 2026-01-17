@@ -3,6 +3,7 @@
 This module provides rendering and output utilities for both terminal
 (Rich-based) and JSON output modes.
 """
+
 from __future__ import annotations
 
 from vibeusage.display.json import decode_json

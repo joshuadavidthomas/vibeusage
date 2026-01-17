@@ -1,4 +1,5 @@
 """Provider status command for vibeusage."""
+
 from __future__ import annotations
 
 import time

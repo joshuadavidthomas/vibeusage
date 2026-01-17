@@ -1,4 +1,5 @@
 """Fetch strategies for vibeusage."""
+
 from __future__ import annotations
 
 from vibeusage.strategies.base import FetchAttempt

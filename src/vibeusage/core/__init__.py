@@ -1,4 +1,5 @@
 """Core orchestration and utilities for vibeusage."""
+
 from __future__ import annotations
 
 from vibeusage.core.aggregate import AggregatedResult

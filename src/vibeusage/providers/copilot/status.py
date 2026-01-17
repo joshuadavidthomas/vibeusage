@@ -1,4 +1,5 @@
 """Status fetching for Copilot (GitHub) provider."""
+
 from __future__ import annotations
 
 from vibeusage.models import ProviderStatus

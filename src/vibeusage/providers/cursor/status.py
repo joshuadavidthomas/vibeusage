@@ -1,4 +1,5 @@
 """Status fetching for Cursor provider."""
+
 from __future__ import annotations
 
 from vibeusage.models import ProviderStatus

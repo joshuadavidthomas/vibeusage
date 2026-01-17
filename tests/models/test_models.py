@@ -1,4 +1,5 @@
 """Tests for vibeusage.models data structures."""
+
 from __future__ import annotations
 
 from datetime import UTC
@@ -415,9 +416,7 @@ class TestUsageSnapshot:
 
     def test_primary_period_none(self):
         """primary_period() returns None when no periods."""
-        snapshot = UsageSnapshot(
-            provider="claude", fetched_at=datetime.now(UTC)
-        )
+        snapshot = UsageSnapshot(provider="claude", fetched_at=datetime.now(UTC))
         assert snapshot.primary_period() is None
 
     def test_secondary_period(self, sample_multi_period_snapshot):

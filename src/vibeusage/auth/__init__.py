@@ -1,4 +1,5 @@
 """Authentication strategies for vibeusage."""
+
 from __future__ import annotations
 
 from vibeusage.auth.base import REFRESH_BUFFER

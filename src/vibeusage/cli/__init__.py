@@ -1,4 +1,5 @@
 """CLI framework for vibeusage."""
+
 from __future__ import annotations
 
 from vibeusage.cli.app import ExitCode

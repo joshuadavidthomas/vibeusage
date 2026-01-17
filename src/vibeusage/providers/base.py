@@ -1,4 +1,5 @@
 """Base provider protocol and metadata for vibeusage."""
+
 from __future__ import annotations
 
 from abc import ABC

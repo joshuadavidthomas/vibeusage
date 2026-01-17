@@ -1,4 +1,5 @@
 """Error handling for vibeusage."""
+
 from __future__ import annotations
 
 from vibeusage.errors.classify import classify_exception

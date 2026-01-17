@@ -1,4 +1,5 @@
 """Status page fetching utilities for providers."""
+
 from __future__ import annotations
 
 import json

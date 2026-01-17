@@ -1,4 +1,5 @@
 """Configuration management for vibeusage."""
+
 from __future__ import annotations
 
 from vibeusage.config.cache import cache_org_id

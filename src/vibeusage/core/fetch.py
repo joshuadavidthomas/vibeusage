@@ -1,4 +1,5 @@
 """Fetch pipeline for executing provider fetch strategies."""
+
 from __future__ import annotations
 
 import asyncio

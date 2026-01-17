@@ -1,4 +1,5 @@
 """Async wrapper for Typer to support async commands."""
+
 from __future__ import annotations
 
 import asyncio
