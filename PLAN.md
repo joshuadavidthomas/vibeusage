@@ -35,6 +35,25 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ---
 
+## Recent Fixes
+
+### 2026-01-17: CLI Subcommands Missing from Help Output
+
+**Issue**: All CLI subcommands (auth, init, status, usage, cache, config, key) were missing from `vibeusage --help`. Only provider commands (claude, codex, copilot, cursor, gemini) were showing.
+
+**Root Cause**: Lines 147-152 in `cli/app.py` had comments about importing command modules to trigger self-registration, but the actual import statements were completely missing.
+
+**Fix Applied**: Added the missing imports to `cli/app.py`:
+- Import command modules that use `@app.command()` decorators (auth, init, status, usage)
+- Import command groups (key, cache, config) and register them via `app.add_typer()`
+
+**Verification**:
+- All commands now appear in `vibeusage --help`
+- All subcommands work (key set/delete, cache show/clear, config show/path/reset/edit)
+- All 1055 tests pass (82% coverage)
+
+---
+
 ## Implementation History (Summary)
 
 **January 2025**: Implemented all 5 priority providers (Claude, Codex, Copilot, Cursor, Gemini), CLI framework with ATyper, display modules (Rich/JSON), error classification system, and configuration management. Fixed OAuth credential loading and API response parsing for all providers.

@@ -148,7 +148,21 @@ def run_app() -> None:
 # These imports must come after app is defined
 # Note: key, config, and cache groups register themselves via add_typer()
 
-# Import key, config, cache modules to trigger their self-registration
+# Import command modules - they register themselves via @app.command() decorators
+from vibeusage.cli.commands import auth  # noqa: F401 (registers auth command)
+from vibeusage.cli.commands import init  # noqa: F401 (registers init command)
+from vibeusage.cli.commands import status  # noqa: F401 (registers status command)
+from vibeusage.cli.commands import usage  # noqa: F401 (registers usage command)
+
+# Import key, config, cache modules and register their typer groups
+from vibeusage.cli.commands import cache as cache_cmd  # noqa: F401
+from vibeusage.cli.commands import config as config_cmd  # noqa: F401
+from vibeusage.cli.commands import key as key_cmd  # noqa: F401
+
+# Register typer groups for key, cache, config commands
+app.add_typer(key_cmd.key_app, name="key")
+app.add_typer(cache_cmd.cache_app, name="cache")
+app.add_typer(config_cmd.config_app, name="config")
 
 
 # Provider command aliases - these provide top-level shortcuts like `vibeusage claude`
