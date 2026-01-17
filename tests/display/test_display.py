@@ -365,3 +365,257 @@ class TestDecodeJson:
 
 # Import io for BytesIO
 import io
+
+# Import for CLI display tests
+from rich.console import Console
+from vibeusage.models import UsageSnapshot
+from vibeusage.cli.display import SingleProviderDisplay, ProviderPanel
+
+
+class TestSingleProviderDisplay:
+    """Tests for SingleProviderDisplay class."""
+
+    def test_title_is_capitalized(self):
+        """Provider name should be capitalized in title per spec 05."""
+        now = datetime.now(timezone.utc)
+        snapshot = UsageSnapshot(
+            provider="claude",  # lowercase input
+            periods=[],
+            fetched_at=now,
+        )
+
+        display = SingleProviderDisplay(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        # Title should be "Claude" not "claude"
+        assert "Claude" in output
+        # First line should be the capitalized title
+        lines = output.strip().split("\n")
+        assert lines[0] == "Claude"
+
+    def test_shows_model_specific_periods(self):
+        """Single provider view should show model-specific periods per spec 05."""
+        now = datetime.now(timezone.utc)
+        periods = [
+            UsagePeriod(
+                name="Session (5h)",
+                utilization=58,
+                period_type=PeriodType.SESSION,
+                model=None,
+                resets_at=now + timedelta(hours=2),
+            ),
+            UsagePeriod(
+                name="Opus",
+                utilization=12,
+                period_type=PeriodType.WEEKLY,
+                model="opus",  # Model-specific
+                resets_at=now + timedelta(days=4),
+            ),
+        ]
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=periods,
+            fetched_at=now,
+        )
+
+        display = SingleProviderDisplay(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        # Model-specific periods should be shown
+        assert "Opus" in output
+
+    def test_title_separator_format(self):
+        """Single provider view should use title+separator format per spec 05."""
+        now = datetime.now(timezone.utc)
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            fetched_at=now,
+        )
+
+        display = SingleProviderDisplay(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        lines = output.strip().split("\n")
+        # Second line should be the separator (box drawing characters)
+        assert len(lines) > 1
+        assert "━" in lines[1]
+
+    def test_overage_panel_rendered(self):
+        """Overage should be rendered in a Panel per spec 05."""
+        now = datetime.now(timezone.utc)
+        overage = OverageUsage(
+            used=Decimal("5.50"),
+            limit=Decimal("100.00"),
+            currency="USD",
+            is_enabled=True,
+        )
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[],
+            overage=overage,
+            fetched_at=now,
+        )
+
+        display = SingleProviderDisplay(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(display)
+
+        output = capture.get()
+        # Overage should be shown with panel borders
+        assert "Overage" in output
+        assert "$5.50" in output
+        assert "$100.00" in output
+
+
+class TestProviderPanel:
+    """Tests for ProviderPanel class (multi-provider compact view)."""
+
+    def test_filters_model_specific_periods(self):
+        """Multi-provider view should NOT show model-specific periods per spec 05."""
+        now = datetime.now(timezone.utc)
+        periods = [
+            UsagePeriod(
+                name="Session (5h)",
+                utilization=58,
+                period_type=PeriodType.SESSION,
+                model=None,  # Not model-specific
+                resets_at=now + timedelta(hours=2),
+            ),
+            UsagePeriod(
+                name="Weekly",
+                utilization=23,
+                period_type=PeriodType.WEEKLY,
+                model=None,  # Not model-specific
+                resets_at=now + timedelta(days=4),
+            ),
+            UsagePeriod(
+                name="Opus",
+                utilization=12,
+                period_type=PeriodType.WEEKLY,
+                model="opus",  # Model-specific - should be filtered
+                resets_at=now + timedelta(days=4),
+            ),
+            UsagePeriod(
+                name="Sonnet",
+                utilization=31,
+                period_type=PeriodType.WEEKLY,
+                model="sonnet",  # Model-specific - should be filtered
+                resets_at=now + timedelta(days=4),
+            ),
+        ]
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=periods,
+            fetched_at=now,
+        )
+
+        panel = ProviderPanel(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(panel)
+
+        output = capture.get()
+        # General periods should be shown
+        assert "Session (5h)" in output
+        assert "Weekly" in output
+        # Model-specific periods should NOT be shown in compact view
+        assert "Opus" not in output
+        assert "Sonnet" not in output
+
+    def test_panel_title_is_capitalized(self):
+        """Provider panel title should be capitalized per spec 05."""
+        now = datetime.now(timezone.utc)
+        snapshot = UsageSnapshot(
+            provider="claude",  # lowercase input
+            periods=[],
+            fetched_at=now,
+        )
+
+        panel = ProviderPanel(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(panel)
+
+        output = capture.get()
+        # Title should be "Claude" not "claude"
+        assert "Claude" in output
+
+    def test_no_source_row_in_compact_view(self):
+        """Compact multi-provider view should not show source row per spec 05."""
+        now = datetime.now(timezone.utc)
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=[
+                UsagePeriod(
+                    name="Session",
+                    utilization=50,
+                    period_type=PeriodType.SESSION,
+                    model=None,
+                    resets_at=now + timedelta(hours=2),
+                ),
+            ],
+            fetched_at=now,
+            source="oauth",  # Has a source
+        )
+
+        panel = ProviderPanel(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(panel)
+
+        output = capture.get()
+        # Should not show "via oauth" in compact view
+        assert "via oauth" not in output
+        assert "CLAUDE" not in output
+
+    def test_uses_period_type_names_in_compact_view(self):
+        """Compact view should use period type names (Weekly, Daily) per spec 05."""
+        now = datetime.now(timezone.utc)
+        periods = [
+            UsagePeriod(
+                name="Custom Session Name",
+                utilization=58,
+                period_type=PeriodType.SESSION,
+                model=None,
+                resets_at=now + timedelta(hours=2),
+            ),
+            UsagePeriod(
+                name="Custom Weekly Name",
+                utilization=23,
+                period_type=PeriodType.WEEKLY,
+                model=None,
+                resets_at=now + timedelta(days=4),
+            ),
+        ]
+
+        snapshot = UsageSnapshot(
+            provider="claude",
+            periods=periods,
+            fetched_at=now,
+        )
+
+        panel = ProviderPanel(snapshot)
+        console = Console()
+        with console.capture() as capture:
+            console.print(panel)
+
+        output = capture.get()
+        # Should use period type names, not period names
+        assert "Custom Session Name" not in output
+        assert "Custom Weekly Name" not in output
+        # Should show "Weekly" as the period type label
+        assert "Weekly" in output
