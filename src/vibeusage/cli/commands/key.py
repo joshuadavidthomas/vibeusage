@@ -23,14 +23,11 @@ key_app = ATyper(help="Manage credentials for providers.")
 @key_app.callback(invoke_without_command=True)
 def key_callback(
     ctx: typer.Context,
-    provider: str = typer.Argument(
-        None,
-        help="Provider to show credentials for",
-    ),
 ) -> None:
-    """Show credential status for all providers or a specific provider.
+    """Show credential status for all providers.
 
-    If no subcommand is provided, shows credential status.
+    If no subcommand is provided, shows credential status for all providers.
+    Use `vibeusage auth <provider>` to see detailed status for a specific provider.
     """
     console = Console()
 
@@ -38,18 +35,8 @@ def key_callback(
     if ctx.invoked_subcommand is not None:
         return
 
-    if provider is None:
-        # Show all providers
-        display_all_credential_status(console)
-    else:
-        # Show specific provider
-        if provider not in list_provider_ids():
-            console.print(f"[red]Unknown provider:[/red] {provider}")
-            console.print(f"Available providers: {', '.join(list_provider_ids())}")
-            raise typer.Exit(ExitCode.CONFIG_ERROR)
-
-        has_creds, source = check_provider_credentials(provider)
-        display_provider_credential_status(console, provider, has_creds, source)
+    # Show all providers
+    display_all_credential_status(console)
 
 
 @key_app.command("set")

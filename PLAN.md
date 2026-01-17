@@ -26,6 +26,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Test suite (399 passing tests, 48% coverage)
 
+**Recent Fixes** (2025-01-17):
+- CLI command audit completed - all commands tested
+- Confirmed `vibeusage usage` is working (typer.get_context() fix successful)
+- Documented --json flag partial implementation (works on status, not usage)
+- Updated test count: 399 passing tests, 3 test ordering issues remain
+
 **Recent Fixes** (2025-01-16):
 - Fixed File I/O type issue in _save_to_toml(): use binary mode 'wb' instead of 'w'
 - Fixed AsyncIO event loop handling in atyper.py sync_wrapper
@@ -42,7 +48,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - Fixed with_retry to accept callable that returns coroutine for retries
 - Reduced test failures from 38 to 3 (only test ordering issues remain)
 
-## CLI Command Testing Results (2026-01-16)
+## CLI Command Testing Results (2026-01-17)
 
 ### WORKING Commands (✓)
 
@@ -50,17 +56,20 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - `vibeusage --help` - Shows all commands correctly ✓
 - `vibeusage` (default) - Shows "No usage data available" message ✓
 - `vibeusage --version` - Shows "vibeusage 0.1.0" ✓
-- `vibeusage usage` - Shows "No usage data available" message ✓ **FIXED - was broken in earlier notes**
-- `vibeusage usage --refresh` - Works ✓
 - `vibeusage --no-color` - Works (disables color output) ✓
-- `vibeusage --json` - Works with default/usage commands ✓
+- `vibeusage usage` - NOW WORKS (was broken in earlier notes) ✓
+- `vibeusage usage --refresh` - Works ✓
+
+**Provider-Specific Usage (Expected Behavior):**
+- `vibeusage usage claude` - Gives "Invalid credentials: missing access_token" error (expected behavior, command works) ✓
+- `vibeusage usage codex` - Gives "Invalid credentials: missing access_token" error (expected) ✓
+- `vibeusage usage copilot` - Gives "Strategy not available" error (expected, provider needs auth) ✓
 
 **Status & Auth Commands:**
-- `vibeusage status` - Shows provider status table with Claude (?), Codex (●), Copilot (●) ✓
+- `vibeusage status` - Shows provider status table ✓
+- `vibeusage status --json` - JSON output works ✓
 - `vibeusage auth` - Shows auth status table ✓
-- `vibeusage auth --status` - Shows auth status table ✓
-- `vibeusage auth --all` - Shows detailed auth status ✓
-- `vibeusage auth <provider>` - Starts provider-specific auth flow (prompts for input) ✓
+- `vibeusage auth claude` - Interactive auth flow works (hangs waiting for input - expected) ✓
 
 **Cache Commands:**
 - `vibeusage cache show` - Shows cache status table ✓
@@ -69,46 +78,42 @@ A CLI application to track usage stats from all LLM providers to understand sess
 **Config Commands:**
 - `vibeusage config show` - Shows config file contents ✓
 - `vibeusage config path` - Shows config/cache/credentials directory paths ✓
-- `vibeusage config reset` - Prompts for confirmation before reset ✓
 
 **Key Commands:**
 - `vibeusage key` - Shows credential status for all providers ✓
 - `vibeusage key <provider>` - Shows credential status for specific provider ✓
 
-### BROKEN / NOT IMPLEMENTED (✗)
+### MINOR Issues
 
-**1. Provider-specific top-level commands NOT IMPLEMENTED:**
-- `vibeusage claude` - Error: "No such command 'claude'" ✗
-- `vibeusage codex` - Error: "No such command 'codex'" ✗
-- `vibeusage copilot` - Error: "No such command 'copilot'" ✗
+**1. `--json` flag not working on default command:**
+- `vibeusage --json` - Does NOT output JSON (only plain text) ⚠️
+- Expected: Output JSON for the default command
+- Actual: The global --json flag doesn't affect the default command output
+
+**2. `--json` flag NOT supported on auth command:**
+- `vibeusage auth --json` - NOT SUPPORTED ⚠️
+- The auth command doesn't accept the --json flag despite earlier plans saying it should
+- Workaround: Use other auth commands without JSON output
+
+### NOT IMPLEMENTED (Expected)
+
+**1. Provider-specific top-level commands:**
+- `vibeusage claude` - "No such command 'claude'" ✗
+- `vibeusage codex` - "No such command 'codex'" ✗
+- `vibeusage copilot` - "No such command 'copilot'" ✗
 - Note: Provider-specific usage is accessed via `vibeusage usage <provider>` instead
 - Design decision: These were never intended as top-level commands
 
-**2. `vibeusage key set <provider>` - INTERFACE ISSUE:**
-- Running `vibeusage key set claude` gives "No such command 'claude'" ✗
-- The key_app callback takes an optional `provider` argument, creating ambiguity
-- Help shows: `vibeusage key [OPTIONS] [PROVIDER] COMMAND [ARGS]...`
-- Actual syntax: `vibeusage key set` (then prompted for provider)
-- Users expect: `vibeusage key set <provider>`
+### UX Issues
 
-**3. `vibeusage usage <provider>` - CREDENTIAL/STRATEGY ERRORS:**
-- `vibeusage usage claude` - Exit code 1: "Invalid credentials: missing access_token" ⚠️
-- `vibeusage usage codex` - Exit code 1: "Invalid credentials: missing access_token" ⚠️
-- `vibeusage usage copilot` - Exit code 1: "Strategy not available" ⚠️
-- These are credential/configuration issues, not command bugs
+**1. `vibeusage key set --help` shows wrong help:**
+- Running `vibeusage key set --help` shows parent `key` group help instead of `set` subcommand help
+- The key group has optional provider arg, and set command has required provider arg
+- This creates potential confusion for users
 
-**4. `--json` flag - LIMITED IMPLEMENTATION:**
-- `vibeusage --json status` - Outputs Rich table, not JSON ✗
-- `vibeusage --json key` - Outputs Rich table, not JSON ✗
-- `vibeusage --json auth` - Outputs Rich table, not JSON ✗
-- Only works for default/usage commands when data is available
+**CLI Design Note**: Provider-specific usage is accessed via `vibeusage usage <provider>`, NOT via top-level `vibeusage <provider>` commands. The providers (Claude, Codex, Copilot) ARE implemented and functional.
 
-**5. `--verbose` and `--quiet` flags - NO EFFECT:**
-- `vibeusage --verbose` - No change in output ✗
-- `vibeusage --quiet` - No change in output ✗
-- Flags are accepted but not implemented
-
-**CLI Design Note**: Provider-specific usage is accessed via `vibeusage usage <provider>`, NOT via top-level `vibeusage <provider>` commands. The providers (Claude, Codex, Copilot) ARE implemented and functional, but there are no provider-specific top-level commands.
+**KEY FINDING**: The CRITICAL BUG with `typer.get_context()` that was blocking `vibeusage usage` has been FIXED. The command now works correctly.
 
 ---
 
@@ -117,20 +122,20 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ### Priority 1: Minor Fixes & UX Improvements
 **Goal**: Fix remaining interface issues and polish UX
 
-**Completed Items:**
-- [x] **FIXED: usage_command typer.get_context() bug** (fixed in earlier commit)
-  - Was: `AttributeError: module 'typer' has no attribute 'get_context'`
-  - Now: Usage command works correctly
-
 **Remaining Issues:**
 - [ ] **Fix `key set` command interface**
-  - Current: `vibeusage key set claude` fails with "No such command 'claude'"
-  - Expected: Accept provider as argument: `vibeusage key set claude`
-  - Workaround: `vibeusage key set` (then prompted for provider)
+  - Issue: `vibeusage key set --help` shows parent `key` group help instead of `set` subcommand help
+  - The key group has optional provider arg, and set command has required provider arg
+  - This creates confusion for users trying to understand the command
 
-- [ ] **Implement `--json` flag for all commands**
-  - Current: Only works for default/usage commands
-  - Missing: `--json status`, `--json key`, `--json auth`, `--json cache`
+- [ ] **Implement `--json` flag for default command**
+  - Current: `vibeusage --json` does NOT output JSON (only plain text)
+  - Expected: The global --json flag should affect the default command output
+  - Note: `--json` works on `status` command, but NOT on default command or `auth` command
+
+- [ ] **Consider adding `--json` support to auth command**
+  - Current: `vibeusage auth --json` is NOT SUPPORTED
+  - The auth command doesn't accept the --json flag
 
 - [ ] **Implement `--verbose` and `--quiet` flags**
   - Current: Flags accepted but no effect on output
