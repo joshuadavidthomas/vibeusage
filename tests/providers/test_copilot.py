@@ -19,9 +19,14 @@ class TestCopilotProvider:
         assert CopilotProvider.metadata.id == "copilot"
         assert CopilotProvider.metadata.name == "Copilot"
         assert "GitHub" in CopilotProvider.metadata.description
-        assert CopilotProvider.metadata.homepage == "https://github.com/features/copilot"
+        assert (
+            CopilotProvider.metadata.homepage == "https://github.com/features/copilot"
+        )
         assert CopilotProvider.metadata.status_url == "https://www.githubstatus.com"
-        assert CopilotProvider.metadata.dashboard_url == "https://github.com/settings/copilot"
+        assert (
+            CopilotProvider.metadata.dashboard_url
+            == "https://github.com/settings/copilot"
+        )
 
     def test_id_property(self):
         """id property returns correct value."""
@@ -53,6 +58,7 @@ class TestCopilotProvider:
         provider = CopilotProvider()
 
         import inspect
+
         assert inspect.iscoroutinefunction(provider.fetch_status)
 
 
@@ -89,7 +95,9 @@ class TestCopilotDeviceFlowStrategy:
         """is_available returns True when credentials exist."""
         strategy = CopilotDeviceFlowStrategy()
 
-        with patch("vibeusage.providers.copilot.device_flow.Path.exists", return_value=True):
+        with patch(
+            "vibeusage.providers.copilot.device_flow.Path.exists", return_value=True
+        ):
             result = strategy.is_available()
             assert result is True
 
@@ -113,7 +121,10 @@ class TestCopilotDeviceFlowStrategy:
             result = await strategy.fetch()
             assert result.success is False
             # Empty dict is truthy but has no access_token
-            assert "credentials" in result.error.lower() or "access_token" in result.error.lower()
+            assert (
+                "credentials" in result.error.lower()
+                or "access_token" in result.error.lower()
+            )
 
     @pytest.mark.asyncio
     async def test_fetch_success_with_premium_interactions(self):
@@ -144,7 +155,9 @@ class TestCopilotDeviceFlowStrategy:
         }
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
-            with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+            with patch(
+                "vibeusage.providers.copilot.device_flow.get_http_client"
+            ) as mock_http:
                 # Mock the HTTP response
                 mock_response = Mock()
                 mock_response.status_code = 200
@@ -184,7 +197,9 @@ class TestCopilotDeviceFlowStrategy:
         }
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
-            with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+            with patch(
+                "vibeusage.providers.copilot.device_flow.get_http_client"
+            ) as mock_http:
                 # Mock the HTTP response
                 mock_response = Mock()
                 mock_response.status_code = 200
@@ -215,7 +230,9 @@ class TestCopilotDeviceFlowStrategy:
         credentials = {"access_token": "expired_token"}
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
-            with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+            with patch(
+                "vibeusage.providers.copilot.device_flow.get_http_client"
+            ) as mock_http:
                 # Mock the HTTP response
                 mock_response = AsyncMock()
                 mock_response.status_code = 401
@@ -244,7 +261,9 @@ class TestCopilotDeviceFlowStrategy:
         credentials = {"access_token": "unauthorized_token"}
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
-            with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+            with patch(
+                "vibeusage.providers.copilot.device_flow.get_http_client"
+            ) as mock_http:
                 # Mock the HTTP response
                 mock_response = AsyncMock()
                 mock_response.status_code = 403
@@ -272,7 +291,9 @@ class TestCopilotDeviceFlowStrategy:
         credentials = {"access_token": "valid_token"}
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
-            with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+            with patch(
+                "vibeusage.providers.copilot.device_flow.get_http_client"
+            ) as mock_http:
                 # Mock the HTTP response
                 mock_response = AsyncMock()
                 mock_response.status_code = 404
@@ -300,7 +321,9 @@ class TestCopilotDeviceFlowStrategy:
         credentials = {"access_token": "test_token"}
 
         with patch.object(strategy, "_load_credentials", return_value=credentials):
-            with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+            with patch(
+                "vibeusage.providers.copilot.device_flow.get_http_client"
+            ) as mock_http:
                 # Mock the HTTP response - use Mock (not AsyncMock) for json since it's synchronous
                 mock_response = Mock()
                 mock_response.status_code = 200
@@ -338,13 +361,17 @@ class TestCopilotDeviceFlowStrategy:
         }
 
         result = strategy._needs_refresh(credentials)
-        assert result is False  # GitHub tokens don't expire, but we have a 1-day threshold
+        assert (
+            result is False
+        )  # GitHub tokens don't expire, but we have a 1-day threshold
 
     def test_needs_refresh_true_when_expiring_soon(self):
         """_needs_refresh returns True when token expires within threshold."""
         strategy = CopilotDeviceFlowStrategy()
         credentials = {
-            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=12)).isoformat(),
+            "expires_at": (
+                datetime.now(timezone.utc) + timedelta(hours=12)
+            ).isoformat(),
         }
 
         result = strategy._needs_refresh(credentials)
@@ -356,7 +383,9 @@ class TestCopilotDeviceFlowStrategy:
         strategy = CopilotDeviceFlowStrategy()
         credentials = {"access_token": "valid_token"}
 
-        with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
             # Mock the HTTP response for user verification
             mock_user_response = Mock()
             mock_user_response.status_code = 200
@@ -383,7 +412,9 @@ class TestCopilotDeviceFlowStrategy:
         strategy = CopilotDeviceFlowStrategy()
         credentials = {"access_token": "expired_token"}
 
-        with patch("vibeusage.providers.copilot.device_flow.get_http_client") as mock_http:
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
             # Mock the HTTP response for user verification
             mock_user_response = AsyncMock()
             mock_user_response.status_code = 401
@@ -441,7 +472,9 @@ class TestCopilotDeviceFlowStrategy:
         assert len(snapshot.periods) == 3
 
         # Check monthly period
-        monthly = next((p for p in snapshot.periods if p.period_type == PeriodType.MONTHLY), None)
+        monthly = next(
+            (p for p in snapshot.periods if p.period_type == PeriodType.MONTHLY), None
+        )
         assert monthly is not None
         assert monthly.name == "Monthly"
         assert monthly.utilization == 45  # 450/1000
@@ -451,7 +484,9 @@ class TestCopilotDeviceFlowStrategy:
         assert daily_gpt4 is not None
         assert daily_gpt4.utilization == 50  # 15/30
 
-        daily_gpt35 = next((p for p in snapshot.periods if p.model == "gpt-3.5-turbo"), None)
+        daily_gpt35 = next(
+            (p for p in snapshot.periods if p.model == "gpt-3.5-turbo"), None
+        )
         assert daily_gpt35 is not None
         assert daily_gpt35.utilization == 80  # 80/100
 

@@ -61,10 +61,18 @@ class SingleProviderDisplay:
         grid.add_column(justify="right")  # Reset time
 
         # Group periods by type for proper display per spec
-        session_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION]
-        weekly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.WEEKLY]
-        daily_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY]
-        monthly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY]
+        session_periods = [
+            p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION
+        ]
+        weekly_periods = [
+            p for p in self.snapshot.periods if p.period_type == PeriodType.WEEKLY
+        ]
+        daily_periods = [
+            p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY
+        ]
+        monthly_periods = [
+            p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY
+        ]
 
         # Display session periods first (typically "Session (5h)") - not indented
         if session_periods:
@@ -121,8 +129,15 @@ class SingleProviderDisplay:
                 )
 
         # Add any remaining periods (not session/weekly/daily/monthly)
-        handled_types = {PeriodType.SESSION, PeriodType.WEEKLY, PeriodType.DAILY, PeriodType.MONTHLY}
-        remaining_periods = [p for p in self.snapshot.periods if p.period_type not in handled_types]
+        handled_types = {
+            PeriodType.SESSION,
+            PeriodType.WEEKLY,
+            PeriodType.DAILY,
+            PeriodType.MONTHLY,
+        }
+        remaining_periods = [
+            p for p in self.snapshot.periods if p.period_type not in handled_types
+        ]
         for period in remaining_periods:
             grid.add_row(
                 Text(period.name, style="bold"),
@@ -136,7 +151,9 @@ class SingleProviderDisplay:
         if self.snapshot.overage and self.snapshot.overage.is_enabled:
             overage = self.snapshot.overage
             symbol = "$" if overage.currency == "USD" else ""
-            overage_text = Text(f"Extra Usage: {symbol}{overage.used:.2f} / {symbol}{overage.limit:.2f} {overage.currency}")
+            overage_text = Text(
+                f"Extra Usage: {symbol}{overage.used:.2f} / {symbol}{overage.limit:.2f} {overage.currency}"
+            )
             yield Panel(
                 overage_text,
                 title="Overage",
@@ -150,7 +167,7 @@ class SingleProviderDisplay:
         from vibeusage.models import pace_to_color
 
         text = Text()
-        pace_ratio = period.pace_ratio() if hasattr(period, 'pace_ratio') else None
+        pace_ratio = period.pace_ratio() if hasattr(period, "pace_ratio") else None
         color = pace_to_color(pace_ratio, period.utilization)
         bar = render_usage_bar(period.utilization, color=color)
         text.append_text(bar)
@@ -160,7 +177,9 @@ class SingleProviderDisplay:
     def _format_reset_time(self, period) -> Text:
         """Format the reset time column."""
         text = Text()
-        time_until = period.time_until_reset() if hasattr(period, 'time_until_reset') else None
+        time_until = (
+            period.time_until_reset() if hasattr(period, "time_until_reset") else None
+        )
         if time_until is not None:
             time_str = format_reset_countdown(time_until)
             text.append(f"resets in {time_str}", style="dim")
@@ -201,7 +220,9 @@ class UsageDisplay:
         # Overage
         if self.snapshot.overage and self.snapshot.overage.is_enabled:
             overage = self.snapshot.overage
-            overage_text = format_overage_used(overage.used, overage.limit, overage.currency)
+            overage_text = format_overage_used(
+                overage.used, overage.limit, overage.currency
+            )
             lines.append(overage_text)
 
         # Identity
@@ -257,10 +278,26 @@ class ProviderPanel:
 
         # In multi-provider (compact) view, skip model-specific periods
         # Only show general periods where model is None
-        session_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION and p.model is None]
-        weekly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.WEEKLY and p.model is None]
-        daily_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY and p.model is None]
-        monthly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY and p.model is None]
+        session_periods = [
+            p
+            for p in self.snapshot.periods
+            if p.period_type == PeriodType.SESSION and p.model is None
+        ]
+        weekly_periods = [
+            p
+            for p in self.snapshot.periods
+            if p.period_type == PeriodType.WEEKLY and p.model is None
+        ]
+        daily_periods = [
+            p
+            for p in self.snapshot.periods
+            if p.period_type == PeriodType.DAILY and p.model is None
+        ]
+        monthly_periods = [
+            p
+            for p in self.snapshot.periods
+            if p.period_type == PeriodType.MONTHLY and p.model is None
+        ]
 
         # Display session periods first - use their specific name per spec 05
         if session_periods:
@@ -296,8 +333,17 @@ class ProviderPanel:
                 )
 
         # Add any remaining periods (not session/weekly/daily/monthly) - skip model-specific
-        handled_types = {PeriodType.SESSION, PeriodType.WEEKLY, PeriodType.DAILY, PeriodType.MONTHLY}
-        remaining_periods = [p for p in self.snapshot.periods if p.period_type not in handled_types and p.model is None]
+        handled_types = {
+            PeriodType.SESSION,
+            PeriodType.WEEKLY,
+            PeriodType.DAILY,
+            PeriodType.MONTHLY,
+        }
+        remaining_periods = [
+            p
+            for p in self.snapshot.periods
+            if p.period_type not in handled_types and p.model is None
+        ]
         for period in remaining_periods:
             grid.add_row(
                 Text(period.name, style="bold"),
@@ -310,7 +356,9 @@ class ProviderPanel:
             overage = self.snapshot.overage
             overage_text = Text()
             symbol = "$" if overage.currency == "USD" else ""
-            overage_text.append(f"Extra Usage: {symbol}{overage.used:.2f} / {symbol}{overage.limit:.2f} {overage.currency}")
+            overage_text.append(
+                f"Extra Usage: {symbol}{overage.used:.2f} / {symbol}{overage.limit:.2f} {overage.currency}"
+            )
             grid.add_row(
                 overage_text,
                 Text(),
@@ -331,7 +379,7 @@ class ProviderPanel:
         from vibeusage.models import pace_to_color
 
         text = Text()
-        pace_ratio = period.pace_ratio() if hasattr(period, 'pace_ratio') else None
+        pace_ratio = period.pace_ratio() if hasattr(period, "pace_ratio") else None
         color = pace_to_color(pace_ratio, period.utilization)
         bar = render_usage_bar(period.utilization, color=color)
         text.append_text(bar)
@@ -341,7 +389,9 @@ class ProviderPanel:
     def _format_reset_time(self, period) -> Text:
         """Format the reset time column."""
         text = Text()
-        time_until = period.time_until_reset() if hasattr(period, 'time_until_reset') else None
+        time_until = (
+            period.time_until_reset() if hasattr(period, "time_until_reset") else None
+        )
         if time_until is not None:
             time_str = format_reset_countdown(time_until)
             text.append(f"resets in {time_str}", style="dim")
@@ -395,7 +445,9 @@ class ErrorDisplay:
         )
 
 
-def show_error(error: VibeusageError | Exception, console: Console | None = None) -> None:
+def show_error(
+    error: VibeusageError | Exception, console: Console | None = None
+) -> None:
     """Display a formatted error message.
 
     Args:
@@ -447,7 +499,9 @@ def show_partial_failures(
         console.print(f"[red]{provider_id}[/red]: {vibe_error.message}")
         if vibe_error.remediation:
             # Remove color codes for simpler display
-            remediation = vibe_error.remediation.replace("[cyan]", "").replace("[/cyan]", "")
+            remediation = vibe_error.remediation.replace("[cyan]", "").replace(
+                "[/cyan]", ""
+            )
             console.print(f"  [dim]{remediation}[/dim]")
 
 
@@ -477,9 +531,7 @@ def show_stale_warning(
             age_str = f"{hours} hour{'s' if hours != 1 else ''}"
 
         console.print(f"[yellow]⚠ Showing cached data from {age_str} ago[/yellow]")
-        console.print(
-            f"[dim]Run with [cyan]--refresh[/cyan] to fetch fresh data[/dim]"
-        )
+        console.print(f"[dim]Run with [cyan]--refresh[/cyan] to fetch fresh data[/dim]")
 
 
 def show_diagnostic_info(console: Console | None = None) -> None:

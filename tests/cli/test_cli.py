@@ -20,6 +20,7 @@ class TestAsyncCommandWrapper:
 
     def test_wraps_async_function(self):
         """Wrapper executes async function synchronously."""
+
         async def async_func():
             return "async result"
 
@@ -30,6 +31,7 @@ class TestAsyncCommandWrapper:
 
     def test_wraps_sync_function(self):
         """Wrapper passes through sync functions."""
+
         def sync_func():
             return "sync result"
 
@@ -44,6 +46,7 @@ class TestAsyncTyperCommand:
 
     def test_invoke_async_function(self):
         """Invoke runs async function with asyncio.run."""
+
         # Create an actual async function
         async def async_callback():
             return "result"
@@ -64,6 +67,7 @@ class TestAsyncTyperCommand:
 
     def test_invoke_sync_function(self):
         """Invoke runs sync function normally."""
+
         # Create an actual sync function
         def sync_callback():
             return "sync result"
@@ -181,7 +185,9 @@ class TestCommandIntegration:
     def test_commands_registered(self):
         """Expected commands are registered with the app."""
         registered = app.registered_commands or {}
-        command_names = set(registered.keys()) if isinstance(registered, dict) else set()
+        command_names = (
+            set(registered.keys()) if isinstance(registered, dict) else set()
+        )
 
         # Check that some expected commands might be registered
         # Note: Typer's internal structure may vary
@@ -232,7 +238,12 @@ class TestJsonOutput:
         """output_json_usage outputs correct JSON for successful outcomes."""
         from datetime import datetime, timezone
         from vibeusage.cli.commands.usage import output_json_usage
-        from vibeusage.models import UsagePeriod, UsageSnapshot, PeriodType, ProviderIdentity
+        from vibeusage.models import (
+            UsagePeriod,
+            UsageSnapshot,
+            PeriodType,
+            ProviderIdentity,
+        )
         from vibeusage.strategies.base import FetchOutcome
         import sys
         from io import StringIO
@@ -276,13 +287,14 @@ class TestJsonOutput:
 
         # Verify JSON is valid
         data = json.loads(output)
-        assert "test" in data
-        assert data["test"]["provider"] == "test"
-        assert data["test"]["source"] == "oauth"
-        assert "periods" in data["test"]
-        assert len(data["test"]["periods"]) == 1
-        assert data["test"]["periods"][0]["name"] == "Test Period"
-        assert data["test"]["periods"][0]["utilization"] == 50
+        assert "providers" in data
+        assert "test" in data["providers"]
+        assert data["providers"]["test"]["provider"] == "test"
+        assert data["providers"]["test"]["source"] == "oauth"
+        assert "periods" in data["providers"]["test"]
+        assert len(data["providers"]["test"]["periods"]) == 1
+        assert data["providers"]["test"]["periods"][0]["name"] == "Test Period"
+        assert data["providers"]["test"]["periods"][0]["utilization"] == 50
 
     def test_output_json_usage_with_error(self):
         """output_json_usage outputs correct JSON for error outcomes."""
@@ -363,10 +375,12 @@ class TestJsonOutput:
         sys.stdout = StringIO()
 
         try:
-            output_json_usage({
-                "provider1": success_outcome,
-                "provider2": error_outcome,
-            })
+            output_json_usage(
+                {
+                    "provider1": success_outcome,
+                    "provider2": error_outcome,
+                }
+            )
             output = sys.stdout.getvalue()
         finally:
             sys.stdout = old_stdout
@@ -384,7 +398,12 @@ class TestJsonOutput:
         from datetime import datetime, timezone
         from decimal import Decimal
         from vibeusage.cli.commands.usage import output_json_usage
-        from vibeusage.models import UsagePeriod, UsageSnapshot, OverageUsage, PeriodType
+        from vibeusage.models import (
+            UsagePeriod,
+            UsageSnapshot,
+            OverageUsage,
+            PeriodType,
+        )
         from vibeusage.strategies.base import FetchOutcome
         import sys
         from io import StringIO

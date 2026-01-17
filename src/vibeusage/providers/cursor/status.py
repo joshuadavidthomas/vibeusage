@@ -9,6 +9,4 @@ async def fetch_cursor_status() -> ProviderStatus:
 
     Cursor uses Statuspage.io at status.cursor.com.
     """
-    return await fetch_statuspage_status(
-        "https://status.cursor.com/api/v2/status.json"
-    )
+    return await fetch_statuspage_status("https://status.cursor.com/api/v2/status.json")

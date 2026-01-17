@@ -114,7 +114,9 @@ def classify_http_status_error(error: httpx.HTTPStatusError) -> VibeusageError:
     elif status == 403:
         remediation = "Your account may not have access to this resource. Check your subscription status."
     elif status == 404:
-        remediation = "The requested resource was not found. The provider API may have changed."
+        remediation = (
+            "The requested resource was not found. The provider API may have changed."
+        )
     elif status == 429:
         remediation = "Rate limited. Wait a few minutes before trying again."
     elif status >= 500:

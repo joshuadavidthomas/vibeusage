@@ -151,7 +151,9 @@ class UsageSnapshot(msgspec.Struct, frozen=True):
 
     provider: str  # Provider identifier (e.g., "claude", "codex")
     fetched_at: datetime  # When this data was fetched
-    periods: tuple[UsagePeriod, ...] = ()  # Rate windows (session, weekly, model-specific)
+    periods: tuple[
+        UsagePeriod, ...
+    ] = ()  # Rate windows (session, weekly, model-specific)
     overage: OverageUsage | None = None  # Extra usage if applicable
     identity: ProviderIdentity | None = None  # Account info
     status: ProviderStatus | None = None  # Provider health

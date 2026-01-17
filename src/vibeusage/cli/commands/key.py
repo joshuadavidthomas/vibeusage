@@ -39,7 +39,9 @@ def key_callback(
     json_mode = ctx.meta.get("json", False)
     verbose = ctx.meta.get("verbose", False)
     quiet = ctx.meta.get("quiet", False)
-    display_all_credential_status(console, json_mode=json_mode, verbose=verbose, quiet=quiet)
+    display_all_credential_status(
+        console, json_mode=json_mode, verbose=verbose, quiet=quiet
+    )
 
 
 @key_app.command("set")
@@ -64,7 +66,9 @@ def key_set_command(
         raise typer.Exit(ExitCode.CONFIG_ERROR)
 
     # Prompt for credential value
-    credential_value = typer.prompt(f"Enter {provider} {credential_type} credential", hide_input=True)
+    credential_value = typer.prompt(
+        f"Enter {provider} {credential_type} credential", hide_input=True
+    )
 
     if not credential_value:
         console.print("[red]Credential cannot be empty[/red]")
@@ -110,9 +114,13 @@ def key_delete_command(
         # Delete specific credential type
         cred_path = credential_path(provider, credential_type)
         if delete_credential(cred_path):
-            console.print(f"[green]✓[/green] Deleted {credential_type} credential for {provider}")
+            console.print(
+                f"[green]✓[/green] Deleted {credential_type} credential for {provider}"
+            )
         else:
-            console.print(f"[yellow]No {credential_type} credential found for {provider}[/yellow]")
+            console.print(
+                f"[yellow]No {credential_type} credential found for {provider}[/yellow]"
+            )
     else:
         # Delete all credentials for provider
         from pathlib import Path
@@ -127,14 +135,21 @@ def key_delete_command(
                     deleted += 1
 
             if deleted > 0:
-                console.print(f"[green]✓[/green] Deleted {deleted} credential(s) for {provider}")
+                console.print(
+                    f"[green]✓[/green] Deleted {deleted} credential(s) for {provider}"
+                )
             else:
                 console.print(f"[yellow]No credentials found for {provider}[/yellow]")
         else:
             console.print(f"[yellow]No credentials found for {provider}[/yellow]")
 
 
-def display_all_credential_status(console: Console, json_mode: bool = False, verbose: bool = False, quiet: bool = False) -> None:
+def display_all_credential_status(
+    console: Console,
+    json_mode: bool = False,
+    verbose: bool = False,
+    quiet: bool = False,
+) -> None:
     """Display credential status for all providers."""
     all_status = get_all_credential_status()
 
@@ -144,7 +159,9 @@ def display_all_credential_status(console: Console, json_mode: bool = False, ver
         data = {
             provider_id: {
                 "configured": status_info["has_credentials"],
-                "source": status_info.get("source") if status_info["has_credentials"] else None,
+                "source": status_info.get("source")
+                if status_info["has_credentials"]
+                else None,
             }
             for provider_id, status_info in all_status.items()
         }
@@ -154,7 +171,9 @@ def display_all_credential_status(console: Console, json_mode: bool = False, ver
     # Quiet mode: minimal output
     if quiet:
         for provider_id, status_info in all_status.items():
-            status = "configured" if status_info["has_credentials"] else "not configured"
+            status = (
+                "configured" if status_info["has_credentials"] else "not configured"
+            )
             console.print(f"{provider_id}: {status}")
         return
 
@@ -202,7 +221,9 @@ def display_provider_credential_status(
             "env": "environment variable",
         }.get(source or "", source or "unknown")
 
-        console.print(f"[green]✓[/green] {provider_id} credentials configured ({source_label})")
+        console.print(
+            f"[green]✓[/green] {provider_id} credentials configured ({source_label})"
+        )
 
         # Show details
         found, src, path = find_provider_credential(provider_id)

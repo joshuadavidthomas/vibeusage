@@ -58,8 +58,7 @@ async def fetch_all_providers(
 
     # Create tasks for all providers
     tasks = [
-        fetch_with_callback(pid, strategies)
-        for pid, strategies in provider_map.items()
+        fetch_with_callback(pid, strategies) for pid, strategies in provider_map.items()
     ]
 
     # Run with semaphore for concurrency control

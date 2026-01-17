@@ -64,7 +64,9 @@ class CursorWebStrategy(FetchStrategy):
             if usage_response.status_code == 404:
                 return FetchResult.fail("User not found or no active subscription")
             if usage_response.status_code != 200:
-                return FetchResult.fail(f"Usage request failed: {usage_response.status_code}")
+                return FetchResult.fail(
+                    f"Usage request failed: {usage_response.status_code}"
+                )
 
             try:
                 usage_data = usage_response.json()
@@ -150,10 +152,14 @@ class CursorWebStrategy(FetchStrategy):
                     try:
                         # Try ISO format first
                         if isinstance(end_date, str):
-                            resets_at = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+                            resets_at = datetime.fromisoformat(
+                                end_date.replace("Z", "+00:00")
+                            )
                         elif isinstance(end_date, int):
                             # Unix timestamp in milliseconds
-                            resets_at = datetime.fromtimestamp(end_date / 1000, tz=timezone.utc)
+                            resets_at = datetime.fromtimestamp(
+                                end_date / 1000, tz=timezone.utc
+                            )
                     except (ValueError, TypeError):
                         pass
 

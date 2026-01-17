@@ -40,7 +40,9 @@ async def status_command(
         if json_mode:
             output_json_status(statuses)
         else:
-            display_status_table(console, statuses, verbose=verbose, quiet=quiet, duration_ms=duration_ms)
+            display_status_table(
+                console, statuses, verbose=verbose, quiet=quiet, duration_ms=duration_ms
+            )
 
     except KeyboardInterrupt:
         if not quiet:
@@ -76,7 +78,13 @@ async def fetch_all_statuses():
     return statuses
 
 
-def display_status_table(console, statuses, verbose: bool = False, quiet: bool = False, duration_ms: float = 0):
+def display_status_table(
+    console,
+    statuses,
+    verbose: bool = False,
+    quiet: bool = False,
+    duration_ms: float = 0,
+):
     """Display provider statuses in a table."""
     from rich.text import Text
 

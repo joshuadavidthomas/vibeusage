@@ -11,8 +11,8 @@ Run these after implementing to get immediate feedback:
 
 - Tests: `uv run pytest tests/ -v`
 - Coverage: `uv run pytest tests/ --cov`
-- Typecheck: `uv run python -c "from vibeusage.errors.classify import classify_exception"`
-- Lint: Not configured
+- Typecheck: `uvx ty check`
+- Lint: `uvx ruff format`
 
 ## Operational Notes
 

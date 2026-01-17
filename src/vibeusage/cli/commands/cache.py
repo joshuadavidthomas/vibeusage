@@ -181,6 +181,7 @@ def cache_clear_command(
             result["error"] = f"Unknown provider: {provider}"
             if json_mode:
                 from vibeusage.display.json import output_json_pretty
+
                 output_json_pretty(result)
             console.print(f"[red]Unknown provider:[/red] {provider}")
             console.print(f"Available providers: {', '.join(list_provider_ids())}")
@@ -199,6 +200,7 @@ def cache_clear_command(
 
     if json_mode:
         from vibeusage.display.json import output_json_pretty
+
         output_json_pretty(result)
         return
 

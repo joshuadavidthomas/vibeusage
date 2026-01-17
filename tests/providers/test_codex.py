@@ -21,7 +21,10 @@ class TestCodexProvider:
         assert "OpenAI" in CodexProvider.metadata.description
         assert CodexProvider.metadata.homepage == "https://chatgpt.com"
         assert CodexProvider.metadata.status_url == "https://status.openai.com"
-        assert CodexProvider.metadata.dashboard_url == "https://chatgpt.com/codex/settings/usage"
+        assert (
+            CodexProvider.metadata.dashboard_url
+            == "https://chatgpt.com/codex/settings/usage"
+        )
 
     def test_id_property(self):
         """id property returns correct value."""
@@ -53,6 +56,7 @@ class TestCodexProvider:
         provider = CodexProvider()
 
         import inspect
+
         assert inspect.iscoroutinefunction(provider.fetch_status)
 
 
@@ -74,7 +78,9 @@ class TestCodexOAuthStrategy:
         """is_available returns False when no credentials exist."""
         strategy = CodexOAuthStrategy()
 
-        with patch.object(strategy, "CREDENTIAL_PATHS", [Path("/nonexistent/path.json")]):
+        with patch.object(
+            strategy, "CREDENTIAL_PATHS", [Path("/nonexistent/path.json")]
+        ):
             result = strategy.is_available()
             assert result is False
 
@@ -400,7 +406,9 @@ class TestCodexOAuthStrategy:
 
         # Mock read_credential to return Codex CLI format
         with patch("vibeusage.providers.codex.oauth.read_credential") as mock_read:
-            mock_read.return_value = '{"tokens": {"access_token": "test_token", "refresh_token": "rt_"}}'
+            mock_read.return_value = (
+                '{"tokens": {"access_token": "test_token", "refresh_token": "rt_"}}'
+            )
 
             credentials = strategy._load_credentials()
 
@@ -414,7 +422,9 @@ class TestCodexOAuthStrategy:
 
         # Mock read_credential to return standard format
         with patch("vibeusage.providers.codex.oauth.read_credential") as mock_read:
-            mock_read.return_value = '{"access_token": "test_token", "refresh_token": "rt_"}'
+            mock_read.return_value = (
+                '{"access_token": "test_token", "refresh_token": "rt_"}'
+            )
 
             credentials = strategy._load_credentials()
 
@@ -451,7 +461,9 @@ class TestCodexProviderIntegration:
     @pytest.mark.asyncio
     async def test_codex_status_fetch(self):
         """Codex provider fetches status from OpenAI status page."""
-        with patch("vibeusage.providers.claude.status.fetch_statuspage_status") as mock_fetch:
+        with patch(
+            "vibeusage.providers.claude.status.fetch_statuspage_status"
+        ) as mock_fetch:
             from vibeusage.models import ProviderStatus
 
             mock_fetch.return_value = ProviderStatus(
@@ -464,4 +476,6 @@ class TestCodexProviderIntegration:
             status = await provider.fetch_status()
 
             assert status.level == StatusLevel.OPERATIONAL
-            mock_fetch.assert_called_once_with("https://status.openai.com/api/v2/status.json")
+            mock_fetch.assert_called_once_with(
+                "https://status.openai.com/api/v2/status.json"
+            )

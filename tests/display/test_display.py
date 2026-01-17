@@ -1,5 +1,6 @@
 """Tests for display utilities."""
 
+import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import StringIO
@@ -19,6 +20,11 @@ from vibeusage.display.json import (
     output_json_pretty,
     encode_json,
     decode_json,
+    ErrorResponse,
+    ErrorData,
+    create_error_response,
+    output_json_error,
+    from_vibeusage_error,
 )
 from vibeusage.models import (
     UsagePeriod,
@@ -95,7 +101,10 @@ class TestFormatPeriod:
     def test_format_without_reset_time(self):
         """Period without reset time omits reset info."""
         period = UsagePeriod(
-            name="Session", utilization=50, period_type=PeriodType.SESSION, resets_at=None
+            name="Session",
+            utilization=50,
+            period_type=PeriodType.SESSION,
+            resets_at=None,
         )
 
         result = format_period(period)
@@ -350,7 +359,7 @@ class TestDecodeJson:
 
     def test_decode_invalid_json(self):
         """Invalid JSON raises exception."""
-        json_bytes = b'{invalid json}'
+        json_bytes = b"{invalid json}"
 
         with pytest.raises(Exception):  # msgspec.DecodeError
             decode_json(json_bytes)
@@ -623,3 +632,257 @@ class TestProviderPanel:
         assert "Weekly" in output
         # Daily periods should use "Daily" label
         assert "Daily" in output or "Weekly" in output  # At least one period type label
+
+
+class TestErrorResponse:
+    """Tests for ErrorResponse struct per spec 07."""
+
+    def test_error_data_has_required_fields(self):
+        """ErrorData should have all required fields per spec."""
+        error = ErrorData(
+            message="Authentication failed",
+            category="authentication",
+            severity="recoverable",
+        )
+
+        assert error.message == "Authentication failed"
+        assert error.category == "authentication"
+        assert error.severity == "recoverable"
+        assert error.provider is None
+        assert error.remediation is None
+        assert error.details is None
+        # timestamp should be set by default_factory
+        assert error.timestamp is not None
+
+    def test_error_data_with_optional_fields(self):
+        """ErrorData should support optional fields."""
+        error = ErrorData(
+            message="Rate limit exceeded",
+            category="rate_limited",
+            severity="transient",
+            provider="claude",
+            remediation="Wait 10 minutes before retrying",
+            details={"retry_after": 600},
+        )
+
+        assert error.provider == "claude"
+        assert error.remediation == "Wait 10 minutes before retrying"
+        assert error.details == {"retry_after": 600}
+
+    def test_error_data_to_dict(self):
+        """ErrorData.to_dict() returns correct dict structure."""
+        error = ErrorData(
+            message="Network error",
+            category="network",
+            severity="transient",
+            provider="codex",
+            remediation="Check your internet connection",
+        )
+
+        result = error.to_dict()
+
+        assert result == {
+            "message": "Network error",
+            "category": "network",
+            "severity": "transient",
+            "provider": "codex",
+            "remediation": "Check your internet connection",
+            "timestamp": error.timestamp,
+        }
+
+    def test_error_data_to_dict_omits_none_fields(self):
+        """ErrorData.to_dict() omits None values for optional fields."""
+        error = ErrorData(
+            message="Test error",
+            category="unknown",
+            severity="warning",
+        )
+
+        result = error.to_dict()
+
+        # None fields should not be in dict
+        assert "provider" not in result
+        assert "remediation" not in result
+        assert "details" not in result
+        # Required fields should be present
+        assert "message" in result
+        assert "category" in result
+        assert "severity" in result
+        assert "timestamp" in result
+
+    def test_error_response_structure(self):
+        """ErrorResponse should wrap error data per spec."""
+        error_data = ErrorData(
+            message="Test error",
+            category="test",
+            severity="fatal",
+        )
+        response = ErrorResponse(error=error_data)
+
+        assert response.error is error_data
+        assert response.error.message == "Test error"
+
+    def test_error_response_to_dict(self):
+        """ErrorResponse.to_dict() returns correct nested structure."""
+        error_data = ErrorData(
+            message="API error",
+            category="provider",
+            severity="transient",
+            provider="gemini",
+        )
+        response = ErrorResponse(error=error_data)
+
+        result = response.to_dict()
+
+        assert result == {
+            "error": {
+                "message": "API error",
+                "category": "provider",
+                "severity": "transient",
+                "provider": "gemini",
+                "timestamp": error_data.timestamp,
+            }
+        }
+
+
+class TestCreateErrorResponse:
+    """Tests for create_error_response function."""
+
+    def test_create_error_response_basic(self):
+        """Create error response with basic fields."""
+        response = create_error_response(
+            message="Test error",
+            category="test",
+            severity="warning",
+        )
+
+        assert response.error.message == "Test error"
+        assert response.error.category == "test"
+        assert response.error.severity == "warning"
+
+    def test_create_error_response_with_all_fields(self):
+        """Create error response with all fields."""
+        response = create_error_response(
+            message="Auth failed",
+            category="authentication",
+            severity="recoverable",
+            provider="copilot",
+            remediation="Run: vibeusage auth copilot",
+            details={"status_code": 401},
+        )
+
+        assert response.error.message == "Auth failed"
+        assert response.error.provider == "copilot"
+        assert response.error.remediation == "Run: vibeusage auth copilot"
+        assert response.error.details == {"status_code": 401}
+
+
+class TestOutputJsonError:
+    """Tests for output_json_error function."""
+
+    def test_output_json_error_basic(self, capsys):
+        """Output basic error in JSON format."""
+        output_json_error(
+            message="Test error",
+            category="test",
+            severity="warning",
+        )
+
+        result = capsys.readouterr().out
+        data = json.loads(result)
+
+        assert "error" in data
+        assert data["error"]["message"] == "Test error"
+        assert data["error"]["category"] == "test"
+        assert data["error"]["severity"] == "warning"
+
+    def test_output_json_error_with_all_fields(self, capsys):
+        """Output error with all fields in JSON format."""
+        output_json_error(
+            message="Connection timeout",
+            category="network",
+            severity="transient",
+            provider="cursor",
+            remediation="Check your network and retry",
+            details={"timeout": 30},
+        )
+
+        result = capsys.readouterr().out
+        data = json.loads(result)
+
+        assert data["error"]["message"] == "Connection timeout"
+        assert data["error"]["category"] == "network"
+        assert data["error"]["provider"] == "cursor"
+        assert data["error"]["remediation"] == "Check your network and retry"
+        assert data["error"]["details"] == {"timeout": 30}
+
+    def test_output_json_error_is_pretty_printed(self, capsys):
+        """JSON error output is pretty-printed."""
+        output_json_error(
+            message="Test",
+            category="test",
+            severity="warning",
+        )
+
+        result = capsys.readouterr().out
+        # Check for indentation
+        assert "  " in result or "    " in result
+        assert "\n" in result
+
+
+class TestFromVibeusageError:
+    """Tests for from_vibeusage_error function."""
+
+    def test_from_vibeusage_error_basic(self):
+        """Convert VibeusageError to ErrorResponse."""
+        from vibeusage.errors.types import VibeusageError, ErrorCategory, ErrorSeverity
+
+        vibe_error = VibeusageError(
+            message="Test error",
+            category=ErrorCategory.AUTHENTICATION,
+            severity=ErrorSeverity.RECOVERABLE,
+        )
+
+        response = from_vibeusage_error(vibe_error)
+
+        assert response.error.message == "Test error"
+        assert response.error.category == "authentication"
+        assert response.error.severity == "recoverable"
+
+    def test_from_vibeusage_error_with_all_fields(self):
+        """Convert VibeusageError with all fields to ErrorResponse."""
+        from vibeusage.errors.types import VibeusageError, ErrorCategory, ErrorSeverity
+
+        vibe_error = VibeusageError(
+            message="Token expired",
+            category=ErrorCategory.AUTHENTICATION,
+            severity=ErrorSeverity.RECOVERABLE,
+            provider="claude",
+            remediation="Run: vibeusage auth claude",
+            details={"error_code": "invalid_token"},
+        )
+
+        response = from_vibeusage_error(vibe_error)
+
+        assert response.error.message == "Token expired"
+        assert response.error.provider == "claude"
+        assert response.error.remediation == "Run: vibeusage auth claude"
+        assert response.error.details == {"error_code": "invalid_token"}
+
+    def test_from_vibeusage_error_to_dict(self):
+        """from_vibeusage_error result serializes correctly."""
+        from vibeusage.errors.types import VibeusageError, ErrorCategory, ErrorSeverity
+
+        vibe_error = VibeusageError(
+            message="Test",
+            category=ErrorCategory.NETWORK,
+            severity=ErrorSeverity.TRANSIENT,
+            provider="codex",
+        )
+
+        response = from_vibeusage_error(vibe_error)
+        result = response.to_dict()
+
+        assert result["error"]["message"] == "Test"
+        assert result["error"]["category"] == "network"
+        assert result["error"]["provider"] == "codex"

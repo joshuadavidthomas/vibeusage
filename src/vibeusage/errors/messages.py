@@ -24,8 +24,7 @@ AUTH_ERROR_TEMPLATES: dict[str, dict[str, str]] = {
     },
     "codex": {
         "401": (
-            "Codex session expired or invalid.\n"
-            "Run: [cyan]vibeusage auth codex[/cyan]"
+            "Codex session expired or invalid.\nRun: [cyan]vibeusage auth codex[/cyan]"
         ),
         "403": (
             "Access denied. Your account may not have a ChatGPT Plus/Pro subscription.\n"
@@ -37,10 +36,7 @@ AUTH_ERROR_TEMPLATES: dict[str, dict[str, str]] = {
         ),
     },
     "copilot": {
-        "401": (
-            "GitHub token expired.\n"
-            "Run: [cyan]vibeusage auth copilot[/cyan]"
-        ),
+        "401": ("GitHub token expired.\nRun: [cyan]vibeusage auth copilot[/cyan]"),
         "403": (
             "GitHub Copilot not enabled for this account.\n"
             "Enable it at: [cyan]https://github.com/settings/copilot[/cyan]"
@@ -62,10 +58,7 @@ AUTH_ERROR_TEMPLATES: dict[str, dict[str, str]] = {
         ),
     },
     "gemini": {
-        "401": (
-            "Gemini credentials expired.\n"
-            "Run: [cyan]vibeusage auth gemini[/cyan]"
-        ),
+        "401": ("Gemini credentials expired.\nRun: [cyan]vibeusage auth gemini[/cyan]"),
         "403": (
             "Gemini quota exceeded or access denied.\n"
             "Check your usage at: [cyan]https://aistudio.google.com/app/usage[/cyan]"
@@ -119,12 +112,8 @@ def get_provider_remediation(provider_id: str, category: str) -> str | None:
         ErrorCategory.AUTHORIZATION: (
             f"Check your {provider_id} account permissions and subscription status."
         ),
-        ErrorCategory.RATE_LIMITED: (
-            "Wait a few minutes before trying again."
-        ),
-        ErrorCategory.NETWORK: (
-            "Check your internet connection and try again."
-        ),
+        ErrorCategory.RATE_LIMITED: ("Wait a few minutes before trying again."),
+        ErrorCategory.NETWORK: ("Check your internet connection and try again."),
         ErrorCategory.PROVIDER: (
             f"The {provider_id} service may be experiencing issues. "
             f"Check [cyan]https://status.{provider_id}.com[/cyan] for outages."

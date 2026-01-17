@@ -68,7 +68,9 @@ class GeminiApiKeyStrategy(FetchStrategy):
         """Fetch usage using API key."""
         api_key = self._load_api_key()
         if not api_key:
-            return FetchResult.fail("No API key found. Set GEMINI_API_KEY or use 'vibeusage key set gemini'")
+            return FetchResult.fail(
+                "No API key found. Set GEMINI_API_KEY or use 'vibeusage key set gemini'"
+            )
 
         # Validate the API key by fetching models
         async with get_http_client() as client:
@@ -76,16 +78,29 @@ class GeminiApiKeyStrategy(FetchStrategy):
             response = await self._fetch_models(client, api_key)
 
             if response.status_code == 401:
-                return FetchResult.fail("API key is invalid or expired", should_fallback=False)
+                return FetchResult.fail(
+                    "API key is invalid or expired", should_fallback=False
+                )
             if response.status_code == 403:
-                return FetchResult.fail("API key does not have access to Generative Language API", should_fallback=False)
+                return FetchResult.fail(
+                    "API key does not have access to Generative Language API",
+                    should_fallback=False,
+                )
             if response.status_code == 429:
-                return FetchResult.fail("Rate limit exceeded. Please try again later.", should_fallback=False)
+                return FetchResult.fail(
+                    "Rate limit exceeded. Please try again later.",
+                    should_fallback=False,
+                )
             if response.status_code != 200:
-                return FetchResult.fail(f"Failed to validate API key: {response.status_code}", should_fallback=False)
+                return FetchResult.fail(
+                    f"Failed to validate API key: {response.status_code}",
+                    should_fallback=False,
+                )
 
         # Parse response to get model info
-        snapshot = self._parse_models_response(response.json() if response.content else {}, api_key)
+        snapshot = self._parse_models_response(
+            response.json() if response.content else {}, api_key
+        )
         if snapshot is None:
             return FetchResult.fail("Failed to parse API response")
 
@@ -114,7 +129,9 @@ class GeminiApiKeyStrategy(FetchStrategy):
 
         return None
 
-    async def _fetch_models(self, client: httpx.AsyncClient, api_key: str) -> httpx.Response:
+    async def _fetch_models(
+        self, client: httpx.AsyncClient, api_key: str
+    ) -> httpx.Response:
         """Fetch available models to validate API key."""
         url = f"{self.API_BASE}/{self.MODELS_ENDPOINT}"
         params = {"key": api_key}
@@ -161,6 +178,7 @@ class GeminiApiKeyStrategy(FetchStrategy):
 
         # Identity with model info
         from vibeusage.models import ProviderIdentity
+
         identity = ProviderIdentity(
             plan="API Key",
             organization=f"Available models: {model_info['count']}",
@@ -197,5 +215,7 @@ class GeminiApiKeyStrategy(FetchStrategy):
         from datetime import timedelta
 
         now = datetime.now(timezone.utc)
-        tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+            days=1
+        )
         return tomorrow

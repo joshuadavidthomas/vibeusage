@@ -116,8 +116,7 @@ class ClaudeOAuthStrategy(FetchStrategy):
         for key, value in data.items():
             # Convert camelCase to snake_case
             snake_key = "".join(
-                "_" + c.lower() if c.isupper() else c
-                for c in key
+                "_" + c.lower() if c.isupper() else c for c in key
             ).lstrip("_")
 
             # Handle expiresAt timestamp -> expires_at ISO string
@@ -125,7 +124,10 @@ class ClaudeOAuthStrategy(FetchStrategy):
                 if isinstance(value, (int, float)):
                     # Convert millisecond timestamp to ISO string
                     from datetime import datetime, timezone
-                    value = datetime.fromtimestamp(value / 1000, tz=timezone.utc).isoformat()
+
+                    value = datetime.fromtimestamp(
+                        value / 1000, tz=timezone.utc
+                    ).isoformat()
 
             result[snake_key] = value
 

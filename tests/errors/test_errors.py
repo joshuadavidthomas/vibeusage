@@ -75,7 +75,9 @@ class TestVibeusageError:
         """Default timestamp is current time."""
         before = datetime.now(timezone.utc)
         error = VibeusageError(
-            message="Test", category=ErrorCategory.UNKNOWN, severity=ErrorSeverity.WARNING
+            message="Test",
+            category=ErrorCategory.UNKNOWN,
+            severity=ErrorSeverity.WARNING,
         )
         after = datetime.now(timezone.utc)
 
@@ -84,7 +86,9 @@ class TestVibeusageError:
     def test_immutability(self):
         """VibeusageError is immutable."""
         error = VibeusageError(
-            message="Test", category=ErrorCategory.UNKNOWN, severity=ErrorSeverity.WARNING
+            message="Test",
+            category=ErrorCategory.UNKNOWN,
+            severity=ErrorSeverity.WARNING,
         )
         with pytest.raises(AttributeError):
             error.message = "Changed"
@@ -266,7 +270,9 @@ class TestClassifyException:
         """HTTPStatusError 401 is classified."""
         mock_response.status_code = 401
         mock_response.text = "Unauthorized"
-        error = httpx.HTTPStatusError("Unauthorized", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Unauthorized", request=MagicMock(), response=mock_response
+        )
         result = classify_exception(error)
 
         assert result.category == ErrorCategory.AUTHENTICATION
@@ -276,7 +282,9 @@ class TestClassifyException:
         """HTTPStatusError includes provider when provided."""
         mock_response.status_code = 403
         mock_response.text = "Forbidden"
-        error = httpx.HTTPStatusError("Forbidden", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Forbidden", request=MagicMock(), response=mock_response
+        )
         result = classify_exception(error, provider_id="claude")
 
         assert result.provider == "claude"
@@ -366,7 +374,9 @@ class TestClassifyHttpStatusError:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Unauthorized", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Unauthorized", request=request, response=mock_response
+        )
         result = classify_http_status_error(error)
 
         assert result.category == ErrorCategory.AUTHENTICATION
@@ -379,7 +389,9 @@ class TestClassifyHttpStatusError:
         mock_response.text = "Unauthorized access"
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Unauthorized", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Unauthorized", request=request, response=mock_response
+        )
         result = classify_http_status_error(error)
 
         assert result.category == ErrorCategory.AUTHENTICATION
@@ -392,7 +404,9 @@ class TestClassifyHttpStatusError:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Server error", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Server error", request=request, response=mock_response
+        )
         result = classify_http_status_error(error)
 
         assert result.category == ErrorCategory.PROVIDER
@@ -501,7 +515,9 @@ class TestHandleHttpRequest:
         """Successful request returns immediately."""
         mock_httpx_client.request = AsyncMock(return_value=mock_response)
 
-        result = await handle_http_request(mock_httpx_client, "GET", "https://example.com")
+        result = await handle_http_request(
+            mock_httpx_client, "GET", "https://example.com"
+        )
 
         assert result == mock_response
         assert mock_httpx_client.request.call_count == 1
@@ -526,7 +542,11 @@ class TestHandleHttpRequest:
         )
 
         result = await handle_http_request(
-            mock_httpx_client, "GET", "https://example.com", max_retries=3, base_delay=0.01
+            mock_httpx_client,
+            "GET",
+            "https://example.com",
+            max_retries=3,
+            base_delay=0.01,
         )
 
         assert result.status_code == 200
@@ -569,7 +589,11 @@ class TestHandleHttpRequest:
         )
 
         result = await handle_http_request(
-            mock_httpx_client, "GET", "https://example.com", max_retries=3, base_delay=0.01
+            mock_httpx_client,
+            "GET",
+            "https://example.com",
+            max_retries=3,
+            base_delay=0.01,
         )
 
         assert result.status_code == 200
@@ -591,7 +615,11 @@ class TestHandleHttpRequest:
 
         with pytest.raises(httpx.HTTPStatusError):
             await handle_http_request(
-                mock_httpx_client, "GET", "https://example.com", max_retries=2, base_delay=0.01
+                mock_httpx_client,
+                "GET",
+                "https://example.com",
+                max_retries=2,
+                base_delay=0.01,
             )
 
         assert mock_httpx_client.request.call_count == 3  # initial + 2 retries
@@ -735,7 +763,9 @@ class TestClassifyNetworkError:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Service unavailable", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Service unavailable", request=request, response=mock_response
+        )
         result = classify_network_error(error)
 
         assert result.category == ErrorCategory.PROVIDER
@@ -840,7 +870,9 @@ class TestClassifyHttpStatusErrorNetwork:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Unauthorized", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Unauthorized", request=request, response=mock_response
+        )
         result = classify_http_status_error_network(error)
 
         assert result.category == ErrorCategory.AUTHENTICATION
@@ -854,7 +886,9 @@ class TestClassifyHttpStatusErrorNetwork:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Forbidden", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Forbidden", request=request, response=mock_response
+        )
         result = classify_http_status_error_network(error)
 
         assert result.category == ErrorCategory.AUTHORIZATION
@@ -868,7 +902,9 @@ class TestClassifyHttpStatusErrorNetwork:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Not found", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Not found", request=request, response=mock_response
+        )
         result = classify_http_status_error_network(error)
 
         assert result.category == ErrorCategory.NOT_FOUND
@@ -881,7 +917,9 @@ class TestClassifyHttpStatusErrorNetwork:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Rate limited", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Rate limited", request=request, response=mock_response
+        )
         result = classify_http_status_error_network(error)
 
         assert result.category == ErrorCategory.RATE_LIMITED
@@ -895,7 +933,9 @@ class TestClassifyHttpStatusErrorNetwork:
         mock_response.text = ""
 
         request = MagicMock()
-        error = httpx.HTTPStatusError("Internal error", request=request, response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Internal error", request=request, response=mock_response
+        )
         result = classify_http_status_error_network(error)
 
         assert result.category == ErrorCategory.PROVIDER

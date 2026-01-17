@@ -79,16 +79,12 @@ class TestUsagePeriod:
 
     def test_remaining(self):
         """remaining() returns 100 - utilization."""
-        period = UsagePeriod(
-            name="Test", utilization=30, period_type=PeriodType.DAILY
-        )
+        period = UsagePeriod(name="Test", utilization=30, period_type=PeriodType.DAILY)
         assert period.remaining() == 70
 
     def test_remaining_zero(self):
         """remaining() is 0 when utilization is 100."""
-        period = UsagePeriod(
-            name="Test", utilization=100, period_type=PeriodType.DAILY
-        )
+        period = UsagePeriod(name="Test", utilization=100, period_type=PeriodType.DAILY)
         assert period.remaining() == 0
 
     def test_elapsed_ratio_with_reset_time(self):
@@ -199,7 +195,10 @@ class TestUsagePeriod:
     def test_time_until_reset_none(self):
         """time_until_reset() returns None when no reset time."""
         period = UsagePeriod(
-            name="Session", utilization=50, period_type=PeriodType.SESSION, resets_at=None
+            name="Session",
+            utilization=50,
+            period_type=PeriodType.SESSION,
+            resets_at=None,
         )
         assert period.time_until_reset() is None
 
@@ -217,9 +216,7 @@ class TestUsagePeriod:
 
     def test_immutability(self):
         """UsagePeriod is immutable (frozen)."""
-        period = UsagePeriod(
-            name="Test", utilization=50, period_type=PeriodType.DAILY
-        )
+        period = UsagePeriod(name="Test", utilization=50, period_type=PeriodType.DAILY)
         with pytest.raises(AttributeError):
             period.utilization = 75
 
@@ -230,7 +227,10 @@ class TestOverageUsage:
     def test_create_overage(self):
         """Can create OverageUsage."""
         overage = OverageUsage(
-            used=Decimal("5.25"), limit=Decimal("20.00"), currency="USD", is_enabled=True
+            used=Decimal("5.25"),
+            limit=Decimal("20.00"),
+            currency="USD",
+            is_enabled=True,
         )
 
         assert overage.used == Decimal("5.25")
@@ -241,28 +241,40 @@ class TestOverageUsage:
     def test_remaining(self):
         """remaining() calculates correctly."""
         overage = OverageUsage(
-            used=Decimal("5.00"), limit=Decimal("20.00"), currency="USD", is_enabled=True
+            used=Decimal("5.00"),
+            limit=Decimal("20.00"),
+            currency="USD",
+            is_enabled=True,
         )
         assert overage.remaining() == Decimal("15.00")
 
     def test_remaining_no_negative(self):
         """remaining() never goes below 0."""
         overage = OverageUsage(
-            used=Decimal("25.00"), limit=Decimal("20.00"), currency="USD", is_enabled=True
+            used=Decimal("25.00"),
+            limit=Decimal("20.00"),
+            currency="USD",
+            is_enabled=True,
         )
         assert overage.remaining() == Decimal("0")
 
     def test_utilization_percentage(self):
         """utilization() returns percentage."""
         overage = OverageUsage(
-            used=Decimal("10.00"), limit=Decimal("20.00"), currency="USD", is_enabled=True
+            used=Decimal("10.00"),
+            limit=Decimal("20.00"),
+            currency="USD",
+            is_enabled=True,
         )
         assert overage.utilization() == 50
 
     def test_utilization_caps_at_100(self):
         """utilization() caps at 100."""
         overage = OverageUsage(
-            used=Decimal("30.00"), limit=Decimal("20.00"), currency="USD", is_enabled=True
+            used=Decimal("30.00"),
+            limit=Decimal("20.00"),
+            currency="USD",
+            is_enabled=True,
         )
         assert overage.utilization() == 100
 
@@ -284,7 +296,10 @@ class TestOverageUsage:
     def test_credits_currency(self):
         """Can use credits instead of currency."""
         overage = OverageUsage(
-            used=Decimal("100"), limit=Decimal("500"), currency="credits", is_enabled=True
+            used=Decimal("100"),
+            limit=Decimal("500"),
+            currency="credits",
+            is_enabled=True,
         )
         assert overage.utilization() == 20
 
@@ -326,7 +341,9 @@ class TestProviderStatus:
         """Can create status."""
         now = datetime.now(timezone.utc)
         status = ProviderStatus(
-            level=StatusLevel.OPERATIONAL, description="All systems normal", updated_at=now
+            level=StatusLevel.OPERATIONAL,
+            description="All systems normal",
+            updated_at=now,
         )
 
         assert status.level == StatusLevel.OPERATIONAL
@@ -370,7 +387,9 @@ class TestUsageSnapshot:
         assert len(snapshot.periods) == 1
         assert snapshot.periods[0] == sample_period
 
-    def test_full_snapshot(self, utc_now, sample_period, sample_overage, sample_identity):
+    def test_full_snapshot(
+        self, utc_now, sample_period, sample_overage, sample_identity
+    ):
         """Can create a complete snapshot with all fields."""
         snapshot = UsageSnapshot(
             provider="claude",
@@ -395,7 +414,9 @@ class TestUsageSnapshot:
 
     def test_primary_period_none(self):
         """primary_period() returns None when no periods."""
-        snapshot = UsageSnapshot(provider="claude", fetched_at=datetime.now(timezone.utc))
+        snapshot = UsageSnapshot(
+            provider="claude", fetched_at=datetime.now(timezone.utc)
+        )
         assert snapshot.primary_period() is None
 
     def test_secondary_period(self, sample_multi_period_snapshot):
@@ -407,7 +428,9 @@ class TestUsageSnapshot:
     def test_secondary_period_none(self, sample_period):
         """secondary_period() returns None with only one period."""
         snapshot = UsageSnapshot(
-            provider="claude", fetched_at=datetime.now(timezone.utc), periods=(sample_period,)
+            provider="claude",
+            fetched_at=datetime.now(timezone.utc),
+            periods=(sample_period,),
         )
         assert snapshot.secondary_period() is None
 
@@ -420,7 +443,9 @@ class TestUsageSnapshot:
     def test_model_periods_empty(self, sample_period):
         """model_periods() returns empty tuple when none."""
         snapshot = UsageSnapshot(
-            provider="claude", fetched_at=datetime.now(timezone.utc), periods=(sample_period,)
+            provider="claude",
+            fetched_at=datetime.now(timezone.utc),
+            periods=(sample_period,),
         )
         assert snapshot.model_periods() == ()
 
@@ -466,26 +491,20 @@ class TestValidateFunctions:
 
     def test_validate_usage_period_valid(self):
         """Valid period passes validation."""
-        period = UsagePeriod(
-            name="Test", utilization=50, period_type=PeriodType.DAILY
-        )
+        period = UsagePeriod(name="Test", utilization=50, period_type=PeriodType.DAILY)
         errors = validate_usage_period(period)
         assert errors == []
 
     def test_validate_usage_period_negative(self):
         """Negative utilization fails validation."""
-        period = UsagePeriod(
-            name="Test", utilization=-10, period_type=PeriodType.DAILY
-        )
+        period = UsagePeriod(name="Test", utilization=-10, period_type=PeriodType.DAILY)
         errors = validate_usage_period(period)
         assert len(errors) == 1
         assert "out of range" in errors[0]
 
     def test_validate_usage_period_over_100(self):
         """Utilization > 100 fails validation."""
-        period = UsagePeriod(
-            name="Test", utilization=150, period_type=PeriodType.DAILY
-        )
+        period = UsagePeriod(name="Test", utilization=150, period_type=PeriodType.DAILY)
         errors = validate_usage_period(period)
         assert len(errors) == 1
         assert "out of range" in errors[0]

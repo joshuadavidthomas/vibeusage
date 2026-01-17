@@ -76,7 +76,9 @@ def config_show_command(
 
     # Format as TOML
     toml_data = msgspec.toml.encode(config)
-    console.print(Panel(Syntax(toml_data.decode(), "toml"), title=f"Config: {config_path}"))
+    console.print(
+        Panel(Syntax(toml_data.decode(), "toml"), title=f"Config: {config_path}")
+    )
 
     # Verbose: show additional info
     if verbose:
@@ -84,7 +86,9 @@ def config_show_command(
         if config_path.exists():
             console.print(f"[dim]File size: {config_path.stat().st_size} bytes[/dim]")
         else:
-            console.print("[dim]Using default configuration (file not created yet)[/dim]")
+            console.print(
+                "[dim]Using default configuration (file not created yet)[/dim]"
+            )
 
 
 @config_app.command("path")
@@ -179,6 +183,7 @@ def config_reset_command(
         result["message"] = "Reset cancelled"
         if json_mode:
             from vibeusage.display.json import output_json_pretty
+
             output_json_pretty(result)
         console.print("Reset cancelled")
         raise typer.Exit()
@@ -194,6 +199,7 @@ def config_reset_command(
 
         if json_mode:
             from vibeusage.display.json import output_json_pretty
+
             output_json_pretty(result)
             return
 
@@ -203,6 +209,7 @@ def config_reset_command(
         result["message"] = "No custom configuration to reset"
         if json_mode:
             from vibeusage.display.json import output_json_pretty
+
             output_json_pretty(result)
             return
         console.print("[yellow]No custom configuration to reset[/yellow]")

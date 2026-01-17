@@ -229,6 +229,6 @@ class ProviderAuthConfig(msgspec.Struct):
             errors.append(f"{strategy.name}: {result.error}")
 
         return AuthResult.fail(
-            "All authentication methods failed:\n" +
-            "\n".join(f"  - {e}" for e in errors)
+            "All authentication methods failed:\n"
+            + "\n".join(f"  - {e}" for e in errors)
         )

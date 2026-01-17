@@ -52,6 +52,7 @@ class TestSingleProviderJsonOutput:
 
         # Capture stdout
         import sys
+
         old_stdout = sys.stdout
         sys.stdout = StringIO()
 
@@ -102,6 +103,7 @@ class TestSingleProviderJsonOutput:
 
         # Capture stdout
         import sys
+
         old_stdout = sys.stdout
         sys.stdout = StringIO()
 
@@ -131,6 +133,7 @@ class TestSingleProviderJsonOutput:
 
         # Capture stdout
         import sys
+
         old_stdout = sys.stdout
         sys.stdout = StringIO()
 
@@ -208,6 +211,7 @@ class TestJsonOutputFormat:
 
         # Capture stdout
         import sys
+
         old_stdout = sys.stdout
         sys.stdout = StringIO()
 
@@ -245,6 +249,7 @@ class TestJsonOutputFormat:
 
         # Capture stdout
         import sys
+
         old_stdout = sys.stdout
         sys.stdout = StringIO()
 

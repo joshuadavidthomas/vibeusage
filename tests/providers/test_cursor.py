@@ -8,7 +8,12 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from vibeusage.models import OverageUsage, PeriodType, UsagePeriod, UsageSnapshot
-from vibeusage.providers import CursorProvider, create_provider, get_provider, list_provider_ids
+from vibeusage.providers import (
+    CursorProvider,
+    create_provider,
+    get_provider,
+    list_provider_ids,
+)
 from vibeusage.providers.cursor import CursorWebStrategy
 
 
@@ -19,10 +24,15 @@ class TestCursorProvider:
         """CursorProvider has correct metadata."""
         assert CursorProvider.metadata.id == "cursor"
         assert CursorProvider.metadata.name == "Cursor"
-        assert "AI" in CursorProvider.metadata.description or "code editor" in CursorProvider.metadata.description
+        assert (
+            "AI" in CursorProvider.metadata.description
+            or "code editor" in CursorProvider.metadata.description
+        )
         assert "cursor.com" in CursorProvider.metadata.homepage
         assert CursorProvider.metadata.status_url == "https://status.cursor.com"
-        assert CursorProvider.metadata.dashboard_url == "https://cursor.com/settings/usage"
+        assert (
+            CursorProvider.metadata.dashboard_url == "https://cursor.com/settings/usage"
+        )
 
     def test_id_property(self):
         """id property returns correct value."""
@@ -54,6 +64,7 @@ class TestCursorProvider:
         provider = CursorProvider()
 
         import inspect
+
         assert inspect.iscoroutinefunction(provider.fetch_status)
 
 
@@ -95,7 +106,9 @@ class TestCursorWebStrategy:
         mock_path = Mock()
         mock_path.exists.return_value = False
 
-        with patch("vibeusage.providers.cursor.web.credential_path", return_value=mock_path):
+        with patch(
+            "vibeusage.providers.cursor.web.credential_path", return_value=mock_path
+        ):
             result = strategy.is_available()
             assert result is False
 
@@ -106,7 +119,9 @@ class TestCursorWebStrategy:
         mock_path = Mock()
         mock_path.exists.return_value = True
 
-        with patch("vibeusage.providers.cursor.web.credential_path", return_value=mock_path):
+        with patch(
+            "vibeusage.providers.cursor.web.credential_path", return_value=mock_path
+        ):
             result = strategy.is_available()
             assert result is True
 
@@ -115,7 +130,9 @@ class TestCursorWebStrategy:
         strategy = CursorWebStrategy()
         mock_content = b'{"session_token": "test_token_123"}'
 
-        with patch("vibeusage.providers.cursor.web.read_credential", return_value=mock_content):
+        with patch(
+            "vibeusage.providers.cursor.web.read_credential", return_value=mock_content
+        ):
             token = strategy._load_session_token()
             assert token == "test_token_123"
 
@@ -125,16 +142,20 @@ class TestCursorWebStrategy:
 
         # Try 'token' key
         mock_content = b'{"token": "alt_token_456"}'
-        with patch("vibeusage.providers.cursor.web.read_credential", return_value=mock_content):
+        with patch(
+            "vibeusage.providers.cursor.web.read_credential", return_value=mock_content
+        ):
             token = strategy._load_session_token()
             assert token == "alt_token_456"
 
     def test_load_session_token_raw_string(self):
         """_load_session_token handles raw string content."""
         strategy = CursorWebStrategy()
-        mock_content = b'raw_session_token_789'
+        mock_content = b"raw_session_token_789"
 
-        with patch("vibeusage.providers.cursor.web.read_credential", return_value=mock_content):
+        with patch(
+            "vibeusage.providers.cursor.web.read_credential", return_value=mock_content
+        ):
             token = strategy._load_session_token()
             assert token == "raw_session_token_789"
 
@@ -161,7 +182,9 @@ class TestCursorWebStrategy:
         """fetch handles 401 error (expired session)."""
         strategy = CursorWebStrategy()
 
-        with patch.object(strategy, "_load_session_token", return_value="expired_token"):
+        with patch.object(
+            strategy, "_load_session_token", return_value="expired_token"
+        ):
             with patch("vibeusage.providers.cursor.web.get_http_client") as mock_http:
                 mock_response = AsyncMock()
                 mock_response.status_code = 401
@@ -238,7 +261,9 @@ class TestCursorWebStrategy:
             with patch("vibeusage.providers.cursor.web.get_http_client") as mock_http:
                 mock_response = Mock()
                 mock_response.status_code = 200
-                mock_response.json = Mock(side_effect=json.JSONDecodeError("Invalid JSON", "", 0))
+                mock_response.json = Mock(
+                    side_effect=json.JSONDecodeError("Invalid JSON", "", 0)
+                )
 
                 mock_client = AsyncMock()
                 mock_client.post = AsyncMock(return_value=mock_response)
@@ -606,7 +631,10 @@ class TestCursorStatus:
         """fetch_cursor_status returns ProviderStatus."""
         from vibeusage.providers.cursor.status import fetch_cursor_status
 
-        with patch("vibeusage.providers.claude.status.fetch_url", return_value=b'{"status": {"indicator": "none"}}'):
+        with patch(
+            "vibeusage.providers.claude.status.fetch_url",
+            return_value=b'{"status": {"indicator": "none"}}',
+        ):
             status = await fetch_cursor_status()
 
             assert status is not None

@@ -23,7 +23,10 @@ class TestGeminiProvider:
         assert "Google" in GeminiProvider.metadata.description
         assert GeminiProvider.metadata.homepage == "https://gemini.google.com"
         assert GeminiProvider.metadata.status_url is None
-        assert GeminiProvider.metadata.dashboard_url == "https://aistudio.google.com/app/usage"
+        assert (
+            GeminiProvider.metadata.dashboard_url
+            == "https://aistudio.google.com/app/usage"
+        )
 
     def test_id_property(self):
         """id property returns correct value."""
@@ -57,6 +60,7 @@ class TestGeminiProvider:
         provider = GeminiProvider()
 
         import inspect
+
         assert inspect.iscoroutinefunction(provider.fetch_status)
 
 
@@ -109,7 +113,10 @@ class TestGeminiOAuthStrategy:
             "expires_at": "2026-01-01T00:00:00+00:00",
         }
 
-        with patch("vibeusage.providers.gemini.oauth.read_credential", return_value=json.dumps(creds_data).encode()):
+        with patch(
+            "vibeusage.providers.gemini.oauth.read_credential",
+            return_value=json.dumps(creds_data).encode(),
+        ):
             creds = strategy._load_credentials()
 
             assert creds is not None
@@ -127,7 +134,10 @@ class TestGeminiOAuthStrategy:
             }
         }
 
-        with patch("vibeusage.providers.gemini.oauth.read_credential", return_value=json.dumps(cli_data).encode()):
+        with patch(
+            "vibeusage.providers.gemini.oauth.read_credential",
+            return_value=json.dumps(cli_data).encode(),
+        ):
             creds = strategy._load_credentials()
 
             assert creds is not None
@@ -144,7 +154,10 @@ class TestGeminiOAuthStrategy:
             "expiry_date": "2026-01-01T00:00:00+00:00",
         }
 
-        with patch("vibeusage.providers.gemini.oauth.read_credential", return_value=json.dumps(token_data).encode()):
+        with patch(
+            "vibeusage.providers.gemini.oauth.read_credential",
+            return_value=json.dumps(token_data).encode(),
+        ):
             creds = strategy._load_credentials()
 
             assert creds is not None

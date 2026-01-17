@@ -160,7 +160,9 @@ async def execute_fetch_pipeline(
     from vibeusage.errors.types import ErrorCategory
     from vibeusage.errors.classify import classify_exception
 
-    last_error = attempts[-1].error if attempts else Exception("No strategies available")
+    last_error = (
+        attempts[-1].error if attempts else Exception("No strategies available")
+    )
     classified = classify_exception(last_error)
     gate.record_failure(classified.category, str(last_error))
     save_gate(gate)

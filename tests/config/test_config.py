@@ -122,9 +122,13 @@ class TestEnsureDirectories:
 
     def test_creates_directories(self, tmp_path):
         """ensure_directories creates all required directories."""
-        with patch("vibeusage.config.paths.config_dir", return_value=tmp_path / "config"), patch(
-            "vibeusage.config.paths.cache_dir", return_value=tmp_path / "cache"
-        ), patch("vibeusage.config.paths.state_dir", return_value=tmp_path / "state"):
+        with (
+            patch(
+                "vibeusage.config.paths.config_dir", return_value=tmp_path / "config"
+            ),
+            patch("vibeusage.config.paths.cache_dir", return_value=tmp_path / "cache"),
+            patch("vibeusage.config.paths.state_dir", return_value=tmp_path / "state"),
+        ):
             ensure_directories()
 
             assert (tmp_path / "config").exists()
@@ -137,9 +141,11 @@ class TestEnsureDirectories:
 
     def test_existing_directories_ok(self, tmp_path):
         """ensure_directories doesn't fail with existing directories."""
-        with patch("vibeusage.config.paths.config_dir", return_value=tmp_path), patch(
-            "vibeusage.config.paths.cache_dir", return_value=tmp_path
-        ), patch("vibeusage.config.paths.state_dir", return_value=tmp_path):
+        with (
+            patch("vibeusage.config.paths.config_dir", return_value=tmp_path),
+            patch("vibeusage.config.paths.cache_dir", return_value=tmp_path),
+            patch("vibeusage.config.paths.state_dir", return_value=tmp_path),
+        ):
             # Create directories first
             ensure_directories()
             # Call again - should not raise
@@ -178,7 +184,9 @@ class TestFetchConfig:
 
     def test_custom_values(self):
         """Can create FetchConfig with custom values."""
-        config = FetchConfig(timeout=60.0, max_concurrent=10, stale_threshold_minutes=30)
+        config = FetchConfig(
+            timeout=60.0, max_concurrent=10, stale_threshold_minutes=30
+        )
         assert config.timeout == 60.0
         assert config.max_concurrent == 10
         assert config.stale_threshold_minutes == 30
@@ -258,13 +266,17 @@ class TestConfig:
     def test_is_provider_enabled_explicitly_disabled(self):
         """Provider not enabled when explicitly disabled in config."""
         provider_cfg = ProviderConfig(enabled=False)
-        config = Config(providers={"claude": provider_cfg}, enabled_providers=["claude"])
+        config = Config(
+            providers={"claude": provider_cfg}, enabled_providers=["claude"]
+        )
         assert config.is_provider_enabled("claude") is False
 
     def test_is_provider_enabled_enabled_in_config(self):
         """Provider enabled when explicitly enabled in config."""
         provider_cfg = ProviderConfig(enabled=True)
-        config = Config(providers={"claude": provider_cfg}, enabled_providers=["claude"])
+        config = Config(
+            providers={"claude": provider_cfg}, enabled_providers=["claude"]
+        )
         assert config.is_provider_enabled("claude") is True
 
 
@@ -371,7 +383,9 @@ class TestLoadConfig:
 
     def test_load_default_config(self, tmp_path):
         """Load config with no file returns defaults."""
-        with patch("vibeusage.config.paths.config_file", return_value=tmp_path / "config.toml"):
+        with patch(
+            "vibeusage.config.paths.config_file", return_value=tmp_path / "config.toml"
+        ):
             config = load_config()
             assert isinstance(config, Config)
             assert config.enabled_providers == []
@@ -419,9 +433,12 @@ class TestConfigSingleton:
 
     def test_get_config_returns_singleton(self, tmp_path):
         """get_config returns same instance on subsequent calls."""
-        with patch("vibeusage.config.paths.config_file", return_value=tmp_path / "config.toml"):
+        with patch(
+            "vibeusage.config.paths.config_file", return_value=tmp_path / "config.toml"
+        ):
             # Reset singleton
             import vibeusage.config.settings as settings_module
+
             settings_module._config = None
 
             config1 = get_config()
@@ -435,6 +452,7 @@ class TestConfigSingleton:
 
         with patch("vibeusage.config.paths.config_file", return_value=config_file):
             import vibeusage.config.settings as settings_module
+
             settings_module._config = None
 
             config1 = get_config()
@@ -451,7 +469,10 @@ class TestCredentialPath:
 
     def test_credential_path_format(self, tmp_path):
         """credential_path returns correct format."""
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"):
+        with patch(
+            "vibeusage.config.credentials.credentials_dir",
+            return_value=tmp_path / "credentials",
+        ):
             result = credential_path("claude", "oauth")
             assert result == tmp_path / "credentials" / "claude" / "oauth.json"
 
@@ -615,9 +636,13 @@ class TestFindProviderCredential:
 
     def test_finds_vibeusage_credential(self, tmp_path):
         """Finds credential in vibeusage storage."""
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
-            "vibeusage.config.settings.get_config"
-        ) as mock_get_config:
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
             mock_get_config.return_value = Config()
 
             # Create credential file
@@ -636,10 +661,19 @@ class TestFindProviderCredential:
         provider_path.parent.mkdir(parents=True, exist_ok=True)
         provider_path.write_bytes(b'{"token": "test"}')
 
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
-            "vibeusage.config.credentials._expand_path", return_value=provider_path
-        ), patch("vibeusage.config.settings.get_config") as mock_get_config:
-            mock_get_config.return_value = Config(credentials=CredentialsConfig(reuse_provider_credentials=True))
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch(
+                "vibeusage.config.credentials._expand_path", return_value=provider_path
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
+            mock_get_config.return_value = Config(
+                credentials=CredentialsConfig(reuse_provider_credentials=True)
+            )
 
             found, source, path = find_provider_credential("claude")
             assert found is True
@@ -650,9 +684,14 @@ class TestFindProviderCredential:
         """Finds credential in environment variable."""
         # Disable provider CLI reuse to ensure env var is checked
         config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
-        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}), patch(
-            "vibeusage.config.credentials.credentials_dir", return_value=Path("/tmp/credentials")
-        ), patch("vibeusage.config.settings.get_config") as mock_get_config:
+        with (
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}),
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=Path("/tmp/credentials"),
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
             mock_get_config.return_value = config
 
             found, source, path = find_provider_credential("claude")
@@ -664,9 +703,13 @@ class TestFindProviderCredential:
         """Returns not found when no credential exists."""
         # Disable provider CLI reuse to ensure no credentials are found
         config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
-            "vibeusage.config.settings.get_config"
-        ) as mock_get_config:
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
             mock_get_config.return_value = config
 
             found, source, path = find_provider_credential("claude")
@@ -680,11 +723,20 @@ class TestFindProviderCredential:
         provider_path.parent.mkdir(parents=True, exist_ok=True)
         provider_path.write_bytes(b'{"token": "test"}')
 
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
-            "vibeusage.config.credentials._expand_path", return_value=provider_path
-        ), patch("vibeusage.config.settings.get_config") as mock_get_config:
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch(
+                "vibeusage.config.credentials._expand_path", return_value=provider_path
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
             # Disable reuse
-            mock_get_config.return_value = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
+            mock_get_config.return_value = Config(
+                credentials=CredentialsConfig(reuse_provider_credentials=False)
+            )
 
             found, source, path = find_provider_credential("claude")
             # Should not find provider CLI credential when reuse is disabled
@@ -696,9 +748,13 @@ class TestCheckProviderCredentials:
 
     def test_has_credentials(self, tmp_path):
         """Returns True when credentials exist."""
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
-            "vibeusage.config.settings.get_config"
-        ) as mock_get_config:
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
             mock_get_config.return_value = Config()
 
             cred_path = tmp_path / "credentials" / "claude" / "oauth.json"
@@ -713,9 +769,13 @@ class TestCheckProviderCredentials:
         """Returns False when no credentials exist."""
         # Disable provider CLI reuse to ensure no credentials are found
         config = Config(credentials=CredentialsConfig(reuse_provider_credentials=False))
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
-            "vibeusage.config.settings.get_config"
-        ) as mock_get_config:
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
             mock_get_config.return_value = config
 
             has_creds, source = check_provider_credentials("claude")
@@ -728,9 +788,13 @@ class TestGetAllCredentialStatus:
 
     def test_returns_status_for_all_providers(self, tmp_path):
         """Returns status for all known providers."""
-        with patch("vibeusage.config.credentials.credentials_dir", return_value=tmp_path / "credentials"), patch(
-            "vibeusage.config.settings.get_config"
-        ) as mock_get_config:
+        with (
+            patch(
+                "vibeusage.config.credentials.credentials_dir",
+                return_value=tmp_path / "credentials",
+            ),
+            patch("vibeusage.config.settings.get_config") as mock_get_config,
+        ):
             mock_get_config.return_value = Config()
 
             status = get_all_credential_status()

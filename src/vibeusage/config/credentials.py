@@ -53,7 +53,10 @@ def find_provider_credential(provider_id: str) -> tuple[bool, str | None, Path |
             return True, "vibeusage", cred_path
 
     # Check provider CLI credentials if reuse is enabled
-    if config.credentials.reuse_provider_credentials and provider_id in PROVIDER_CREDENTIAL_PATHS:
+    if (
+        config.credentials.reuse_provider_credentials
+        and provider_id in PROVIDER_CREDENTIAL_PATHS
+    ):
         provider_paths = PROVIDER_CREDENTIAL_PATHS[provider_id]
         if isinstance(provider_paths, str):
             provider_paths = [provider_paths]

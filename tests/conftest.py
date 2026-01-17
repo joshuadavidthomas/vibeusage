@@ -271,8 +271,9 @@ def temp_config_dir(tmp_path: Path) -> Generator[Path, None, None]:
     config_dir.mkdir()
     cache_dir.mkdir()
 
-    with patch("vibeusage.config.paths.config_dir", return_value=config_dir), patch(
-        "vibeusage.config.paths.cache_dir", return_value=cache_dir
+    with (
+        patch("vibeusage.config.paths.config_dir", return_value=config_dir),
+        patch("vibeusage.config.paths.cache_dir", return_value=cache_dir),
     ):
         yield config_dir
 
@@ -413,30 +414,22 @@ def edge_case_snapshots(utc_now: datetime) -> dict[str, UsageSnapshot]:
             provider="claude",
             fetched_at=utc_now,
             periods=(
-                UsagePeriod(
-                    name="Empty", utilization=0, period_type=PeriodType.DAILY
-                ),
+                UsagePeriod(name="Empty", utilization=0, period_type=PeriodType.DAILY),
             ),
         ),
         "full_utilization": UsageSnapshot(
             provider="claude",
             fetched_at=utc_now,
             periods=(
-                UsagePeriod(
-                    name="Full", utilization=100, period_type=PeriodType.DAILY
-                ),
+                UsagePeriod(name="Full", utilization=100, period_type=PeriodType.DAILY),
             ),
         ),
-        "no_periods": UsageSnapshot(
-            provider="claude", fetched_at=utc_now, periods=()
-        ),
+        "no_periods": UsageSnapshot(provider="claude", fetched_at=utc_now, periods=()),
         "stale": UsageSnapshot(
             provider="claude",
             fetched_at=utc_now - timedelta(minutes=15),
             periods=(
-                UsagePeriod(
-                    name="Old", utilization=50, period_type=PeriodType.DAILY
-                ),
+                UsagePeriod(name="Old", utilization=50, period_type=PeriodType.DAILY),
             ),
         ),
         "future_reset": UsageSnapshot(

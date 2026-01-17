@@ -75,7 +75,15 @@ async def usage_command(
             results = await fetch_all_usage(refresh)
             duration_ms = (time.monotonic() - start_time) * 1000
 
-            display_multiple_snapshots(console, results, ctx, json_mode, verbose=verbose, quiet=quiet, total_duration_ms=duration_ms)
+            display_multiple_snapshots(
+                console,
+                results,
+                ctx,
+                json_mode,
+                verbose=verbose,
+                quiet=quiet,
+                total_duration_ms=duration_ms,
+            )
 
     except KeyboardInterrupt:
         if not quiet:
@@ -103,7 +111,9 @@ async def fetch_provider_usage(provider_id: str, refresh: bool):
             snapshot=None,
             source=None,
             attempts=[],
-            error=Exception(f"Unknown provider: {provider_id}. Available: {', '.join(available)}"),
+            error=Exception(
+                f"Unknown provider: {provider_id}. Available: {', '.join(available)}"
+            ),
         )
 
     # Create provider and get strategies
@@ -134,7 +144,15 @@ async def fetch_all_usage(refresh: bool):
     return outcomes
 
 
-def display_snapshot(console, snapshot, source, cached, verbose: bool = False, quiet: bool = False, duration_ms: float = 0):
+def display_snapshot(
+    console,
+    snapshot,
+    source,
+    cached,
+    verbose: bool = False,
+    quiet: bool = False,
+    duration_ms: float = 0,
+):
     """Display a single usage snapshot with spec-compliant format."""
     from vibeusage.cli.display import SingleProviderDisplay
 
@@ -162,7 +180,8 @@ def display_snapshot(console, snapshot, source, cached, verbose: bool = False, q
 
 def output_single_provider_json(outcome) -> None:
     """Output single provider usage data in JSON format."""
-    from vibeusage.display.json import output_json_pretty
+    from vibeusage.display.json import from_vibeusage_error, output_json_pretty
+    from vibeusage.errors.classify import classify_exception
 
     if outcome.success and outcome.snapshot:
         snapshot = outcome.snapshot
@@ -172,13 +191,17 @@ def output_single_provider_json(outcome) -> None:
                 "email": snapshot.identity.email,
                 "organization": snapshot.identity.organization,
                 "plan": snapshot.identity.plan,
-            } if snapshot.identity else None,
+            }
+            if snapshot.identity
+            else None,
             "periods": [
                 {
                     "name": period.name,
                     "utilization": period.utilization,
                     "remaining": period.remaining(),
-                    "resets_at": period.resets_at.isoformat() if period.resets_at else None,
+                    "resets_at": period.resets_at.isoformat()
+                    if period.resets_at
+                    else None,
                     "period_type": period.period_type.value,
                     "model": period.model,
                 }
@@ -198,18 +221,49 @@ def output_single_provider_json(outcome) -> None:
 
         output_json_pretty(data)
     else:
-        data = {
-            "error": str(outcome.error) if outcome.error else "Unknown error",
-            "success": False,
-        }
-        output_json_pretty(data)
+        # Use standardized error response format
+        error = outcome.error
+        if error:
+            classified = classify_exception(error)
+            # Use from_vibeusage_error if we have a VibeusageError, otherwise output_json_error
+            if hasattr(classified, "category") and hasattr(classified, "severity"):
+                error_response = from_vibeusage_error(classified)
+                output_json_pretty(error_response.to_dict())
+            else:
+                output_json_pretty(
+                    {
+                        "error": {
+                            "message": str(error),
+                            "category": "unknown",
+                            "severity": "recoverable",
+                            "provider": outcome.provider_id,
+                        }
+                    }
+                )
+        else:
+            output_json_pretty(
+                {
+                    "error": {
+                        "message": "Unknown error occurred",
+                        "category": "unknown",
+                        "severity": "recoverable",
+                        "provider": outcome.provider_id,
+                    }
+                }
+            )
 
 
 def output_json_usage(outcomes: dict) -> None:
     """Output usage data in JSON format."""
+    from datetime import datetime
     from vibeusage.display.json import output_json_pretty
 
-    data = {}
+    data = {
+        "providers": {},
+        "errors": {},
+        "fetched_at": datetime.now().astimezone().isoformat(),
+    }
+
     for provider_id, outcome in outcomes.items():
         if outcome.success and outcome.snapshot:
             snapshot = outcome.snapshot
@@ -219,13 +273,17 @@ def output_json_usage(outcomes: dict) -> None:
                     "email": snapshot.identity.email,
                     "organization": snapshot.identity.organization,
                     "plan": snapshot.identity.plan,
-                } if snapshot.identity else None,
+                }
+                if snapshot.identity
+                else None,
                 "periods": [
                     {
                         "name": period.name,
                         "utilization": period.utilization,
                         "remaining": period.remaining(),
-                        "resets_at": period.resets_at.isoformat() if period.resets_at else None,
+                        "resets_at": period.resets_at.isoformat()
+                        if period.resets_at
+                        else None,
                         "period_type": period.period_type.value,
                         "model": period.model,
                     }
@@ -243,17 +301,24 @@ def output_json_usage(outcomes: dict) -> None:
                     "currency": snapshot.overage.currency,
                 }
 
-            data[provider_id] = provider_data
+            data["providers"][provider_id] = provider_data
         else:
-            data[provider_id] = {
-                "error": str(outcome.error) if outcome.error else "Unknown error",
-                "success": False,
-            }
+            data["errors"][provider_id] = (
+                str(outcome.error) if outcome.error else "Unknown error"
+            )
 
     output_json_pretty(data)
 
 
-def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = None, json_mode: bool = False, verbose: bool = False, quiet: bool = False, total_duration_ms: float = 0):
+def display_multiple_snapshots(
+    console,
+    outcomes,
+    ctx: typer.Context | None = None,
+    json_mode: bool = False,
+    verbose: bool = False,
+    quiet: bool = False,
+    total_duration_ms: float = 0,
+):
     """Display multiple provider outcomes using panel-based layout per spec."""
     # Check for JSON mode (from parameter or context)
     if json_mode or (ctx and ctx.meta.get("json")):
@@ -293,7 +358,12 @@ def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = No
                 if verbose:
                     if outcome.attempts:
                         duration = sum(a.duration_ms for a in outcome.attempts)
-                        console.print(Text(f"Fetched in {duration:.0f}ms via {outcome.source}", style="dim"))
+                        console.print(
+                            Text(
+                                f"Fetched in {duration:.0f}ms via {outcome.source}",
+                                style="dim",
+                            )
+                        )
         else:
             # Track errors for verbose output
             if outcome.error:
@@ -340,7 +410,9 @@ def format_period(period, verbose: bool = False):
     if period.resets_at:
         from vibeusage.models import format_reset_countdown
 
-        time_until = period.time_until_reset() if hasattr(period, 'time_until_reset') else None
+        time_until = (
+            period.time_until_reset() if hasattr(period, "time_until_reset") else None
+        )
         if time_until is not None:
             time_str = format_reset_countdown(time_until)
             text.append(f" • resets in {time_str}", style="dim")
@@ -366,6 +438,6 @@ def get_pace_color(period):
     """Get color for a period based on utilization pace."""
     from vibeusage.models import pace_to_color
 
-    pace_ratio = period.pace_ratio() if hasattr(period, 'pace_ratio') else None
+    pace_ratio = period.pace_ratio() if hasattr(period, "pace_ratio") else None
     color_name = pace_to_color(pace_ratio, period.utilization)
     return color_name

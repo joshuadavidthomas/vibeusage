@@ -8,7 +8,11 @@ from pathlib import Path
 import httpx
 
 from vibeusage.config.cache import cache_org_id, load_cached_org_id
-from vibeusage.config.credentials import credential_path, read_credential, write_credential
+from vibeusage.config.credentials import (
+    credential_path,
+    read_credential,
+    write_credential,
+)
 from vibeusage.core.http import get_http_client
 from vibeusage.models import OverageUsage, PeriodType, UsagePeriod, UsageSnapshot
 from vibeusage.strategies.base import FetchResult, FetchStrategy
@@ -22,7 +26,9 @@ class ClaudeWebStrategy(FetchStrategy):
     # API endpoints
     ORG_URL = "https://claude.ai/api/organizations"
     USAGE_URL_TEMPLATE = "https://claude.ai/api/organizations/{org_id}/usage"
-    OVERAGE_URL_TEMPLATE = "https://claude.ai/api/organizations/{org_id}/overage_spend_limit"
+    OVERAGE_URL_TEMPLATE = (
+        "https://claude.ai/api/organizations/{org_id}/overage_spend_limit"
+    )
 
     # Session key location
     SESSION_PATH = credential_path("claude", "session")
@@ -54,7 +60,9 @@ class ClaudeWebStrategy(FetchStrategy):
             if usage_response.status_code == 401:
                 return FetchResult.fail("Session key expired or invalid", fatal=True)
             if usage_response.status_code != 200:
-                return FetchResult.fail(f"Usage request failed: {usage_response.status_code}")
+                return FetchResult.fail(
+                    f"Usage request failed: {usage_response.status_code}"
+                )
 
             try:
                 usage_data = usage_response.json()
@@ -175,7 +183,9 @@ class ClaudeWebStrategy(FetchStrategy):
 
         if usage_amount is not None and usage_limit is not None:
             try:
-                utilization = int((usage_amount / usage_limit) * 100) if usage_limit > 0 else 0
+                utilization = (
+                    int((usage_amount / usage_limit) * 100) if usage_limit > 0 else 0
+                )
             except (ValueError, TypeError):
                 utilization = 0
 
@@ -184,7 +194,9 @@ class ClaudeWebStrategy(FetchStrategy):
             period_end = data.get("period_end") or data.get("reset_at")
             if period_end:
                 try:
-                    resets_at = datetime.fromisoformat(period_end.replace("Z", "+00:00"))
+                    resets_at = datetime.fromisoformat(
+                        period_end.replace("Z", "+00:00")
+                    )
                 except (ValueError, AttributeError):
                     pass
 

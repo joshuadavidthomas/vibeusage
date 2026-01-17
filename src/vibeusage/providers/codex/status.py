@@ -9,6 +9,4 @@ async def fetch_codex_status() -> ProviderStatus:
 
     OpenAI uses Statuspage.io at status.openai.com.
     """
-    return await fetch_statuspage_status(
-        "https://status.openai.com/api/v2/status.json"
-    )
+    return await fetch_statuspage_status("https://status.openai.com/api/v2/status.json")

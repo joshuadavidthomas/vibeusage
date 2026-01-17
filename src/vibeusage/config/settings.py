@@ -44,9 +44,10 @@ class ProviderConfig(msgspec.Struct, omit_defaults=True):
     """Configuration for a specific provider."""
 
     auth_source: Literal["auto", "oauth", "web", "cli", "apikey", "manual"] = "auto"
-    preferred_browser: Literal[
-        "safari", "chrome", "firefox", "arc", "brave", "edge", "chromium"
-    ] | None = None
+    preferred_browser: (
+        Literal["safari", "chrome", "firefox", "arc", "brave", "edge", "chromium"]
+        | None
+    ) = None
     enabled: bool = True
 
 
@@ -175,7 +176,11 @@ def save_config(config: Config, path: Path | None = None) -> None:
 
     # Remove None values
     def clean_none(d: dict) -> dict:
-        return {k: clean_none(v) if isinstance(v, dict) else v for k, v in d.items() if v is not None}
+        return {
+            k: clean_none(v) if isinstance(v, dict) else v
+            for k, v in d.items()
+            if v is not None
+        }
 
     data = clean_none(data)
 

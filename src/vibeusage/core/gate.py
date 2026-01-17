@@ -39,7 +39,9 @@ class FailureGate:
     def record_failure(self, error_category: ErrorCategory, message: str) -> None:
         """Record a failure and update gate state."""
         now = datetime.now()
-        record = FailureRecord(timestamp=now, error_category=error_category, message=message)
+        record = FailureRecord(
+            timestamp=now, error_category=error_category, message=message
+        )
 
         # Clean old failures outside the window
         cutoff = now - WINDOW_DURATION

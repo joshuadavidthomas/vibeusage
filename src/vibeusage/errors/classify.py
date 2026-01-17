@@ -126,7 +126,9 @@ def classify_exception(
     if isinstance(e, PermissionError):
         filename = getattr(e, "filename", None)
         return VibeusageError(
-            message=f"Permission denied: {filename}" if filename else "Permission denied",
+            message=f"Permission denied: {filename}"
+            if filename
+            else "Permission denied",
             category=ErrorCategory.CONFIGURATION,
             severity=ErrorSeverity.FATAL,
             provider=provider_id,

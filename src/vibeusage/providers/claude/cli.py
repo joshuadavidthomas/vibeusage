@@ -15,9 +15,7 @@ from vibeusage.strategies.base import FetchResult, FetchStrategy
 ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 
 # Pattern to match usage output like "█ 45.2% (5-hour session)"
-USAGE_PATTERN = re.compile(
-    r"█\s*([\d.]+)%\s*(?:\(([^)]+)\)|\[([^\]]+)\])"
-)
+USAGE_PATTERN = re.compile(r"█\s*([\d.]+)%\s*(?:\(([^)]+)\)|\[([^\]]+)\])")
 
 
 class ClaudeCLIStrategy(FetchStrategy):

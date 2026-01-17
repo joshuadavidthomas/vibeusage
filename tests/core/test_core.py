@@ -92,7 +92,9 @@ class TestCalculateRetryDelay:
 
     def test_max_delay_cap(self):
         """Delay is capped at max_delay."""
-        config = RetryConfig(base_delay=1.0, exponential_base=10.0, max_delay=60.0, jitter=False)
+        config = RetryConfig(
+            base_delay=1.0, exponential_base=10.0, max_delay=60.0, jitter=False
+        )
         delay = calculate_retry_delay(5, config)
         assert delay == 60.0
 
@@ -121,43 +123,57 @@ class TestShouldRetryException:
     def test_500_retryable(self, mock_response):
         """500 server error is retryable."""
         mock_response.status_code = 500
-        error = httpx.HTTPStatusError("Server error", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Server error", request=MagicMock(), response=mock_response
+        )
         assert should_retry_exception(error) is True
 
     def test_502_retryable(self, mock_response):
         """502 bad gateway is retryable."""
         mock_response.status_code = 502
-        error = httpx.HTTPStatusError("Bad gateway", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Bad gateway", request=MagicMock(), response=mock_response
+        )
         assert should_retry_exception(error) is True
 
     def test_503_retryable(self, mock_response):
         """503 service unavailable is retryable."""
         mock_response.status_code = 503
-        error = httpx.HTTPStatusError("Unavailable", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Unavailable", request=MagicMock(), response=mock_response
+        )
         assert should_retry_exception(error) is True
 
     def test_429_retryable(self, mock_response):
         """429 rate limit is retryable."""
         mock_response.status_code = 429
-        error = httpx.HTTPStatusError("Rate limited", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Rate limited", request=MagicMock(), response=mock_response
+        )
         assert should_retry_exception(error) is True
 
     def test_401_not_retryable(self, mock_response):
         """401 unauthorized is not retryable."""
         mock_response.status_code = 401
-        error = httpx.HTTPStatusError("Unauthorized", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Unauthorized", request=MagicMock(), response=mock_response
+        )
         assert should_retry_exception(error) is False
 
     def test_403_not_retryable(self, mock_response):
         """403 forbidden is not retryable."""
         mock_response.status_code = 403
-        error = httpx.HTTPStatusError("Forbidden", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Forbidden", request=MagicMock(), response=mock_response
+        )
         assert should_retry_exception(error) is False
 
     def test_404_not_retryable(self, mock_response):
         """404 not found is not retryable."""
         mock_response.status_code = 404
-        error = httpx.HTTPStatusError("Not found", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Not found", request=MagicMock(), response=mock_response
+        )
         assert should_retry_exception(error) is False
 
     def test_other_exception_not_retryable(self):
@@ -181,13 +197,17 @@ class TestWithRetry:
     @pytest.mark.asyncio
     async def test_retry_on_retryable_error(self):
         """Retries on retryable error."""
-        coro = AsyncMock(side_effect=[
-            httpx.NetworkError("Failed"),
-            httpx.NetworkError("Failed"),
-            "success",
-        ])
+        coro = AsyncMock(
+            side_effect=[
+                httpx.NetworkError("Failed"),
+                httpx.NetworkError("Failed"),
+                "success",
+            ]
+        )
 
-        result = await with_retry(coro, config=RetryConfig(max_attempts=3, base_delay=0.01))
+        result = await with_retry(
+            coro, config=RetryConfig(max_attempts=3, base_delay=0.01)
+        )
         assert result == "success"
         assert coro.call_count == 3
 
@@ -206,7 +226,9 @@ class TestWithRetry:
         """Does not retry on non-retryable error."""
         mock_response = MagicMock(spec=httpx.Response)
         mock_response.status_code = 401
-        error = httpx.HTTPStatusError("Unauthorized", request=MagicMock(), response=mock_response)
+        error = httpx.HTTPStatusError(
+            "Unauthorized", request=MagicMock(), response=mock_response
+        )
         coro = AsyncMock(side_effect=error)
 
         with pytest.raises(httpx.HTTPStatusError):
@@ -339,6 +361,7 @@ class TestGatePath:
     def test_gate_path_format(self):
         """gate_path returns correct format."""
         from pathlib import Path
+
         with patch("vibeusage.core.gate.gate_dir", return_value=Path("/tmp/gates")):
             result = gate_path("claude")
             assert result == "/tmp/gates/claude.json"
@@ -349,9 +372,10 @@ class TestClearGate:
 
     def test_clear_gate_function(self):
         """clear_gate clears and saves."""
-        with patch("vibeusage.core.gate.get_failure_gate") as mock_get, patch(
-            "vibeusage.core.gate.save_gate"
-        ) as mock_save:
+        with (
+            patch("vibeusage.core.gate.get_failure_gate") as mock_get,
+            patch("vibeusage.core.gate.save_gate") as mock_save,
+        ):
             mock_gate = MagicMock()
             mock_get.return_value = mock_gate
 
@@ -410,9 +434,7 @@ class TestAggregatedResult:
 
     def test_all_failed(self):
         """all_failed returns True when all providers failed."""
-        result = AggregatedResult(
-            errors={"claude": Exception("Failed")}, snapshots={}
-        )
+        result = AggregatedResult(errors={"claude": Exception("Failed")}, snapshots={})
         assert result.all_failed() is True
 
     def test_all_failed_false_when_success(self, sample_snapshot):
@@ -620,9 +642,10 @@ class TestFetchAllProviders:
             ),
         }
 
-        with patch("vibeusage.core.orchestrator.execute_fetch_pipeline") as mock_fetch, patch(
-            "vibeusage.config.settings.get_config"
-        ) as mock_config:
+        with (
+            patch("vibeusage.core.orchestrator.execute_fetch_pipeline") as mock_fetch,
+            patch("vibeusage.config.settings.get_config") as mock_config,
+        ):
             mock_fetch.return_value = outcomes["claude"]
             mock_config.return_value = MagicMock(fetch=MagicMock(max_concurrent=5))
 
@@ -639,9 +662,10 @@ class TestFetchEnabledProviders:
     @pytest.mark.asyncio
     async def test_fetch_only_enabled(self, sample_snapshot):
         """Only fetches enabled providers."""
-        with patch("vibeusage.config.settings.get_config") as mock_config, patch(
-            "vibeusage.core.orchestrator.fetch_all_providers"
-        ) as mock_fetch:
+        with (
+            patch("vibeusage.config.settings.get_config") as mock_config,
+            patch("vibeusage.core.orchestrator.fetch_all_providers") as mock_fetch,
+        ):
             # Configure only claude as enabled
             config = MagicMock()
             config.is_provider_enabled.side_effect = lambda pid: pid == "claude"

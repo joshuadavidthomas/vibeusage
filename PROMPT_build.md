@@ -27,5 +27,7 @@
 <next>
 **IMPORTANT** This is your next task.
 
-Select the next priority item from PLAN.md's "Remaining Work" section and implement it.
+Type checking has not been run. Please run `uvx ty check` and fix the errors.
+
+Once you are finished, please delete this <next> block.
 </next>

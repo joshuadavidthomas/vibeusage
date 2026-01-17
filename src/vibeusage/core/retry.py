@@ -33,7 +33,7 @@ def calculate_retry_delay(
         Delay in seconds
     """
     # Exponential backoff
-    delay = config.base_delay * (config.exponential_base ** attempt)
+    delay = config.base_delay * (config.exponential_base**attempt)
 
     # Apply jitter if enabled
     if config.jitter:

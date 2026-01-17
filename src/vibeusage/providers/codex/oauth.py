@@ -69,9 +69,13 @@ class CodexOAuthStrategy(FetchStrategy):
             )
 
             if response.status_code == 401:
-                return FetchResult.fail("OAuth token expired or invalid", should_fallback=False)
+                return FetchResult.fail(
+                    "OAuth token expired or invalid", should_fallback=False
+                )
             if response.status_code == 403:
-                return FetchResult.fail("Not authorized to access usage. Account may not have ChatGPT Plus/Pro subscription.")
+                return FetchResult.fail(
+                    "Not authorized to access usage. Account may not have ChatGPT Plus/Pro subscription."
+                )
             if response.status_code != 200:
                 return FetchResult.fail(f"Usage request failed: {response.status_code}")
 
@@ -117,7 +121,9 @@ class CodexOAuthStrategy(FetchStrategy):
         try:
             expiry = datetime.fromisoformat(expires_at)
             # Refresh if expires within REFRESH_THRESHOLD_DAYS
-            threshold = datetime.now(timezone.utc) + timedelta(days=self.REFRESH_THRESHOLD_DAYS)
+            threshold = datetime.now(timezone.utc) + timedelta(
+                days=self.REFRESH_THRESHOLD_DAYS
+            )
             return threshold >= expiry
         except (ValueError, TypeError):
             return True
@@ -148,7 +154,9 @@ class CodexOAuthStrategy(FetchStrategy):
 
         # Update expires_at (OpenAI uses expires_in seconds)
         if "expires_in" in data:
-            expires_at = datetime.now(timezone.utc) + timedelta(seconds=data["expires_in"])
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                seconds=data["expires_in"]
+            )
             data["expires_at"] = expires_at.isoformat()
 
         # Preserve refresh_token if not in response
@@ -279,6 +287,7 @@ class CodexOAuthStrategy(FetchStrategy):
 
         # Parse plan info for identity
         from vibeusage.models import ProviderIdentity
+
         identity = None
         if plan_type := data.get("plan_type"):
             identity = ProviderIdentity(plan=plan_type)

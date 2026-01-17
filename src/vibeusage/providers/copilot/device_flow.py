@@ -56,13 +56,18 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
 
         access_token = credentials.get("access_token")
         if not access_token:
-            return FetchResult.fail("Invalid credentials: missing access_token", should_fallback=False)
+            return FetchResult.fail(
+                "Invalid credentials: missing access_token", should_fallback=False
+            )
 
         # Check if token needs refresh
         if self._needs_refresh(credentials):
             credentials = await self._refresh_token(credentials)
             if not credentials:
-                return FetchResult.fail("Failed to refresh token. Run `vibeusage auth copilot` to re-authenticate.", should_fallback=False)
+                return FetchResult.fail(
+                    "Failed to refresh token. Run `vibeusage auth copilot` to re-authenticate.",
+                    should_fallback=False,
+                )
             access_token = credentials.get("access_token")
 
         # Fetch usage from Copilot API
@@ -76,11 +81,18 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
             )
 
             if response.status_code == 401:
-                return FetchResult.fail("OAuth token expired or invalid. Run `vibeusage auth copilot` to re-authenticate.", should_fallback=False)
+                return FetchResult.fail(
+                    "OAuth token expired or invalid. Run `vibeusage auth copilot` to re-authenticate.",
+                    should_fallback=False,
+                )
             if response.status_code == 403:
-                return FetchResult.fail("Not authorized to access Copilot usage. Account may not have Copilot subscription.")
+                return FetchResult.fail(
+                    "Not authorized to access Copilot usage. Account may not have Copilot subscription."
+                )
             if response.status_code == 404:
-                return FetchResult.fail("Copilot API endpoint not found. Your account may not have Copilot access.")
+                return FetchResult.fail(
+                    "Copilot API endpoint not found. Your account may not have Copilot access."
+                )
             if response.status_code != 200:
                 return FetchResult.fail(f"Usage request failed: {response.status_code}")
 
@@ -189,7 +201,9 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
                 resets_at = None
                 if reset_str := premium.get("reset_at"):
                     try:
-                        resets_at = datetime.fromisoformat(reset_str.replace("Z", "+00:00"))
+                        resets_at = datetime.fromisoformat(
+                            reset_str.replace("Z", "+00:00")
+                        )
                     except (ValueError, TypeError):
                         pass
 
@@ -214,7 +228,9 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
                     resets_at = None
                     if reset_str := quota.get("reset_at"):
                         try:
-                            resets_at = datetime.fromisoformat(reset_str.replace("Z", "+00:00"))
+                            resets_at = datetime.fromisoformat(
+                                reset_str.replace("Z", "+00:00")
+                            )
                         except (ValueError, TypeError):
                             pass
 
@@ -254,6 +270,7 @@ class CopilotDeviceFlowStrategy(FetchStrategy):
 
         # Parse identity
         from vibeusage.models import ProviderIdentity
+
         identity = None
         if account := data.get("account"):
             if isinstance(account, dict):

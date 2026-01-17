@@ -33,7 +33,9 @@ def main(
     ctx: typer.Context,
     json: bool = typer.Option(False, "--json", "-j", help="Enable JSON output mode"),
     no_color: bool = typer.Option(False, "--no-color", help="Disable colored output"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Enable verbose output"
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Enable quiet mode"),
     version: bool = typer.Option(False, "--version", help="Show version and exit"),
 ) -> None:
@@ -80,7 +82,14 @@ async def run_default_usage(ctx: typer.Context) -> None:
     verbose = ctx.meta.get("verbose", False)
     quiet = ctx.meta.get("quiet", False)
 
-    display_multiple_snapshots(console, outcomes, ctx, verbose=verbose, quiet=quiet, total_duration_ms=duration_ms)
+    display_multiple_snapshots(
+        console,
+        outcomes,
+        ctx,
+        verbose=verbose,
+        quiet=quiet,
+        total_duration_ms=duration_ms,
+    )
 
     # Cleanup HTTP client
     await cleanup()
@@ -101,6 +110,7 @@ from vibeusage.cli.commands import (
 from vibeusage.cli.commands import (
     auth_command,
 )  # noqa: E402,F401
+
 # Import key, config, cache modules to trigger their self-registration
 from vibeusage.cli.commands import (
     cache,

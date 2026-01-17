@@ -60,7 +60,7 @@ async def handle_http_request(
                 raise
 
             # Calculate delay with exponential backoff
-            delay = base_delay * (2 ** attempt)
+            delay = base_delay * (2**attempt)
 
             # Add jitter to prevent thundering herd
             delay = delay * (1.0 + random.random() * 0.25)
@@ -86,7 +86,7 @@ async def handle_http_request(
                 raise
 
             # Calculate delay with exponential backoff
-            delay = base_delay * (2 ** attempt)
+            delay = base_delay * (2**attempt)
             delay = delay * (1.0 + random.random() * 0.25)
 
             if on_retry:
@@ -138,7 +138,9 @@ def extract_error_message(response: httpx.Response) -> str:
     return f"HTTP {status}"
 
 
-def get_retry_after_delay(response: httpx.Response, default_delay: float = 1.0) -> float:
+def get_retry_after_delay(
+    response: httpx.Response, default_delay: float = 1.0
+) -> float:
     """Get the delay from a Retry-After header.
 
     Args:

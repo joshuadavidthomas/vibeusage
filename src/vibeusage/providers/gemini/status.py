@@ -58,7 +58,9 @@ async def fetch_gemini_status() -> ProviderStatus:
             "cloud code",
         ]
 
-        if any(keyword in title or keyword in service_names for keyword in gemini_keywords):
+        if any(
+            keyword in title or keyword in service_names for keyword in gemini_keywords
+        ):
             gemini_incidents.append(incident)
 
     # Determine status level based on incidents

@@ -78,6 +78,7 @@ class TestProviderBase:
 
             async def fetch_status(self):
                 from vibeusage.models import ProviderStatus
+
                 return ProviderStatus.unknown()
 
         TestProvider.metadata = metadata
@@ -126,7 +127,9 @@ class TestClaudeProvider:
         assert "Anthropic" in ClaudeProvider.metadata.description
         assert ClaudeProvider.metadata.homepage == "https://claude.ai"
         assert ClaudeProvider.metadata.status_url == "https://status.anthropic.com"
-        assert ClaudeProvider.metadata.dashboard_url == "https://claude.ai/settings/usage"
+        assert (
+            ClaudeProvider.metadata.dashboard_url == "https://claude.ai/settings/usage"
+        )
 
     def test_id_property(self):
         """id property returns correct value."""
@@ -169,7 +172,9 @@ class TestClaudeProvider:
     @pytest.mark.asyncio
     async def test_fetch_status_returns_provider_status(self):
         """fetch_status returns ProviderStatus."""
-        with patch("vibeusage.providers.claude.status.fetch_statuspage_status") as mock_fetch:
+        with patch(
+            "vibeusage.providers.claude.status.fetch_statuspage_status"
+        ) as mock_fetch:
             from vibeusage.models import ProviderStatus
 
             mock_fetch.return_value = ProviderStatus(level=StatusLevel.OPERATIONAL)
@@ -187,6 +192,7 @@ class TestProviderRegistry:
     def setup_method(self):
         """Clear registry before each test."""
         import vibeusage.providers as providers_module
+
         providers_module._PROVIDERS.clear()
 
     def teardown_method(self):
@@ -322,7 +328,10 @@ class TestProviderStatus:
 
         class TestProvider(Provider):
             metadata = ProviderMetadata(
-                id="test", name="Test", description="Test", homepage="https://example.com"
+                id="test",
+                name="Test",
+                description="Test",
+                homepage="https://example.com",
             )
 
             def fetch_strategies(self):
@@ -336,7 +345,9 @@ class TestProviderStatus:
     @pytest.mark.asyncio
     async def test_claude_status_fetch(self):
         """Claude provider fetches status from statuspage."""
-        with patch("vibeusage.providers.claude.status.fetch_statuspage_status") as mock_fetch:
+        with patch(
+            "vibeusage.providers.claude.status.fetch_statuspage_status"
+        ) as mock_fetch:
             from vibeusage.models import ProviderStatus
 
             mock_fetch.return_value = ProviderStatus(
