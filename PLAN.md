@@ -41,6 +41,26 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - Verification: `vibeusage usage` works correctly (< 1s) when credentials exist
   - Test suite: 414 passing tests, 47% coverage (3 known test ordering issues in test_providers.py)
 
+**Recent Fixes** (2026-01-16):
+- **Fixed usage display to match spec 05-cli-interface.md**
+  - Problem: Usage command output did not match the specification in three ways:
+    1. Missing top-level provider command aliases (`vibeusage claude`, etc.)
+    2. Single provider view used Panel wrapper instead of title+separator format
+    3. Multi-provider view showed model-specific periods (should be compact)
+  - Fixes applied:
+    1. Added provider command aliases to app.py using `_create_provider_command()` factory function
+       - Commands `claude`, `codex`, `copilot`, `cursor`, `gemini` now available as top-level commands
+       - Each delegates to `usage_command` with provider set appropriately
+    2. Created `SingleProviderDisplay` class in display.py for spec-compliant single provider output:
+       - Provider name title with full-width `━━━` separator
+       - Session periods displayed standalone, not indented
+       - Weekly/Daily/Monthly section headers with indented model periods
+       - Only overage in a separate Panel at bottom
+    3. Updated `display_snapshot()` in usage.py to use `SingleProviderDisplay`
+    4. Verified `ProviderPanel` already filters out model-specific periods (`p.model is None`)
+  - All 455 tests pass (3 known test ordering issues remain, unrelated to this change)
+  - Output now matches spec 05-cli-interface.md exactly
+
 **Recent Fixes** (2026-01-17):
 - **Implemented `--verbose` and `--quiet` flags across all commands**
   - Problem: Flags were defined but had no effect on output
@@ -178,14 +198,17 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - `vibeusage --json key` - JSON output works ✓
 - `vibeusage key set <provider>` - Sets credential for provider ✓
 
-### NOT IMPLEMENTED (Expected)
+### Provider-Specific Top-Level Commands (✓ Implemented 2026-01-16)
 
-**1. Provider-specific top-level commands:**
-- `vibeusage claude` - "No such command 'claude'" ✗
-- `vibeusage codex` - "No such command 'codex'" ✗
-- `vibeusage copilot` - "No such command 'copilot'" ✗
-- Note: Provider-specific usage is accessed via `vibeusage usage <provider>` instead
-- Design decision: These were never intended as top-level commands
+**Provider command aliases now available:**
+- `vibeusage claude` - Shows Claude usage (identical to `vibeusage usage claude`) ✓
+- `vibeusage codex` - Shows Codex usage ✓
+- `vibeusage copilot` - Shows Copilot usage ✓
+- `vibeusage cursor` - Shows Cursor usage ✓
+- `vibeusage gemini` - Shows Gemini usage ✓
+- These are implemented as convenience aliases that delegate to `vibeusage usage <provider>`
+
+### UX Issues
 
 ### UX Issues
 
