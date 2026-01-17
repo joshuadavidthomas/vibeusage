@@ -27,7 +27,7 @@
 <next>
 **IMPORTANT** This is your next task.
 
-Type checking has not been run. Please run `uvx ty check` and fix the errors.
+Linting has not been run in a while. Please run `uvx ruff check` and fix the errors.
 
 Once you are finished, please delete this <next> block.
 </next>

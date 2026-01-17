@@ -143,10 +143,13 @@ class TestSingleProviderJsonOutput:
         finally:
             sys.stdout = old_stdout
 
-        # Verify JSON includes error
+        # Verify JSON includes error with new ErrorResponse format
         data = json.loads(output)
-        assert data["success"] is False
-        assert "Invalid credentials" in data["error"]
+        assert "error" in data
+        assert data["error"]["message"] == "Invalid credentials"
+        assert data["error"]["category"] == "unknown"
+        assert data["error"]["severity"] == "recoverable"
+        assert data["error"]["provider"] == "claude"
 
 
 class TestJsonCommandOptions:

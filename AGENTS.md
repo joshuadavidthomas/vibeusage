@@ -12,7 +12,8 @@ Run these after implementing to get immediate feedback:
 - Tests: `uv run pytest tests/ -v`
 - Coverage: `uv run pytest tests/ --cov`
 - Typecheck: `uvx ty check`
-- Lint: `uvx ruff format`
+- Lint: `uvx ruff check`
+- Format: `uvx ruff format`
 
 ## Operational Notes
 

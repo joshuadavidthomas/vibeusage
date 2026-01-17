@@ -325,9 +325,10 @@ class TestJsonOutput:
 
         # Verify JSON is valid
         data = json.loads(output)
-        assert "test" in data
-        assert data["test"]["success"] is False
-        assert data["test"]["error"] == "Test error message"
+        assert "providers" in data
+        assert "test" in data["providers"]
+        assert data["providers"]["test"]["success"] is False
+        assert data["providers"]["test"]["error"] == "Test error message"
 
     def test_output_json_usage_multiple_providers(self):
         """output_json_usage handles multiple providers with mixed results."""
