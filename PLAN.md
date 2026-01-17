@@ -42,75 +42,104 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - Fixed with_retry to accept callable that returns coroutine for retries
 - Reduced test failures from 38 to 3 (only test ordering issues remain)
 
-### CLI Command Audit (2025-01-16)
+## CLI Command Testing Results (2026-01-16)
 
-**CRITICAL BUG FIXED**: `vibeusage usage` command was broken
-- Error: `AttributeError: module 'typer' has no attribute 'get_context'`
-- Root cause: usage.py was calling `typer.get_context()` which doesn't exist in Typer
-- Fix: Added `ctx: typer.Context` as parameter to `usage_command()` function
-- Also fixed `display_multiple_snapshots()` to accept ctx as parameter
-- Status: NOW WORKING
+### WORKING Commands (✓)
 
-**Working Commands**:
-- `vibeusage` (default command) - Shows "No usage data available" message
-- `vibeusage --help` - Shows help
-- `vibeusage usage` - Shows usage for all configured providers (NOW WORKING - was broken)
-- `vibeusage usage <provider>` - Shows usage for specific provider (e.g., `vibeusage usage claude`)
-- `vibeusage usage --refresh` - Fetches fresh usage data
-- `vibeusage auth` - Shows auth status table
-- `vibeusage status` - Shows provider status
-- `vibeusage key` - Shows credential status
-- `vibeusage config show` - Shows config
-- `vibeusage config path` - Shows paths
-- `vibeusage cache show` - Shows cache status
+**Core Commands:**
+- `vibeusage --help` - Shows all commands correctly ✓
+- `vibeusage` (default) - Shows "No usage data available" message ✓
+- `vibeusage --version` - Shows "vibeusage 0.1.0" ✓
+- `vibeusage usage` - Shows "No usage data available" message ✓ **FIXED - was broken in earlier notes**
+- `vibeusage usage --refresh` - Works ✓
+- `vibeusage --no-color` - Works (disables color output) ✓
+- `vibeusage --json` - Works with default/usage commands ✓
+
+**Status & Auth Commands:**
+- `vibeusage status` - Shows provider status table with Claude (?), Codex (●), Copilot (●) ✓
+- `vibeusage auth` - Shows auth status table ✓
+- `vibeusage auth --status` - Shows auth status table ✓
+- `vibeusage auth --all` - Shows detailed auth status ✓
+- `vibeusage auth <provider>` - Starts provider-specific auth flow (prompts for input) ✓
+
+**Cache Commands:**
+- `vibeusage cache show` - Shows cache status table ✓
+- `vibeusage cache clear` - Clears cache ✓
+
+**Config Commands:**
+- `vibeusage config show` - Shows config file contents ✓
+- `vibeusage config path` - Shows config/cache/credentials directory paths ✓
+- `vibeusage config reset` - Prompts for confirmation before reset ✓
+
+**Key Commands:**
+- `vibeusage key` - Shows credential status for all providers ✓
+- `vibeusage key <provider>` - Shows credential status for specific provider ✓
+
+### BROKEN / NOT IMPLEMENTED (✗)
+
+**1. Provider-specific top-level commands NOT IMPLEMENTED:**
+- `vibeusage claude` - Error: "No such command 'claude'" ✗
+- `vibeusage codex` - Error: "No such command 'codex'" ✗
+- `vibeusage copilot` - Error: "No such command 'copilot'" ✗
+- Note: Provider-specific usage is accessed via `vibeusage usage <provider>` instead
+- Design decision: These were never intended as top-level commands
+
+**2. `vibeusage key set <provider>` - INTERFACE ISSUE:**
+- Running `vibeusage key set claude` gives "No such command 'claude'" ✗
+- The key_app callback takes an optional `provider` argument, creating ambiguity
+- Help shows: `vibeusage key [OPTIONS] [PROVIDER] COMMAND [ARGS]...`
+- Actual syntax: `vibeusage key set` (then prompted for provider)
+- Users expect: `vibeusage key set <provider>`
+
+**3. `vibeusage usage <provider>` - CREDENTIAL/STRATEGY ERRORS:**
+- `vibeusage usage claude` - Exit code 1: "Invalid credentials: missing access_token" ⚠️
+- `vibeusage usage codex` - Exit code 1: "Invalid credentials: missing access_token" ⚠️
+- `vibeusage usage copilot` - Exit code 1: "Strategy not available" ⚠️
+- These are credential/configuration issues, not command bugs
+
+**4. `--json` flag - LIMITED IMPLEMENTATION:**
+- `vibeusage --json status` - Outputs Rich table, not JSON ✗
+- `vibeusage --json key` - Outputs Rich table, not JSON ✗
+- `vibeusage --json auth` - Outputs Rich table, not JSON ✗
+- Only works for default/usage commands when data is available
+
+**5. `--verbose` and `--quiet` flags - NO EFFECT:**
+- `vibeusage --verbose` - No change in output ✗
+- `vibeusage --quiet` - No change in output ✗
+- Flags are accepted but not implemented
 
 **CLI Design Note**: Provider-specific usage is accessed via `vibeusage usage <provider>`, NOT via top-level `vibeusage <provider>` commands. The providers (Claude, Codex, Copilot) ARE implemented and functional, but there are no provider-specific top-level commands.
-
-**Partially Implemented**:
-- ⚠️ auth/base.py: Base classes only - concrete strategies implemented in provider modules
-
-**NOT Implemented** (blocking full release):
-- ❌ providers/cursor/ - Entire provider (web strategy)
-- ❌ providers/gemini/ - Entire provider (OAuth strategy)
-
-**Minor Issues** (non-blocking):
-- ProviderStatus factory methods have wrong return type hints (returns `type[ProviderStatus]` instead of `ProviderStatus`)
-- `pace_to_color()` in models.py instead of display/colors.py (functional but location differs from spec)
 
 ---
 
 ## Remaining Work (Prioritized by Dependencies & Value)
 
-### Priority 1: Complete Claude Provider Experience (MVP++)
-**Goal**: Make Claude provider fully functional with auth management
+### Priority 1: Minor Fixes & UX Improvements
+**Goal**: Fix remaining interface issues and polish UX
 
-- [x] **Implement auth command** (cli/commands/auth.py)
-  - [x] `vibeusage auth <provider>` - trigger provider-specific auth flow
-  - [x] `vibeusage auth --status` - show auth status for all providers
-  - [x] Claude: session key prompt with validation
-  - [x] Integrate with ClaudeWebStrategy to save session credentials
-  - [x] Rich table output with auth status indicators
+**Completed Items:**
+- [x] **FIXED: usage_command typer.get_context() bug** (fixed in earlier commit)
+  - Was: `AttributeError: module 'typer' has no attribute 'get_context'`
+  - Now: Usage command works correctly
 
-- [x] **Implement error display utilities** (cli/display.py errors/)
-  - [x] `UsageDisplay` class - __rich_console__ renderable for single provider
-  - [x] `ProviderPanel` class - provider wrapped in panel for multi-view
-  - [x] `show_error()` - formatted error panel with remediation
-  - [x] `show_partial_failures()` - summary of failed providers
-  - [x] `show_stale_warning()` - cached data indicator with age
+**Remaining Issues:**
+- [ ] **Fix `key set` command interface**
+  - Current: `vibeusage key set claude` fails with "No such command 'claude'"
+  - Expected: Accept provider as argument: `vibeusage key set claude`
+  - Workaround: `vibeusage key set` (then prompted for provider)
 
-- [x] **Add error message templates** (errors/messages.py)
-  - [x] `AUTH_ERROR_TEMPLATES` dict per provider (Claude, Codex, Copilot, Cursor, Gemini)
-  - [x] `get_auth_error_message(provider_id, error)` function
-  - [x] Include remediation steps for each auth error type
-  - [x] Map to VibeusageError.remediation field
-  - [x] Additional modules: errors/http.py, errors/network.py
+- [ ] **Implement `--json` flag for all commands**
+  - Current: Only works for default/usage commands
+  - Missing: `--json status`, `--json key`, `--json auth`, `--json cache`
+
+- [ ] **Implement `--verbose` and `--quiet` flags**
+  - Current: Flags accepted but no effect on output
+  - Verbose: Show diagnostic info, fetch timing, failure details
+  - Quiet: Suppress headers, tables, only show data/errors
 
 - [ ] **Fix minor type issues**
   - [ ] Fix ProviderStatus factory method return type hints
-  - [x] Export `classify_exception` from errors/__init__.py
   - [ ] Consider moving `pace_to_color()` to display/colors.py for consistency
-
-**Value**: Completes end-to-end Claude experience with proper auth flow and error handling
 
 ---
 
