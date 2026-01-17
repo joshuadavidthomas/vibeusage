@@ -196,12 +196,14 @@ class TestProviderRegistry:
         from vibeusage.providers.codex import CodexProvider
         from vibeusage.providers.copilot import CopilotProvider
         from vibeusage.providers.cursor import CursorProvider
+        from vibeusage.providers.gemini import GeminiProvider
 
         # Re-register the default providers
         providers_module._PROVIDERS["claude"] = ClaudeProvider
         providers_module._PROVIDERS["codex"] = CodexProvider
         providers_module._PROVIDERS["copilot"] = CopilotProvider
         providers_module._PROVIDERS["cursor"] = CursorProvider
+        providers_module._PROVIDERS["gemini"] = GeminiProvider
 
     def test_register_provider_decorator(self):
         """register_provider decorator registers provider."""

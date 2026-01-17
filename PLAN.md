@@ -9,7 +9,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Current Status
 
-**Implementation State**: Phase 0-4 complete (Claude MVP functional), Phase 5-6 in progress (Claude, Codex, Copilot, Cursor providers implemented)
+**Implementation State**: Phase 0-5 complete (All 5 priority providers implemented: Claude, Codex, Copilot, Cursor, Gemini)
 
 **Completed** (100% functional):
 - ✓ Phase 0: Project setup (dependencies, structure, entry points)
@@ -23,9 +23,12 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Error messages (errors/messages.py with provider templates)
 - ✓ Provider registry and base protocol
 - ✓ Configuration system (paths, settings, credentials, cache, keyring)
+- ✓ Claude provider (OAuth, Web, CLI strategies, status polling)
+- ✓ Codex provider (OAuth strategy, status polling)
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
-- ✓ Test suite (466 passing tests, 49% coverage)
+- ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
+- ✓ Test suite (466 passing tests, 46% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -33,6 +36,14 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ## Recent Fixes
+
+### 2026-01-17: Gemini Provider Implementation
+- **Implemented complete Gemini provider with OAuth and API key strategies**
+  - OAuth strategy uses Google Cloud Code API (retrieveUserQuota, loadCodeAssist endpoints)
+  - API key strategy as fallback for users without OAuth credentials
+  - Status polling via Google Workspace incidents feed
+  - Per-model quota tracking with daily reset periods
+  - Provider registered and CLI command `vibeusage gemini` functional
 
 ### 2026-01-17: Spec Compliance Fixes
 - **Fixed minor spec compliance issues in display formatting**
@@ -193,14 +204,15 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ---
 
-### Priority 5: Gemini Provider
-**Goal**: Add Google Gemini Studio support
+### Priority 5: Gemini Provider ✅ COMPLETED
 
-- [ ] **Create provider module** (providers/gemini/)
-  - [ ] `__init__.py` - GeminiProvider with metadata
-  - [ ] `oauth.py` - GeminiOAuthStrategy
-  - [ ] Google OAuth flow and credential storage
-- [ ] **Register and test**
+- [x] **Create provider module** (providers/gemini/)
+  - [x] `__init__.py` - GeminiProvider with metadata
+  - [x] `oauth.py` - GeminiOAuthStrategy
+  - [x] Google OAuth flow and credential storage
+  - [x] `api_key.py` - GeminiApiKeyStrategy (fallback)
+  - [x] `status.py` - Google Workspace status polling
+- [x] **Register and test**
 
 **Value**: Medium - Fourth most requested provider
 
@@ -273,7 +285,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ### Short-term (Expand Provider Coverage)
 4. **Priority 4**: Cursor provider ✅
-5. **Priority 5**: Gemini provider
+5. **Priority 5**: Gemini provider ✅
 
 ### Medium-term (Production Readiness)
 6. **Priority 6**: Polish & robustness
@@ -292,15 +304,15 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Display module with Rich and JSON output
 - ✓ Spec-compliant usage display (single and multi-provider)
 
-### Multi-Provider Milestone (In Progress)
+### Multi-Provider Milestone ✅ COMPLETE
 **Goal**: Support top 5 AI providers
-- Claude ✅, Codex ✅, Copilot ✅, Cursor ✅, Gemini (pending)
+- Claude ✅, Codex ✅, Copilot ✅, Cursor ✅, Gemini ✅
 
-### Production Release Milestone (Pending)
+### Production Release Milestone (In Progress)
 **Goal**: Production-ready tool
-- All 5 providers fully implemented
-- Comprehensive error handling
-- Full test coverage
+- All 5 providers fully implemented ✅
+- Comprehensive error handling (Priority 6)
+- Full test coverage (Priority 7)
 
 ---
 
