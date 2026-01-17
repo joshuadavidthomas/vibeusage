@@ -11,10 +11,10 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 **Implementation State**: Phase 0-5 complete (All 5 priority providers implemented: Claude, Codex, Copilot, Cursor, Gemini)
 
-**Known Gaps** (discovered 2026-01-17):
-- ⚠ Interactive authentication flows not implemented (auth commands only show instructions)
-- ⚠ Browser cookie extraction code exists but is dead (not registered in strategy chains)
-- ⚠ Copilot device flow fully specified in spec 03 but never implemented
+**Known Gaps** (discovered 2026-01-17) - **ALL ARE NEXT TASKS**:
+- 🚨 **Copilot device flow**: Fully specified in spec 03 but never implemented - users cannot authenticate
+- 🚨 **Claude browser cookies**: Strategy implemented but not registered - manual paste only
+- 🚨 **Cursor browser cookies**: Strategy implemented but not registered - manual paste only
 
 **Completed** (100% functional):
 - ✓ Phase 0: Project setup (dependencies, structure, entry points)
@@ -33,7 +33,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (1057 passing tests, 81% coverage - **exceeds 80% target**)
+- ✓ Test suite (1062 passing tests, 81% coverage - **exceeds 80% target**)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -41,6 +41,16 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ## Recent Fixes
+
+### 2026-01-17: Browser Cookie Dependency Added ✅ RESOLVED
+- **Issue**: Browser cookie extraction strategies (`ClaudeBrowserCookieStrategy`, `CursorBrowserCookieStrategy`) were implemented but couldn't function because `browser_cookie3` was not in dependencies
+- **Root Cause**: The code attempted to import `browser_cookie3` or `pycookiecheat`, but neither was listed in pyproject.toml
+- **Resolution**:
+  - Added `browser-cookie3>=0.19.0` to dependencies in pyproject.toml
+  - Added 5 tests for `ClaudeBrowserCookieStrategy` in test_providers.py
+  - Updated tests for both strategies to verify dependency availability
+- **Verification**: All 1062 tests pass (up from 1060), browser cookie strategies can now import required library
+- **Note**: Browser strategies are still not registered in `fetch_strategies()` - see Phase 9.2 for remaining activation work
 
 ### 2026-01-17: Key Command Syntax - Provider First, Then Action ✅ RESOLVED
 - **Issue**: `vibeusage key copilot set` command failed with "No such command 'copilot'"
@@ -93,6 +103,46 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ## Remaining Work (Prioritized by Dependencies & Value)
+
+### 🚨 NEXT TASKS: Authentication Flows (Phase 9.1 + 9.2)
+**Status**: HIGHEST PRIORITY - Multiple providers have broken or degraded authentication
+
+#### Task A: Copilot Device Flow (Critical)
+**Impact**: New Copilot users cannot authenticate at all
+
+The device flow is fully specified in `specs/03-authentication.md` lines 557-697 but was never implemented. The `auth copilot` command only shows instructions instead of running the interactive OAuth device flow.
+
+**Actions**:
+1. Implement `_device_flow()` in `providers/copilot/device_flow.py`
+2. Implement `_poll_for_token()` with proper error handling
+3. Update `auth copilot` command to invoke the device flow
+4. Add comprehensive tests
+
+**See**: Priority 9.1 below for full task breakdown
+
+#### Task B: Claude Browser Cookie Activation (Medium)
+**Impact**: Users must manually extract cookies from DevTools instead of automatic extraction
+
+`ClaudeBrowserCookieStrategy` is fully implemented at `providers/claude/web.py:236-304` but NOT registered in `fetch_strategies()`. The `browser_cookie3` dependency is now installed.
+
+**Actions**:
+1. Register `ClaudeBrowserCookieStrategy` in `ClaudeProvider.fetch_strategies()`
+2. Update `auth claude` to try automatic extraction before manual paste
+3. Add tests for the integrated flow
+
+#### Task C: Cursor Browser Cookie Activation (Medium)
+**Impact**: Users must manually extract cookies from DevTools instead of automatic extraction
+
+`CursorBrowserCookieStrategy` is fully implemented at `providers/cursor/web.py:214-295` but NOT registered in `fetch_strategies()`. The `browser_cookie3` dependency is now installed.
+
+**Actions**:
+1. Register `CursorBrowserCookieStrategy` in `CursorProvider.fetch_strategies()`
+2. Update `auth cursor` to try automatic extraction before manual paste
+3. Add tests for the integrated flow
+
+**See**: Priority 9.2 below for full task breakdown
+
+---
 
 ### Priority 1: Minor Fixes & UX Improvements ✅ COMPLETE
 **Goal**: Fix remaining interface issues and polish UX
@@ -203,23 +253,178 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ---
 
+### Priority 9: Interactive Authentication ⚠ NEW
+**Goal**: Implement spec-compliant interactive authentication flows
+
+**Problem Statement** (discovered 2026-01-17):
+All `auth <provider>` commands currently only display instructions - they don't actually perform authentication. Users must use external CLIs or manually paste credentials. This violates the specs which define complete interactive flows.
+
+#### Gap Analysis by Provider
+
+| Provider | Spec Says | Implementation Has | Gap | Status |
+|----------|-----------|-------------------|-----|--------|
+| **Copilot** | Full device flow (spec 03:557-697) | Only credential loading | **Critical** - flow never implemented | 🚨 NEXT |
+| **Claude** | Browser cookie extraction | Code exists, not registered | **Major** - dead code | 🚨 NEXT |
+| **Cursor** | Browser cookie extraction | Code exists, not registered | **Major** - dead code | 🚨 NEXT |
+| **Codex** | Web strategy "(future)" | Not implemented | Intentional | — |
+| **Gemini** | OAuth via CLI credentials | Only loads existing creds | Minor | — |
+
+#### Phase 9.1: Copilot Device Flow 🚨 NEXT
+**Spec Reference**: `specs/03-authentication.md` lines 557-697
+**Status**: NEXT TASK - Critical, users cannot authenticate at all
+
+The spec fully defines `GitHubDeviceFlowStrategy` with:
+- Request device code from `POST https://github.com/login/device/code`
+- Display user code and verification URL
+- Open browser automatically
+- Poll for token at `POST https://github.com/login/oauth/access_token`
+- Handle authorization_pending, slow_down, expired_token, access_denied
+- Save credentials to `~/.config/vibeusage/credentials/copilot/oauth.json`
+
+**Tasks**:
+- [ ] Implement `_device_flow()` method in `providers/copilot/device_flow.py`
+  - [ ] Request device code with client_id and scope
+  - [ ] Display user code with Rich formatting
+  - [ ] Attempt to open browser via `webbrowser.open()`
+  - [ ] Show fallback URL if browser fails
+- [ ] Implement `_poll_for_token()` method
+  - [ ] Poll with configurable interval (default 5s)
+  - [ ] Handle `authorization_pending` (continue polling)
+  - [ ] Handle `slow_down` (increase interval by 5s)
+  - [ ] Handle `expired_token` (fail with retry message)
+  - [ ] Handle `access_denied` (fail with clear message)
+  - [ ] Max 60 attempts (5 minute timeout)
+- [ ] Update `auth copilot` command to invoke device flow
+  - [ ] Check for existing valid credentials first
+  - [ ] Offer to re-authenticate if credentials exist
+  - [ ] Run device flow interactively
+  - [ ] Show success message with credential location
+- [ ] Add tests for device flow
+  - [ ] Mock HTTP responses for device code request
+  - [ ] Mock polling responses (pending, success, error cases)
+  - [ ] Test timeout behavior
+  - [ ] Test credential storage
+
+**Value**: High - Copilot is a major provider, currently completely broken for new users
+
+---
+
+#### Phase 9.2: Activate Browser Cookie Extraction 🚨 NEXT
+**Spec Reference**: `specs/03-authentication.md` lines 280-389
+**Status**: NEXT TASK - Code exists, dependency installed, just needs registration
+
+Browser cookie strategies are fully implemented but not registered in `fetch_strategies()`:
+- `ClaudeBrowserCookieStrategy` at `providers/claude/web.py:236-304`
+- `CursorBrowserCookieStrategy` at `providers/cursor/web.py:214-295`
+
+**Tasks**:
+- [x] Add `browser_cookie3` to project dependencies (pyproject.toml)
+  - [x] `browser-cookie3>=0.19.0` added to dependencies
+  - [ ] Consider `pycookiecheat` as fallback
+  - [ ] Make optional dependency group: `pip install vibeusage[browser]`
+- [ ] Register `ClaudeBrowserCookieStrategy` in Claude provider
+  - [ ] Add to `fetch_strategies()` before `ClaudeWebStrategy`
+  - [ ] Update comment to reflect actual strategy order
+- [ ] Register `CursorBrowserCookieStrategy` in Cursor provider
+  - [ ] Add to `fetch_strategies()` before `CursorWebStrategy`
+  - [ ] Update comment to reflect actual strategy order
+- [ ] Update `auth claude` command
+  - [ ] Try automatic browser extraction first
+  - [ ] Fall back to manual paste if extraction fails
+  - [ ] Show which browser cookie was found
+- [ ] Update `auth cursor` command
+  - [ ] Try automatic browser extraction first
+  - [ ] Improve instructions with specific cookie names
+  - [ ] Show step-by-step DevTools navigation
+- [ ] Add tests for browser cookie strategies
+  - [ ] Mock browser_cookie3 responses
+  - [ ] Test fallback to manual entry
+  - [ ] Test cookie storage after extraction
+
+**Value**: High - Quick win, code already exists, just needs activation
+
+---
+
+#### Phase 9.3: Improve Auth Command Instructions
+**Goal**: Make instruction-only auth commands more helpful
+
+Even without interactive flows, the current instructions are sparse.
+
+**Tasks**:
+- [ ] Claude auth instructions
+  - [x] Already has detailed DevTools navigation
+  - [ ] Add expected cookie format/prefix validation
+- [ ] Codex auth instructions
+  - [ ] Add `~/.codex/auth.json` file format example
+  - [ ] Explain what the OAuth token looks like
+- [ ] Cursor auth instructions
+  - [ ] Add which cookie names to look for
+  - [ ] Add step-by-step DevTools navigation (like Claude)
+  - [ ] Show expected cookie format
+- [ ] Gemini auth instructions
+  - [ ] Add `~/.gemini/oauth_creds.json` file format example
+  - [ ] Explain credential structure
+- [ ] Copilot auth instructions (after device flow)
+  - [ ] Show VS Code hosts.json location as alternative
+  - [ ] Explain token format
+
+**Value**: Low - Nice to have, doesn't add functionality
+
+---
+
+#### Phase 9.4: Optional Keyring Integration
+**Spec Reference**: `specs/03-authentication.md` lines 890-910
+
+**Tasks**:
+- [ ] Add `keyring` to optional dependencies
+- [ ] Implement `store_in_keyring()` and `get_from_keyring()` helpers
+- [ ] Add config option to enable keyring storage
+- [ ] Update credential loading to check keyring first when enabled
+- [ ] Add macOS Keychain support for Claude (`"Claude Code-credentials"` service)
+
+**Value**: Low - Security enhancement, optional
+
+---
+
+#### Implementation Order
+
+**🚨 IMMEDIATE (All Next Tasks)**:
+1. **Phase 9.1** (Copilot Device Flow) - Critical, users cannot authenticate
+2. **Phase 9.2** (Browser Cookies) - Medium, activate existing code for Claude + Cursor
+
+**Later**:
+3. **Phase 9.3** (Better Instructions) - Low priority, polish
+4. **Phase 9.4** (Keyring) - Low priority, optional security
+
+**Dependencies**:
+- Phase 9.1 requires no external dependencies
+- Phase 9.2: `browser_cookie3` already added ✅
+- Phase 9.4 requires `keyring` package
+
+---
+
 ## Implementation Order Summary
 
-### Immediate (Complete MVP)
+### 🚨 IMMEDIATE (Next Tasks)
+- **Phase 9.1**: Copilot Device Flow - Critical, users cannot authenticate
+- **Phase 9.2**: Browser Cookie Activation - Claude + Cursor, code exists, just needs registration
+
+### Completed (MVP)
 1. **Priority 1**: Minor fixes ✅
 2. **Priority 2**: Codex/OpenAI provider ✅
 3. **Priority 3**: Copilot provider ✅
-
-### Short-term (Expand Provider Coverage)
 4. **Priority 4**: Cursor provider ✅
 5. **Priority 5**: Gemini provider ✅
-
-### Medium-term (Production Readiness)
-6. **Priority 6**: Polish & robustness
-7. **Priority 7**: Test suite improvements
-
-### Long-term (Documentation & Release)
+6. **Priority 6**: Polish & robustness ✅
+7. **Priority 7**: Test suite ✅
 8. **Priority 8**: Documentation ✅
+
+### Upcoming (Authentication Gaps)
+9. **Priority 9**: Interactive Authentication
+   - Phase 9.1: Copilot device flow 🚨 NEXT
+   - Phase 9.2: Claude + Cursor browser cookies 🚨 NEXT
+   - Phase 9.3: Better auth instructions (Later)
+   - Phase 9.4: Keyring integration (Later)
 
 ---
 
@@ -240,6 +445,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - All 5 providers fully implemented ✅
 - Comprehensive error handling (Priority 6)
 - Full test coverage (Priority 7)
+- Interactive authentication flows (Priority 9) ⚠ BLOCKED
 
 ---
 
@@ -252,5 +458,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 5. ✓ **Display Module Split**: `cli/display.py` for Rich renderables, `display/rich.py` for utilities
 
 **Still Outstanding**:
-- Browser cookie extraction: `browser_cookie3` or `pycookiecheat` not in dependencies (deferred)
+- Browser cookie extraction: Dependency added (`browser_cookie3>=0.19.0`) but strategies not yet registered in `fetch_strategies()` → See Priority 9.2
 - `pace_to_color` location: In models.py instead of display/colors.py (functional but inconsistent with spec)
+- Interactive authentication: All auth commands only show instructions → See Priority 9
+- Copilot device flow: Never implemented despite being fully specified → See Priority 9.1

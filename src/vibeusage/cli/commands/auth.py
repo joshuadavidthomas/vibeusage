@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import typer
@@ -19,7 +20,7 @@ from vibeusage.providers import list_provider_ids
 
 
 @app.command("auth")
-def auth_command(
+async def auth_command(
     ctx: typer.Context,
     provider: str = typer.Argument(
         None,
@@ -83,6 +84,8 @@ def auth_command(
     # Provider-specific auth flows
     if provider == "claude":
         auth_claude_command(verbose=verbose, quiet=quiet)
+    elif provider == "copilot":
+        await auth_copilot_command(verbose=verbose, quiet=quiet)
     else:
         auth_generic_command(provider, verbose=verbose, quiet=quiet)
 
@@ -218,6 +221,54 @@ def auth_claude_command(
         raise typer.Exit(ExitCode.GENERAL_ERROR) from e
 
 
+async def auth_copilot_command(verbose: bool = False, quiet: bool = False) -> None:
+    """Authenticate with Copilot using GitHub device flow OAuth.
+
+    This interactive flow:
+    1. Requests a device code from GitHub
+    2. Displays the verification URL and user code
+    3. Opens a browser for the user to authorize
+    4. Polls for the access token
+    5. Saves credentials to vibeusage storage
+    """
+    console = Console()
+
+    # Check if already authenticated
+    has_creds, source = check_provider_credentials("copilot")
+
+    if has_creds:
+        source_label = {
+            "vibeusage": "vibeusage storage",
+            "provider_cli": "provider CLI",
+            "env": "environment variable",
+        }.get(source or "", source or "unknown")
+        if not quiet:
+            console.print(
+                f"[green]✓[/green] Copilot is already authenticated ({source_label})"
+            )
+
+        if verbose:
+            from vibeusage.config.credentials import find_provider_credential
+
+            _, _, cred_path = find_provider_credential("copilot")
+            if cred_path:
+                console.print(f"  Location: {cred_path}")
+
+        # Ask if user wants to re-authenticate
+        if not quiet:
+            if not typer.confirm("Re-authenticate?"):
+                raise typer.Exit(ExitCode.SUCCESS)
+
+    # Import and run device flow
+    from vibeusage.providers.copilot.device_flow import CopilotDeviceFlowStrategy
+
+    strategy = CopilotDeviceFlowStrategy()
+    success = await strategy.device_flow(console=console, quiet=quiet)
+
+    if not success:
+        raise typer.Exit(ExitCode.AUTH_ERROR)
+
+
 def auth_generic_command(
     provider: str, verbose: bool = False, quiet: bool = False
 ) -> None:
@@ -296,15 +347,12 @@ Codex authentication uses OAuth credentials.
   [dim]vibeusage key codex set[/dim]""",
         "copilot": """[bold cyan]GitHub Copilot Authentication[/bold cyan]
 
-GitHub Copilot uses GitHub device flow OAuth.
+[green]Running interactive device flow...[/green]
 
-[dim]Run the official GitHub CLI to authenticate:[/dim]
-  [dim]gh auth login[/dim]
+This will open a browser window where you can authorize vibeusage to access your Copilot usage data.
 
 [dim]Or set credentials manually with your OAuth token:[/dim]
-  [dim]vibeusage key copilot set[/dim]
-
-[dim]Note: [italic]gh auth login[/italic] authenticates the GitHub CLI, not Copilot.[/dim]""",
+  [dim]vibeusage key copilot set[/dim]""",
         "cursor": """[bold cyan]Cursor Authentication[/bold cyan]
 
 Cursor uses session cookies from the browser.

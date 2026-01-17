@@ -589,6 +589,472 @@ class TestCopilotProviderIntegration:
         assert "copilot" in ids
 
 
+class TestCopilotDeviceFlow:
+    """Tests for Copilot device flow OAuth functionality."""
+
+    @pytest.mark.asyncio
+    async def test_device_flow_success(self):
+        """device_flow successfully completes OAuth flow."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        # Mock device code response
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 5,
+            "expires_in": 300,
+        }
+
+        # Mock token response
+        token_response = {
+            "access_token": "test-access-token",
+            "token_type": "bearer",
+            "scope": "read:user",
+        }
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            # Mock device code request
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            # Mock token request
+            mock_token_response = Mock()
+            mock_token_response.status_code = 200
+            mock_token_response.json = Mock(return_value=token_response)
+
+            # Mock the HTTP client
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[
+                    mock_dc_response,  # First call: device code
+                    mock_token_response,  # Second call: token
+                ]
+            )
+
+            # Mock the async context manager
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            # Mock webbrowser
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                # Mock credential saving
+                with patch.object(strategy, "_save_credentials") as mock_save:
+                    console = Console()
+                    result = await strategy.device_flow(console=console, quiet=True)
+
+                    # Should return True on success
+                    assert result is True
+
+                    # Credentials should be saved
+                    mock_save.assert_called_once_with(token_response)
+
+    @pytest.mark.asyncio
+    async def test_device_flow_handles_authorization_pending(self):
+        """device_flow polls correctly on authorization_pending."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        # Mock device code response
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 1,  # Short interval for testing
+            "expires_in": 300,
+        }
+
+        # Mock pending then success responses
+        pending_response = {"error": "authorization_pending"}
+        token_response = {
+            "access_token": "test-access-token",
+            "token_type": "bearer",
+            "scope": "read:user",
+        }
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            # Mock device code request
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            # Mock pending then token responses
+            mock_pending = Mock()
+            mock_pending.status_code = 200
+            mock_pending.json = Mock(return_value=pending_response)
+
+            mock_token = Mock()
+            mock_token.status_code = 200
+            mock_token.json = Mock(return_value=token_response)
+
+            # Mock the HTTP client
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[
+                    mock_dc_response,  # First call: device code
+                    mock_pending,  # Second call: pending
+                    mock_token,  # Third call: success
+                ]
+            )
+
+            # Mock the async context manager
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            # Mock webbrowser and credential saving
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                with patch.object(strategy, "_save_credentials"):
+                    console = Console()
+                    result = await strategy.device_flow(console=console, quiet=True)
+
+                    # Should return True after polling succeeds
+                    assert result is True
+
+    @pytest.mark.asyncio
+    async def test_device_flow_handles_slow_down(self):
+        """device_flow handles slow_down error by increasing interval."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 1,
+            "expires_in": 300,
+        }
+
+        slow_down_response = {"error": "slow_down"}
+        token_response = {
+            "access_token": "test-access-token",
+            "token_type": "bearer",
+        }
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            mock_slow = Mock()
+            mock_slow.status_code = 200
+            mock_slow.json = Mock(return_value=slow_down_response)
+
+            mock_token = Mock()
+            mock_token.status_code = 200
+            mock_token.json = Mock(return_value=token_response)
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[
+                    mock_dc_response,
+                    mock_slow,
+                    mock_token,
+                ]
+            )
+
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                with patch.object(strategy, "_save_credentials"):
+                    console = Console()
+                    result = await strategy.device_flow(console=console, quiet=True)
+
+                    assert result is True
+
+    @pytest.mark.asyncio
+    async def test_device_flow_handles_expired_token(self):
+        """device_flow handles expired_token error."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 1,
+            "expires_in": 300,
+        }
+
+        expired_response = {"error": "expired_token"}
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            mock_expired = Mock()
+            mock_expired.status_code = 200
+            mock_expired.json = Mock(return_value=expired_response)
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[
+                    mock_dc_response,
+                    mock_expired,
+                ]
+            )
+
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                console = Console()
+                result = await strategy.device_flow(console=console, quiet=True)
+
+                    # Should return False on expired token
+                assert result is False
+
+    @pytest.mark.asyncio
+    async def test_device_flow_handles_access_denied(self):
+        """device_flow handles access_denied error."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 1,
+            "expires_in": 300,
+        }
+
+        denied_response = {"error": "access_denied"}
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            mock_denied = Mock()
+            mock_denied.status_code = 200
+            mock_denied.json = Mock(return_value=denied_response)
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[
+                    mock_dc_response,
+                    mock_denied,
+                ]
+            )
+
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                console = Console()
+                result = await strategy.device_flow(console=console, quiet=True)
+
+                    # Should return False on access denied
+                assert result is False
+
+    @pytest.mark.asyncio
+    async def test_device_flow_timeout(self):
+        """device_flow returns False after max polling attempts."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 1,
+            "expires_in": 300,
+        }
+
+        pending_response = {"error": "authorization_pending"}
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            mock_pending = Mock()
+            mock_pending.status_code = 200
+            mock_pending.json = Mock(return_value=pending_response)
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[
+                    mock_dc_response,
+                    # All subsequent calls return pending
+                    *[mock_pending] * (strategy.MAX_POLL_ATTEMPTS + 1),
+                ]
+            )
+
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                console = Console()
+                result = await strategy.device_flow(console=console, quiet=True)
+
+                    # Should return False after max attempts
+                assert result is False
+
+    def test_try_open_browser_returns_true_on_success(self):
+        """_try_open_browser returns True when browser opens."""
+        strategy = CopilotDeviceFlowStrategy()
+
+        with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            result = strategy._try_open_browser("https://example.com")
+            assert result is True
+
+    def test_try_open_browser_returns_false_on_failure(self):
+        """_try_open_browser returns False when browser fails to open."""
+        strategy = CopilotDeviceFlowStrategy()
+
+        with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", side_effect=Exception("No browser")):
+            result = strategy._try_open_browser("https://example.com")
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_device_flow_saves_credentials(self):
+        """device_flow saves credentials to file on success."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 5,
+            "expires_in": 300,
+        }
+
+        token_response = {
+            "access_token": "test-access-token",
+            "token_type": "bearer",
+            "scope": "read:user",
+        }
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            mock_token_response = Mock()
+            mock_token_response.status_code = 200
+            mock_token_response.json = Mock(return_value=token_response)
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[mock_dc_response, mock_token_response]
+            )
+
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                # Track credential saving
+                with patch("vibeusage.providers.copilot.device_flow.write_credential") as mock_write:
+                    console = Console()
+                    result = await strategy.device_flow(console=console, quiet=True)
+
+                    assert result is True
+                    # Verify credentials were written
+                    mock_write.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_device_flow_handles_network_error_transient(self):
+        """device_flow retries on transient network errors."""
+        from rich.console import Console
+
+        strategy = CopilotDeviceFlowStrategy()
+
+        device_code_response = {
+            "device_code": "test-device-code-123",
+            "user_code": "ABCD-1234",
+            "verification_uri": "https://github.com/login/device",
+            "interval": 5,
+            "expires_in": 300,
+        }
+
+        token_response = {
+            "access_token": "test-access-token",
+            "token_type": "bearer",
+        }
+
+        with patch(
+            "vibeusage.providers.copilot.device_flow.get_http_client"
+        ) as mock_http:
+            mock_dc_response = Mock()
+            mock_dc_response.status_code = 200
+            mock_dc_response.json = Mock(return_value=device_code_response)
+
+            mock_token_response = Mock()
+            mock_token_response.status_code = 200
+            mock_token_response.json = Mock(return_value=token_response)
+
+            mock_client = AsyncMock()
+            mock_client.post = AsyncMock(
+                side_effect=[
+                    mock_dc_response,
+                    Exception("Network error"),
+                    Exception("Network error"),
+                    mock_token_response,
+                ]
+            )
+
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__.return_value = mock_client
+            mock_cm.__aexit__.return_value = None
+
+            mock_http.return_value = mock_cm
+
+            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+                with patch.object(strategy, "_save_credentials"):
+                    console = Console()
+                    result = await strategy.device_flow(console=console, quiet=True)
+
+                    # Should succeed after retries
+                    assert result is True
+
+
 class TestCopilotStatus:
     """Tests for Copilot status fetching."""
 

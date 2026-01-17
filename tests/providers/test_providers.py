@@ -391,3 +391,44 @@ class TestProviderIsEnabled:
             result = provider.is_enabled()
 
             assert result is False
+
+
+class TestClaudeBrowserCookieStrategy:
+    """Tests for ClaudeBrowserCookieStrategy."""
+
+    def setup_method(self):
+        """Import strategy class for testing."""
+        from vibeusage.providers.claude.web import ClaudeBrowserCookieStrategy
+
+        self.strategy_cls = ClaudeBrowserCookieStrategy
+
+    def test_name_property(self):
+        """Strategy has correct name."""
+        strategy = self.strategy_cls()
+        assert strategy.name == "browser"
+
+    def test_cookie_domains(self):
+        """COOKIE_DOMAINS includes expected values."""
+        strategy = self.strategy_cls()
+        assert "claude.ai" in str(strategy.COOKIE_DOMAINS)
+        assert ".claude.ai" in str(strategy.COOKIE_DOMAINS)
+
+    def test_cookie_names(self):
+        """COOKIE_NAMES includes expected values."""
+        strategy = self.strategy_cls()
+        assert "sessionKey" in strategy.COOKIE_NAMES
+
+    def test_is_available_always_returns_true(self):
+        """is_available always returns True."""
+        strategy = self.strategy_cls()
+        assert strategy.is_available() is True
+
+    def test_strategy_imports_browser_cookie3(self):
+        """Strategy can import browser_cookie3 module."""
+        # Verify browser_cookie3 is available as a dependency
+        import browser_cookie3
+
+        # Module should have browser attribute methods
+        assert hasattr(browser_cookie3, "chrome") or hasattr(
+            browser_cookie3, "safari"
+        ) or hasattr(browser_cookie3, "firefox")

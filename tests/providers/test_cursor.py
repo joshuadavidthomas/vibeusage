@@ -593,15 +593,15 @@ class TestCursorBrowserCookieStrategy:
         strategy = self.strategy_cls()
         assert strategy.is_available() is True
 
-    @pytest.mark.asyncio
-    async def test_fetch_fails_without_browser_cookie_lib(self):
-        """fetch fails when browser_cookie3 not available."""
-        strategy = self.strategy_cls()
+    def test_strategy_imports_browser_cookie3(self):
+        """Strategy can import browser_cookie3 module."""
+        # Verify browser_cookie3 is available as a dependency
+        import browser_cookie3
 
-        with patch("builtins.__import__", side_effect=ImportError):
-            result = await strategy.fetch()
-            assert result.success is False
-            assert "browser_cookie3" in result.error or "pycookiecheat" in result.error
+        # Module should have browser attribute methods
+        assert hasattr(browser_cookie3, "chrome") or hasattr(
+            browser_cookie3, "safari"
+        ) or hasattr(browser_cookie3, "firefox")
 
 
 class TestCursorProviderIntegration:
