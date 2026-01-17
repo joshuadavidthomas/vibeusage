@@ -28,7 +28,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (543 passing tests, 51% coverage)
+- ✓ Test suite (685 passing tests, 58% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -44,6 +44,19 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - Created init.py command with interactive wizard, --quick flag, --skip flag, and JSON output support
   - Added 25 new tests for first-run detection and init command functionality
   - All 677 tests pass (54% coverage)
+
+### 2025-01-17: Auth CLI Commands Test Suite (Priority 7)
+- **Added comprehensive test suite for auth CLI commands (46 new tests)**
+  - Created tests/cli/test_auth_commands.py with comprehensive auth command tests
+  - Tests for auth_command (main entry point with provider routing)
+  - Tests for auth_status_command (JSON/quiet/normal/verbose modes)
+  - Tests for auth_claude_command (session key handling, validation, errors)
+  - Tests for auth_generic_command (all providers, instructions display)
+  - Tests for helper functions (_show_claude_auth_instructions, _show_provider_auth_instructions)
+- **Improved overall test coverage from 54% to 58%**
+  - auth.py: 10% → 97% coverage
+  - 685 tests passing (up from 614)
+- All tests pass with 0 failures
 
 ### 2026-01-16: Auth Module Tests (Priority 7)
 - **Added comprehensive test suite for auth/base.py (71 new tests, 96% coverage)**
@@ -317,7 +330,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ### Priority 7: Test Suite
-**Status**: MOSTLY COMPLETE (51% coverage, 543 passing tests, 0 test ordering issues)
+**Status**: MOSTLY COMPLETE (58% coverage, 685 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)
