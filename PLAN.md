@@ -37,19 +37,21 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
-### 2026-01-17: CLI Subcommands Missing from Help Output
+### 2026-01-17: CLI Subcommands Investigation
 
-**Issue**: All CLI subcommands (auth, init, status, usage, cache, config, key) were missing from `vibeusage --help`. Only provider commands (claude, codex, copilot, cursor, gemini) were showing.
+**Issue Reported**: CLI subcommands (auth, init, status, usage, cache, config, key) were missing from `vibeusage --help`. Only provider commands (claude, codex, copilot, cursor, gemini) were showing.
 
-**Root Cause**: Lines 147-152 in `cli/app.py` had comments about importing command modules to trigger self-registration, but the actual import statements were completely missing.
+**Investigation**: When investigated, all 12 commands were actually present and registered correctly. The issue was likely caused by:
+- Stale shell command hash cache (fix: `hash -r` in bash/zsh)
+- Not running `uv sync` after code changes
+- Using an old installed version instead of the development environment
 
-**Fix Applied**: Added the missing imports to `cli/app.py`:
-- Import command modules that use `@app.command()` decorators (auth, init, status, usage)
-- Import command groups (key, cache, config) and register them via `app.add_typer()`
+**Fix Applied**:
+- Removed duplicate `app.add_typer()` calls from key.py, config.py, cache.py (now registered only once in cli/app.py)
 
 **Verification**:
-- All commands now appear in `vibeusage --help`
-- All subcommands work (key set/delete, cache show/clear, config show/path/reset/edit)
+- All commands appear in `vibeusage --help`: auth, init, status, usage, claude, codex, copilot, cursor, gemini, key, cache, config
+- All subcommands work correctly (key set/delete, cache show/clear, config show/path/reset/edit)
 - All 1055 tests pass (82% coverage)
 
 ---

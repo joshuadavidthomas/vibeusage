@@ -206,5 +206,4 @@ def cache_clear_command(
         console.print(f"[green]✓[/green] {result['message']}")
 
 
-# Register the cache group with the main app
-app.add_typer(cache_app, name="cache")
+# Note: cache_app is registered with the main app in cli/app.py

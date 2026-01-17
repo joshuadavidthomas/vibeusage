@@ -255,5 +255,4 @@ def config_edit_command() -> None:
         raise typer.Exit(ExitCode.CONFIG_ERROR) from None
 
 
-# Register the config group with the main app
-app.add_typer(config_app, name="config")
+# Note: config_app is registered with the main app in cli/app.py

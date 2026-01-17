@@ -234,5 +234,4 @@ def display_provider_credential_status(
         console.print(f"  vibeusage key set {provider_id}")
 
 
-# Register the key group with the main app
-app.add_typer(key_app, name="key")
+# Note: key_app is registered with the main app in cli/app.py
