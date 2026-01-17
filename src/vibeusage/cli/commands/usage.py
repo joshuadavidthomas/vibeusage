@@ -135,9 +135,8 @@ async def fetch_all_usage(refresh: bool):
 
 
 def display_snapshot(console, snapshot, source, cached, verbose: bool = False, quiet: bool = False, duration_ms: float = 0):
-    """Display a single usage snapshot."""
-    from rich.panel import Panel
-    from rich.text import Text
+    """Display a single usage snapshot with spec-compliant format."""
+    from vibeusage.cli.display import SingleProviderDisplay
 
     # In quiet mode, show minimal output
     if quiet:
@@ -145,37 +144,20 @@ def display_snapshot(console, snapshot, source, cached, verbose: bool = False, q
             console.print(f"{snapshot.provider} {period.name}: {period.utilization}%")
         return
 
-    # Build output
-    lines = []
-
-    # Header
-    header = Text()
-    header.append(f"{snapshot.provider.upper()} ", style="bold")
-    if cached:
-        header.append("(cached) ", style="dim yellow")
-    header.append(f"via {source}", style="dim")
-    lines.append(header)
-
-    # Verbose: add timing and source info
+    # Verbose: add timing and source info before the main display
     if verbose:
         if duration_ms > 0:
-            lines.append(Text(f"Fetched in {duration_ms:.0f}ms", style="dim"))
+            console.print(f"Fetched in {duration_ms:.0f}ms", style="dim")
         if snapshot.identity and snapshot.identity.email:
-            lines.append(Text(f"Account: {snapshot.identity.email}", style="dim"))
+            console.print(f"Account: {snapshot.identity.email}", style="dim")
+        if source:
+            console.print(f"Source: {source}", style="dim")
+        if verbose:
+            console.print()  # Blank line before main display
 
-    # Periods
-    for period in snapshot.periods:
-        period_text = format_period(period, verbose=verbose)
-        lines.append(period_text)
-
-    # Overage
-    if snapshot.overage and snapshot.overage.is_enabled:
-        overage_text = format_overage(snapshot.overage)
-        lines.append(overage_text)
-
-    # Display
-    content = "\n".join(str(line) for line in lines)
-    console.print(Panel.fit(content, title=f"{snapshot.provider} Usage"))
+    # Use spec-compliant SingleProviderDisplay for single provider view
+    display = SingleProviderDisplay(snapshot, cached=cached, source=source)
+    console.print(display)
 
 
 def output_single_provider_json(outcome) -> None:

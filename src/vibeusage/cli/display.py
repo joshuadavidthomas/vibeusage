@@ -11,7 +11,162 @@ from rich.text import Text
 
 from vibeusage.display.rich import format_period, format_overage_used
 from vibeusage.errors.types import ErrorCategory, ErrorSeverity, VibeusageError
-from vibeusage.models import UsageSnapshot, format_reset_countdown
+from vibeusage.models import UsageSnapshot, format_reset_countdown, PeriodType
+
+
+class SingleProviderDisplay:
+    """Rich renderable for displaying a single provider's usage with title+separator format.
+
+    This produces the spec-compliant single provider output:
+    - Provider name as title (e.g., "Claude")
+    - Separator line with ━ characters
+    - Session periods standalone (not indented)
+    - Blank line separator
+    - Weekly/Daily/Monthly section header (bold)
+    - Model-specific periods indented with 2 spaces
+    - Overage in a Panel (only part wrapped in a panel)
+    """
+
+    def __init__(
+        self,
+        snapshot: UsageSnapshot,
+        cached: bool = False,
+        source: str | None = None,
+    ):
+        """Initialize display with usage snapshot.
+
+        Args:
+            snapshot: UsageSnapshot to display
+            cached: Whether data is from cache
+            source: Data source (e.g., "oauth", "web", "cli")
+        """
+        self.snapshot = snapshot
+        self.cached = cached
+        self.source = source
+
+    def __rich_console__(self, console: Console, options: dict) -> RenderableType:
+        """Render the single provider usage display."""
+        # Title line with provider name
+        title = Text(self.snapshot.provider, style="bold")
+        yield title
+
+        # Separator line (80 dashes)
+        separator = "━" * 80
+        yield Text(separator, style="dim")
+
+        # Create grid for period display
+        grid = Table.grid(padding=(0, 2))
+        grid.add_column(min_width=12, justify="left")  # Period name
+        grid.add_column(min_width=22, justify="left")  # Bar + percentage
+        grid.add_column(justify="right")  # Reset time
+
+        # Group periods by type for proper display per spec
+        session_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION]
+        weekly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.WEEKLY]
+        daily_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY]
+        monthly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY]
+
+        # Display session periods first (typically "Session (5h)") - not indented
+        if session_periods:
+            for period in session_periods:
+                grid.add_row(
+                    Text(period.name, style="bold"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+            # Add separator if we have other periods to show
+            if weekly_periods or daily_periods or monthly_periods:
+                yield grid
+                yield Text()  # Blank line after session
+                grid = Table.grid(padding=(0, 2))
+                grid.add_column(min_width=12, justify="left")
+                grid.add_column(min_width=22, justify="left")
+                grid.add_column(justify="right")
+
+        # Display longer periods with header and indented model-specific periods
+        longer_periods = weekly_periods or daily_periods or monthly_periods
+        if longer_periods:
+            # Determine the header name based on period type
+            if weekly_periods:
+                header_name = "Weekly"
+                periods_to_show = weekly_periods
+            elif daily_periods:
+                header_name = "Daily"
+                periods_to_show = daily_periods
+            else:  # monthly_periods
+                header_name = "Monthly"
+                periods_to_show = monthly_periods
+
+            # Separate general periods from model-specific periods
+            general_periods = [p for p in periods_to_show if p.model is None]
+            model_periods = [p for p in periods_to_show if p.model is not None]
+
+            # Add header row
+            yield Text(header_name, style="bold")
+
+            # Add general periods (e.g., "All Models") - indented
+            for period in general_periods:
+                display_name = period.model.title() if period.model else "All Models"
+                grid.add_row(
+                    Text(f"  {display_name}", style="bold"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+
+            # Add model-specific periods (e.g., "Opus", "Sonnet") - indented
+            for period in model_periods:
+                display_name = period.model.title() if period.model else period.name
+                grid.add_row(
+                    Text(f"  {display_name}"),
+                    self._format_bar_and_percentage(period),
+                    self._format_reset_time(period),
+                )
+
+        # Add any remaining periods (not session/weekly/daily/monthly)
+        handled_types = {PeriodType.SESSION, PeriodType.WEEKLY, PeriodType.DAILY, PeriodType.MONTHLY}
+        remaining_periods = [p for p in self.snapshot.periods if p.period_type not in handled_types]
+        for period in remaining_periods:
+            grid.add_row(
+                Text(period.name, style="bold"),
+                self._format_bar_and_percentage(period),
+                self._format_reset_time(period),
+            )
+
+        yield grid
+
+        # Add overage in a panel if enabled
+        if self.snapshot.overage and self.snapshot.overage.is_enabled:
+            overage = self.snapshot.overage
+            symbol = "$" if overage.currency == "USD" else ""
+            overage_text = Text(f"Extra Usage: {symbol}{overage.used:.2f} / {symbol}{overage.limit:.2f} {overage.currency}")
+            yield Panel(
+                overage_text,
+                title="Overage",
+                border_style="cyan",
+                padding=(0, 1),
+            )
+
+    def _format_bar_and_percentage(self, period) -> Text:
+        """Format the progress bar and percentage column."""
+        from vibeusage.display.rich import render_usage_bar
+        from vibeusage.models import pace_to_color
+
+        text = Text()
+        pace_ratio = period.pace_ratio() if hasattr(period, 'pace_ratio') else None
+        color = pace_to_color(pace_ratio, period.utilization)
+        bar = render_usage_bar(period.utilization, color=color)
+        text.append_text(bar)
+        text.append(f" {period.utilization}%", style=color)
+        return text
+
+    def _format_reset_time(self, period) -> Text:
+        """Format the reset time column."""
+        text = Text()
+        time_until = period.time_until_reset() if hasattr(period, 'time_until_reset') else None
+        if time_until is not None:
+            time_str = format_reset_countdown(time_until)
+            text.append(f"resets in {time_str}", style="dim")
+        return text
 
 
 class UsageDisplay:
@@ -109,11 +264,12 @@ class ProviderPanel:
             source_text.append(f"via {self.snapshot.source}", style="dim")
         grid.add_row(source_text, Text(), Text())
 
-        # Group periods by type for proper display per spec
-        session_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION]
-        weekly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.WEEKLY]
-        daily_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY]
-        monthly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY]
+        # In multi-provider (compact) view, skip model-specific periods
+        # Only show general periods where model is None
+        session_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.SESSION and p.model is None]
+        weekly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.WEEKLY and p.model is None]
+        daily_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.DAILY and p.model is None]
+        monthly_periods = [p for p in self.snapshot.periods if p.period_type == PeriodType.MONTHLY and p.model is None]
 
         # Display session periods first (typically "Session (5h)")
         if session_periods:
@@ -127,47 +283,18 @@ class ProviderPanel:
             if weekly_periods or daily_periods or monthly_periods:
                 grid.add_row(Text(), Text(), Text())
 
-        # Display longer periods with header and indented model-specific periods
-        longer_periods = weekly_periods or daily_periods or monthly_periods
-        if longer_periods:
-            # Determine the header name based on period type
-            if weekly_periods:
-                header_name = "Weekly"
-                model_periods = [p for p in weekly_periods if p.model]
-                general_periods = [p for p in weekly_periods if not p.model]
-            elif daily_periods:
-                header_name = "Daily"
-                model_periods = [p for p in daily_periods if p.model]
-                general_periods = [p for p in daily_periods if not p.model]
-            else:  # monthly_periods
-                header_name = "Monthly"
-                model_periods = [p for p in monthly_periods if p.model]
-                general_periods = [p for p in monthly_periods if not p.model]
+        # Display longer periods (compact view - no model-specific breakdown)
+        all_longer_periods = weekly_periods + daily_periods + monthly_periods
+        for period in all_longer_periods:
+            grid.add_row(
+                Text(period.name, style="bold"),
+                self._format_bar_and_percentage(period),
+                self._format_reset_time(period),
+            )
 
-            # Add header row
-            grid.add_row(Text(header_name, style="bold"), Text(), Text())
-
-            # Add general periods (e.g., "All Models")
-            for period in general_periods:
-                display_name = period.model.title() if period.model else "All Models"
-                grid.add_row(
-                    Text(f"  {display_name}", style="bold"),
-                    self._format_bar_and_percentage(period),
-                    self._format_reset_time(period),
-                )
-
-            # Add model-specific periods (e.g., "Opus", "Sonnet")
-            for period in model_periods:
-                display_name = period.model.title() if period.model else period.name
-                grid.add_row(
-                    Text(f"  {display_name}"),
-                    self._format_bar_and_percentage(period),
-                    self._format_reset_time(period),
-                )
-
-        # Add any remaining periods (not session/weekly/daily/monthly) as-is
+        # Add any remaining periods (not session/weekly/daily/monthly) - skip model-specific
         handled_types = {PeriodType.SESSION, PeriodType.WEEKLY, PeriodType.DAILY, PeriodType.MONTHLY}
-        remaining_periods = [p for p in self.snapshot.periods if p.period_type not in handled_types]
+        remaining_periods = [p for p in self.snapshot.periods if p.period_type not in handled_types and p.model is None]
         for period in remaining_periods:
             grid.add_row(
                 Text(period.name, style="bold"),

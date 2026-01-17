@@ -71,6 +71,22 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - All commands now work correctly: `vibeusage usage`, `vibeusage usage claude`, `vibeusage usage codex`
 
 **Recent Fixes** (2026-01-16):
+- **Fixed usage display to match spec 05 panel-based layout**
+  - Problem: Multi-provider usage display was not matching the specification in specs/05-cli-interface.md
+  - Issues fixed:
+    1. ProviderPanel title now shows provider name only (e.g., "Claude" instead of "─ Claude ─")
+    2. Grid layout now uses proper column widths (min_width=12 for period name, min_width=22 for bar+percentage)
+    3. Added source display row in ProviderPanel (e.g., "CLAUDE via oauth")
+    4. Fixed progress bar calculation to use integer division for consistent 5% segments
+    5. Proper period grouping by type (SESSION, WEEKLY, DAILY, MONTHLY) with hierarchical display
+    6. Added period type headers (e.g., "Weekly") with indented model-specific periods
+  - Files modified:
+    - src/vibeusage/cli/display.py (ProviderPanel class)
+    - src/vibeusage/display/rich.py (render_usage_bar function)
+    - src/vibeusage/cli/commands/usage.py (format_period function)
+  - All 455 tests pass (3 known test ordering issues remain, unrelated to this change)
+  - Deleted ccusage_example.py reference file (no longer needed)
+
 - **Fixed usage display to match panel-based layout spec**
   - Problem: Period display showed inconsistent formatting for SESSION vs WEEKLY/DAILY/MONTHLY period types
   - Fixes applied:

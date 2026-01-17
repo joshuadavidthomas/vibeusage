@@ -107,3 +107,49 @@ from vibeusage.cli.commands import (
     config,
     key,
 )  # noqa: E402,F401
+
+
+# Provider command aliases - these provide top-level shortcuts like `vibeusage claude`
+# Each alias behaves identically to `vibeusage usage <provider>`
+def _create_provider_command(provider_id: str):
+    """Create a provider-specific command that delegates to usage command."""
+
+    @app.command(provider_id)
+    async def provider_command(
+        ctx: typer.Context,
+        refresh: bool = typer.Option(
+            False,
+            "--refresh",
+            "-r",
+            help="Bypass cache and fetch fresh data",
+        ),
+        json_output: bool = typer.Option(
+            False,
+            "--json",
+            "-j",
+            help="Output in JSON format",
+        ),
+    ) -> None:
+        """Show usage statistics for this provider."""
+        # Import here to avoid circular imports
+        from vibeusage.cli.commands.usage import usage_command
+
+        # Create a new context with provider set
+        # This simulates calling `vibeusage usage <provider>`
+        return await usage_command(
+            ctx,
+            provider=provider_id,
+            refresh=refresh,
+            json_output=json_output,
+        )
+
+    return provider_command
+
+
+# Register provider commands for all known providers
+# These must come after app is fully initialized
+_create_provider_command("claude")
+_create_provider_command("codex")
+_create_provider_command("copilot")
+_create_provider_command("cursor")
+_create_provider_command("gemini")
