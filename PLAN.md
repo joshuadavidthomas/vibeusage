@@ -128,14 +128,10 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - `vibeusage key set claude` works correctly
   - Resolved help display confusion between key group and set subcommand
 
-- [ ] **Implement `--json` flag for default command**
-  - Current: `vibeusage --json` does NOT output JSON (only plain text)
-  - Expected: The global --json flag should affect the default command output
-  - Note: `--json` works on `status` command, but NOT on default command or `auth` command
-
-- [ ] **Consider adding `--json` support to auth command**
-  - Current: `vibeusage auth --json` is NOT SUPPORTED
-  - The auth command doesn't accept the --json flag
+- [x] **Implement `--json` flag for all commands**
+  - Completed: status, key, auth, cache, and config commands now all support --json output
+  - The global --json flag works for all commands
+  - Tests have been updated and pass
 
 - [ ] **Implement `--verbose` and `--quiet` flags**
   - Current: Flags accepted but no effect on output

@@ -24,6 +24,12 @@ async def usage_command(
         "-r",
         help="Bypass cache and fetch fresh data",
     ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output in JSON format",
+    ),
 ) -> None:
     """Show usage statistics for all enabled providers or a specific provider."""
     import sys
@@ -33,11 +39,16 @@ async def usage_command(
     # Get console, respecting no-color option
     console = Console()
 
+    # Check for JSON mode (from global flag or local option)
+    json_mode = json_output or ctx.meta.get("json", False)
+
     try:
         if provider:
             # Single provider
             result = await fetch_provider_usage(provider, refresh)
-            if result.success:
+            if json_mode:
+                output_single_provider_json(result)
+            elif result.success:
                 display_snapshot(console, result.snapshot, result.source, result.cached)
             else:
                 console.print(f"[red]Error:[/red] {result.error}")
@@ -45,7 +56,7 @@ async def usage_command(
         else:
             # All enabled providers
             results = await fetch_all_usage(refresh)
-            display_multiple_snapshots(console, results, ctx)
+            display_multiple_snapshots(console, results, ctx, json_mode)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted[/yellow]")
@@ -133,10 +144,108 @@ def display_snapshot(console, snapshot, source, cached):
     console.print(Panel.fit(content, title=f"{snapshot.provider} Usage"))
 
 
-def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = None):
+def output_single_provider_json(outcome) -> None:
+    """Output single provider usage data in JSON format."""
+    from vibeusage.display.json import output_json_pretty
+
+    if outcome.success and outcome.snapshot:
+        snapshot = outcome.snapshot
+        data = {
+            "provider": snapshot.provider,
+            "identity": {
+                "email": snapshot.identity.email,
+                "organization": snapshot.identity.organization,
+                "plan": snapshot.identity.plan,
+            } if snapshot.identity else None,
+            "periods": [
+                {
+                    "name": period.name,
+                    "utilization": period.utilization,
+                    "remaining": period.remaining(),
+                    "resets_at": period.resets_at.isoformat() if period.resets_at else None,
+                    "period_type": period.period_type.value,
+                    "model": period.model,
+                }
+                for period in snapshot.periods
+            ],
+            "source": outcome.source,
+            "cached": outcome.cached,
+        }
+
+        if snapshot.overage and snapshot.overage.is_enabled:
+            data["overage"] = {
+                "used": float(snapshot.overage.used),
+                "limit": float(snapshot.overage.limit),
+                "remaining": float(snapshot.overage.remaining()),
+                "currency": snapshot.overage.currency,
+            }
+
+        output_json_pretty(data)
+    else:
+        data = {
+            "error": str(outcome.error) if outcome.error else "Unknown error",
+            "success": False,
+        }
+        output_json_pretty(data)
+
+
+def output_json_usage(outcomes: dict) -> None:
+    """Output usage data in JSON format."""
+    from vibeusage.display.json import output_json_pretty
+
+    data = {}
+    for provider_id, outcome in outcomes.items():
+        if outcome.success and outcome.snapshot:
+            snapshot = outcome.snapshot
+            provider_data = {
+                "provider": snapshot.provider,
+                "identity": {
+                    "email": snapshot.identity.email,
+                    "organization": snapshot.identity.organization,
+                    "plan": snapshot.identity.plan,
+                } if snapshot.identity else None,
+                "periods": [
+                    {
+                        "name": period.name,
+                        "utilization": period.utilization,
+                        "remaining": period.remaining(),
+                        "resets_at": period.resets_at.isoformat() if period.resets_at else None,
+                        "period_type": period.period_type.value,
+                        "model": period.model,
+                    }
+                    for period in snapshot.periods
+                ],
+                "source": outcome.source,
+                "cached": outcome.cached,
+            }
+
+            if snapshot.overage and snapshot.overage.is_enabled:
+                provider_data["overage"] = {
+                    "used": float(snapshot.overage.used),
+                    "limit": float(snapshot.overage.limit),
+                    "remaining": float(snapshot.overage.remaining()),
+                    "currency": snapshot.overage.currency,
+                }
+
+            data[provider_id] = provider_data
+        else:
+            data[provider_id] = {
+                "error": str(outcome.error) if outcome.error else "Unknown error",
+                "success": False,
+            }
+
+    output_json_pretty(data)
+
+
+def display_multiple_snapshots(console, outcomes, ctx: typer.Context | None = None, json_mode: bool = False):
     """Display multiple provider outcomes."""
     from rich.panel import Panel
     from rich.table import Table
+
+    # Check for JSON mode (from parameter or context)
+    if json_mode or (ctx and ctx.meta.get("json")):
+        output_json_usage(outcomes)
+        return
 
     # Check if any data
     has_data = any(o.success and o.snapshot for o in outcomes.values())

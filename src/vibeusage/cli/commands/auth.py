@@ -19,6 +19,7 @@ from vibeusage.providers import list_provider_ids
 
 @app.command("auth")
 def auth_command(
+    ctx: typer.Context,
     provider: str = typer.Argument(
         None,
         help="Provider to authenticate with",
@@ -34,6 +35,12 @@ def auth_command(
         "-a",
         help="Show detailed status for all providers",
     ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output in JSON format",
+    ),
 ) -> None:
     """Authenticate with a provider or show auth status.
 
@@ -42,14 +49,17 @@ def auth_command(
     """
     console = Console()
 
+    # Check for JSON mode (from global flag or local option)
+    json_mode = json_output or ctx.meta.get("json", False)
+
     # Handle --status flag (deprecated, use --all instead)
     if status:
-        auth_status_command(show_all=True)
+        auth_status_command(show_all=True, json_mode=json_mode)
         return
 
     # No provider - show status
     if provider is None:
-        auth_status_command(show_all=show_all)
+        auth_status_command(show_all=show_all, json_mode=json_mode)
         return
 
     # Validate provider
@@ -65,17 +75,40 @@ def auth_command(
         auth_generic_command(provider)
 
 
-def auth_status_command(show_all: bool = False) -> None:
+def auth_status_command(show_all: bool = False, json_mode: bool = False) -> None:
     """Show authentication status for all providers."""
     console = Console()
+
+    all_providers = list_provider_ids()
+
+    if json_mode:
+        from vibeusage.display.json import output_json_pretty
+
+        data = {}
+        for provider_id in sorted(all_providers):
+            has_creds, source = check_provider_credentials(provider_id)
+            _, _, cred_path = find_provider_credential(provider_id)
+
+            source_label = {
+                "vibeusage": "vibeusage storage",
+                "provider_cli": "provider CLI",
+                "env": "environment variable",
+            }.get(source or "", source or "unknown")
+
+            data[provider_id] = {
+                "authenticated": has_creds,
+                "source": source_label if has_creds else None,
+                "credential_path": str(cred_path) if cred_path else None,
+            }
+
+        output_json_pretty(data)
+        return
 
     table = Table(title="Authentication Status", show_header=True, header_style="bold")
     table.add_column("Provider", style="cyan")
     table.add_column("Status", style="bold")
     table.add_column("Source", style="dim")
     table.add_column("Details", style="dim")
-
-    all_providers = list_provider_ids()
 
     for provider_id in sorted(all_providers):
         has_creds, source = check_provider_credentials(provider_id)

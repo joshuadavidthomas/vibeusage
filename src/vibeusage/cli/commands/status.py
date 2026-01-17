@@ -13,7 +13,8 @@ from vibeusage.providers import get_all_providers, list_provider_ids
 
 @app.command("status")
 async def status_command(
-    json: bool = typer.Option(
+    ctx: typer.Context,
+    json_output: bool = typer.Option(
         False,
         "--json",
         "-j",
@@ -27,8 +28,10 @@ async def status_command(
         # Fetch all provider statuses
         statuses = await fetch_all_statuses()
 
-        if json:
-            output_json_status(console, statuses)
+        # Check for JSON mode (from global flag or local option)
+        json_mode = json_output or ctx.meta.get("json", False)
+        if json_mode:
+            output_json_status(statuses)
         else:
             display_status_table(console, statuses)
 
@@ -87,10 +90,8 @@ def display_status_table(console, statuses):
     console.print(table)
 
 
-def output_json_status(console, statuses):
+def output_json_status(statuses):
     """Output statuses in JSON format."""
-    import msgspec.json
-
     from vibeusage.display.json import output_json_pretty
 
     data = {

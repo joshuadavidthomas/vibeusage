@@ -36,7 +36,8 @@ def key_callback(
         return
 
     # Show all providers
-    display_all_credential_status(console)
+    json_mode = ctx.meta.get("json", False)
+    display_all_credential_status(console, json_mode=json_mode)
 
 
 @key_app.command("set")
@@ -131,14 +132,27 @@ def key_delete_command(
             console.print(f"[yellow]No credentials found for {provider}[/yellow]")
 
 
-def display_all_credential_status(console: Console) -> None:
+def display_all_credential_status(console: Console, json_mode: bool = False) -> None:
     """Display credential status for all providers."""
+    all_status = get_all_credential_status()
+
+    if json_mode:
+        from vibeusage.display.json import output_json_pretty
+
+        data = {
+            provider_id: {
+                "configured": status_info["has_credentials"],
+                "source": status_info.get("source") if status_info["has_credentials"] else None,
+            }
+            for provider_id, status_info in all_status.items()
+        }
+        output_json_pretty(data)
+        return
+
     table = Table(title="Credential Status", show_header=True, header_style="bold")
     table.add_column("Provider", style="cyan")
     table.add_column("Status", style="bold")
     table.add_column("Source", style="dim")
-
-    all_status = get_all_credential_status()
 
     for provider_id, status_info in all_status.items():
         if status_info["has_credentials"]:

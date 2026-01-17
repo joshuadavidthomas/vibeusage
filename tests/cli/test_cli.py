@@ -1,5 +1,6 @@
 """Tests for CLI components."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -222,3 +223,214 @@ class TestExitBehavior:
         """Exit codes are integers in valid range."""
         for code in ExitCode:
             assert 0 <= code.value <= 255
+
+
+class TestJsonOutput:
+    """Tests for JSON output functionality."""
+
+    def test_output_json_usage_with_success(self):
+        """output_json_usage outputs correct JSON for successful outcomes."""
+        from datetime import datetime, timezone
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.models import UsagePeriod, UsageSnapshot, PeriodType, ProviderIdentity
+        from vibeusage.strategies.base import FetchOutcome
+        import sys
+        from io import StringIO
+
+        # Create test data
+        period = UsagePeriod(
+            name="Test Period",
+            utilization=50,
+            resets_at=datetime.now(timezone.utc),
+            period_type=PeriodType.DAILY,
+        )
+        identity = ProviderIdentity(
+            email="test@example.com",
+            organization="Test Organization",
+            plan="pro",
+        )
+        snapshot = UsageSnapshot(
+            provider="test",
+            fetched_at=datetime.now(timezone.utc),
+            identity=identity,
+            periods=[period],
+            overage=None,
+        )
+        outcome = FetchOutcome(
+            provider_id="test",
+            success=True,
+            snapshot=snapshot,
+            source="oauth",
+            attempts=[],
+        )
+
+        # Capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            output_json_usage({"test": outcome})
+            output = sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        # Verify JSON is valid
+        data = json.loads(output)
+        assert "test" in data
+        assert data["test"]["provider"] == "test"
+        assert data["test"]["source"] == "oauth"
+        assert "periods" in data["test"]
+        assert len(data["test"]["periods"]) == 1
+        assert data["test"]["periods"][0]["name"] == "Test Period"
+        assert data["test"]["periods"][0]["utilization"] == 50
+
+    def test_output_json_usage_with_error(self):
+        """output_json_usage outputs correct JSON for error outcomes."""
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.strategies.base import FetchOutcome
+        import sys
+        from io import StringIO
+
+        # Create test error outcome
+        outcome = FetchOutcome(
+            provider_id="test",
+            success=False,
+            snapshot=None,
+            source=None,
+            attempts=[],
+            error=Exception("Test error message"),
+        )
+
+        # Capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            output_json_usage({"test": outcome})
+            output = sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        # Verify JSON is valid
+        data = json.loads(output)
+        assert "test" in data
+        assert data["test"]["success"] is False
+        assert data["test"]["error"] == "Test error message"
+
+    def test_output_json_usage_multiple_providers(self):
+        """output_json_usage handles multiple providers with mixed results."""
+        from datetime import datetime, timezone
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.models import UsagePeriod, UsageSnapshot, PeriodType
+        from vibeusage.strategies.base import FetchOutcome
+        import sys
+        from io import StringIO
+
+        # Create successful outcome
+        period = UsagePeriod(
+            name="Period 1",
+            utilization=80,
+            resets_at=datetime.now(timezone.utc),
+            period_type=PeriodType.DAILY,
+        )
+        snapshot = UsageSnapshot(
+            provider="provider1",
+            fetched_at=datetime.now(timezone.utc),
+            identity=None,
+            periods=[period],
+            overage=None,
+        )
+        success_outcome = FetchOutcome(
+            provider_id="provider1",
+            success=True,
+            snapshot=snapshot,
+            source="web",
+            attempts=[],
+        )
+
+        # Create error outcome
+        error_outcome = FetchOutcome(
+            provider_id="provider2",
+            success=False,
+            snapshot=None,
+            source=None,
+            attempts=[],
+            error=Exception("Auth failed"),
+        )
+
+        # Capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            output_json_usage({
+                "provider1": success_outcome,
+                "provider2": error_outcome,
+            })
+            output = sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        # Verify JSON is valid
+        data = json.loads(output)
+        assert "provider1" in data
+        assert data["provider1"]["provider"] == "provider1"
+        assert "provider2" in data
+        assert data["provider2"]["success"] is False
+        assert data["provider2"]["error"] == "Auth failed"
+
+    def test_output_json_usage_with_overage(self):
+        """output_json_usage includes overage data when present."""
+        from datetime import datetime, timezone
+        from decimal import Decimal
+        from vibeusage.cli.commands.usage import output_json_usage
+        from vibeusage.models import UsagePeriod, UsageSnapshot, OverageUsage, PeriodType
+        from vibeusage.strategies.base import FetchOutcome
+        import sys
+        from io import StringIO
+
+        # Create test data with overage
+        period = UsagePeriod(
+            name="Period 1",
+            utilization=120,
+            resets_at=datetime.now(timezone.utc),
+            period_type=PeriodType.MONTHLY,
+        )
+        overage = OverageUsage(
+            used=Decimal("20.0"),
+            limit=Decimal("50.0"),
+            currency="USD",
+            is_enabled=True,
+        )
+        snapshot = UsageSnapshot(
+            provider="test",
+            fetched_at=datetime.now(timezone.utc),
+            identity=None,
+            periods=[period],
+            overage=overage,
+        )
+        outcome = FetchOutcome(
+            provider_id="test",
+            success=True,
+            snapshot=snapshot,
+            source="cli",
+            attempts=[],
+        )
+
+        # Capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+
+        try:
+            output_json_usage({"test": outcome})
+            output = sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+        # Verify JSON includes overage
+        data = json.loads(output)
+        assert data["test"]["overage"] is not None
+        assert data["test"]["overage"]["limit"] == 50.0
+        assert data["test"]["overage"]["used"] == 20.0
+        assert data["test"]["overage"]["remaining"] == 30.0
+        assert data["test"]["overage"]["currency"] == "USD"
