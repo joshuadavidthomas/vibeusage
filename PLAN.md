@@ -37,6 +37,18 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-16: Auth Module Tests (Priority 7)
+- **Added comprehensive test suite for auth/base.py (71 new tests, 96% coverage)**
+  - Tests for all credential types: OAuth2Credentials, SessionCredentials, APIKeyCredentials, CLICredentials, LocalProcessCredentials
+  - Tests for AuthResult factory methods (ok, fail)
+  - Tests for AuthStrategy abstract base class
+  - Tests for all config structs: OAuth2Config, CookieConfig, CLIConfig, DeviceFlowConfig, LocalProcessConfig
+  - Tests for ProviderAuthConfig authentication flow with strategy fallback
+  - Tests for protocol compliance
+- **auth/__init__.py: 100% coverage**
+- **auth/base.py: 96% coverage (up from 0%)**
+- All 614 tests pass (54% overall coverage, up from 51%)
+
 ### 2026-01-16: Stale Warning Config Threshold Fix
 - **Fixed stale warnings to use configured threshold instead of hardcoded value**
   - Changed `display_snapshot()` and `display_multiple_snapshots()` to read `stale_threshold_minutes` from config
