@@ -287,24 +287,22 @@ def _show_provider_auth_instructions(
     instructions_map = {
         "codex": """[bold cyan]Codex (ChatGPT) Authentication[/bold cyan]
 
-Codex authentication uses OAuth or session cookies.
+Codex authentication uses OAuth credentials.
 
 [dim]Run the official Codex CLI to authenticate:[/dim]
   [dim]codex auth login[/dim]
 
-[dim]Or set credentials manually:[/dim]
-  [dim]vibeusage key codex set --type oauth[/dim]""",
+[dim]Or set credentials manually with your OAuth token:[/dim]
+  [dim]vibeusage key codex set[/dim]""",
         "copilot": """[bold cyan]GitHub Copilot Authentication[/bold cyan]
 
-GitHub Copilot uses OAuth credentials (separate from GitHub CLI).
+GitHub Copilot uses GitHub device flow OAuth.
 
-[dim]To authenticate, use one of these methods:[/dim]
+[dim]Run the official GitHub CLI to authenticate:[/dim]
+  [dim]gh auth login[/dim]
 
-[dim]1. Use VS Code with Copilot extension, then copy the OAuth token from:[/dim]
-   [dim]~/.config/github-copilot/hosts.json[/dim]
-
-[dim]2. Set credentials manually with your OAuth token:[/dim]
-   [dim]vibeusage key copilot set[/dim]
+[dim]Or set credentials manually with your OAuth token:[/dim]
+  [dim]vibeusage key copilot set[/dim]
 
 [dim]Note: [italic]gh auth login[/italic] authenticates the GitHub CLI, not Copilot.[/dim]""",
         "cursor": """[bold cyan]Cursor Authentication[/bold cyan]
@@ -322,8 +320,8 @@ Gemini uses Google OAuth credentials.
 [dim]Run the official Gemini CLI to authenticate:[/dim]
   [dim]gemini auth login[/dim]
 
-[dim]Or set credentials manually:[/dim]
-  [dim]vibeusage key gemini set --type oauth[/dim]""",
+[dim]Or set credentials manually with your OAuth token:[/dim]
+  [dim]vibeusage key gemini set[/dim]""",
     }
 
     instructions = instructions_map.get(
