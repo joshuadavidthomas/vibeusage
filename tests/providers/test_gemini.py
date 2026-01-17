@@ -73,22 +73,20 @@ class TestGeminiOAuthStrategy:
         strategy = GeminiOAuthStrategy()
         assert len(strategy.CREDENTIAL_PATHS) == 2
 
-    @pytest.mark.asyncio
-    async def test_is_available_returns_false_when_no_credentials(self):
+    def test_is_available_returns_false_when_no_credentials(self):
         """is_available returns False when no credentials exist."""
         strategy = GeminiOAuthStrategy()
 
         with patch.object(strategy, "CREDENTIAL_PATHS", [Path("/nonexistent/path")]):
-            result = await strategy.is_available()
+            result = strategy.is_available()
             assert result is False
 
-    @pytest.mark.asyncio
-    async def test_is_available_returns_true_when_credentials_exist(self):
+    def test_is_available_returns_true_when_credentials_exist(self):
         """is_available returns True when credentials exist."""
         strategy = GeminiOAuthStrategy()
 
         with patch("pathlib.Path.exists", return_value=True):
-            result = await strategy.is_available()
+            result = strategy.is_available()
             assert result is True
 
     @pytest.mark.asyncio
@@ -102,8 +100,7 @@ class TestGeminiOAuthStrategy:
             assert result.success is False
             assert "No OAuth credentials found" in result.error
 
-    @pytest.mark.asyncio
-    async def test_load_credentials_from_vibeusage_format(self):
+    def test_load_credentials_from_vibeusage_format(self):
         """_load_credentials handles vibeusage format."""
         strategy = GeminiOAuthStrategy()
         creds_data = {
@@ -112,15 +109,14 @@ class TestGeminiOAuthStrategy:
             "expires_at": "2026-01-01T00:00:00+00:00",
         }
 
-        with patch("vibeusage.config.credentials.read_credential", return_value=json.dumps(creds_data).encode()):
+        with patch("vibeusage.providers.gemini.oauth.read_credential", return_value=json.dumps(creds_data).encode()):
             creds = strategy._load_credentials()
 
             assert creds is not None
             assert creds["access_token"] == "test_token"
             assert creds["refresh_token"] == "test_refresh"
 
-    @pytest.mark.asyncio
-    async def test_load_credentials_from_gemini_cli_format(self):
+    def test_load_credentials_from_gemini_cli_format(self):
         """_load_credentials handles Gemini CLI format with 'installed' key."""
         strategy = GeminiOAuthStrategy()
         cli_data = {
@@ -131,7 +127,7 @@ class TestGeminiOAuthStrategy:
             }
         }
 
-        with patch("vibeusage.config.credentials.read_credential", return_value=json.dumps(cli_data).encode()):
+        with patch("vibeusage.providers.gemini.oauth.read_credential", return_value=json.dumps(cli_data).encode()):
             creds = strategy._load_credentials()
 
             assert creds is not None
@@ -139,8 +135,7 @@ class TestGeminiOAuthStrategy:
             assert creds["refresh_token"] == "cli_refresh"
             assert "expires_at" in creds
 
-    @pytest.mark.asyncio
-    async def test_load_credentials_from_token_format(self):
+    def test_load_credentials_from_token_format(self):
         """_load_credentials handles format with 'token' key (not in 'installed')."""
         strategy = GeminiOAuthStrategy()
         token_data = {
@@ -149,7 +144,7 @@ class TestGeminiOAuthStrategy:
             "expiry_date": "2026-01-01T00:00:00+00:00",
         }
 
-        with patch("vibeusage.config.credentials.read_credential", return_value=json.dumps(token_data).encode()):
+        with patch("vibeusage.providers.gemini.oauth.read_credential", return_value=json.dumps(token_data).encode()):
             creds = strategy._load_credentials()
 
             assert creds is not None
@@ -329,8 +324,7 @@ class TestGeminiApiKeyStrategy:
         strategy = GeminiApiKeyStrategy()
         assert len(strategy.CREDENTIAL_PATHS) == 2
 
-    @pytest.mark.asyncio
-    async def test_is_available_returns_false_when_no_credentials(self):
+    def test_is_available_returns_false_when_no_credentials(self):
         """is_available returns False when no credentials exist."""
         strategy = GeminiApiKeyStrategy()
 
@@ -339,19 +333,18 @@ class TestGeminiApiKeyStrategy:
                 # Remove GEMINI_API_KEY if present
                 env = os.environ.pop("GEMINI_API_KEY", None)
                 try:
-                    result = await strategy.is_available()
+                    result = strategy.is_available()
                     assert result is False
                 finally:
                     if env:
                         os.environ["GEMINI_API_KEY"] = env
 
-    @pytest.mark.asyncio
-    async def test_is_available_returns_true_from_env_var(self):
+    def test_is_available_returns_true_from_env_var(self):
         """is_available returns True when API key in environment."""
         strategy = GeminiApiKeyStrategy()
 
         with patch.dict("os.environ", {"GEMINI_API_KEY": "test_key"}):
-            result = await strategy.is_available()
+            result = strategy.is_available()
             assert result is True
 
 

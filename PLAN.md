@@ -28,7 +28,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (466 passing tests, 46% coverage)
+- ✓ Test suite (498 passing tests, 48% coverage)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -240,7 +240,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 ---
 
 ### Priority 7: Test Suite
-**Status**: MOSTLY COMPLETE (49% coverage, 466 passing tests, 0 test ordering issues)
+**Status**: MOSTLY COMPLETE (48% coverage, 498 passing tests, 0 test ordering issues)
 
 **Completed**:
 - [x] Test infrastructure (pytest, pytest-asyncio, pytest-cov, pytest-mock)
@@ -248,7 +248,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - [x] Model validation tests
 - [x] Error classification tests
 - [x] Config system tests
-- [x] Provider fetch tests (Claude, Codex, Copilot, Cursor)
+- [x] Provider fetch tests (Claude, Codex, Copilot, Cursor, Gemini)
 - [x] Fetch pipeline tests
 - [x] Orchestrator tests
 - [x] CLI command behavior tests
@@ -257,7 +257,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - [x] Error scenario tests
 
 **Remaining Issues**:
-- [ ] Increase code coverage from 49% to 80%+
+- [ ] Increase code coverage from 48% to 80%+
 - [ ] Add more display module tests (rich.py, json.py have partial coverage)
 
 **Value**: High - Essential for production reliability

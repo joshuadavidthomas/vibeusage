@@ -39,7 +39,7 @@ class GeminiOAuthStrategy(FetchStrategy):
     CLIENT_ID = "77185425430.apps.googleusercontent.com"
     CLIENT_SECRET = "GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv"
 
-    async def is_available(self) -> bool:
+    def is_available(self) -> bool:
         """Check if OAuth credentials are available."""
         for path in self.CREDENTIAL_PATHS:
             if path.exists():
@@ -98,7 +98,8 @@ class GeminiOAuthStrategy(FetchStrategy):
                     return self._convert_gemini_cli_format(cli_data)
 
                 # Handle nested "token" format (some Gemini CLI versions)
-                if "token" in data and not any(k in data for k in ["access_token", "refresh_token"]):
+                # Convert "token" key to "access_token" if present
+                if "token" in data and "access_token" not in data:
                     return {
                         "access_token": data.get("token"),
                         "refresh_token": data.get("refresh_token"),
@@ -106,7 +107,7 @@ class GeminiOAuthStrategy(FetchStrategy):
                     }
 
                 # Already in standard format
-                if "access_token" in data or "refresh_token" in data:
+                if "access_token" in data:
                     return data
 
         return None
