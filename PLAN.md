@@ -37,6 +37,16 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-16: Linting Fixes
+- **Fixed linting issues across the codebase**
+  - Ran ruff format on all files (60 files reformatted)
+  - Fixed B904: raise without `from` in exception handlers
+  - Fixed UP017: datetime.UTC to datetime.timezone.utc
+  - Fixed E402: module level import not at top of file
+  - Fixed B017: contextmanager suppress-specific exception check
+  - Fixed test_copilot.py mock issue: changed from patching Path.exists (which isn't imported) to patching CREDENTIAL_FILE directly
+  - All 512 tests pass
+
 ### 2026-01-17: JSON Error Response Standardization (Priority 6)
 - **Implemented standardized ErrorResponse struct for JSON error output per spec 07**
   - Added ErrorResponse and ErrorData msgpack.Structs to display/json.py
