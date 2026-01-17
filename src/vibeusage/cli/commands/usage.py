@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import time
 
 import typer
@@ -129,9 +130,7 @@ async def fetch_provider_usage(provider_id: str, refresh: bool):
             snapshot=None,
             source=None,
             attempts=[],
-            error=Exception(
-                f"Unknown provider: {provider_id}. Available: {', '.join(available)}"
-            ),
+            error=f"Unknown provider: {provider_id}. Available: {', '.join(available)}",
         )
 
     # Create provider and get strategies
@@ -146,7 +145,7 @@ async def fetch_provider_usage(provider_id: str, refresh: bool):
     return outcome
 
 
-async def fetch_all_usage(refresh: bool, on_complete: callable | None = None):
+async def fetch_all_usage(refresh: bool, on_complete: collections.abc.Callable | None = None):
     """Fetch usage for all enabled providers."""
     from vibeusage.core.orchestrator import fetch_enabled_providers
     from vibeusage.providers import get_all_providers
@@ -174,6 +173,7 @@ def display_snapshot(
     """Display a single usage snapshot with spec-compliant format."""
     from vibeusage.cli.display import SingleProviderDisplay
     from vibeusage.cli.display import show_stale_warning
+    from vibeusage.config.settings import get_config
 
     # In quiet mode, show minimal output
     if quiet:
@@ -181,9 +181,12 @@ def display_snapshot(
             console.print(f"{snapshot.provider} {period.name}: {period.utilization}%")
         return
 
-    # Show stale warning if data is cached and old
+    # Show stale warning if data is cached and exceeds threshold
     if cached:
-        show_stale_warning(snapshot, console=console)
+        config = get_config()
+        stale_threshold = config.fetch.stale_threshold_minutes
+        show_stale_warning(snapshot, stale_threshold, console)
+        console.print()  # Blank line after warning
 
     # Verbose: add timing and source info before the main display
     if verbose:
@@ -363,14 +366,19 @@ def display_multiple_snapshots(
     # Import ProviderPanel for spec-compliant panel-based display
     from vibeusage.cli.display import ProviderPanel
     from vibeusage.cli.display import show_stale_warning
+    from vibeusage.config.settings import get_config
 
     errors = []
+    # Get stale threshold once for all providers
+    config = get_config()
+    stale_threshold = config.fetch.stale_threshold_minutes
 
     for provider_id, outcome in outcomes.items():
         if outcome.success and outcome.snapshot:
             # Show stale warning if data is cached and old
             if outcome.cached and not quiet:
-                show_stale_warning(outcome.snapshot, console=console)
+                show_stale_warning(outcome.snapshot, stale_threshold, console)
+                console.print()  # Blank line after warning
 
             # Quiet mode: minimal output
             if quiet:

@@ -17,12 +17,12 @@ from rich.theme import Theme
 if TYPE_CHECKING:
     from vibeusage.strategies.base import FetchOutcome
 
-# Custom theme for progress indicators
+# Custom theme for progress indicators (applied to Console, not Progress)
 PROGRESS_THEME = Theme(
     {
         "bar.back": "black",
-        "bar.complete": "rgb(67, 142, 247)",  # Blue
-        "bar.finished": "rgb(98, 189, 119)",  # Green
+        "bar.complete": "rgb(67,142,247)",  # Blue
+        "bar.finished": "rgb(98,189,119)",  # Green
         "progress.description": "white",
         "progress.download": "cyan",
         "progress.data.speed": "cyan",
@@ -38,7 +38,7 @@ def create_progress(console: Console | None = None, quiet: bool = False):
     """Create a Rich progress context for tracking fetch operations.
 
     Args:
-        console: Rich console (uses default if None)
+        console: Rich console (uses default with theme if None)
         quiet: If True, suppresses progress output
 
     Yields:
@@ -48,6 +48,10 @@ def create_progress(console: Console | None = None, quiet: bool = False):
         yield None
         return
 
+    # Use provided console or create new one with theme
+    if console is None:
+        console = Console(theme=PROGRESS_THEME)
+
     progress = Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -55,7 +59,6 @@ def create_progress(console: Console | None = None, quiet: bool = False):
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeRemainingColumn(),
         console=console,
-        theme=PROGRESS_THEME,
         transient=True,  # Auto-remove progress when complete
     )
 
@@ -158,7 +161,7 @@ class ProgressCallback:
         self.tracker.update(outcome)
 
 
-def create_progress_callback(tracker: ProgressTracker | None) -> callable | None:
+def create_progress_callback(tracker: ProgressTracker | None) -> ProgressCallback | None:
     """Create a progress callback for use with orchestrator.
 
     Args:

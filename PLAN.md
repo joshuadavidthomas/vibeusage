@@ -37,6 +37,21 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+### 2026-01-16: Progress Module Tests & Type Fixes
+- **Added comprehensive test suite for cli/progress.py (31 new tests, 100% coverage)**
+  - Tests for create_progress() context manager (quiet mode, normal mode, console handling)
+  - Tests for ProgressTracker class (start, update, description formatting)
+  - Tests for ProgressCallback callable adapter
+  - Tests for create_progress_callback() factory function
+  - Integration tests for full fetch cycles
+  - Tests for progress theme configuration
+- **Fixed type issues in progress.py**
+  - Fixed RGB color format (removed spaces: `rgb(67,142,247)` instead of `rgb(67, 142, 247)`)
+  - Removed invalid `theme` parameter from Progress() constructor (theme applied to Console instead)
+  - Changed return type from `callable` to `ProgressCallback | None` for proper type annotation
+- **Typecheck now passes for progress.py**
+- All 543 tests pass (51% coverage, up from 50%)
+
 ### 2026-01-16: Progress Indicators & Stale Data Warnings
 - **Implemented progress indicators for concurrent fetch operations per Priority 6**
   - Added `cli/progress.py` module with ProgressTracker and ProgressCallback classes
