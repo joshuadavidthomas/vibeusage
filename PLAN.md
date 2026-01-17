@@ -11,8 +11,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 **Implementation State**: Phase 0-5 complete (All 5 priority providers implemented: Claude, Codex, Copilot, Cursor, Gemini)
 
-**Known Gaps** (discovered 2026-01-17) - **ALL ARE NEXT TASKS**:
-- 🚨 **Copilot device flow**: Fully specified in spec 03 but never implemented - users cannot authenticate
+**Known Gaps** (discovered 2026-01-17) - **REMAINING TASKS**:
 - 🚨 **Claude browser cookies**: Strategy implemented but not registered - manual paste only
 - 🚨 **Cursor browser cookies**: Strategy implemented but not registered - manual paste only
 
@@ -33,7 +32,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
-- ✓ Test suite (1062 passing tests, 81% coverage - **exceeds 80% target**)
+- ✓ Test suite (1072 passing tests, 81% coverage - **exceeds 80% target**)
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -104,23 +103,10 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Remaining Work (Prioritized by Dependencies & Value)
 
-### 🚨 NEXT TASKS: Authentication Flows (Phase 9.1 + 9.2)
-**Status**: HIGHEST PRIORITY - Multiple providers have broken or degraded authentication
+### 🚨 NEXT TASKS: Authentication Flows (Phase 9.2)
+**Status**: HIGHEST PRIORITY - Two providers have degraded authentication
 
-#### Task A: Copilot Device Flow (Critical)
-**Impact**: New Copilot users cannot authenticate at all
-
-The device flow is fully specified in `specs/03-authentication.md` lines 557-697 but was never implemented. The `auth copilot` command only shows instructions instead of running the interactive OAuth device flow.
-
-**Actions**:
-1. Implement `_device_flow()` in `providers/copilot/device_flow.py`
-2. Implement `_poll_for_token()` with proper error handling
-3. Update `auth copilot` command to invoke the device flow
-4. Add comprehensive tests
-
-**See**: Priority 9.1 below for full task breakdown
-
-#### Task B: Claude Browser Cookie Activation (Medium)
+#### Task A: Claude Browser Cookie Activation (Medium)
 **Impact**: Users must manually extract cookies from DevTools instead of automatic extraction
 
 `ClaudeBrowserCookieStrategy` is fully implemented at `providers/claude/web.py:236-304` but NOT registered in `fetch_strategies()`. The `browser_cookie3` dependency is now installed.
@@ -130,7 +116,9 @@ The device flow is fully specified in `specs/03-authentication.md` lines 557-697
 2. Update `auth claude` to try automatic extraction before manual paste
 3. Add tests for the integrated flow
 
-#### Task C: Cursor Browser Cookie Activation (Medium)
+**See**: Priority 9.2 below for full task breakdown
+
+#### Task B: Cursor Browser Cookie Activation (Medium)
 **Impact**: Users must manually extract cookies from DevTools instead of automatic extraction
 
 `CursorBrowserCookieStrategy` is fully implemented at `providers/cursor/web.py:214-295` but NOT registered in `fetch_strategies()`. The `browser_cookie3` dependency is now installed.
@@ -263,49 +251,69 @@ All `auth <provider>` commands currently only display instructions - they don't 
 
 | Provider | Spec Says | Implementation Has | Gap | Status |
 |----------|-----------|-------------------|-----|--------|
-| **Copilot** | Full device flow (spec 03:557-697) | Only credential loading | **Critical** - flow never implemented | 🚨 NEXT |
+| **Copilot** | Full device flow (spec 03:557-697) | Device flow fully implemented | None | ✅ COMPLETE |
 | **Claude** | Browser cookie extraction | Code exists, not registered | **Major** - dead code | 🚨 NEXT |
 | **Cursor** | Browser cookie extraction | Code exists, not registered | **Major** - dead code | 🚨 NEXT |
 | **Codex** | Web strategy "(future)" | Not implemented | Intentional | — |
 | **Gemini** | OAuth via CLI credentials | Only loads existing creds | Minor | — |
 
-#### Phase 9.1: Copilot Device Flow 🚨 NEXT
+#### Phase 9.1: Copilot Device Flow ✅ COMPLETE
 **Spec Reference**: `specs/03-authentication.md` lines 557-697
-**Status**: NEXT TASK - Critical, users cannot authenticate at all
+**Status**: COMPLETED - Device flow fully implemented and tested
 
-The spec fully defines `GitHubDeviceFlowStrategy` with:
-- Request device code from `POST https://github.com/login/device/code`
-- Display user code and verification URL
-- Open browser automatically
-- Poll for token at `POST https://github.com/login/oauth/access_token`
-- Handle authorization_pending, slow_down, expired_token, access_denied
-- Save credentials to `~/.config/vibeusage/credentials/copilot/oauth.json`
+**Implementation Summary**:
+Implemented `device_flow()` method in `CopilotDeviceFlowStrategy` that:
+- Requests device code from GitHub (`POST https://github.com/login/device/code`)
+- Displays user code with Rich formatting (large, centered code with verification URL)
+- Opens browser automatically via `webbrowser.open()` with fallback URL display
+- Saves credentials on success to `~/.config/vibeusage/credentials/copilot/oauth.json`
 
-**Tasks**:
-- [ ] Implement `_device_flow()` method in `providers/copilot/device_flow.py`
-  - [ ] Request device code with client_id and scope
-  - [ ] Display user code with Rich formatting
-  - [ ] Attempt to open browser via `webbrowser.open()`
-  - [ ] Show fallback URL if browser fails
-- [ ] Implement `_poll_for_token()` method
-  - [ ] Poll with configurable interval (default 5s)
-  - [ ] Handle `authorization_pending` (continue polling)
-  - [ ] Handle `slow_down` (increase interval by 5s)
-  - [ ] Handle `expired_token` (fail with retry message)
-  - [ ] Handle `access_denied` (fail with clear message)
-  - [ ] Max 60 attempts (5 minute timeout)
-- [ ] Update `auth copilot` command to invoke device flow
-  - [ ] Check for existing valid credentials first
-  - [ ] Offer to re-authenticate if credentials exist
-  - [ ] Run device flow interactively
-  - [ ] Show success message with credential location
-- [ ] Add tests for device flow
-  - [ ] Mock HTTP responses for device code request
-  - [ ] Mock polling responses (pending, success, error cases)
-  - [ ] Test timeout behavior
-  - [ ] Test credential storage
+Implemented `_poll_for_token()` method with comprehensive error handling:
+- Polls with configurable interval (default 5s)
+- Handles `authorization_pending` (continue polling)
+- Handles `slow_down` (increase interval by 5s)
+- Handles `expired_token` (fail with retry message)
+- Handles `access_denied` (fail with clear message)
+- Max 60 attempts (5 minute timeout)
 
-**Value**: High - Copilot is a major provider, currently completely broken for new users
+Updated `auth copilot` command to:
+- Check for existing valid credentials first
+- Offer to re-authenticate if credentials exist
+- Run device flow interactively with Rich console UI
+- Show success message with credential location
+
+**Tests Added**: 10 comprehensive tests covering:
+- Device code request success and error responses
+- Polling responses (pending, success, slow_down, expired_token, access_denied)
+- Timeout behavior after max attempts
+- Credential storage to file system
+- Browser opening (with mock)
+
+**Verification**: All 1072 tests pass with 81% coverage
+
+**Tasks Completed**:
+- [x] Implement `device_flow()` method in `providers/copilot/device_flow.py`
+  - [x] Request device code with client_id and scope
+  - [x] Display user code with Rich formatting
+  - [x] Attempt to open browser via `webbrowser.open()`
+  - [x] Show fallback URL if browser fails
+- [x] Implement `_poll_for_token()` method
+  - [x] Poll with configurable interval (default 5s)
+  - [x] Handle `authorization_pending` (continue polling)
+  - [x] Handle `slow_down` (increase interval by 5s)
+  - [x] Handle `expired_token` (fail with retry message)
+  - [x] Handle `access_denied` (fail with clear message)
+  - [x] Max 60 attempts (5 minute timeout)
+- [x] Update `auth copilot` command to invoke device flow
+  - [x] Check for existing valid credentials first
+  - [x] Offer to re-authenticate if credentials exist
+  - [x] Run device flow interactively
+  - [x] Show success message with credential location
+- [x] Add tests for device flow
+  - [x] Mock HTTP responses for device code request
+  - [x] Mock polling responses (pending, success, error cases)
+  - [x] Test timeout behavior
+  - [x] Test credential storage
 
 ---
 
@@ -406,7 +414,6 @@ Even without interactive flows, the current instructions are sparse.
 ## Implementation Order Summary
 
 ### 🚨 IMMEDIATE (Next Tasks)
-- **Phase 9.1**: Copilot Device Flow - Critical, users cannot authenticate
 - **Phase 9.2**: Browser Cookie Activation - Claude + Cursor, code exists, just needs registration
 
 ### Completed (MVP)
