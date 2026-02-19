@@ -7,6 +7,7 @@ from vibeusage.providers.base import Provider
 from vibeusage.providers.base import ProviderMetadata
 from vibeusage.providers.claude.cli import ClaudeCLIStrategy
 from vibeusage.providers.claude.oauth import ClaudeOAuthStrategy
+from vibeusage.providers.claude.web import ClaudeBrowserCookieStrategy
 from vibeusage.providers.claude.web import ClaudeWebStrategy
 
 
@@ -27,12 +28,14 @@ class ClaudeProvider(Provider):
 
         Priority order:
         1. OAuth - stored tokens with refresh capability
-        2. Web - session key from browser cookies
-        3. CLI - delegate to claude CLI tool
+        2. Web - stored session key from credential storage
+        3. Browser - extract session key from browser cookies
+        4. CLI - delegate to claude CLI tool
         """
         return [
             ClaudeOAuthStrategy(),
             ClaudeWebStrategy(),
+            ClaudeBrowserCookieStrategy(),
             ClaudeCLIStrategy(),
         ]
 

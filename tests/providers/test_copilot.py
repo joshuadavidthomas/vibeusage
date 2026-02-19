@@ -252,8 +252,12 @@ class TestCopilotDeviceFlowStrategy:
 
         assert result.success is True
         assert result.snapshot is not None
-        assert len(result.snapshot.periods) == 1
-        assert result.snapshot.periods[0].utilization == 50  # 250/500
+        # Both chat and completions are unlimited, so 2 periods
+        assert len(result.snapshot.periods) == 2
+        assert result.snapshot.periods[0].name == "Monthly (Chat)"
+        assert result.snapshot.periods[0].utilization == 0  # Unlimited
+        assert result.snapshot.periods[1].name == "Monthly (Completions)"
+        assert result.snapshot.periods[1].utilization == 0  # Unlimited
 
     @pytest.mark.asyncio
     async def test_fetch_handles_401_error(self):
@@ -500,9 +504,7 @@ class TestCopilotDeviceFlowStrategy:
         assert len(snapshot.periods) == 3
 
         # Check premium interactions period
-        premium = next(
-            (p for p in snapshot.periods if "Premium" in p.name), None
-        )
+        premium = next((p for p in snapshot.periods if "Premium" in p.name), None)
         assert premium is not None
         assert premium.name == "Monthly (Premium)"
         assert premium.utilization == 45  # (300-165)/300 = 135/300 = 45%
@@ -671,7 +673,10 @@ class TestCopilotDeviceFlow:
             mock_http.return_value = mock_cm
 
             # Mock webbrowser
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 # Mock credential saving
                 with patch.object(strategy, "_save_credentials") as mock_save:
                     console = Console()
@@ -742,7 +747,10 @@ class TestCopilotDeviceFlow:
             mock_http.return_value = mock_cm
 
             # Mock webbrowser and credential saving
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 with patch.object(strategy, "_save_credentials"):
                     console = Console()
                     result = await strategy.device_flow(console=console, quiet=True)
@@ -801,7 +809,10 @@ class TestCopilotDeviceFlow:
 
             mock_http.return_value = mock_cm
 
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 with patch.object(strategy, "_save_credentials"):
                     console = Console()
                     result = await strategy.device_flow(console=console, quiet=True)
@@ -850,11 +861,14 @@ class TestCopilotDeviceFlow:
 
             mock_http.return_value = mock_cm
 
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 console = Console()
                 result = await strategy.device_flow(console=console, quiet=True)
 
-                    # Should return False on expired token
+                # Should return False on expired token
                 assert result is False
 
     @pytest.mark.asyncio
@@ -899,11 +913,14 @@ class TestCopilotDeviceFlow:
 
             mock_http.return_value = mock_cm
 
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 console = Console()
                 result = await strategy.device_flow(console=console, quiet=True)
 
-                    # Should return False on access denied
+                # Should return False on access denied
                 assert result is False
 
     @pytest.mark.asyncio
@@ -949,18 +966,23 @@ class TestCopilotDeviceFlow:
 
             mock_http.return_value = mock_cm
 
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 console = Console()
                 result = await strategy.device_flow(console=console, quiet=True)
 
-                    # Should return False after max attempts
+                # Should return False after max attempts
                 assert result is False
 
     def test_try_open_browser_returns_true_on_success(self):
         """_try_open_browser returns True when browser opens."""
         strategy = CopilotDeviceFlowStrategy()
 
-        with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+        with patch(
+            "vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True
+        ):
             result = strategy._try_open_browser("https://example.com")
             assert result is True
 
@@ -968,7 +990,10 @@ class TestCopilotDeviceFlow:
         """_try_open_browser returns False when browser fails to open."""
         strategy = CopilotDeviceFlowStrategy()
 
-        with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", side_effect=Exception("No browser")):
+        with patch(
+            "vibeusage.providers.copilot.device_flow.webbrowser.open",
+            side_effect=Exception("No browser"),
+        ):
             result = strategy._try_open_browser("https://example.com")
             assert result is False
 
@@ -1015,9 +1040,14 @@ class TestCopilotDeviceFlow:
 
             mock_http.return_value = mock_cm
 
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 # Track credential saving
-                with patch("vibeusage.providers.copilot.device_flow.write_credential") as mock_write:
+                with patch(
+                    "vibeusage.providers.copilot.device_flow.write_credential"
+                ) as mock_write:
                     console = Console()
                     result = await strategy.device_flow(console=console, quiet=True)
 
@@ -1072,7 +1102,10 @@ class TestCopilotDeviceFlow:
 
             mock_http.return_value = mock_cm
 
-            with patch("vibeusage.providers.copilot.device_flow.webbrowser.open", return_value=True):
+            with patch(
+                "vibeusage.providers.copilot.device_flow.webbrowser.open",
+                return_value=True,
+            ):
                 with patch.object(strategy, "_save_credentials"):
                     console = Console()
                     result = await strategy.device_flow(console=console, quiet=True)

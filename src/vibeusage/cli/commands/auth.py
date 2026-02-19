@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 
 import typer
@@ -84,6 +83,8 @@ async def auth_command(
     # Provider-specific auth flows
     if provider == "claude":
         auth_claude_command(verbose=verbose, quiet=quiet)
+    elif provider == "cursor":
+        auth_cursor_command(verbose=verbose, quiet=quiet)
     elif provider == "copilot":
         await auth_copilot_command(verbose=verbose, quiet=quiet)
     else:
@@ -184,12 +185,23 @@ def auth_claude_command(
 ) -> None:
     """Authenticate with Claude using a session key.
 
-    The session key can be found in browser cookies at claude.ai.
-    Look for the 'sessionKey' cookie.
+    Tries automatic browser cookie extraction first, then falls back
+    to manual session key entry.
     """
     console = Console()
 
-    # Show instructions if no session key provided
+    # If no session key provided, try automatic extraction first
+    if session_key is None:
+        session_key = _try_browser_cookie_extraction(
+            console,
+            provider="claude",
+            cookie_domains=[".claude.ai", "claude.ai"],
+            cookie_names=["sessionKey"],
+            verbose=verbose,
+            quiet=quiet,
+        )
+
+    # If still no session key, prompt for manual entry
     if session_key is None:
         _show_claude_auth_instructions(console, quiet=quiet)
         session_key = typer.prompt("Session key", hide_input=True)
@@ -215,6 +227,54 @@ def auth_claude_command(
             console.print(f"  Location: {cred_path}")
         if verbose:
             console.print(f"[dim]Session key prefix: {session_key[:20]}...[/dim]")
+    except Exception as e:
+        if not quiet:
+            console.print(f"[red]Error saving credential:[/red] {e}")
+        raise typer.Exit(ExitCode.GENERAL_ERROR) from e
+
+
+def auth_cursor_command(
+    session_token: str | None = None, verbose: bool = False, quiet: bool = False
+) -> None:
+    """Authenticate with Cursor using a session token.
+
+    Tries automatic browser cookie extraction first, then falls back
+    to manual session token entry.
+    """
+    console = Console()
+
+    # If no session token provided, try automatic extraction first
+    if session_token is None:
+        session_token = _try_browser_cookie_extraction(
+            console,
+            provider="cursor",
+            cookie_domains=[".cursor.com", "cursor.com", ".cursor.sh", "cursor.sh"],
+            cookie_names=[
+                "WorkosCursorSessionToken",
+                "__Secure-next-auth.session-token",
+                "next-auth.session-token",
+            ],
+            verbose=verbose,
+            quiet=quiet,
+        )
+
+    # If still no session token, prompt for manual entry
+    if session_token is None:
+        _show_cursor_auth_instructions(console, quiet=quiet)
+        session_token = typer.prompt("Session token", hide_input=True)
+
+    # Save session token
+    cred_path = credential_path("cursor", "session")
+    cred_data = {"session_token": session_token}
+    content = json.dumps(cred_data).encode()
+
+    try:
+        write_credential(cred_path, content)
+        if not quiet:
+            console.print("[green]Success:[/green] Cursor session token saved")
+            console.print(f"  Location: {cred_path}")
+        if verbose:
+            console.print(f"[dim]Session token prefix: {session_token[:20]}...[/dim]")
     except Exception as e:
         if not quiet:
             console.print(f"[red]Error saving credential:[/red] {e}")
@@ -378,3 +438,85 @@ Gemini uses Google OAuth credentials.
     )
 
     console.print(Panel(instructions, title="Instructions", border_style="cyan"))
+
+
+def _show_cursor_auth_instructions(console: Console, quiet: bool = False) -> None:
+    """Display instructions for getting Cursor session token."""
+    if quiet:
+        return
+    instructions = Panel(
+        """[bold cyan]Cursor Authentication[/bold cyan]
+
+Get your session token from cursor.com:
+
+1. Open https://cursor.com in your browser
+2. Open browser DevTools (F12 or Cmd+Option+I)
+3. Go to Application/Storage → Cookies → https://cursor.com
+4. Look for one of these cookies:
+   • [bold]WorkosCursorSessionToken[/bold]
+   • [bold]__Secure-next-auth.session-token[/bold]
+   • [bold]next-auth.session-token[/bold]
+5. Copy its value
+
+[dim]The session token allows vibeusage to fetch your usage data.[/dim]""",
+        title="Instructions",
+        border_style="cyan",
+    )
+    console.print(instructions)
+
+
+def _try_browser_cookie_extraction(
+    console: Console,
+    *,
+    provider: str,
+    cookie_domains: list[str],
+    cookie_names: list[str],
+    verbose: bool = False,
+    quiet: bool = False,
+) -> str | None:
+    """Try to extract a session cookie from installed browsers.
+
+    Returns the cookie value if found, None otherwise.
+    """
+    try:
+        import browser_cookie3
+    except ImportError:
+        try:
+            import pycookiecheat as browser_cookie3  # type: ignore[no-redef]
+        except ImportError:
+            if verbose:
+                console.print(
+                    "[dim]Browser cookie extraction not available "
+                    "(install browser_cookie3)[/dim]"
+                )
+            return None
+
+    if not quiet:
+        console.print(
+            f"[dim]Attempting to extract {provider} session from browser cookies...[/dim]"
+        )
+
+    browsers = ["safari", "chrome", "firefox", "brave", "edge", "arc"]
+
+    for browser_name in browsers:
+        browser_fn = getattr(browser_cookie3, browser_name, None)
+        if browser_fn is None:
+            continue
+
+        for domain in cookie_domains:
+            try:
+                cookies = browser_fn(domain_name=domain)
+                for cookie in cookies:
+                    if cookie.name in cookie_names:
+                        if not quiet:
+                            console.print(
+                                f"[green]Found[/green] {provider} session cookie "
+                                f"from {browser_name} ({cookie.name})"
+                            )
+                        return cookie.value
+            except Exception:
+                continue
+
+    if verbose:
+        console.print("[dim]No session cookie found in any browser[/dim]")
+    return None
