@@ -36,10 +36,11 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "vibeusage",
-	Short: "Track usage across agentic LLM providers",
-	Long:  "A unified CLI tool that aggregates usage statistics from Claude, Codex, Copilot, Cursor, and Gemini.",
-	RunE:  runDefaultUsage,
+	Use:          "vibeusage",
+	Short:        "Track usage across agentic LLM providers",
+	Long:         "A unified CLI tool that aggregates usage statistics from Claude, Codex, Copilot, Cursor, and Gemini.",
+	SilenceUsage: true,
+	RunE:         runDefaultUsage,
 }
 
 func init() {
@@ -276,10 +277,11 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 	}
 
 	if !outcome.Success || outcome.Snapshot == nil {
-		if !quiet {
-			out("Error: %s\n", outcome.Error)
+		errMsg := outcome.Error
+		if errMsg == "" {
+			errMsg = "fetch failed"
 		}
-		os.Exit(1)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	snap := *outcome.Snapshot
