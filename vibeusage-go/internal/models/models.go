@@ -60,9 +60,6 @@ func (p UsagePeriod) PaceRatio() *float64 {
 		return nil
 	}
 	expected := *elapsed * 100.0
-	if expected <= 0 {
-		return nil
-	}
 	ratio := float64(p.Utilization) / expected
 	return &ratio
 }
