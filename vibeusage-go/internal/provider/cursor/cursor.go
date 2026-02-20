@@ -92,12 +92,14 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	userReq.Header.Set("User-Agent", "Mozilla/5.0")
 
 	userHTTPResp, err := client.Do(userReq)
-	if err == nil && userHTTPResp.StatusCode == 200 {
-		userBody, _ := io.ReadAll(userHTTPResp.Body)
-		userHTTPResp.Body.Close()
-		var u UserMeResponse
-		if json.Unmarshal(userBody, &u) == nil {
-			userResp = &u
+	if err == nil {
+		defer userHTTPResp.Body.Close()
+		if userHTTPResp.StatusCode == 200 {
+			userBody, _ := io.ReadAll(userHTTPResp.Body)
+			var u UserMeResponse
+			if json.Unmarshal(userBody, &u) == nil {
+				userResp = &u
+			}
 		}
 	}
 

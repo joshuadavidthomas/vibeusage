@@ -149,10 +149,13 @@ func (s *OAuthStrategy) refreshToken(creds *Credentials) *Credentials {
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
 		return nil
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil
+	}
 
 	body, _ := io.ReadAll(resp.Body)
 	var tokenResp TokenResponse

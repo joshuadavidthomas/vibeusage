@@ -132,10 +132,13 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
 		return nil
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil
+	}
 
 	body, _ := io.ReadAll(resp.Body)
 	var tokenResp TokenResponse
@@ -172,12 +175,14 @@ func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *Cod
 	qReq, _ := http.NewRequest("POST", "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota", strings.NewReader("{}"))
 	qReq.Header.Set("Authorization", "Bearer "+accessToken)
 	qReq.Header.Set("Content-Type", "application/json")
-	if qHTTPResp, err := client.Do(qReq); err == nil && qHTTPResp.StatusCode == 200 {
-		body, _ := io.ReadAll(qHTTPResp.Body)
-		qHTTPResp.Body.Close()
-		var qr QuotaResponse
-		if json.Unmarshal(body, &qr) == nil {
-			quotaResp = &qr
+	if qHTTPResp, err := client.Do(qReq); err == nil {
+		defer qHTTPResp.Body.Close()
+		if qHTTPResp.StatusCode == 200 {
+			body, _ := io.ReadAll(qHTTPResp.Body)
+			var qr QuotaResponse
+			if json.Unmarshal(body, &qr) == nil {
+				quotaResp = &qr
+			}
 		}
 	}
 
@@ -185,12 +190,14 @@ func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *Cod
 	tReq, _ := http.NewRequest("POST", "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", strings.NewReader("{}"))
 	tReq.Header.Set("Authorization", "Bearer "+accessToken)
 	tReq.Header.Set("Content-Type", "application/json")
-	if tHTTPResp, err := client.Do(tReq); err == nil && tHTTPResp.StatusCode == 200 {
-		body, _ := io.ReadAll(tHTTPResp.Body)
-		tHTTPResp.Body.Close()
-		var ca CodeAssistResponse
-		if json.Unmarshal(body, &ca) == nil {
-			codeAssistResp = &ca
+	if tHTTPResp, err := client.Do(tReq); err == nil {
+		defer tHTTPResp.Body.Close()
+		if tHTTPResp.StatusCode == 200 {
+			body, _ := io.ReadAll(tHTTPResp.Body)
+			var ca CodeAssistResponse
+			if json.Unmarshal(body, &ca) == nil {
+				codeAssistResp = &ca
+			}
 		}
 	}
 
