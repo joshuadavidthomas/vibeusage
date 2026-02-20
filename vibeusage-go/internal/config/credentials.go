@@ -42,7 +42,6 @@ func expandPath(p string) string {
 // Returns (found, source, path).
 func FindProviderCredential(providerID string) (bool, string, string) {
 	cfg := Get()
-	_ = cfg // used for reuse_provider_credentials check
 
 	// Check vibeusage storage first
 	for _, credType := range []string{"oauth", "session", "apikey"} {

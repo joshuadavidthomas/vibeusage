@@ -34,9 +34,7 @@ func TestConfigReset_UsesConfirm(t *testing.T) {
 
 	reloadConfig()
 
-	cmd := configResetCmd
-	cmd.Flags().Set("confirm", "false") // don't use --confirm flag, use prompt
-	err := cmd.RunE(cmd, nil)
+	err := configResetCmd.RunE(configResetCmd, nil)
 	if err != nil {
 		t.Fatalf("config reset error: %v", err)
 	}
