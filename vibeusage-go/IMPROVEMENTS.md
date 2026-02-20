@@ -62,12 +62,12 @@ The orchestrator already has an `onComplete func(FetchOutcome)` callback — per
 
 ### Tasks
 
-- [ ] Add spinner dependency (`huh/spinner` for simple, or bubbletea for full control)
-- [ ] Create spinner wrapper that tracks in-flight providers
-- [ ] Wire `onComplete` callback to update spinner state
-- [ ] Show per-provider completion with timing
-- [ ] Skip spinner when `--quiet` or `--json` flags are set
-- [ ] Ensure spinner doesn't interfere with non-TTY output (piped)
+- [x] Add spinner dependency (`huh/spinner` for simple, or bubbletea for full control)
+- [x] Create spinner wrapper that tracks in-flight providers
+- [x] Wire `onComplete` callback to update spinner state
+- [x] Show per-provider completion with timing
+- [x] Skip spinner when `--quiet` or `--json` flags are set
+- [x] Ensure spinner doesn't interfere with non-TTY output (piped)
 
 ## 3. `lipgloss/table` for Tabular Displays
 

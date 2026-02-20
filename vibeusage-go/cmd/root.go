@@ -8,12 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
 
 	// Register all providers
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/claude"
@@ -81,12 +83,31 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 	return fetchAndDisplayAll(false)
 }
 
+func isTerminal() bool {
+	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+}
+
 func fetchAndDisplayAll(refresh bool) error {
 	ctx := context.Background()
 	start := time.Now()
 
 	providerMap := buildProviderMap()
-	outcomes := fetch.FetchEnabledProviders(ctx, providerMap, nil)
+
+	var outcomes map[string]fetch.FetchOutcome
+
+	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
+		providerIDs := enabledProviderIDs(providerMap)
+		err := spinner.Run(providerIDs, func(onComplete func(spinner.CompletionInfo)) {
+			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, func(o fetch.FetchOutcome) {
+				onComplete(outcomeToCompletion(o))
+			})
+		})
+		if err != nil {
+			return fmt.Errorf("spinner error: %w", err)
+		}
+	} else {
+		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, nil)
+	}
 
 	durationMs := time.Since(start).Milliseconds()
 
@@ -97,6 +118,32 @@ func fetchAndDisplayAll(refresh bool) error {
 
 	displayMultipleSnapshots(outcomes, durationMs)
 	return nil
+}
+
+func enabledProviderIDs(providerMap map[string][]fetch.Strategy) []string {
+	cfg := config.Get()
+	var ids []string
+	for pid := range providerMap {
+		if cfg.IsProviderEnabled(pid) {
+			ids = append(ids, pid)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func outcomeToCompletion(o fetch.FetchOutcome) spinner.CompletionInfo {
+	durationMs := 0
+	for _, a := range o.Attempts {
+		durationMs += a.DurationMs
+	}
+	return spinner.CompletionInfo{
+		ProviderID: o.ProviderID,
+		Source:     o.Source,
+		DurationMs: durationMs,
+		Success:    o.Success,
+		Error:      o.Error,
+	}
 }
 
 func buildProviderMap() map[string][]fetch.Strategy {
@@ -200,7 +247,20 @@ func fetchAndDisplayProvider(providerID string, refresh bool) error {
 	start := time.Now()
 
 	strategies := p.FetchStrategies()
-	outcome := fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+
+	var outcome fetch.FetchOutcome
+
+	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
+		err := spinner.Run([]string{providerID}, func(onComplete func(spinner.CompletionInfo)) {
+			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+			onComplete(outcomeToCompletion(outcome))
+		})
+		if err != nil {
+			return fmt.Errorf("spinner error: %w", err)
+		}
+	} else {
+		outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+	}
 
 	durationMs := time.Since(start).Milliseconds()
 
