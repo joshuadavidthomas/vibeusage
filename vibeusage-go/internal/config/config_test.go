@@ -312,6 +312,9 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 	if pc.AuthSource != "oauth" {
 		t.Errorf("Providers[claude].AuthSource = %q, want %q", pc.AuthSource, "oauth")
 	}
+	if !pc.Enabled {
+		t.Error("Providers[claude].Enabled should be true after roundtrip")
+	}
 }
 
 // applyEnvOverrides
@@ -1264,14 +1267,29 @@ func TestCacheSnapshot_PreservesComplexData(t *testing.T) {
 	if loaded.Periods[0].Utilization != 75 {
 		t.Errorf("Periods[0].Utilization = %d, want 75", loaded.Periods[0].Utilization)
 	}
+	if loaded.Periods[0].PeriodType != models.PeriodMonthly {
+		t.Errorf("Periods[0].PeriodType = %q, want %q", loaded.Periods[0].PeriodType, models.PeriodMonthly)
+	}
+	if loaded.Periods[0].ResetsAt == nil {
+		t.Fatal("Periods[0].ResetsAt should not be nil")
+	}
+	if !loaded.Periods[0].ResetsAt.Equal(reset) {
+		t.Errorf("Periods[0].ResetsAt = %v, want %v", *loaded.Periods[0].ResetsAt, reset)
+	}
 	if loaded.Periods[1].Model != "claude-3-sonnet" {
 		t.Errorf("Periods[1].Model = %q, want %q", loaded.Periods[1].Model, "claude-3-sonnet")
+	}
+	if loaded.Periods[1].PeriodType != models.PeriodDaily {
+		t.Errorf("Periods[1].PeriodType = %q, want %q", loaded.Periods[1].PeriodType, models.PeriodDaily)
 	}
 	if loaded.Overage == nil {
 		t.Fatal("Overage should not be nil")
 	}
 	if loaded.Overage.Used != 5.50 {
 		t.Errorf("Overage.Used = %v, want 5.50", loaded.Overage.Used)
+	}
+	if loaded.Overage.Limit != 100.0 {
+		t.Errorf("Overage.Limit = %v, want 100.0", loaded.Overage.Limit)
 	}
 	if loaded.Identity == nil {
 		t.Fatal("Identity should not be nil")
