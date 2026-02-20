@@ -113,5 +113,3 @@ func OutputStatusJSON(statuses map[string]models.ProviderStatus) {
 	}
 	OutputJSON(data)
 }
-
-

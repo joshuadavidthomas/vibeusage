@@ -17,7 +17,7 @@ var (
 	boldStyle      = lipgloss.NewStyle().Bold(true)
 	greenStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	yellowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	redStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	redStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 
 	panelBorder = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

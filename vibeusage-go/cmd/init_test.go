@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
@@ -27,6 +28,7 @@ func TestInteractiveWizard_UsesMultiSelect(t *testing.T) {
 	// Capture output
 	var buf bytes.Buffer
 	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
 
 	// Run wizard (not the cobra command, the extracted function)
 	err := interactiveWizard()
@@ -58,6 +60,7 @@ func TestInteractiveWizard_NoSelection(t *testing.T) {
 
 	var buf bytes.Buffer
 	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
 
 	err := interactiveWizard()
 	if err != nil {
@@ -79,6 +82,7 @@ func TestQuickSetup_NoPrompt(t *testing.T) {
 
 	var buf bytes.Buffer
 	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
 
 	err := quickSetup()
 	if err != nil {

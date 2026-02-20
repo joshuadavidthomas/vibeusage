@@ -475,5 +475,3 @@ func nextMidnightUTC() time.Time {
 	now := time.Now().UTC()
 	return time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
 }
-
-
