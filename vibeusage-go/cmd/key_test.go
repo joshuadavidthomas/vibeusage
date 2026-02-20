@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -145,6 +146,92 @@ func TestKeyDelete_UserDeclinesConfirm(t *testing.T) {
 	// File should still exist
 	if _, err := os.Stat(credPath); os.IsNotExist(err) {
 		t.Error("credential file should not have been deleted")
+	}
+}
+
+func TestDisplayAllCredentialStatus_HasTableBorders(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldNoColor := noColor
+	noColor = false
+	defer func() { noColor = oldNoColor }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	oldJSON := jsonOutput
+	jsonOutput = false
+	defer func() { jsonOutput = oldJSON }()
+
+	displayAllCredentialStatus()
+
+	output := buf.String()
+
+	if !strings.Contains(output, "╭") {
+		t.Errorf("expected lipgloss rounded border in credential status, got:\n%s", output)
+	}
+}
+
+func TestDisplayAllCredentialStatus_ContainsHeaders(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	oldJSON := jsonOutput
+	jsonOutput = false
+	defer func() { jsonOutput = oldJSON }()
+
+	displayAllCredentialStatus()
+
+	output := buf.String()
+	for _, header := range []string{"Provider", "Status", "Source"} {
+		if !strings.Contains(output, header) {
+			t.Errorf("output missing header %q\n\nGot:\n%s", header, output)
+		}
+	}
+}
+
+func TestDisplayAllCredentialStatus_QuietMode(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = true
+	defer func() { quiet = oldQuiet }()
+
+	oldJSON := jsonOutput
+	jsonOutput = false
+	defer func() { jsonOutput = oldJSON }()
+
+	displayAllCredentialStatus()
+
+	output := buf.String()
+	if strings.Contains(output, "╭") {
+		t.Error("quiet mode should not use table borders")
 	}
 }
 

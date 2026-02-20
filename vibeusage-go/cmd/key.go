@@ -41,12 +41,19 @@ func displayAllCredentialStatus() error {
 				"source":     source,
 			}
 		}
-		display.OutputJSON(data)
+		display.OutputJSON(outWriter, data)
 		return nil
 	}
 
+	ids := make([]string, 0, len(allStatus))
+	for id := range allStatus {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
 	if quiet {
-		for pid, info := range allStatus {
+		for _, pid := range ids {
+			info := allStatus[pid]
 			hasCreds := info["has_credentials"].(bool)
 			status := "not configured"
 			if hasCreds {
@@ -57,28 +64,29 @@ func displayAllCredentialStatus() error {
 		return nil
 	}
 
-	ids := make([]string, 0, len(allStatus))
-	for id := range allStatus {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	outln("Credential Status")
-	out("%-12s %-18s %s\n", "Provider", "Status", "Source")
-
+	var rows [][]string
 	for _, pid := range ids {
 		info := allStatus[pid]
 		hasCreds := info["has_credentials"].(bool)
 		source := info["source"].(string)
 
+		status := "✗ Not configured"
+		srcLabel := "—"
 		if hasCreds {
-			out("%-12s %-18s %s\n", pid, "✓ Configured", sourceToLabel(source))
-		} else {
-			out("%-12s %-18s %s\n", pid, "✗ Not configured", "—")
+			status = "✓ Configured"
+			srcLabel = sourceToLabel(source)
 		}
+		rows = append(rows, []string{pid, status, srcLabel})
 	}
 
-	outln("\nSet credentials with:")
+	outln(display.NewTableWithOptions(
+		[]string{"Provider", "Status", "Source"},
+		rows,
+		display.TableOptions{Title: "Credential Status", NoColor: noColor},
+	))
+
+	outln()
+	outln("Set credentials with:")
 	outln("  vibeusage key <provider> set")
 	return nil
 }
@@ -99,7 +107,7 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 			found, source, path := config.FindProviderCredential(providerID)
 
 			if jsonOutput {
-				display.OutputJSON(map[string]any{
+				display.OutputJSON(outWriter, map[string]any{
 					"provider":   providerID,
 					"configured": found,
 					"source":     source,

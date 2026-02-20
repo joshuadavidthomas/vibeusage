@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -60,7 +59,7 @@ var cacheShowCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(cacheData)
+			display.OutputJSON(outWriter, cacheData)
 			return nil
 		}
 
@@ -71,11 +70,7 @@ var cacheShowCmd = &cobra.Command{
 			return nil
 		}
 
-		outln("Cache Status")
-		outln(strings.Repeat("─", 50))
-		out("%-12s %-12s %-8s %s\n", "Provider", "Snapshot", "Org ID", "Age")
-		outln(strings.Repeat("─", 50))
-
+		var rows [][]string
 		for _, pid := range ids {
 			info := cacheData[pid]
 			snapStatus := "—"
@@ -105,8 +100,14 @@ var cacheShowCmd = &cobra.Command{
 				}
 			}
 
-			out("%-12s %-12s %-8s %s\n", pid, snapStatus, orgStatus, ageStr)
+			rows = append(rows, []string{pid, snapStatus, orgStatus, ageStr})
 		}
+
+		outln(display.NewTableWithOptions(
+			[]string{"Provider", "Snapshot", "Org ID", "Age"},
+			rows,
+			display.TableOptions{Title: "Cache Status", NoColor: noColor},
+		))
 
 		out("\nCache directory: %s\n", config.CacheDir())
 		return nil
@@ -133,7 +134,7 @@ var cacheClearCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(map[string]any{
+			display.OutputJSON(outWriter, map[string]any{
 				"success":  true,
 				"message":  msg,
 				"provider": providerID,

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,7 +21,7 @@ var statusCmd = &cobra.Command{
 		durationMs := time.Since(start).Milliseconds()
 
 		if jsonOutput {
-			display.OutputStatusJSON(statuses)
+			display.OutputStatusJSON(outWriter, statuses)
 			return nil
 		}
 
@@ -61,29 +60,31 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 	if quiet {
 		for _, pid := range ids {
 			s := statuses[pid]
-			out("%s: %s %s\n", pid, display.StatusSymbol(s.Level), string(s.Level))
+			out("%s: %s %s\n", pid, display.StatusSymbol(s.Level, noColor), string(s.Level))
 		}
 		return
 	}
 
-	outln("Provider Status")
-	outln(strings.Repeat("─", 70))
-	out("%-12s %-8s %-30s %s\n", "Provider", "Status", "Description", "Updated")
-	outln(strings.Repeat("─", 70))
-
+	var rows [][]string
 	for _, pid := range ids {
 		s := statuses[pid]
 		desc := s.Description
 		if len(desc) > 30 {
 			desc = desc[:27] + "..."
 		}
-		out("%-12s %-8s %-30s %s\n",
+		rows = append(rows, []string{
 			pid,
-			display.StatusSymbol(s.Level),
+			display.StatusSymbol(s.Level, noColor),
 			desc,
 			display.FormatStatusUpdated(s.UpdatedAt),
-		)
+		})
 	}
+
+	outln(display.NewTableWithOptions(
+		[]string{"Provider", "Status", "Description", "Updated"},
+		rows,
+		display.TableOptions{Title: "Provider Status", NoColor: noColor},
+	))
 
 	if verbose && durationMs > 0 {
 		out("\nFetched in %dms\n", durationMs)

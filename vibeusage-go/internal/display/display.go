@@ -262,20 +262,33 @@ func groupPeriods(periods []models.UsagePeriod) (session, weekly, daily, monthly
 	return
 }
 
-// Status display
-func StatusSymbol(level models.StatusLevel) string {
+// StatusSymbol returns a colored status indicator symbol.
+// When noColor is true, the plain symbol is returned without ANSI styling.
+func StatusSymbol(level models.StatusLevel, noColor bool) string {
+	sym := "?"
+	var style lipgloss.Style
+
 	switch level {
 	case models.StatusOperational:
-		return greenStyle.Render("●")
+		sym = "●"
+		style = greenStyle
 	case models.StatusDegraded:
-		return yellowStyle.Render("◐")
+		sym = "◐"
+		style = yellowStyle
 	case models.StatusPartialOutage:
-		return yellowStyle.Render("◑")
+		sym = "◑"
+		style = yellowStyle
 	case models.StatusMajorOutage:
-		return redStyle.Render("○")
+		sym = "○"
+		style = redStyle
 	default:
-		return dimStyle.Render("?")
+		style = dimStyle
 	}
+
+	if noColor {
+		return sym
+	}
+	return style.Render(sym)
 }
 
 func FormatStatusUpdated(t *time.Time) string {

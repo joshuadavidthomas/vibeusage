@@ -62,7 +62,7 @@ func authStatusCommand() error {
 				"source":        sourceLabel,
 			}
 		}
-		display.OutputJSON(data)
+		display.OutputJSON(outWriter, data)
 		return nil
 	}
 
@@ -78,22 +78,27 @@ func authStatusCommand() error {
 		return nil
 	}
 
-	outln("Authentication Status")
-	out("%-12s %-16s %s\n", "Provider", "Status", "Source")
-
+	var rows [][]string
 	var unconfigured []string
 	for _, pid := range allProviders {
 		hasCreds, source := config.CheckProviderCredentials(pid)
 		if hasCreds {
-			out("%-12s %-16s %s\n", pid, "✓ Authenticated", sourceToLabel(source))
+			rows = append(rows, []string{pid, "✓ Authenticated", sourceToLabel(source)})
 		} else {
-			out("%-12s %-16s %s\n", pid, "✗ Not configured", "—")
+			rows = append(rows, []string{pid, "✗ Not configured", "—"})
 			unconfigured = append(unconfigured, pid)
 		}
 	}
 
+	outln(display.NewTableWithOptions(
+		[]string{"Provider", "Status", "Source"},
+		rows,
+		display.TableOptions{Title: "Authentication Status", NoColor: noColor},
+	))
+
 	if len(unconfigured) > 0 {
-		outln("\nTo configure a provider, run:")
+		outln()
+		outln("To configure a provider, run:")
 		for _, pid := range unconfigured {
 			out("  vibeusage auth %s\n", pid)
 		}

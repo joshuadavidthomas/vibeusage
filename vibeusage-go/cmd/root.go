@@ -114,7 +114,7 @@ func fetchAndDisplayAll(refresh bool) error {
 	durationMs := time.Since(start).Milliseconds()
 
 	if jsonOutput {
-		display.OutputMultiProviderJSON(outcomes)
+		display.OutputMultiProviderJSON(outWriter, outcomes)
 		return nil
 	}
 
@@ -267,7 +267,7 @@ func fetchAndDisplayProvider(providerID string, refresh bool) error {
 	durationMs := time.Since(start).Milliseconds()
 
 	if jsonOutput {
-		display.OutputJSON(display.SnapshotToJSON(outcome))
+		display.OutputJSON(outWriter, display.SnapshotToJSON(outcome))
 		return nil
 	}
 

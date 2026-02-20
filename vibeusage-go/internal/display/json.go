@@ -2,16 +2,16 @@ package display
 
 import (
 	"encoding/json"
-	"os"
+	"io"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-// OutputJSON writes pretty-printed JSON to stdout.
-func OutputJSON(data any) {
-	enc := json.NewEncoder(os.Stdout)
+// OutputJSON writes pretty-printed JSON to the given writer.
+func OutputJSON(w io.Writer, data any) {
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.Encode(data)
 }
@@ -73,7 +73,7 @@ func SnapshotToJSON(outcome fetch.FetchOutcome) map[string]any {
 }
 
 // OutputMultiProviderJSON outputs all outcomes as JSON.
-func OutputMultiProviderJSON(outcomes map[string]fetch.FetchOutcome) {
+func OutputMultiProviderJSON(w io.Writer, outcomes map[string]fetch.FetchOutcome) {
 	data := map[string]any{
 		"providers":  map[string]any{},
 		"errors":     map[string]any{},
@@ -95,11 +95,11 @@ func OutputMultiProviderJSON(outcomes map[string]fetch.FetchOutcome) {
 		}
 	}
 
-	OutputJSON(data)
+	OutputJSON(w, data)
 }
 
 // OutputStatusJSON outputs provider statuses as JSON.
-func OutputStatusJSON(statuses map[string]models.ProviderStatus) {
+func OutputStatusJSON(w io.Writer, statuses map[string]models.ProviderStatus) {
 	data := make(map[string]any)
 	for pid, status := range statuses {
 		s := map[string]any{
@@ -111,5 +111,5 @@ func OutputStatusJSON(statuses map[string]models.ProviderStatus) {
 		}
 		data[pid] = s
 	}
-	OutputJSON(data)
+	OutputJSON(w, data)
 }
