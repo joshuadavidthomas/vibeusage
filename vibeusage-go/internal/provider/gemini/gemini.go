@@ -119,7 +119,7 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 		return nil
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var tokenResp TokenResponse
 	resp, err := client.PostForm("https://oauth2.googleapis.com/token",
 		map[string]string{
@@ -161,7 +161,7 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 }
 
 func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *CodeAssistResponse) {
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	bearer := httpclient.WithBearer(accessToken)
 	var quotaResp *QuotaResponse
 	var codeAssistResp *CodeAssistResponse
@@ -256,7 +256,7 @@ func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	// Validate key by fetching models
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var modelsResp ModelsResponse
 	resp, err := client.GetJSON("https://generativelanguage.googleapis.com/v1beta/models?key="+apiKey, &modelsResp)
 	if err != nil {

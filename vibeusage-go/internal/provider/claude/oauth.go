@@ -45,7 +45,7 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 		creds = refreshed
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var usageResp OAuthUsageResponse
 	resp, err := client.GetJSON("https://api.anthropic.com/api/oauth/usage", &usageResp,
 		httpclient.WithBearer(creds.AccessToken),
@@ -112,7 +112,7 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 		return nil
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var tokenResp OAuthTokenResponse
 	resp, err := client.PostForm("https://api.anthropic.com/oauth/token",
 		map[string]string{

@@ -73,7 +73,7 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 
 	usageURL := s.getUsageURL()
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var usageResp UsageResponse
 	resp, err := client.GetJSON(usageURL, &usageResp, httpclient.WithBearer(creds.AccessToken))
 	if err != nil {
@@ -131,7 +131,7 @@ func (s *OAuthStrategy) refreshToken(creds *Credentials) *Credentials {
 		return nil
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var tokenResp TokenResponse
 	resp, err := client.PostForm("https://auth.openai.com/oauth/token",
 		map[string]string{

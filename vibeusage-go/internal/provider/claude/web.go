@@ -32,7 +32,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("Failed to get organization ID"), nil
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	sessionCookie := httpclient.WithCookie("sessionKey", sessionKey)
 
 	// Fetch usage
@@ -89,7 +89,7 @@ func (s *WebStrategy) getOrgID(sessionKey string) string {
 		return cached
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var orgs []WebOrganization
 	resp, err := client.GetJSON("https://claude.ai/api/organizations", &orgs,
 		httpclient.WithCookie("sessionKey", sessionKey),

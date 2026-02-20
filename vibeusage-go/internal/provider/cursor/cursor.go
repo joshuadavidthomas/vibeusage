@@ -56,7 +56,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("No session token found"), nil
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	sessionCookie := httpclient.WithCookie("__Secure-next-auth.session-token", sessionToken)
 	userAgent := httpclient.WithHeader("User-Agent", "Mozilla/5.0")
 

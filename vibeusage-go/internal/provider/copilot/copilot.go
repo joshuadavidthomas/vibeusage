@@ -66,7 +66,7 @@ func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var userResp UserResponse
 	resp, err := client.GetJSON(usageURL, &userResp,
 		httpclient.WithBearer(creds.AccessToken),
@@ -169,7 +169,7 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 // RunDeviceFlow runs the interactive GitHub device flow for auth.
 // Output is written to w, allowing callers to control where messages go.
 func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
-	client := httpclient.New()
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 
 	// Request device code
 	var dcResp DeviceCodeResponse

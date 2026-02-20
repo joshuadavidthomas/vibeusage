@@ -187,6 +187,20 @@ func TestPostForm(t *testing.T) {
 	}
 }
 
+func TestNewFromConfig(t *testing.T) {
+	c := NewFromConfig(15.0)
+	if c.http.Timeout != 15*time.Second {
+		t.Errorf("expected timeout 15s, got %v", c.http.Timeout)
+	}
+}
+
+func TestNewFromConfig_Zero(t *testing.T) {
+	c := NewFromConfig(0)
+	if c.http.Timeout != 30*time.Second {
+		t.Errorf("expected default timeout 30s for zero config, got %v", c.http.Timeout)
+	}
+}
+
 func TestDo_CustomMethod(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPatch {

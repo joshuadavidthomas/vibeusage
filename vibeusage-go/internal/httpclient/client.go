@@ -34,6 +34,15 @@ func NewWithTimeout(timeout time.Duration) *Client {
 	return &Client{http: &http.Client{Timeout: timeout}}
 }
 
+// NewFromConfig creates a Client using the config timeout (in seconds).
+// Falls back to 30s if the value is zero or negative.
+func NewFromConfig(timeoutSeconds float64) *Client {
+	if timeoutSeconds <= 0 {
+		return New()
+	}
+	return NewWithTimeout(time.Duration(timeoutSeconds * float64(time.Second)))
+}
+
 // RequestOption configures an http.Request before it is sent.
 type RequestOption func(*http.Request)
 
