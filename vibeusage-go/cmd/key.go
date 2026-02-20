@@ -41,7 +41,7 @@ func displayAllCredentialStatus() error {
 				"source":     source,
 			}
 		}
-		display.OutputJSON(data)
+		display.OutputJSON(outWriter, data)
 		return nil
 	}
 
@@ -107,7 +107,7 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 			found, source, path := config.FindProviderCredential(providerID)
 
 			if jsonOutput {
-				display.OutputJSON(map[string]any{
+				display.OutputJSON(outWriter, map[string]any{
 					"provider":   providerID,
 					"configured": found,
 					"source":     source,

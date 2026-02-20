@@ -25,7 +25,7 @@ var configShowCmd = &cobra.Command{
 		cfgPath := config.ConfigFile()
 
 		if jsonOutput {
-			display.OutputJSON(map[string]any{
+			display.OutputJSON(outWriter, map[string]any{
 				"fetch": map[string]any{
 					"timeout":                 cfg.Fetch.Timeout,
 					"stale_threshold_minutes": cfg.Fetch.StaleThresholdMinutes,
@@ -72,11 +72,11 @@ var configPathCmd = &cobra.Command{
 				"credentials_dir": config.CredentialsDir(),
 			}
 			if showCache {
-				display.OutputJSON(map[string]string{"cache_dir": config.CacheDir()})
+				display.OutputJSON(outWriter, map[string]string{"cache_dir": config.CacheDir()})
 			} else if showCreds {
-				display.OutputJSON(map[string]string{"credentials_dir": config.CredentialsDir()})
+				display.OutputJSON(outWriter, map[string]string{"credentials_dir": config.CredentialsDir()})
 			} else {
-				display.OutputJSON(paths)
+				display.OutputJSON(outWriter, paths)
 			}
 			return nil
 		}
@@ -130,7 +130,7 @@ var configResetCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(map[string]any{
+			display.OutputJSON(outWriter, map[string]any{
 				"success": true,
 				"reset":   true,
 				"message": "Configuration reset to defaults",
