@@ -20,10 +20,10 @@ var usageCmd = &cobra.Command{
 			if _, ok := provider.Get(providerID); !ok {
 				return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
 			}
-			return fetchAndDisplayProvider(providerID, refresh)
+			return fetchAndDisplayProvider(cmd.Context(), providerID, refresh)
 		}
 
-		return fetchAndDisplayAll(refresh)
+		return fetchAndDisplayAll(cmd.Context(), refresh)
 	},
 }
 
