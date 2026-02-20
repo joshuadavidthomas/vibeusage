@@ -21,7 +21,7 @@ var statusCmd = &cobra.Command{
 		durationMs := time.Since(start).Milliseconds()
 
 		if jsonOutput {
-			display.OutputStatusJSON(statuses)
+			display.OutputStatusJSON(outWriter, statuses)
 			return nil
 		}
 
@@ -60,7 +60,7 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 	if quiet {
 		for _, pid := range ids {
 			s := statuses[pid]
-			out("%s: %s %s\n", pid, display.StatusSymbol(s.Level), string(s.Level))
+			out("%s: %s %s\n", pid, display.StatusSymbol(s.Level, noColor), string(s.Level))
 		}
 		return
 	}
@@ -74,7 +74,7 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 		}
 		rows = append(rows, []string{
 			pid,
-			display.StatusSymbol(s.Level),
+			display.StatusSymbol(s.Level, noColor),
 			desc,
 			display.FormatStatusUpdated(s.UpdatedAt),
 		})
