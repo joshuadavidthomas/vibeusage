@@ -30,7 +30,13 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - ✓ Copilot provider (device flow OAuth strategy, status polling)
 - ✓ Cursor provider (web session strategy, status polling)
 - ✓ Gemini provider (OAuth + API key strategies, Google Workspace status)
+<<<<<<< Updated upstream
 - ✓ Test suite (1072 passing tests, 81% coverage - **exceeds 80% target**)
+||||||| Stash base
+- ✓ Test suite (724 passing tests, 61% coverage)
+=======
+- ✓ Test suite (741 passing tests, 63% coverage)
+>>>>>>> Stashed changes
 - ✓ Provider command aliases (claude, codex, copilot, cursor, gemini as top-level commands)
 - ✓ SingleProviderDisplay with title+separator format per spec 05
 - ✓ ProviderPanel with compact view (filters model-specific periods) per spec 05
@@ -39,6 +45,7 @@ A CLI application to track usage stats from all LLM providers to understand sess
 
 ## Recent Fixes
 
+<<<<<<< Updated upstream
 ### 2026-01-17: Browser Cookie Dependency Added ✅ RESOLVED
 - **Issue**: Browser cookie extraction strategies (`ClaudeBrowserCookieStrategy`, `CursorBrowserCookieStrategy`) were implemented but couldn't function because `browser_cookie3` was not in dependencies
 - **Root Cause**: The code attempted to import `browser_cookie3` or `pycookiecheat`, but neither was listed in pyproject.toml
@@ -48,7 +55,27 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - Updated tests for both strategies to verify dependency availability
 - **Verification**: All 1062 tests pass (up from 1060), browser cookie strategies can now import required library
 - **Note**: Browser strategies are still not registered in `fetch_strategies()` - see Phase 9.2 for remaining activation work
+||||||| Stash base
+### 2026-01-17: Documentation (Priority 8) ✅ COMPLETED
+- **Added comprehensive user documentation**
+  - README.md with installation, quick start, provider setup, command reference, troubleshooting
+  - Provider-specific setup guides (docs/providers/claude.md, codex.md, copilot.md, cursor.md, gemini.md)
+  - Configuration reference (docs/config.md) with all options and environment variables
+  - Each provider doc includes authentication methods, credential storage, troubleshooting
+  - Configuration reference covers display, fetch, credential settings, and provider-specific options
+- All 724 tests pass (61% coverage)
+=======
+### 2026-01-17: Documentation (Priority 8) ✅ COMPLETED
+- **Added comprehensive user documentation**
+  - README.md with installation, quick start, provider setup, command reference, troubleshooting
+  - Provider-specific setup guides (docs/providers/claude.md, codex.md, copilot.md, cursor.md, gemini.md)
+  - Configuration reference (docs/config.md) with all options and environment variables
+  - Each provider doc includes authentication methods, credential storage, troubleshooting
+  - Configuration reference covers display, fetch, credential settings, and provider-specific options
+- All 741 tests pass (63% coverage)
+>>>>>>> Stashed changes
 
+<<<<<<< Updated upstream
 ### 2026-01-17: Key Command Syntax - Provider First, Then Action ✅ RESOLVED
 - **Issue**: `vibeusage key copilot set` command failed with "No such command 'copilot'"
 - **Root Cause**: The `key` command was implemented as `key set <provider>` but spec 06 defines `key <provider> set` (factory pattern)
@@ -59,6 +86,27 @@ A CLI application to track usage stats from all LLM providers to understand sess
   - Updated Copilot auth to clarify that `gh auth login` is for GitHub CLI, not Copilot
   - Updated tests to use CLI runner testing instead of direct function calls
 - **Verification**: `vibeusage key copilot set` now works correctly, all 1057 tests pass (81% coverage)
+||||||| Stash base
+### 2026-01-16: Usage Command Tests (Priority 7)
+- **Added 39 comprehensive tests for CLI usage commands (tests/cli/test_usage_commands.py)**
+  - Tests for usage_command (main entry point) with single/multiple provider paths
+  - Tests for fetch_provider_usage and fetch_all_usage helper functions
+  - Tests for display_snapshot and display_multiple_snapshots display functions
+  - Tests for format_period, format_overage, and get_pace_color utility functions
+  - Tests for keyboard interrupt, exception handling, and cleanup behavior
+  - Tests for verbose/quiet modes and JSON output
+  - All 724 tests pass (61% coverage, up from 58%)
+=======
+### 2026-01-16: Usage Command Tests (Priority 7)
+- **Added 39 comprehensive tests for CLI usage commands (tests/cli/test_usage_commands.py)**
+  - Tests for usage_command (main entry point) with single/multiple provider paths
+  - Tests for fetch_provider_usage and fetch_all_usage helper functions
+  - Tests for display_snapshot and display_multiple_snapshots display functions
+  - Tests for format_period, format_overage, and get_pace_color utility functions
+  - Tests for keyboard interrupt, exception handling, and cleanup behavior
+  - Tests for verbose/quiet modes and JSON output
+  - All 741 tests pass (63% coverage, up from 58%)
+>>>>>>> Stashed changes
 
 ### 2026-01-17: ProviderStatus Type Hint Fix ✅ RESOLVED
 - **Issue**: `ProviderStatus.operational()` and `ProviderStatus.unknown()` factory methods had incorrect return type hints
@@ -72,7 +120,49 @@ A CLI application to track usage stats from all LLM providers to understand sess
 - **Resolution**: Ran `uv sync --reinstall` to rebuild the package
 - **Verification**: All 12 commands now showing correctly, all 1057 tests pass (81% coverage)
 
+<<<<<<< Updated upstream
 ### 2026-01-17: CLI Subcommands Investigation
+||||||| Stash base
+### 2026-01-16: Auth Module Tests (Priority 7)
+- **Added comprehensive test suite for auth/base.py (71 new tests, 96% coverage)**
+  - Tests for all credential types: OAuth2Credentials, SessionCredentials, APIKeyCredentials, CLICredentials, LocalProcessCredentials
+  - Tests for AuthResult factory methods (ok, fail)
+  - Tests for AuthStrategy abstract base class
+  - Tests for all config structs: OAuth2Config, CookieConfig, CLIConfig, DeviceFlowConfig, LocalProcessConfig
+  - Tests for ProviderAuthConfig authentication flow with strategy fallback
+  - Tests for protocol compliance
+- **auth/__init__.py: 100% coverage**
+- **auth/base.py: 96% coverage (up from 0%)**
+- All 614 tests pass (54% overall coverage, up from 51%)
+=======
+### 2026-01-16: Status Module Tests (Priority 7 - Test Suite)
+- **Added comprehensive test coverage for status modules**
+  - Added 3 tests for `providers/copilot/status.py` - now at 100% coverage
+  - Added 14 tests for `providers/gemini/status.py` - now at 100% coverage
+  - Tests cover all branches: empty fetch, JSON errors, incident filtering, keyword matching, severity mapping
+- **Improved overall test coverage from 61% to 63%**
+  - 741 tests passing (up from 685)
+  - All tests pass with 0 failures
+- **Remaining low-coverage modules identified:**
+  - `claude/cli.py` - 23% coverage
+  - `claude/web.py` - 17% coverage
+  - `claude/oauth.py` - 13% coverage
+  - `config/cache.py` - 18% coverage
+  - `config/keyring.py` - 18% coverage
+  - `core/fetch.py` - 17% coverage
+
+### 2026-01-16: Auth Module Tests (Priority 7)
+- **Added comprehensive test suite for auth/base.py (71 new tests, 96% coverage)**
+  - Tests for all credential types: OAuth2Credentials, SessionCredentials, APIKeyCredentials, CLICredentials, LocalProcessCredentials
+  - Tests for AuthResult factory methods (ok, fail)
+  - Tests for AuthStrategy abstract base class
+  - Tests for all config structs: OAuth2Config, CookieConfig, CLIConfig, DeviceFlowConfig, LocalProcessConfig
+  - Tests for ProviderAuthConfig authentication flow with strategy fallback
+  - Tests for protocol compliance
+- **auth/__init__.py: 100% coverage**
+- **auth/base.py: 96% coverage (up from 0%)**
+- All 614 tests pass (54% overall coverage, up from 51%)
+>>>>>>> Stashed changes
 
 **Issue Reported**: CLI subcommands (auth, init, status, usage, cache, config, key) were missing from `vibeusage --help`. Only provider commands (claude, codex, copilot, cursor, gemini) were showing.
 

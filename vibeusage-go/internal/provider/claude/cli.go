@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -25,8 +26,8 @@ func (s *CLIStrategy) IsAvailable() bool {
 	return err == nil
 }
 
-func (s *CLIStrategy) Fetch() (fetch.FetchResult, error) {
-	cmd := exec.Command("claude", "/usage")
+func (s *CLIStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
+	cmd := exec.CommandContext(ctx, "claude", "/usage")
 	output, err := cmd.Output()
 	if err != nil {
 		return fetch.ResultFail("claude CLI failed: " + err.Error()), nil

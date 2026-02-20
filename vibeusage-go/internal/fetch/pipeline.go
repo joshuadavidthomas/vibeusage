@@ -28,7 +28,7 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 
 		resultCh := make(chan fetchAttemptResult, 1)
 		go func() {
-			result, err := strategy.Fetch()
+			result, err := strategy.Fetch(ctx)
 			resultCh <- fetchAttemptResult{result: result, err: err}
 		}()
 

@@ -1,6 +1,8 @@
 package fetch
 
 import (
+	"context"
+
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -47,5 +49,5 @@ type FetchOutcome struct {
 type Strategy interface {
 	Name() string
 	IsAvailable() bool
-	Fetch() (FetchResult, error)
+	Fetch(ctx context.Context) (FetchResult, error)
 }

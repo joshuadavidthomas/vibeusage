@@ -66,6 +66,12 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
+// ExecuteContext runs the root command with the given context.
+// Commands access it via cmd.Context().
+func ExecuteContext(ctx context.Context) error {
+	return rootCmd.ExecuteContext(ctx)
+}
+
 func runDefaultUsage(cmd *cobra.Command, args []string) error {
 	if v, _ := cmd.Flags().GetBool("version"); v {
 		out("vibeusage %s\n", version)
@@ -81,15 +87,14 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	return fetchAndDisplayAll(false)
+	return fetchAndDisplayAll(cmd.Context(), false)
 }
 
 func isTerminal() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
-func fetchAndDisplayAll(refresh bool) error {
-	ctx := context.Background()
+func fetchAndDisplayAll(ctx context.Context, refresh bool) error {
 	start := time.Now()
 
 	providerMap := buildProviderMap()
@@ -232,20 +237,19 @@ func makeProviderCmd(providerID string) *cobra.Command {
 		Use:   providerID,
 		Short: "Show usage for " + titleName,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchAndDisplayProvider(providerID, refresh)
+			return fetchAndDisplayProvider(cmd.Context(), providerID, refresh)
 		},
 	}
 	cmd.Flags().BoolVarP(&refresh, "refresh", "r", false, "Bypass cache and fetch fresh data")
 	return cmd
 }
 
-func fetchAndDisplayProvider(providerID string, refresh bool) error {
+func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh bool) error {
 	p, ok := provider.Get(providerID)
 	if !ok {
 		return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
 	}
 
-	ctx := context.Background()
 	start := time.Now()
 
 	strategies := p.FetchStrategies()

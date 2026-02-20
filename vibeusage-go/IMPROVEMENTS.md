@@ -229,11 +229,11 @@ type Strategy interface {
 
 ### Tasks
 
-- [ ] Update `Strategy` interface to accept `context.Context`
-- [ ] Update `ExecutePipeline` to pass context to `strategy.Fetch(ctx)`
-- [ ] Update all strategy `Fetch` implementations (12 total across 5 providers)
-- [ ] Pass context to HTTP requests via `http.NewRequestWithContext`
-- [ ] Wire signal handling (SIGINT/SIGTERM) to context cancellation in `main.go`
+- [x] Update `Strategy` interface to accept `context.Context`
+- [x] Update `ExecutePipeline` to pass context to `strategy.Fetch(ctx)`
+- [x] Update all strategy `Fetch` implementations (8 total across 5 providers)
+- [x] Pass context to HTTP requests via `http.NewRequestWithContext`
+- [x] Wire signal handling (SIGINT/SIGTERM) to context cancellation in `main.go`
 
 ## 7. Fix Deprecated `strings.Title`
 

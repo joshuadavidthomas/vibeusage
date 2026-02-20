@@ -1,6 +1,7 @@
 package httpclient
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -250,5 +251,237 @@ func TestDo_CustomMethod(t *testing.T) {
 	}
 	if httpResp.StatusCode != 204 {
 		t.Errorf("expected 204, got %d", httpResp.StatusCode)
+	}
+}
+
+// Context-aware method tests
+
+func TestDoCtx_CancelledContext(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	c := New()
+	_, err := c.DoCtx(ctx, http.MethodGet, srv.URL, nil)
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+}
+
+func TestDoCtx_ContextDeadlineExceeded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Block until client disconnects
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	c := NewWithTimeout(30 * time.Second) // Long client timeout; short context timeout
+	_, err := c.DoCtx(ctx, http.MethodGet, srv.URL, nil)
+	if err == nil {
+		t.Fatal("expected error for context deadline exceeded")
+	}
+}
+
+func TestDoCtx_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`OK`))
+	}))
+	defer srv.Close()
+
+	ctx := context.Background()
+	c := New()
+	resp, err := c.DoCtx(ctx, http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestDoCtx_WithOptions(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer ctx-token" {
+			t.Errorf("expected bearer token, got %s", r.Header.Get("Authorization"))
+		}
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	ctx := context.Background()
+	c := New()
+	resp, err := c.DoCtx(ctx, http.MethodGet, srv.URL, nil, WithBearer("ctx-token"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestGetJSONCtx_Success(t *testing.T) {
+	type resp struct {
+		Name string `json:"name"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(resp{Name: "ctx-test"})
+	}))
+	defer srv.Close()
+
+	ctx := context.Background()
+	c := New()
+	var out resp
+	httpResp, err := c.GetJSONCtx(ctx, srv.URL, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if httpResp.StatusCode != 200 {
+		t.Errorf("expected 200, got %d", httpResp.StatusCode)
+	}
+	if out.Name != "ctx-test" {
+		t.Errorf("expected name ctx-test, got %s", out.Name)
+	}
+}
+
+func TestGetJSONCtx_Cancelled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	c := New()
+	_, err := c.GetJSONCtx(ctx, srv.URL, nil)
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+}
+
+func TestPostJSONCtx_Success(t *testing.T) {
+	type reqBody struct {
+		Input string `json:"input"`
+	}
+	type respBody struct {
+		Output string `json:"output"`
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		var in reqBody
+		json.NewDecoder(r.Body).Decode(&in)
+		json.NewEncoder(w).Encode(respBody{Output: "echo:" + in.Input})
+	}))
+	defer srv.Close()
+
+	ctx := context.Background()
+	c := New()
+	var out respBody
+	httpResp, err := c.PostJSONCtx(ctx, srv.URL, reqBody{Input: "hello"}, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if httpResp.StatusCode != 200 {
+		t.Errorf("expected 200, got %d", httpResp.StatusCode)
+	}
+	if out.Output != "echo:hello" {
+		t.Errorf("unexpected output: %s", out.Output)
+	}
+}
+
+func TestPostJSONCtx_Cancelled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	c := New()
+	_, err := c.PostJSONCtx(ctx, srv.URL, nil, nil)
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+}
+
+func TestPostFormCtx_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.FormValue("grant_type") != "refresh_token" {
+			t.Errorf("unexpected grant_type: %s", r.FormValue("grant_type"))
+		}
+		json.NewEncoder(w).Encode(map[string]string{"access_token": "new"})
+	}))
+	defer srv.Close()
+
+	ctx := context.Background()
+	c := New()
+	var out map[string]string
+	httpResp, err := c.PostFormCtx(ctx, srv.URL, map[string]string{"grant_type": "refresh_token"}, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if httpResp.StatusCode != 200 {
+		t.Errorf("expected 200, got %d", httpResp.StatusCode)
+	}
+	if out["access_token"] != "new" {
+		t.Errorf("unexpected token: %s", out["access_token"])
+	}
+}
+
+func TestPostFormCtx_Cancelled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	c := New()
+	_, err := c.PostFormCtx(ctx, srv.URL, map[string]string{"k": "v"}, nil)
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+}
+
+func TestDoCtx_CancelMidFlight(t *testing.T) {
+	// Verify that cancelling mid-flight interrupts the request
+	started := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		// Block until the client disconnects
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c := New()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := c.DoCtx(ctx, http.MethodGet, srv.URL, nil)
+		errCh <- err
+	}()
+
+	// Wait for the handler to start, then cancel
+	<-started
+	cancel()
+
+	err := <-errCh
+	if err == nil {
+		t.Fatal("expected error after mid-flight cancellation")
 	}
 }

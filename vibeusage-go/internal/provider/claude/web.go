@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -21,13 +22,13 @@ func (s *WebStrategy) IsAvailable() bool {
 	return err == nil
 }
 
-func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
+func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	sessionKey := s.loadSessionKey()
 	if sessionKey == "" {
 		return fetch.ResultFail("No session key found"), nil
 	}
 
-	orgID := s.getOrgID(sessionKey)
+	orgID := s.getOrgID(ctx, sessionKey)
 	if orgID == "" {
 		return fetch.ResultFail("Failed to get organization ID"), nil
 	}
@@ -38,7 +39,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	// Fetch usage
 	usageURL := webBaseURL + "/" + orgID + "/usage"
 	var usageResp WebUsageResponse
-	resp, err := client.GetJSON(usageURL, &usageResp, sessionCookie)
+	resp, err := client.GetJSONCtx(ctx, usageURL, &usageResp, sessionCookie)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
@@ -57,7 +58,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	var overage *models.OverageUsage
 	overageURL := webBaseURL + "/" + orgID + "/overage_spend_limit"
 	var overageResp WebOverageResponse
-	oResp, err := client.GetJSON(overageURL, &overageResp, sessionCookie)
+	oResp, err := client.GetJSONCtx(ctx, overageURL, &overageResp, sessionCookie)
 	if err == nil && oResp.StatusCode == 200 && oResp.JSONErr == nil {
 		overage = overageResp.ToOverageUsage()
 	}
@@ -83,7 +84,7 @@ func (s *WebStrategy) loadSessionKey() string {
 	return ""
 }
 
-func (s *WebStrategy) getOrgID(sessionKey string) string {
+func (s *WebStrategy) getOrgID(ctx context.Context, sessionKey string) string {
 	// Check cache
 	if cached := config.LoadCachedOrgID("claude"); cached != "" {
 		return cached
@@ -91,7 +92,7 @@ func (s *WebStrategy) getOrgID(sessionKey string) string {
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var orgs []WebOrganization
-	resp, err := client.GetJSON(webBaseURL, &orgs,
+	resp, err := client.GetJSONCtx(ctx, webBaseURL, &orgs,
 		httpclient.WithCookie("sessionKey", sessionKey),
 	)
 	if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
