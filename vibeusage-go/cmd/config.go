@@ -1,16 +1,15 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 )
 
 var configCmd = &cobra.Command{
@@ -28,7 +27,7 @@ var configShowCmd = &cobra.Command{
 		if jsonOutput {
 			display.OutputJSON(map[string]any{
 				"fetch": map[string]any{
-					"timeout":                cfg.Fetch.Timeout,
+					"timeout":                 cfg.Fetch.Timeout,
 					"stale_threshold_minutes": cfg.Fetch.StaleThresholdMinutes,
 					"max_concurrent":          cfg.Fetch.MaxConcurrent,
 				},
@@ -39,7 +38,7 @@ var configShowCmd = &cobra.Command{
 					"reset_format":   cfg.Display.ResetFormat,
 				},
 				"credentials": map[string]any{
-					"use_keyring":               cfg.Credentials.UseKeyring,
+					"use_keyring":                cfg.Credentials.UseKeyring,
 					"reuse_provider_credentials": cfg.Credentials.ReuseProviderCredentials,
 				},
 				"path": cfgPath,
@@ -48,12 +47,12 @@ var configShowCmd = &cobra.Command{
 		}
 
 		if quiet {
-			fmt.Println(cfgPath)
+			outln(cfgPath)
 			return nil
 		}
 
-		fmt.Printf("Config: %s\n\n", cfgPath)
-		toml.NewEncoder(os.Stdout).Encode(cfg)
+		out("Config: %s\n\n", cfgPath)
+		toml.NewEncoder(outWriter).Encode(cfg)
 		return nil
 	},
 }
@@ -84,24 +83,24 @@ var configPathCmd = &cobra.Command{
 
 		if quiet {
 			if showCache {
-				fmt.Println(config.CacheDir())
+				outln(config.CacheDir())
 			} else if showCreds {
-				fmt.Println(config.CredentialsDir())
+				outln(config.CredentialsDir())
 			} else {
-				fmt.Println(config.ConfigDir())
+				outln(config.ConfigDir())
 			}
 			return nil
 		}
 
 		if showCache {
-			fmt.Println(config.CacheDir())
+			outln(config.CacheDir())
 		} else if showCreds {
-			fmt.Println(config.CredentialsDir())
+			outln(config.CredentialsDir())
 		} else {
-			fmt.Printf("Config dir:    %s\n", config.ConfigDir())
-			fmt.Printf("Config file:   %s\n", config.ConfigFile())
-			fmt.Printf("Cache dir:     %s\n", config.CacheDir())
-			fmt.Printf("Credentials:   %s\n", config.CredentialsDir())
+			out("Config dir:    %s\n", config.ConfigDir())
+			out("Config file:   %s\n", config.ConfigFile())
+			out("Cache dir:     %s\n", config.CacheDir())
+			out("Credentials:   %s\n", config.CredentialsDir())
 		}
 		return nil
 	},
@@ -113,18 +112,21 @@ var configResetCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		confirm, _ := cmd.Flags().GetBool("confirm")
 		if !confirm && !jsonOutput {
-			fmt.Print("This will reset your configuration to defaults. Continue? [y/N] ")
-			var response string
-			fmt.Scanln(&response)
-			if strings.ToLower(response) != "y" {
-				fmt.Println("Reset cancelled")
+			ok, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+				Title: "Reset configuration to defaults?",
+			})
+			if err != nil {
+				return err
+			}
+			if !ok {
+				outln("Reset cancelled")
 				return nil
 			}
 		}
 
 		cfgPath := config.ConfigFile()
 		if err := os.Remove(cfgPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove config: %w", err)
+			return err
 		}
 
 		if jsonOutput {
@@ -136,7 +138,7 @@ var configResetCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Println("✓ Configuration reset to defaults")
+		outln("✓ Configuration reset to defaults")
 		return nil
 	},
 }
@@ -147,7 +149,6 @@ var configEditCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfgPath := config.ConfigFile()
 
-		// Ensure dir and file exist
 		os.MkdirAll(config.ConfigDir(), 0o755)
 		if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 			cfg := config.DefaultConfig()

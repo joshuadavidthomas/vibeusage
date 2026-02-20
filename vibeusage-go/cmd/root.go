@@ -183,9 +183,10 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 
 func makeProviderCmd(providerID string) *cobra.Command {
 	var refresh bool
+	titleName := strings.ToUpper(providerID[:1]) + providerID[1:]
 	cmd := &cobra.Command{
 		Use:   providerID,
-		Short: "Show usage for " + strings.Title(providerID),
+		Short: "Show usage for " + titleName,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fetchAndDisplayProvider(providerID, refresh)
 		},

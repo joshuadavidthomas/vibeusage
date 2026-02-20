@@ -10,6 +10,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 )
 
 var keyCmd = &cobra.Command{
@@ -21,7 +22,6 @@ var keyCmd = &cobra.Command{
 }
 
 func init() {
-	// Register provider-specific key subcommands
 	for _, id := range []string{"claude", "codex", "copilot", "cursor", "gemini"} {
 		keyCmd.AddCommand(makeKeyProviderCmd(id))
 	}
@@ -51,7 +51,7 @@ func displayAllCredentialStatus() error {
 			if hasCreds {
 				status = "configured"
 			}
-			fmt.Printf("%s: %s\n", pid, status)
+			out("%s: %s\n", pid, status)
 		}
 		return nil
 	}
@@ -62,10 +62,8 @@ func displayAllCredentialStatus() error {
 	}
 	sort.Strings(ids)
 
-	fmt.Println("Credential Status")
-	fmt.Println(strings.Repeat("─", 50))
-	fmt.Printf("%-12s %-18s %s\n", "Provider", "Status", "Source")
-	fmt.Println(strings.Repeat("─", 50))
+	outln("Credential Status")
+	out("%-12s %-18s %s\n", "Provider", "Status", "Source")
 
 	for _, pid := range ids {
 		info := allStatus[pid]
@@ -73,14 +71,14 @@ func displayAllCredentialStatus() error {
 		source := info["source"].(string)
 
 		if hasCreds {
-			fmt.Printf("%-12s %-18s %s\n", pid, "✓ Configured", sourceToLabel(source))
+			out("%-12s %-18s %s\n", pid, "✓ Configured", sourceToLabel(source))
 		} else {
-			fmt.Printf("%-12s %-18s %s\n", pid, "✗ Not configured", "—")
+			out("%-12s %-18s %s\n", pid, "✗ Not configured", "—")
 		}
 	}
 
-	fmt.Println("\nSet credentials with:")
-	fmt.Println("  vibeusage key <provider> set")
+	outln("\nSet credentials with:")
+	outln("  vibeusage key <provider> set")
 	return nil
 }
 
@@ -91,9 +89,11 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 		credType = "oauth"
 	}
 
+	titleName := strings.ToUpper(providerID[:1]) + providerID[1:]
+
 	provCmd := &cobra.Command{
 		Use:   providerID,
-		Short: fmt.Sprintf("Manage %s credentials", strings.Title(providerID)),
+		Short: fmt.Sprintf("Manage %s credentials", titleName),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			found, source, path := config.FindProviderCredential(providerID)
 
@@ -108,13 +108,13 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 			}
 
 			if found {
-				fmt.Printf("✓ %s credentials configured (%s)\n", strings.Title(providerID), sourceToLabel(source))
+				out("✓ %s credentials configured (%s)\n", titleName, sourceToLabel(source))
 				if path != "" {
-					fmt.Printf("  Location: %s\n", path)
+					out("  Location: %s\n", path)
 				}
 			} else {
-				fmt.Printf("✗ %s credentials not configured\n", strings.Title(providerID))
-				fmt.Printf("\nRun 'vibeusage key %s set' to configure\n", providerID)
+				out("✗ %s credentials not configured\n", titleName)
+				out("\nRun 'vibeusage key %s set' to configure\n", providerID)
 			}
 			return nil
 		},
@@ -128,8 +128,15 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 			if len(args) > 0 {
 				value = args[0]
 			} else {
-				fmt.Printf("Enter %s %s credential: ", providerID, credType)
-				fmt.Scanln(&value)
+				var err error
+				value, err = prompt.Default.Input(prompt.InputConfig{
+					Title:       fmt.Sprintf("%s %s credential", titleName, credType),
+					Placeholder: "paste credential here",
+					Validate:    prompt.ValidateNotEmpty,
+				})
+				if err != nil {
+					return err
+				}
 			}
 			value = strings.TrimSpace(value)
 			if value == "" {
@@ -143,7 +150,7 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 			}
 
 			config.ClearProviderCache(providerID)
-			fmt.Printf("✓ Credential saved for %s\n", providerID)
+			out("✓ Credential saved for %s\n", providerID)
 			return nil
 		},
 	}
@@ -154,19 +161,22 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			force, _ := cmd.Flags().GetBool("force")
 			if !force {
-				fmt.Printf("Delete %s %s credential? [y/N] ", strings.Title(providerID), credType)
-				var confirm string
-				fmt.Scanln(&confirm)
-				if strings.ToLower(confirm) != "y" {
+				ok, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+					Title: fmt.Sprintf("Delete %s %s credential?", titleName, credType),
+				})
+				if err != nil {
+					return err
+				}
+				if !ok {
 					return nil
 				}
 			}
 
 			path := config.CredentialPath(providerID, credType)
 			if config.DeleteCredential(path) {
-				fmt.Printf("✓ Deleted %s credential for %s\n", credType, providerID)
+				out("✓ Deleted %s credential for %s\n", credType, providerID)
 			} else {
-				fmt.Printf("No %s credential found for %s\n", credType, providerID)
+				out("No %s credential found for %s\n", credType, providerID)
 			}
 			return nil
 		},

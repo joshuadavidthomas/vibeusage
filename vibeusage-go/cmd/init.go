@@ -1,15 +1,14 @@
 package cmd
 
 import (
-	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -50,108 +49,89 @@ func init() {
 
 func quickSetup() error {
 	if quiet {
-		fmt.Println("Run 'vibeusage auth claude' to set up Claude")
+		outln("Run 'vibeusage auth claude' to set up Claude")
 		return nil
 	}
 
-	fmt.Println("Quick Setup: Claude")
-	fmt.Println("Claude is the most popular AI assistant for agentic workflows.")
-	fmt.Println()
+	outln("Quick Setup: Claude")
+	outln("Claude is the most popular AI assistant for agentic workflows.")
+	outln()
 
 	hasCreds, _ := config.CheckProviderCredentials("claude")
 	if hasCreds {
-		fmt.Println("✓ Claude is already configured!")
-		fmt.Println("\nRun 'vibeusage' to see your usage.")
+		outln("✓ Claude is already configured!")
+		outln("\nRun 'vibeusage' to see your usage.")
 		return nil
 	}
 
-	fmt.Println("To set up Claude, run:")
-	fmt.Println("  vibeusage auth claude")
-	fmt.Println()
-	fmt.Println("After setup, run 'vibeusage' to see your usage.")
+	outln("To set up Claude, run:")
+	outln("  vibeusage auth claude")
+	outln()
+	outln("After setup, run 'vibeusage' to see your usage.")
 	return nil
 }
 
 func interactiveWizard() error {
 	if quiet {
-		fmt.Println("Use 'vibeusage auth <provider>' to set up providers")
+		outln("Use 'vibeusage auth <provider>' to set up providers")
 		return nil
 	}
 
 	allProviders := provider.ListIDs()
 	sort.Strings(allProviders)
 
-	// Welcome
-	fmt.Println()
-	fmt.Println("  ✨ Welcome to vibeusage!")
-	fmt.Println()
-	fmt.Println("  Track your usage across AI providers in one place.")
-	fmt.Println()
+	outln()
+	outln("  ✨ Welcome to vibeusage!")
+	outln()
+	outln("  Track your usage across AI providers in one place.")
+	outln()
 
-	// Step 1: Show providers
-	fmt.Println("Step 1: Choose providers to set up")
-	fmt.Println()
-
-	for i, pid := range allProviders {
+	// Build options for multi-select
+	options := make([]prompt.SelectOption, 0, len(allProviders))
+	for _, pid := range allProviders {
 		hasCreds, _ := config.CheckProviderCredentials(pid)
-		status := "  "
+		status := ""
 		if hasCreds {
 			status = "✓ "
 		}
 		desc := providerDescriptions[pid]
 		if desc == "" {
-			desc = strings.Title(pid) + " AI"
+			desc = strings.ToUpper(pid[:1]) + pid[1:] + " AI"
 		}
-		fmt.Printf("  %d. %s%-10s %s\n", i+1, status, pid, desc)
+		label := status + pid + " — " + desc
+		options = append(options, prompt.SelectOption{Label: label, Value: pid})
 	}
 
-	fmt.Println()
-	fmt.Println("Enter provider numbers separated by spaces (e.g., '1 3 5')")
-	fmt.Println("Press Enter to skip setup")
-
-	fmt.Print("Providers: ")
-	var input string
-	fmt.Scanln(&input)
-	input = strings.TrimSpace(input)
-
-	if input == "" {
-		fmt.Println("\nNo providers selected. You can set up providers later:")
-		for _, pid := range allProviders {
-			fmt.Printf("  vibeusage auth %s\n", pid)
-		}
-		return nil
-	}
-
-	// Parse selection
-	parts := strings.Fields(input)
-	var selected []string
-	for _, p := range parts {
-		idx, err := strconv.Atoi(p)
-		if err != nil || idx < 1 || idx > len(allProviders) {
-			continue
-		}
-		selected = append(selected, allProviders[idx-1])
+	selected, err := prompt.Default.MultiSelect(prompt.MultiSelectConfig{
+		Title:       "Choose providers to set up",
+		Description: "Space to select, Enter to confirm",
+		Options:     options,
+	})
+	if err != nil {
+		return err
 	}
 
 	if len(selected) == 0 {
-		fmt.Println("No valid providers selected.")
+		outln("\nNo providers selected. You can set up providers later:")
+		for _, pid := range allProviders {
+			out("  vibeusage auth %s\n", pid)
+		}
 		return nil
 	}
 
-	// Step 2: Show setup commands
-	fmt.Printf("\nStep 2: Set up %d provider(s)\n\n", len(selected))
+	out("\nSet up %d provider(s):\n\n", len(selected))
 
 	for _, pid := range selected {
 		hasCreds, _ := config.CheckProviderCredentials(pid)
 		if hasCreds {
-			fmt.Printf("  ✓ %s already configured\n", pid)
+			out("  ✓ %s already configured\n", pid)
 		} else {
-			fmt.Printf("  → %s: vibeusage auth %s\n", pid, pid)
+			out("  → %s: vibeusage auth %s\n", pid, pid)
 		}
 	}
 
-	fmt.Println()
-	fmt.Println("Run the commands above to authenticate each provider.")
-	fmt.Println("After setup, run 'vibeusage' to see your usage.")
+	outln()
+	outln("Run the commands above to authenticate each provider.")
+	outln("After setup, run 'vibeusage' to see your usage.")
 	return nil
 }
