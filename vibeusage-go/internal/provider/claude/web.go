@@ -36,7 +36,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	sessionCookie := httpclient.WithCookie("sessionKey", sessionKey)
 
 	// Fetch usage
-	usageURL := "https://claude.ai/api/organizations/" + orgID + "/usage"
+	usageURL := webBaseURL + "/" + orgID + "/usage"
 	var usageResp WebUsageResponse
 	resp, err := client.GetJSON(usageURL, &usageResp, sessionCookie)
 	if err != nil {
@@ -55,7 +55,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 
 	// Fetch overage
 	var overage *models.OverageUsage
-	overageURL := "https://claude.ai/api/organizations/" + orgID + "/overage_spend_limit"
+	overageURL := webBaseURL + "/" + orgID + "/overage_spend_limit"
 	var overageResp WebOverageResponse
 	oResp, err := client.GetJSON(overageURL, &overageResp, sessionCookie)
 	if err == nil && oResp.StatusCode == 200 && oResp.JSONErr == nil {
@@ -91,7 +91,7 @@ func (s *WebStrategy) getOrgID(sessionKey string) string {
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var orgs []WebOrganization
-	resp, err := client.GetJSON("https://claude.ai/api/organizations", &orgs,
+	resp, err := client.GetJSON(webBaseURL, &orgs,
 		httpclient.WithCookie("sessionKey", sessionKey),
 	)
 	if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {

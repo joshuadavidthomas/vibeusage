@@ -35,6 +35,11 @@ func (c Cursor) FetchStatus() models.ProviderStatus {
 	return provider.FetchStatuspageStatus("https://status.cursor.com/api/v2/status.json")
 }
 
+const (
+	usageSummaryURL = "https://www.cursor.com/api/usage-summary"
+	authMeURL       = "https://www.cursor.com/api/auth/me"
+)
+
 func init() {
 	provider.Register(Cursor{})
 }
@@ -61,7 +66,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 
 	// Fetch usage
 	var usageResp UsageSummaryResponse
-	resp, err := client.PostJSON("https://www.cursor.com/api/usage-summary", nil, &usageResp,
+	resp, err := client.PostJSON(usageSummaryURL, nil, &usageResp,
 		sessionCookie, userAgent,
 	)
 	if err != nil {
@@ -84,7 +89,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	// Fetch user data
 	var userResp *UserMeResponse
 	var u UserMeResponse
-	uResp, err := client.GetJSON("https://www.cursor.com/api/auth/me", &u,
+	uResp, err := client.GetJSON(authMeURL, &u,
 		sessionCookie, userAgent,
 	)
 	if err == nil && uResp.StatusCode == 200 && uResp.JSONErr == nil {

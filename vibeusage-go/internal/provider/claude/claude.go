@@ -6,6 +6,13 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
+const (
+	oauthUsageURL    = "https://api.anthropic.com/api/oauth/usage"
+	oauthTokenURL    = "https://api.anthropic.com/oauth/token"
+	webBaseURL       = "https://claude.ai/api/organizations"
+	anthropicBetaTag = "oauth-2025-04-20"
+)
+
 type Claude struct{}
 
 func (c Claude) Meta() provider.Metadata {

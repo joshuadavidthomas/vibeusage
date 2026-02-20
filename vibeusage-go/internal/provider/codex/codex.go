@@ -40,9 +40,13 @@ func init() {
 	provider.Register(Codex{})
 }
 
-// OAuth client ID extracted from the Codex CLI installation.
-// Required to refresh tokens stored in ~/.codex/auth.json.
-const codexClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
+const (
+	// OAuth client ID extracted from the Codex CLI installation.
+	// Required to refresh tokens stored in ~/.codex/auth.json.
+	codexClientID   = "app_EMoamEEZ73f0CkXaXp7hrann"
+	codexTokenURL   = "https://auth.openai.com/oauth/token"
+	defaultUsageURL = "https://chatgpt.com/backend-api/wham/usage"
+)
 
 type OAuthStrategy struct{}
 
@@ -137,7 +141,7 @@ func (s *OAuthStrategy) refreshToken(creds *Credentials) *Credentials {
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var tokenResp TokenResponse
-	resp, err := client.PostForm("https://auth.openai.com/oauth/token",
+	resp, err := client.PostForm(codexTokenURL,
 		map[string]string{
 			"grant_type":    "refresh_token",
 			"refresh_token": creds.RefreshToken,
@@ -195,7 +199,7 @@ func (s *OAuthStrategy) getUsageURL() string {
 			}
 		}
 	}
-	return "https://chatgpt.com/backend-api/wham/usage"
+	return defaultUsageURL
 }
 
 func (s *OAuthStrategy) parseTypedUsageResponse(resp UsageResponse) *models.UsageSnapshot {

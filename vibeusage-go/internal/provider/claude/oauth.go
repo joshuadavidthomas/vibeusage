@@ -47,9 +47,9 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var usageResp OAuthUsageResponse
-	resp, err := client.GetJSON("https://api.anthropic.com/api/oauth/usage", &usageResp,
+	resp, err := client.GetJSON(oauthUsageURL, &usageResp,
 		httpclient.WithBearer(creds.AccessToken),
-		httpclient.WithHeader("anthropic-beta", "oauth-2025-04-20"),
+		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
 	)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
@@ -114,13 +114,13 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var tokenResp OAuthTokenResponse
-	resp, err := client.PostForm("https://api.anthropic.com/oauth/token",
+	resp, err := client.PostForm(oauthTokenURL,
 		map[string]string{
 			"grant_type":    "refresh_token",
 			"refresh_token": creds.RefreshToken,
 		},
 		&tokenResp,
-		httpclient.WithHeader("anthropic-beta", "oauth-2025-04-20"),
+		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
 	)
 	if err != nil {
 		return nil
