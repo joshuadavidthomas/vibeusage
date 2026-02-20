@@ -1,0 +1,92 @@
+package cmd
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+)
+
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show health status for all providers",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		start := time.Now()
+		statuses := fetchAllStatuses()
+		durationMs := time.Since(start).Milliseconds()
+
+		if jsonOutput {
+			display.OutputStatusJSON(statuses)
+			return nil
+		}
+
+		displayStatusTable(statuses, durationMs)
+		return nil
+	},
+}
+
+func fetchAllStatuses() map[string]models.ProviderStatus {
+	statuses := make(map[string]models.ProviderStatus)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for id, p := range provider.All() {
+		wg.Add(1)
+		go func(pid string, prov provider.Provider) {
+			defer wg.Done()
+			status := prov.FetchStatus()
+			mu.Lock()
+			statuses[pid] = status
+			mu.Unlock()
+		}(id, p)
+	}
+
+	wg.Wait()
+	return statuses
+}
+
+func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs int64) {
+	ids := make([]string, 0, len(statuses))
+	for id := range statuses {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	if quiet {
+		for _, pid := range ids {
+			s := statuses[pid]
+			fmt.Printf("%s: %s %s\n", pid, display.StatusSymbol(s.Level), string(s.Level))
+		}
+		return
+	}
+
+	fmt.Println("Provider Status")
+	fmt.Println(strings.Repeat("─", 70))
+	fmt.Printf("%-12s %-8s %-30s %s\n", "Provider", "Status", "Description", "Updated")
+	fmt.Println(strings.Repeat("─", 70))
+
+	for _, pid := range ids {
+		s := statuses[pid]
+		desc := s.Description
+		if len(desc) > 30 {
+			desc = desc[:27] + "..."
+		}
+		fmt.Printf("%-12s %-8s %-30s %s\n",
+			pid,
+			display.StatusSymbol(s.Level),
+			desc,
+			display.FormatStatusUpdated(s.UpdatedAt),
+		)
+	}
+
+	if verbose && durationMs > 0 {
+		fmt.Printf("\nFetched in %dms\n", durationMs)
+	}
+}

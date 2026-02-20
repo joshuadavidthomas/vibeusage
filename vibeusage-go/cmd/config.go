@@ -1,0 +1,179 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/BurntSushi/toml"
+	"github.com/spf13/cobra"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
+)
+
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Manage configuration settings",
+}
+
+var configShowCmd = &cobra.Command{
+	Use:   "show",
+	Short: "Display current settings",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := config.Get()
+		cfgPath := config.ConfigFile()
+
+		if jsonOutput {
+			display.OutputJSON(map[string]any{
+				"fetch": map[string]any{
+					"timeout":                cfg.Fetch.Timeout,
+					"stale_threshold_minutes": cfg.Fetch.StaleThresholdMinutes,
+					"max_concurrent":          cfg.Fetch.MaxConcurrent,
+				},
+				"enabled_providers": cfg.EnabledProviders,
+				"display": map[string]any{
+					"show_remaining": cfg.Display.ShowRemaining,
+					"pace_colors":    cfg.Display.PaceColors,
+					"reset_format":   cfg.Display.ResetFormat,
+				},
+				"credentials": map[string]any{
+					"use_keyring":               cfg.Credentials.UseKeyring,
+					"reuse_provider_credentials": cfg.Credentials.ReuseProviderCredentials,
+				},
+				"path": cfgPath,
+			})
+			return nil
+		}
+
+		if quiet {
+			fmt.Println(cfgPath)
+			return nil
+		}
+
+		fmt.Printf("Config: %s\n\n", cfgPath)
+		toml.NewEncoder(os.Stdout).Encode(cfg)
+		return nil
+	},
+}
+
+var configPathCmd = &cobra.Command{
+	Use:   "path",
+	Short: "Show directory paths",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		showCache, _ := cmd.Flags().GetBool("cache")
+		showCreds, _ := cmd.Flags().GetBool("credentials")
+
+		if jsonOutput {
+			paths := map[string]string{
+				"config_dir":      config.ConfigDir(),
+				"config_file":     config.ConfigFile(),
+				"cache_dir":       config.CacheDir(),
+				"credentials_dir": config.CredentialsDir(),
+			}
+			if showCache {
+				display.OutputJSON(map[string]string{"cache_dir": config.CacheDir()})
+			} else if showCreds {
+				display.OutputJSON(map[string]string{"credentials_dir": config.CredentialsDir()})
+			} else {
+				display.OutputJSON(paths)
+			}
+			return nil
+		}
+
+		if quiet {
+			if showCache {
+				fmt.Println(config.CacheDir())
+			} else if showCreds {
+				fmt.Println(config.CredentialsDir())
+			} else {
+				fmt.Println(config.ConfigDir())
+			}
+			return nil
+		}
+
+		if showCache {
+			fmt.Println(config.CacheDir())
+		} else if showCreds {
+			fmt.Println(config.CredentialsDir())
+		} else {
+			fmt.Printf("Config dir:    %s\n", config.ConfigDir())
+			fmt.Printf("Config file:   %s\n", config.ConfigFile())
+			fmt.Printf("Cache dir:     %s\n", config.CacheDir())
+			fmt.Printf("Credentials:   %s\n", config.CredentialsDir())
+		}
+		return nil
+	},
+}
+
+var configResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "Reset configuration to defaults",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		confirm, _ := cmd.Flags().GetBool("confirm")
+		if !confirm && !jsonOutput {
+			fmt.Print("This will reset your configuration to defaults. Continue? [y/N] ")
+			var response string
+			fmt.Scanln(&response)
+			if strings.ToLower(response) != "y" {
+				fmt.Println("Reset cancelled")
+				return nil
+			}
+		}
+
+		cfgPath := config.ConfigFile()
+		if err := os.Remove(cfgPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove config: %w", err)
+		}
+
+		if jsonOutput {
+			display.OutputJSON(map[string]any{
+				"success": true,
+				"reset":   true,
+				"message": "Configuration reset to defaults",
+			})
+			return nil
+		}
+
+		fmt.Println("✓ Configuration reset to defaults")
+		return nil
+	},
+}
+
+var configEditCmd = &cobra.Command{
+	Use:   "edit",
+	Short: "Open configuration in editor",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfgPath := config.ConfigFile()
+
+		// Ensure dir and file exist
+		os.MkdirAll(config.ConfigDir(), 0o755)
+		if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
+			cfg := config.DefaultConfig()
+			config.Save(cfg, cfgPath)
+		}
+
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vi"
+		}
+
+		c := exec.Command(editor, cfgPath)
+		c.Stdin = os.Stdin
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		return c.Run()
+	},
+}
+
+func init() {
+	configPathCmd.Flags().BoolP("cache", "c", false, "Show cache directory")
+	configPathCmd.Flags().BoolP("credentials", "r", false, "Show credentials directory")
+	configResetCmd.Flags().BoolP("confirm", "y", false, "Skip confirmation")
+
+	configCmd.AddCommand(configShowCmd)
+	configCmd.AddCommand(configPathCmd)
+	configCmd.AddCommand(configResetCmd)
+	configCmd.AddCommand(configEditCmd)
+}
