@@ -50,6 +50,34 @@ func TestFormatTitle(t *testing.T) {
 	}
 }
 
+func TestFormatCompletionText(t *testing.T) {
+	tests := []struct {
+		name string
+		info CompletionInfo
+		want string
+	}{
+		{
+			"success",
+			CompletionInfo{ProviderID: "copilot", Source: "device_flow", DurationMs: 189, Success: true},
+			"copilot (device_flow, 189ms)",
+		},
+		{
+			"failure",
+			CompletionInfo{ProviderID: "claude", Success: false, Error: "auth failed"},
+			"claude (auth failed)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatCompletionText(tt.info)
+			if got != tt.want {
+				t.Errorf("FormatCompletionText(%+v) = %q, want %q", tt.info, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFormatCompletion(t *testing.T) {
 	tests := []struct {
 		name string

@@ -14,15 +14,23 @@ func ShouldShow(quiet, json, nonTTY bool) bool {
 // It calls fetchFn, passing a callback that fetchFn should invoke
 // when each provider completes. Run blocks until all providers finish.
 func Run(providerIDs []string, fetchFn func(onComplete func(CompletionInfo))) error {
+	if len(providerIDs) == 0 {
+		fetchFn(func(CompletionInfo) {})
+		return nil
+	}
+
 	m := newModel(providerIDs)
 	p := tea.NewProgram(m)
 
+	done := make(chan struct{})
 	go func() {
 		fetchFn(func(info CompletionInfo) {
 			p.Send(completionMsg(info))
 		})
+		close(done)
 	}()
 
 	_, err := p.Run()
+	<-done
 	return err
 }

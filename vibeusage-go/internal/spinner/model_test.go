@@ -14,9 +14,6 @@ func TestNewModel(t *testing.T) {
 	if len(m.inflight) != 3 {
 		t.Errorf("expected 3 inflight, got %d", len(m.inflight))
 	}
-	if m.total != 3 {
-		t.Errorf("expected total=3, got %d", m.total)
-	}
 	if len(m.completed) != 0 {
 		t.Errorf("expected 0 completed, got %d", len(m.completed))
 	}

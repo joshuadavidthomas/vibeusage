@@ -15,14 +15,12 @@ type model struct {
 	spinner   spinner.Model
 	inflight  []string
 	completed []CompletionInfo
-	total     int
 	quitting  bool
 }
 
 var (
 	checkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	crossStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	dimText    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 )
 
 func newModel(providerIDs []string) model {
@@ -36,7 +34,6 @@ func newModel(providerIDs []string) model {
 	return model{
 		spinner:  s,
 		inflight: inflight,
-		total:    len(providerIDs),
 	}
 }
 
@@ -89,7 +86,7 @@ func (m model) View() string {
 			b.WriteString(crossStyle.Render("✗"))
 		}
 		b.WriteString(" ")
-		b.WriteString(FormatCompletion(c)[2:]) // skip the symbol we already rendered styled
+		b.WriteString(FormatCompletionText(c))
 		b.WriteString("\n")
 	}
 

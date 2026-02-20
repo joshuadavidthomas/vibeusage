@@ -30,10 +30,18 @@ func FormatTitle(inflight []string) string {
 	return "Fetching " + strings.Join(inflight, ", ") + "..."
 }
 
-// FormatCompletion formats a single provider completion line.
+// FormatCompletionText formats the text portion of a completion line (without symbol).
+func FormatCompletionText(info CompletionInfo) string {
+	if !info.Success {
+		return fmt.Sprintf("%s (%s)", info.ProviderID, info.Error)
+	}
+	return fmt.Sprintf("%s (%s, %s)", info.ProviderID, info.Source, FormatDuration(info.DurationMs))
+}
+
+// FormatCompletion formats a single provider completion line with symbol.
 func FormatCompletion(info CompletionInfo) string {
 	if !info.Success {
-		return fmt.Sprintf("✗ %s (%s)", info.ProviderID, info.Error)
+		return "✗ " + FormatCompletionText(info)
 	}
-	return fmt.Sprintf("✓ %s (%s, %s)", info.ProviderID, info.Source, FormatDuration(info.DurationMs))
+	return "✓ " + FormatCompletionText(info)
 }

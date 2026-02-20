@@ -4,11 +4,11 @@ import "testing"
 
 func TestShouldShowSpinner(t *testing.T) {
 	tests := []struct {
-		name    string
-		quiet   bool
-		json    bool
-		nonTTY  bool
-		want    bool
+		name   string
+		quiet  bool
+		json   bool
+		nonTTY bool
+		want   bool
 	}{
 		{"interactive", false, false, false, true},
 		{"quiet mode", true, false, false, false},
@@ -26,5 +26,18 @@ func TestShouldShowSpinner(t *testing.T) {
 					tt.quiet, tt.json, tt.nonTTY, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRunEmptyProviders(t *testing.T) {
+	called := false
+	err := Run([]string{}, func(onComplete func(CompletionInfo)) {
+		called = true
+	})
+	if err != nil {
+		t.Errorf("Run with empty providers returned error: %v", err)
+	}
+	if !called {
+		t.Error("expected fetchFn to be called even with empty providers")
 	}
 }
