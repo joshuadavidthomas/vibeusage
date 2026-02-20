@@ -226,7 +226,8 @@ func (s *DeviceFlowStrategy) parseUsageResponse(data map[string]any) *models.Usa
 }
 
 // RunDeviceFlow runs the interactive GitHub device flow for auth.
-func RunDeviceFlow(quiet bool) (bool, error) {
+// Output is written to w, allowing callers to control where messages go.
+func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	// Request device code
@@ -261,19 +262,19 @@ func RunDeviceFlow(quiet bool) (bool, error) {
 
 	// Display instructions
 	if !quiet {
-		fmt.Println("\n🔐 GitHub Device Flow Authentication")
-		fmt.Println()
-		fmt.Printf("  1. Open %s\n", verificationURI)
+		fmt.Fprintln(w, "\n🔐 GitHub Device Flow Authentication")
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "  1. Open %s\n", verificationURI)
 		if len(userCode) == 8 {
-			fmt.Printf("  2. Enter code: %s-%s\n", userCode[:4], userCode[4:])
+			fmt.Fprintf(w, "  2. Enter code: %s-%s\n", userCode[:4], userCode[4:])
 		} else {
-			fmt.Printf("  2. Enter code: %s\n", userCode)
+			fmt.Fprintf(w, "  2. Enter code: %s\n", userCode)
 		}
-		fmt.Println()
-		fmt.Println("  Waiting for authorization...")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "  Waiting for authorization...")
 	} else {
-		fmt.Println(verificationURI)
-		fmt.Printf("Code: %s\n", userCode)
+		fmt.Fprintln(w, verificationURI)
+		fmt.Fprintf(w, "Code: %s\n", userCode)
 	}
 
 	// Poll for token
@@ -312,7 +313,7 @@ func RunDeviceFlow(quiet bool) (bool, error) {
 			content, _ := json.Marshal(tokenData)
 			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
 			if !quiet {
-				fmt.Println("\n  ✓ Authentication successful!")
+				fmt.Fprintln(w, "\n  ✓ Authentication successful!")
 			}
 			return true, nil
 		}
@@ -326,12 +327,12 @@ func RunDeviceFlow(quiet bool) (bool, error) {
 			continue
 		case "expired_token":
 			if !quiet {
-				fmt.Println("\n  ✗ Device code expired.")
+				fmt.Fprintln(w, "\n  ✗ Device code expired.")
 			}
 			return false, nil
 		case "access_denied":
 			if !quiet {
-				fmt.Println("\n  ✗ Authorization denied by user.")
+				fmt.Fprintln(w, "\n  ✗ Authorization denied by user.")
 			}
 			return false, nil
 		default:
@@ -344,7 +345,7 @@ func RunDeviceFlow(quiet bool) (bool, error) {
 	}
 
 	if !quiet {
-		fmt.Println("\n  ⏱ Timeout waiting for authorization.")
+		fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
 	}
 	return false, nil
 }

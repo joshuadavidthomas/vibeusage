@@ -184,7 +184,7 @@ func authCopilot() error {
 		}
 	}
 
-	success, err := copilot.RunDeviceFlow(quiet)
+	success, err := copilot.RunDeviceFlow(outWriter, quiet)
 	if err != nil {
 		return err
 	}
