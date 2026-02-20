@@ -105,13 +105,19 @@ func CheckProviderCredentials(providerID string) (bool, string) {
 	return found, source
 }
 
-func GetAllCredentialStatus() map[string]map[string]any {
-	status := make(map[string]map[string]any)
+// CredentialStatus reports whether a provider has credentials and their source.
+type CredentialStatus struct {
+	HasCredentials bool
+	Source         string
+}
+
+func GetAllCredentialStatus() map[string]CredentialStatus {
+	status := make(map[string]CredentialStatus)
 	for providerID := range ProviderCLIPaths {
 		hasCreds, source := CheckProviderCredentials(providerID)
-		status[providerID] = map[string]any{
-			"has_credentials": hasCreds,
-			"source":          source,
+		status[providerID] = CredentialStatus{
+			HasCredentials: hasCreds,
+			Source:         source,
 		}
 	}
 	return status

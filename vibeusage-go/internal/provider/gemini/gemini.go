@@ -354,6 +354,7 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 					return key
 				}
 			}
+			continue // Don't return raw JSON as an API key
 		}
 		return strings.TrimSpace(string(data))
 	}

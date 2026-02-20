@@ -34,11 +34,9 @@ func displayAllCredentialStatus() error {
 	if jsonOutput {
 		data := make(map[string]any)
 		for pid, info := range allStatus {
-			hasCreds := info["has_credentials"].(bool)
-			source := info["source"].(string)
 			data[pid] = map[string]any{
-				"configured": hasCreds,
-				"source":     source,
+				"configured": info.HasCredentials,
+				"source":     info.Source,
 			}
 		}
 		display.OutputJSON(outWriter, data)
@@ -54,9 +52,8 @@ func displayAllCredentialStatus() error {
 	if quiet {
 		for _, pid := range ids {
 			info := allStatus[pid]
-			hasCreds := info["has_credentials"].(bool)
 			status := "not configured"
-			if hasCreds {
+			if info.HasCredentials {
 				status = "configured"
 			}
 			out("%s: %s\n", pid, status)
@@ -67,14 +64,12 @@ func displayAllCredentialStatus() error {
 	var rows [][]string
 	for _, pid := range ids {
 		info := allStatus[pid]
-		hasCreds := info["has_credentials"].(bool)
-		source := info["source"].(string)
 
 		status := "✗ Not configured"
 		srcLabel := "—"
-		if hasCreds {
+		if info.HasCredentials {
 			status = "✓ Configured"
-			srcLabel = sourceToLabel(source)
+			srcLabel = sourceToLabel(info.Source)
 		}
 		rows = append(rows, []string{pid, status, srcLabel})
 	}
@@ -89,6 +84,16 @@ func displayAllCredentialStatus() error {
 	outln("Set credentials with:")
 	outln("  vibeusage key <provider> set")
 	return nil
+}
+
+// credentialKey returns the JSON field name used when storing a credential
+// for a provider. This must match what the provider's loadCredentials reads.
+var credentialKeyMap = map[string]string{
+	"claude":  "session_key",
+	"codex":   "access_token",
+	"copilot": "access_token",
+	"cursor":  "session_token",
+	"gemini":  "access_token",
 }
 
 func makeKeyProviderCmd(providerID string) *cobra.Command {
@@ -152,7 +157,8 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 				return fmt.Errorf("credential cannot be empty")
 			}
 
-			credData, _ := json.Marshal(map[string]string{"credential": value})
+			jsonKey := credentialKeyMap[providerID]
+			credData, _ := json.Marshal(map[string]string{jsonKey: value})
 			path := config.CredentialPath(providerID, credType)
 			if err := config.WriteCredential(path, credData); err != nil {
 				return fmt.Errorf("error saving credential: %w", err)
