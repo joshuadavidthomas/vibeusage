@@ -43,7 +43,7 @@ const (
 	deviceCodeURL = "https://github.com/login/device/code"
 	tokenURL      = "https://github.com/login/oauth/access_token"
 	usageURL      = "https://api.github.com/copilot_internal/user"
-	clientID      = "Iv1.b507a08c87ecfe98"
+	clientID      = "Iv1.b507a08c87ecfe98" // VS Code Copilot OAuth app client ID
 )
 
 type DeviceFlowStrategy struct{}

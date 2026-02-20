@@ -44,6 +44,13 @@ func init() {
 	provider.Register(Gemini{})
 }
 
+// OAuth client credentials extracted from the Gemini CLI installation.
+// Required to refresh tokens stored in ~/.gemini/oauth_creds.json.
+const (
+	geminiClientID     = "77185425430.apps.googleusercontent.com"
+	geminiClientSecret = "GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv"
+)
+
 // OAuth Strategy
 type OAuthStrategy struct{}
 
@@ -125,8 +132,8 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 		map[string]string{
 			"grant_type":    "refresh_token",
 			"refresh_token": creds.RefreshToken,
-			"client_id":     "77185425430.apps.googleusercontent.com",
-			"client_secret": "GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv",
+			"client_id":     geminiClientID,
+			"client_secret": geminiClientSecret,
 		},
 		&tokenResp,
 	)

@@ -40,6 +40,10 @@ func init() {
 	provider.Register(Codex{})
 }
 
+// OAuth client ID extracted from the Codex CLI installation.
+// Required to refresh tokens stored in ~/.codex/auth.json.
+const codexClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
+
 type OAuthStrategy struct{}
 
 func (s *OAuthStrategy) Name() string { return "oauth" }
@@ -137,7 +141,7 @@ func (s *OAuthStrategy) refreshToken(creds *Credentials) *Credentials {
 		map[string]string{
 			"grant_type":    "refresh_token",
 			"refresh_token": creds.RefreshToken,
-			"client_id":     "app_EMoamEEZ73f0CkXaXp7hrann",
+			"client_id":     codexClientID,
 		},
 		&tokenResp,
 	)
