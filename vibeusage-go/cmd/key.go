@@ -63,22 +63,28 @@ func displayAllCredentialStatus() error {
 	}
 	sort.Strings(ids)
 
-	outln("Credential Status")
-	out("%-12s %-18s %s\n", "Provider", "Status", "Source")
-
+	var rows [][]string
 	for _, pid := range ids {
 		info := allStatus[pid]
 		hasCreds := info["has_credentials"].(bool)
 		source := info["source"].(string)
 
+		status := "✗ Not configured"
+		srcLabel := "—"
 		if hasCreds {
-			out("%-12s %-18s %s\n", pid, "✓ Configured", sourceToLabel(source))
-		} else {
-			out("%-12s %-18s %s\n", pid, "✗ Not configured", "—")
+			status = "✓ Configured"
+			srcLabel = sourceToLabel(source)
 		}
+		rows = append(rows, []string{pid, status, srcLabel})
 	}
 
-	outln("\nSet credentials with:")
+	outln(display.NewTableWithOptions(
+		[]string{"Provider", "Status", "Source"},
+		rows,
+		display.TableOptions{Title: "Credential Status", NoColor: noColor},
+	))
+
+	outln("Set credentials with:")
 	outln("  vibeusage key <provider> set")
 	return nil
 }
