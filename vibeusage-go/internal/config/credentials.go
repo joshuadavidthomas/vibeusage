@@ -1,7 +1,6 @@
 package config
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -90,15 +89,6 @@ func WriteCredential(path string, content []byte) error {
 func ReadCredential(path string) ([]byte, error) {
 	if !fileExists(path) {
 		return nil, nil
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-	mode := info.Mode()
-	if mode&(fs.FileMode(0o077)) != 0 {
-		// File is accessible by group/others — still read it but log warning
-		// In practice we'll be permissive here since Go CLI tools often run differently
 	}
 	return os.ReadFile(path)
 }

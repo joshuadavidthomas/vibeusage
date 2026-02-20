@@ -17,8 +17,8 @@ type WebStrategy struct{}
 func (s *WebStrategy) Name() string { return "web" }
 
 func (s *WebStrategy) IsAvailable() bool {
-	path := config.CredentialPath("claude", "session")
-	return fileExists(path)
+	_, err := os.Stat(config.CredentialPath("claude", "session"))
+	return err == nil
 }
 
 func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
@@ -214,9 +214,4 @@ func getStringField(m map[string]any, keys ...string) string {
 		}
 	}
 	return ""
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
