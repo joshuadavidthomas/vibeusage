@@ -267,10 +267,10 @@ func titleCase(s string) string {
 
 ### Tasks
 
-- [ ] Choose approach (Option B recommended — inputs are all single-word ASCII)
-- [ ] Create `internal/strutil/title.go` helper (or inline in display package)
-- [ ] Replace all `strings.Title` calls
-- [ ] Verify no compiler warnings remain
+- [x] Choose approach (Option B recommended — inputs are all single-word ASCII)
+- [x] Create `internal/strutil/title.go` helper (or inline in display package)
+- [x] Replace all `strings.Title` calls
+- [x] Verify no compiler warnings remain
 
 ## 8. Tests
 
@@ -292,8 +292,8 @@ func titleCase(s string) string {
 
 ### Tasks
 
-- [ ] Set up test infrastructure (decide on testify vs stdlib-only)
-- [ ] Write `models` package tests (table-driven)
+- [x] Set up test infrastructure (decide on testify vs stdlib-only)
+- [x] Write `models` package tests (table-driven)
 - [ ] Write `config` package tests (with temp dirs)
 - [ ] Write `fetch` pipeline tests (with mock strategies)
 - [ ] Write `display` package tests
