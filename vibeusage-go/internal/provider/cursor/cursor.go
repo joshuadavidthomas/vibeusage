@@ -80,25 +80,28 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var usageData map[string]any
-	if err := json.Unmarshal(body, &usageData); err != nil {
+	var usageResp UsageSummaryResponse
+	if err := json.Unmarshal(body, &usageResp); err != nil {
 		return fetch.ResultFail("Invalid usage response"), nil
 	}
 
 	// Fetch user data
-	var userData map[string]any
+	var userResp *UserMeResponse
 	userReq, _ := http.NewRequest("GET", "https://www.cursor.com/api/auth/me", nil)
 	userReq.AddCookie(&http.Cookie{Name: "__Secure-next-auth.session-token", Value: sessionToken})
 	userReq.Header.Set("User-Agent", "Mozilla/5.0")
 
-	userResp, err := client.Do(userReq)
-	if err == nil && userResp.StatusCode == 200 {
-		userBody, _ := io.ReadAll(userResp.Body)
-		userResp.Body.Close()
-		json.Unmarshal(userBody, &userData)
+	userHTTPResp, err := client.Do(userReq)
+	if err == nil && userHTTPResp.StatusCode == 200 {
+		userBody, _ := io.ReadAll(userHTTPResp.Body)
+		userHTTPResp.Body.Close()
+		var u UserMeResponse
+		if json.Unmarshal(userBody, &u) == nil {
+			userResp = &u
+		}
 	}
 
-	snapshot := s.parseResponse(usageData, userData)
+	snapshot := s.parseTypedResponse(usageResp, userResp)
 	if snapshot == nil {
 		return fetch.ResultFail("Failed to parse usage response"), nil
 	}
@@ -112,30 +115,23 @@ func (s *WebStrategy) loadSessionToken() string {
 	if err != nil || data == nil {
 		return ""
 	}
-	var creds map[string]any
+	var creds SessionCredentials
 	if err := json.Unmarshal(data, &creds); err != nil {
 		return strings.TrimSpace(string(data))
 	}
-	for _, key := range []string{"session_token", "token", "session_key", "session"} {
-		if v, ok := creds[key].(string); ok && v != "" {
-			return v
-		}
+	if tok := creds.EffectiveToken(); tok != "" {
+		return tok
 	}
 	return strings.TrimSpace(string(data))
 }
 
-func (s *WebStrategy) parseResponse(usageData, userData map[string]any) *models.UsageSnapshot {
-	if usageData == nil {
-		return nil
-	}
-
+func (s *WebStrategy) parseTypedResponse(usageResp UsageSummaryResponse, userResp *UserMeResponse) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 	var overage *models.OverageUsage
 
-	// Premium requests
-	if premium, ok := usageData["premium_requests"].(map[string]any); ok {
-		used, _ := premium["used"].(float64)
-		available, _ := premium["available"].(float64)
+	if usageResp.PremiumRequests != nil {
+		used := usageResp.PremiumRequests.Used
+		available := usageResp.PremiumRequests.Available
 		total := used + available
 		var utilization int
 		if total > 0 {
@@ -143,16 +139,8 @@ func (s *WebStrategy) parseResponse(usageData, userData map[string]any) *models.
 		}
 
 		var resetsAt *time.Time
-		if bc, ok := usageData["billing_cycle"].(map[string]any); ok {
-			if end, ok := bc["end"].(string); ok {
-				end = strings.Replace(end, "Z", "+00:00", 1)
-				if t, err := time.Parse(time.RFC3339, end); err == nil {
-					resetsAt = &t
-				}
-			} else if endF, ok := bc["end"].(float64); ok {
-				t := time.UnixMilli(int64(endF)).UTC()
-				resetsAt = &t
-			}
+		if usageResp.BillingCycle != nil {
+			resetsAt = usageResp.BillingCycle.EndTime()
 		}
 
 		periods = append(periods, models.UsagePeriod{
@@ -163,27 +151,18 @@ func (s *WebStrategy) parseResponse(usageData, userData map[string]any) *models.
 		})
 	}
 
-	// On-demand spend
-	if onDemand, ok := usageData["on_demand_spend"].(map[string]any); ok {
-		limitCents, _ := onDemand["limit_cents"].(float64)
-		if limitCents > 0 {
-			usedCents, _ := onDemand["used_cents"].(float64)
-			overage = &models.OverageUsage{
-				Used:      usedCents / 100.0,
-				Limit:     limitCents / 100.0,
-				Currency:  "USD",
-				IsEnabled: true,
-			}
+	if usageResp.OnDemandSpend != nil && usageResp.OnDemandSpend.LimitCents > 0 {
+		overage = &models.OverageUsage{
+			Used:      usageResp.OnDemandSpend.UsedCents / 100.0,
+			Limit:     usageResp.OnDemandSpend.LimitCents / 100.0,
+			Currency:  "USD",
+			IsEnabled: true,
 		}
 	}
 
 	var identity *models.ProviderIdentity
-	if userData != nil {
-		email, _ := userData["email"].(string)
-		memberType, _ := userData["membership_type"].(string)
-		if email != "" || memberType != "" {
-			identity = &models.ProviderIdentity{Email: email, Plan: memberType}
-		}
+	if userResp != nil && (userResp.Email != "" || userResp.MembershipType != "") {
+		identity = &models.ProviderIdentity{Email: userResp.Email, Plan: userResp.MembershipType}
 	}
 
 	if len(periods) == 0 {

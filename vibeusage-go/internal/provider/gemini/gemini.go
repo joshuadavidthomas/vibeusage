@@ -73,26 +73,24 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("No OAuth credentials found"), nil
 	}
 
-	accessToken, _ := creds["access_token"].(string)
-	if accessToken == "" {
+	if creds.AccessToken == "" {
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
-	if s.needsRefresh(creds) {
+	if creds.NeedsRefresh() {
 		refreshed := s.refreshToken(creds)
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
 		}
 		creds = refreshed
-		accessToken, _ = creds["access_token"].(string)
 	}
 
-	quotaData, userTierData := s.fetchQuotaData(accessToken)
-	if quotaData == nil {
+	quotaResp, codeAssistResp := s.fetchQuotaData(creds.AccessToken)
+	if quotaResp == nil {
 		return fetch.ResultFail("Failed to fetch quota data"), nil
 	}
 
-	snapshot := s.parseUsageResponse(quotaData, userTierData)
+	snapshot := s.parseTypedQuotaResponse(*quotaResp, codeAssistResp)
 	if snapshot == nil {
 		return fetch.ResultFail("Failed to parse usage response"), nil
 	}
@@ -100,58 +98,31 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) loadCredentials() map[string]any {
+func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
 		if err != nil || data == nil {
 			continue
 		}
-		var creds map[string]any
-		if err := json.Unmarshal(data, &creds); err != nil {
+		var cliCreds GeminiCLICredentials
+		if err := json.Unmarshal(data, &cliCreds); err != nil {
 			continue
 		}
-
-		// Handle Gemini CLI nested format
-		if installed, ok := creds["installed"].(map[string]any); ok {
-			return convertGeminiCLIFormat(installed)
-		}
-		if _, ok := creds["token"]; ok {
-			if _, ok2 := creds["access_token"]; !ok2 {
-				return map[string]any{
-					"access_token":  creds["token"],
-					"refresh_token": creds["refresh_token"],
-					"expires_at":    creds["expiry_date"],
-				}
-			}
-		}
-		if _, ok := creds["access_token"]; ok {
+		if creds := cliCreds.EffectiveCredentials(); creds != nil {
 			return creds
 		}
 	}
 	return nil
 }
 
-func (s *OAuthStrategy) needsRefresh(creds map[string]any) bool {
-	expiresAt, ok := creds["expires_at"].(string)
-	if !ok {
-		return false
-	}
-	expiry, err := time.Parse(time.RFC3339, expiresAt)
-	if err != nil {
-		return true
-	}
-	return time.Now().UTC().Add(5 * time.Minute).After(expiry)
-}
-
-func (s *OAuthStrategy) refreshToken(creds map[string]any) map[string]any {
-	refreshToken, _ := creds["refresh_token"].(string)
-	if refreshToken == "" {
+func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials {
+	if creds.RefreshToken == "" {
 		return nil
 	}
 
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
-		"refresh_token": {refreshToken},
+		"refresh_token": {creds.RefreshToken},
 		"client_id":     {"77185425430.apps.googleusercontent.com"},
 		"client_secret": {"GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv"},
 	}
@@ -167,87 +138,82 @@ func (s *OAuthStrategy) refreshToken(creds map[string]any) map[string]any {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]any
-	if err := json.Unmarshal(body, &data); err != nil {
+	var tokenResp TokenResponse
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return nil
 	}
 
-	if expiresIn, ok := data["expires_in"].(float64); ok {
-		data["expires_at"] = time.Now().UTC().Add(time.Duration(expiresIn) * time.Second).Format(time.RFC3339)
-	}
-	if _, ok := data["refresh_token"]; !ok {
-		data["refresh_token"] = refreshToken
+	updated := &OAuthCredentials{
+		AccessToken:  tokenResp.AccessToken,
+		RefreshToken: tokenResp.RefreshToken,
 	}
 
-	content, _ := json.Marshal(data)
+	if tokenResp.ExpiresIn > 0 {
+		updated.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
+	}
+
+	// Preserve refresh token if the server didn't issue a new one
+	if updated.RefreshToken == "" {
+		updated.RefreshToken = creds.RefreshToken
+	}
+
+	content, _ := json.Marshal(updated)
 	_ = config.WriteCredential(config.CredentialPath("gemini", "oauth"), content)
 
-	return data
+	return updated
 }
 
-func (s *OAuthStrategy) fetchQuotaData(accessToken string) (map[string]any, map[string]any) {
+func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *CodeAssistResponse) {
 	client := &http.Client{Timeout: 30 * time.Second}
-	var quotaData, userData map[string]any
+	var quotaResp *QuotaResponse
+	var codeAssistResp *CodeAssistResponse
 
 	// Quota
 	qReq, _ := http.NewRequest("POST", "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota", strings.NewReader("{}"))
 	qReq.Header.Set("Authorization", "Bearer "+accessToken)
 	qReq.Header.Set("Content-Type", "application/json")
-	if qResp, err := client.Do(qReq); err == nil && qResp.StatusCode == 200 {
-		body, _ := io.ReadAll(qResp.Body)
-		qResp.Body.Close()
-		json.Unmarshal(body, &quotaData)
+	if qHTTPResp, err := client.Do(qReq); err == nil && qHTTPResp.StatusCode == 200 {
+		body, _ := io.ReadAll(qHTTPResp.Body)
+		qHTTPResp.Body.Close()
+		var qr QuotaResponse
+		if json.Unmarshal(body, &qr) == nil {
+			quotaResp = &qr
+		}
 	}
 
 	// User tier
 	tReq, _ := http.NewRequest("POST", "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", strings.NewReader("{}"))
 	tReq.Header.Set("Authorization", "Bearer "+accessToken)
 	tReq.Header.Set("Content-Type", "application/json")
-	if tResp, err := client.Do(tReq); err == nil && tResp.StatusCode == 200 {
-		body, _ := io.ReadAll(tResp.Body)
-		tResp.Body.Close()
-		json.Unmarshal(body, &userData)
+	if tHTTPResp, err := client.Do(tReq); err == nil && tHTTPResp.StatusCode == 200 {
+		body, _ := io.ReadAll(tHTTPResp.Body)
+		tHTTPResp.Body.Close()
+		var ca CodeAssistResponse
+		if json.Unmarshal(body, &ca) == nil {
+			codeAssistResp = &ca
+		}
 	}
 
-	return quotaData, userData
+	return quotaResp, codeAssistResp
 }
 
-func (s *OAuthStrategy) parseUsageResponse(quotaData, userData map[string]any) *models.UsageSnapshot {
+func (s *OAuthStrategy) parseTypedQuotaResponse(quotaResp QuotaResponse, codeAssistResp *CodeAssistResponse) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	if buckets, ok := quotaData["quota_buckets"].([]any); ok {
-		for _, b := range buckets {
-			bucket, ok := b.(map[string]any)
-			if !ok {
-				continue
-			}
-			remainingFraction := 1.0
-			if rf, ok := bucket["remaining_fraction"].(float64); ok {
-				remainingFraction = rf
-			}
-			utilization := int((1 - remainingFraction) * 100)
-			modelID, _ := bucket["model_id"].(string)
-			modelName := modelID
-			if idx := strings.LastIndex(modelID, "/"); idx >= 0 {
-				modelName = modelID[idx+1:]
-			}
-
-			var resetsAt *time.Time
-			if resetStr, ok := bucket["reset_time"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, resetStr); err == nil {
-					resetsAt = &t
-				}
-			}
-
-			displayName := strutil.TitleCase(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
-			periods = append(periods, models.UsagePeriod{
-				Name:        displayName,
-				Utilization: utilization,
-				PeriodType:  models.PeriodDaily,
-				ResetsAt:    resetsAt,
-				Model:       modelName,
-			})
+	for _, bucket := range quotaResp.QuotaBuckets {
+		modelName := bucket.ModelID
+		if idx := strings.LastIndex(bucket.ModelID, "/"); idx >= 0 {
+			modelName = bucket.ModelID[idx+1:]
 		}
+
+		displayName := strutil.TitleCase(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
+		periods = append(periods, models.UsagePeriod{
+			Name:        displayName,
+			Utilization: bucket.Utilization(),
+			PeriodType:  models.PeriodDaily,
+			ResetsAt:    bucket.ResetTimeUTC(),
+			Model:       modelName,
+		})
 	}
 
 	if len(periods) == 0 {
@@ -261,10 +227,8 @@ func (s *OAuthStrategy) parseUsageResponse(quotaData, userData map[string]any) *
 	}
 
 	var identity *models.ProviderIdentity
-	if userData != nil {
-		if tier, ok := userData["user_tier"].(string); ok {
-			identity = &models.ProviderIdentity{Plan: tier}
-		}
+	if codeAssistResp != nil && codeAssistResp.UserTier != "" {
+		identity = &models.ProviderIdentity{Plan: codeAssistResp.UserTier}
 	}
 
 	now := time.Now().UTC()
@@ -328,13 +292,10 @@ func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]any
-	json.Unmarshal(body, &data)
+	var modelsResp ModelsResponse
+	json.Unmarshal(body, &modelsResp)
 
-	modelCount := 0
-	if modelsSlice, ok := data["models"].([]any); ok {
-		modelCount = len(modelsSlice)
-	}
+	modelCount := len(modelsResp.Models)
 
 	tomorrow := nextMidnightUTC()
 	snapshot := models.UsageSnapshot{
@@ -358,6 +319,19 @@ func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
 	return fetch.ResultOK(snapshot), nil
 }
 
+// apiKeyFile represents JSON credential files that contain an API key.
+type apiKeyFile struct {
+	APIKey string `json:"api_key,omitempty"`
+	Key    string `json:"key,omitempty"`
+}
+
+func (a *apiKeyFile) effectiveKey() string {
+	if a.APIKey != "" {
+		return a.APIKey
+	}
+	return a.Key
+}
+
 func (s *APIKeyStrategy) loadAPIKey() string {
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
 		return key
@@ -370,12 +344,10 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 			continue
 		}
 		if suffix == ".json" {
-			var obj map[string]any
-			if json.Unmarshal(data, &obj) == nil {
-				for _, k := range []string{"api_key", "key"} {
-					if v, ok := obj[k].(string); ok {
-						return v
-					}
+			var keyFile apiKeyFile
+			if json.Unmarshal(data, &keyFile) == nil {
+				if key := keyFile.effectiveKey(); key != "" {
+					return key
 				}
 			}
 		}
@@ -398,7 +370,7 @@ func fetchGeminiStatus() models.ProviderStatus {
 		return models.ProviderStatus{Level: models.StatusUnknown}
 	}
 
-	var incidents []map[string]any
+	var incidents []googleIncident
 	if err := json.Unmarshal(body, &incidents); err != nil {
 		return models.ProviderStatus{Level: models.StatusUnknown}
 	}
@@ -406,20 +378,18 @@ func fetchGeminiStatus() models.ProviderStatus {
 	geminiKeywords := []string{"gemini", "ai studio", "aistudio", "generative ai", "vertex ai", "cloud code"}
 
 	for _, incident := range incidents {
-		if _, ok := incident["end_time"]; ok {
+		if incident.EndTime != "" {
 			continue // ended
 		}
-		title, _ := incident["title"].(string)
-		titleLower := strings.ToLower(title)
+		titleLower := strings.ToLower(incident.Title)
 
 		for _, keyword := range geminiKeywords {
 			if strings.Contains(titleLower, keyword) {
-				severity, _ := incident["severity"].(string)
-				level := severityToLevel(severity)
+				level := severityToLevel(incident.Severity)
 				now := time.Now().UTC()
 				return models.ProviderStatus{
 					Level:       level,
-					Description: title,
+					Description: incident.Title,
 					UpdatedAt:   &now,
 				}
 			}
@@ -445,30 +415,6 @@ func severityToLevel(severity string) models.StatusLevel {
 	default:
 		return models.StatusDegraded
 	}
-}
-
-func convertGeminiCLIFormat(data map[string]any) map[string]any {
-	accessToken, _ := data["token"].(string)
-	if accessToken == "" {
-		accessToken, _ = data["access_token"].(string)
-	}
-	if accessToken == "" {
-		return nil
-	}
-	result := map[string]any{
-		"access_token":  accessToken,
-		"refresh_token": data["refresh_token"],
-	}
-	if expiry := data["expiry_date"]; expiry != nil {
-		switch v := expiry.(type) {
-		case float64:
-			t := time.UnixMilli(int64(v)).UTC()
-			result["expires_at"] = t.Format(time.RFC3339)
-		case string:
-			result["expires_at"] = v
-		}
-	}
-	return result
 }
 
 func nextMidnightUTC() time.Time {

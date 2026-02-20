@@ -146,12 +146,12 @@ type claudeUsageResponse struct {
 
 - [x] Define response structs for Claude OAuth API
 - [x] Define response structs for Claude Web API
-- [ ] Define response structs for Codex API
-- [ ] Define response structs for Copilot API (usage + device flow)
-- [ ] Define response structs for Cursor API
-- [ ] Define response structs for Gemini API (quota + token refresh)
-- [~] Migrate each provider's `Fetch()` and parse methods to use typed structs (Claude OAuth + Web done)
-- [ ] Replace `map[string]any` in credential loading where possible
+- [x] Define response structs for Codex API
+- [x] Define response structs for Copilot API (usage + device flow)
+- [x] Define response structs for Cursor API
+- [x] Define response structs for Gemini API (quota + token refresh)
+- [x] Migrate each provider's `Fetch()` and parse methods to use typed structs
+- [x] Replace `map[string]any` in credential loading where possible
 
 ## 5. Shared HTTP Client
 
