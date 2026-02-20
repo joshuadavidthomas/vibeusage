@@ -18,6 +18,9 @@ func setupTempDir(t *testing.T) string {
 	dir := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
 	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(dir, "cache"))
+	// Clear env override variables so tests aren't affected by the host environment.
+	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "")
+	t.Setenv("VIBEUSAGE_NO_COLOR", "")
 	// Reset global config so tests don't leak state.
 	configMu.Lock()
 	globalConfig = nil
