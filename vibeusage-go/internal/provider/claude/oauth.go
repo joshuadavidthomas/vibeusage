@@ -2,9 +2,7 @@ package claude
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/url"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -46,16 +45,15 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 		creds = refreshed
 	}
 
-	req, _ := http.NewRequest("GET", "https://api.anthropic.com/api/oauth/usage", nil)
-	req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
-	req.Header.Set("anthropic-beta", "oauth-2025-04-20")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	client := httpclient.New()
+	var usageResp OAuthUsageResponse
+	resp, err := client.GetJSON("https://api.anthropic.com/api/oauth/usage", &usageResp,
+		httpclient.WithBearer(creds.AccessToken),
+		httpclient.WithHeader("anthropic-beta", "oauth-2025-04-20"),
+	)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
 		return fetch.ResultFail("OAuth token expired or invalid"), nil
@@ -64,12 +62,9 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("Not authorized to access usage"), nil
 	}
 	if resp.StatusCode != 200 {
-		return fetch.ResultFail("Usage request failed: " + resp.Status), nil
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var usageResp OAuthUsageResponse
-	if err := json.Unmarshal(body, &usageResp); err != nil {
+	if resp.JSONErr != nil {
 		return fetch.ResultFail("Invalid response from usage endpoint"), nil
 	}
 
@@ -117,29 +112,23 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 		return nil
 	}
 
-	form := url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {creds.RefreshToken},
-	}
-
-	req, _ := http.NewRequest("POST", "https://api.anthropic.com/oauth/token", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("anthropic-beta", "oauth-2025-04-20")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	client := httpclient.New()
+	var tokenResp OAuthTokenResponse
+	resp, err := client.PostForm("https://api.anthropic.com/oauth/token",
+		map[string]string{
+			"grant_type":    "refresh_token",
+			"refresh_token": creds.RefreshToken,
+		},
+		&tokenResp,
+		httpclient.WithHeader("anthropic-beta", "oauth-2025-04-20"),
+	)
 	if err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
-
 	if resp.StatusCode != 200 {
 		return nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var tokenResp OAuthTokenResponse
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
+	if resp.JSONErr != nil {
 		return nil
 	}
 

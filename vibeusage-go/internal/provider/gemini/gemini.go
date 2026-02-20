@@ -2,9 +2,7 @@ package gemini
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/url"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +11,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
@@ -120,29 +119,24 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 		return nil
 	}
 
-	form := url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {creds.RefreshToken},
-		"client_id":     {"77185425430.apps.googleusercontent.com"},
-		"client_secret": {"GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv"},
-	}
-
-	req, _ := http.NewRequest("POST", "https://oauth2.googleapis.com/token", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	client := httpclient.New()
+	var tokenResp TokenResponse
+	resp, err := client.PostForm("https://oauth2.googleapis.com/token",
+		map[string]string{
+			"grant_type":    "refresh_token",
+			"refresh_token": creds.RefreshToken,
+			"client_id":     "77185425430.apps.googleusercontent.com",
+			"client_secret": "GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv",
+		},
+		&tokenResp,
+	)
 	if err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var tokenResp TokenResponse
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
+	if resp.JSONErr != nil {
 		return nil
 	}
 
@@ -167,38 +161,27 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 }
 
 func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *CodeAssistResponse) {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := httpclient.New()
+	bearer := httpclient.WithBearer(accessToken)
 	var quotaResp *QuotaResponse
 	var codeAssistResp *CodeAssistResponse
 
 	// Quota
-	qReq, _ := http.NewRequest("POST", "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota", strings.NewReader("{}"))
-	qReq.Header.Set("Authorization", "Bearer "+accessToken)
-	qReq.Header.Set("Content-Type", "application/json")
-	if qHTTPResp, err := client.Do(qReq); err == nil {
-		defer qHTTPResp.Body.Close()
-		if qHTTPResp.StatusCode == 200 {
-			body, _ := io.ReadAll(qHTTPResp.Body)
-			var qr QuotaResponse
-			if json.Unmarshal(body, &qr) == nil {
-				quotaResp = &qr
-			}
-		}
+	var qr QuotaResponse
+	qResp, err := client.PostJSON("https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+		json.RawMessage("{}"), &qr, bearer,
+	)
+	if err == nil && qResp.StatusCode == 200 && qResp.JSONErr == nil {
+		quotaResp = &qr
 	}
 
 	// User tier
-	tReq, _ := http.NewRequest("POST", "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", strings.NewReader("{}"))
-	tReq.Header.Set("Authorization", "Bearer "+accessToken)
-	tReq.Header.Set("Content-Type", "application/json")
-	if tHTTPResp, err := client.Do(tReq); err == nil {
-		defer tHTTPResp.Body.Close()
-		if tHTTPResp.StatusCode == 200 {
-			body, _ := io.ReadAll(tHTTPResp.Body)
-			var ca CodeAssistResponse
-			if json.Unmarshal(body, &ca) == nil {
-				codeAssistResp = &ca
-			}
-		}
+	var ca CodeAssistResponse
+	tResp, err := client.PostJSON("https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+		json.RawMessage("{}"), &ca, bearer,
+	)
+	if err == nil && tResp.StatusCode == 200 && tResp.JSONErr == nil {
+		codeAssistResp = &ca
 	}
 
 	return quotaResp, codeAssistResp
@@ -273,14 +256,12 @@ func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	// Validate key by fetching models
-	client := &http.Client{Timeout: 30 * time.Second}
-	req, _ := http.NewRequest("GET", "https://generativelanguage.googleapis.com/v1beta/models?key="+apiKey, nil)
-
-	resp, err := client.Do(req)
+	client := httpclient.New()
+	var modelsResp ModelsResponse
+	resp, err := client.GetJSON("https://generativelanguage.googleapis.com/v1beta/models?key="+apiKey, &modelsResp)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
 		return fetch.ResultFatal("API key is invalid or expired"), nil
@@ -292,12 +273,8 @@ func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFatal("Rate limit exceeded"), nil
 	}
 	if resp.StatusCode != 200 {
-		return fetch.ResultFatal("Failed to validate API key: " + resp.Status), nil
+		return fetch.ResultFatal(fmt.Sprintf("Failed to validate API key: %d", resp.StatusCode)), nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var modelsResp ModelsResponse
-	json.Unmarshal(body, &modelsResp)
 
 	modelCount := len(modelsResp.Models)
 
@@ -363,20 +340,10 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 
 // Status
 func fetchGeminiStatus() models.ProviderStatus {
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get("https://www.google.com/appsstatus/dashboard/incidents.json")
-	if err != nil {
-		return models.ProviderStatus{Level: models.StatusUnknown}
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return models.ProviderStatus{Level: models.StatusUnknown}
-	}
-
+	client := httpclient.NewWithTimeout(10 * time.Second)
 	var incidents []googleIncident
-	if err := json.Unmarshal(body, &incidents); err != nil {
+	resp, err := client.GetJSON("https://www.google.com/appsstatus/dashboard/incidents.json", &incidents)
+	if err != nil || resp.JSONErr != nil {
 		return models.ProviderStatus{Level: models.StatusUnknown}
 	}
 

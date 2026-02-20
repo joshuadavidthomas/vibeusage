@@ -2,9 +2,7 @@ package codex
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/url"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +10,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -74,15 +73,12 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 
 	usageURL := s.getUsageURL()
 
-	req, _ := http.NewRequest("GET", usageURL, nil)
-	req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	client := httpclient.New()
+	var usageResp UsageResponse
+	resp, err := client.GetJSON(usageURL, &usageResp, httpclient.WithBearer(creds.AccessToken))
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
 		return fetch.ResultFatal("OAuth token expired or invalid"), nil
@@ -91,12 +87,9 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("Not authorized. Account may not have ChatGPT Plus/Pro subscription."), nil
 	}
 	if resp.StatusCode != 200 {
-		return fetch.ResultFail("Usage request failed: " + resp.Status), nil
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var usageResp UsageResponse
-	if err := json.Unmarshal(body, &usageResp); err != nil {
+	if resp.JSONErr != nil {
 		return fetch.ResultFail("Invalid response from usage endpoint"), nil
 	}
 
@@ -138,28 +131,23 @@ func (s *OAuthStrategy) refreshToken(creds *Credentials) *Credentials {
 		return nil
 	}
 
-	form := url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {creds.RefreshToken},
-		"client_id":     {"app_EMoamEEZ73f0CkXaXp7hrann"},
-	}
-
-	req, _ := http.NewRequest("POST", "https://auth.openai.com/oauth/token", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	client := httpclient.New()
+	var tokenResp TokenResponse
+	resp, err := client.PostForm("https://auth.openai.com/oauth/token",
+		map[string]string{
+			"grant_type":    "refresh_token",
+			"refresh_token": creds.RefreshToken,
+			"client_id":     "app_EMoamEEZ73f0CkXaXp7hrann",
+		},
+		&tokenResp,
+	)
 	if err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var tokenResp TokenResponse
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
+	if resp.JSONErr != nil {
 		return nil
 	}
 
