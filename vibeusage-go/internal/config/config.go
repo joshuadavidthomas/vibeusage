@@ -78,16 +78,25 @@ func (c Config) IsProviderEnabled(providerID string) bool {
 
 var (
 	globalConfig *Config
-	configOnce   sync.Once
-	configMu     sync.Mutex
+	configMu     sync.RWMutex
 )
 
 func Get() Config {
-	configOnce.Do(func() {
-		c := Load("")
-		globalConfig = &c
-	})
-	return *globalConfig
+	configMu.RLock()
+	if c := globalConfig; c != nil {
+		configMu.RUnlock()
+		return *c
+	}
+	configMu.RUnlock()
+
+	configMu.Lock()
+	defer configMu.Unlock()
+	if globalConfig != nil {
+		return *globalConfig
+	}
+	c := Load("")
+	globalConfig = &c
+	return c
 }
 
 func Reload() Config {
@@ -95,8 +104,6 @@ func Reload() Config {
 	defer configMu.Unlock()
 	c := Load("")
 	globalConfig = &c
-	configOnce = sync.Once{} // reset
-	configOnce.Do(func() {}) // mark as done
 	return c
 }
 
