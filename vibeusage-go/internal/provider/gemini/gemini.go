@@ -250,12 +250,9 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 	if os.Getenv("GEMINI_API_KEY") != "" {
 		return true
 	}
-	paths := []string{
-		config.CredentialPath("gemini", "api_key") + ".txt",
-		config.CredentialPath("gemini", "api_key"),
-	}
-	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil {
+	credDir := filepath.Join(config.CredentialsDir(), "gemini")
+	for _, name := range []string{"api_key.txt", "api_key.json"} {
+		if _, err := os.Stat(filepath.Join(credDir, name)); err == nil {
 			return true
 		}
 	}

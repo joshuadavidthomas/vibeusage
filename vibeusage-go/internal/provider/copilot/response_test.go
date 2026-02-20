@@ -99,6 +99,11 @@ func TestQuota_Utilization(t *testing.T) {
 			q:    Quota{Entitlement: 0, Remaining: 0, Unlimited: false},
 			want: 0,
 		},
+		{
+			name: "remaining exceeds entitlement clamped to 0",
+			q:    Quota{Entitlement: 100, Remaining: 150, Unlimited: false},
+			want: 0,
+		},
 	}
 
 	for _, tt := range tests {

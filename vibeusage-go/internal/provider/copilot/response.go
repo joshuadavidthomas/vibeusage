@@ -21,14 +21,15 @@ type Quota struct {
 	Unlimited   bool    `json:"unlimited"`
 }
 
-// Utilization returns the percentage of quota used (0-100).
+// Utilization returns the percentage of quota used, clamped to [0, 100].
 func (q *Quota) Utilization() int {
 	if q.Unlimited && q.Entitlement == 0 {
 		return 0
 	}
 	if q.Entitlement > 0 {
 		used := q.Entitlement - q.Remaining
-		return int((used / q.Entitlement) * 100)
+		pct := int((used / q.Entitlement) * 100)
+		return max(0, min(pct, 100))
 	}
 	return 0
 }

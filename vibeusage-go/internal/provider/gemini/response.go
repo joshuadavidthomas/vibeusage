@@ -14,14 +14,15 @@ type QuotaBucket struct {
 	ResetTime         string   `json:"reset_time,omitempty"`
 }
 
-// Utilization returns the usage percentage (0-100).
+// Utilization returns the usage percentage, clamped to [0, 100].
 // If remaining_fraction is absent, assumes full quota remaining (0% used).
 func (b *QuotaBucket) Utilization() int {
 	rf := 1.0
 	if b.RemainingFraction != nil {
 		rf = *b.RemainingFraction
 	}
-	return int((1 - rf) * 100)
+	pct := int((1 - rf) * 100)
+	return max(0, min(pct, 100))
 }
 
 // ResetTimeUTC parses the reset_time as a time.Time.

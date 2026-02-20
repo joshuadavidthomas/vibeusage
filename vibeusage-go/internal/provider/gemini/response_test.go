@@ -67,6 +67,8 @@ func TestQuotaBucket_Utilization(t *testing.T) {
 		{"100% remaining", ptrFloat64(1.0), 0},
 		{"50% remaining", ptrFloat64(0.5), 50},
 		{"nil defaults to 0% used", nil, 0},
+		{"remaining > 1.0 clamped to 0", ptrFloat64(1.5), 0},
+		{"negative remaining clamped to 100", ptrFloat64(-0.5), 100},
 	}
 
 	for _, tt := range tests {
