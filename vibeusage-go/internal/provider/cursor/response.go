@@ -33,12 +33,7 @@ func (bc *BillingCycle) EndTime() *time.Time {
 	// Try string first
 	var s string
 	if json.Unmarshal(bc.EndRaw, &s) == nil && s != "" {
-		// Normalize Z suffix
-		parsed := s
-		if len(parsed) > 0 && parsed[len(parsed)-1] == 'Z' {
-			parsed = parsed[:len(parsed)-1] + "+00:00"
-		}
-		if t, err := time.Parse(time.RFC3339, parsed); err == nil {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
 			return &t
 		}
 	}

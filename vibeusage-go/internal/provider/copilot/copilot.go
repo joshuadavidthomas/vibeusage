@@ -126,8 +126,7 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 
 	var resetsAt *time.Time
 	if resp.QuotaResetDateUTC != "" {
-		resetStr := strings.Replace(resp.QuotaResetDateUTC, "Z", "+00:00", 1)
-		if t, err := time.Parse(time.RFC3339, resetStr); err == nil {
+		if t, err := time.Parse(time.RFC3339, resp.QuotaResetDateUTC); err == nil {
 			resetsAt = &t
 		}
 	}
