@@ -312,6 +312,45 @@ func TestClaudeCLICredentials_ToOAuthCredentials(t *testing.T) {
 	}
 }
 
+func TestClaudeCLIOAuth_ToOAuthCredentials_ZeroExpiresAt(t *testing.T) {
+	cliOAuth := ClaudeCLIOAuth{
+		AccessToken:  "tok",
+		RefreshToken: "ref",
+		ExpiresAt:    0,
+	}
+
+	creds := cliOAuth.ToOAuthCredentials()
+
+	if creds.AccessToken != "tok" {
+		t.Errorf("access_token = %q, want %q", creds.AccessToken, "tok")
+	}
+	if creds.ExpiresAt != "" {
+		t.Errorf("expires_at = %q, want empty for zero timestamp", creds.ExpiresAt)
+	}
+}
+
+func TestOAuthCredentials_Roundtrip(t *testing.T) {
+	original := OAuthCredentials{
+		AccessToken:  "my-token",
+		RefreshToken: "my-refresh",
+		ExpiresAt:    "2025-02-19T22:00:00Z",
+	}
+
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+
+	var decoded OAuthCredentials
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if decoded != original {
+		t.Errorf("roundtrip mismatch: got %+v, want %+v", decoded, original)
+	}
+}
+
 func TestClaudeCLICredentials_NilOAuth(t *testing.T) {
 	raw := `{}`
 
