@@ -56,6 +56,16 @@ func setupTempDirWithCredentialIsolation(t *testing.T) string {
 	return dir
 }
 
+func writeTestFile(t *testing.T, path string, content []byte) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%s): %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("WriteFile(%s): %v", path, err)
+	}
+}
+
 // DefaultConfig
 
 func TestDefaultConfig_Values(t *testing.T) {
@@ -210,8 +220,7 @@ func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
 func TestLoad_MalformedTOML_ReturnsDefaults(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "bad.toml")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, []byte("this is not valid [[[toml"), 0o644)
+	writeTestFile(t, path, []byte("this is not valid [[[toml"))
 
 	cfg := Load(path)
 	def := DefaultConfig()
@@ -224,11 +233,10 @@ func TestLoad_MalformedTOML_ReturnsDefaults(t *testing.T) {
 func TestLoad_PartialTOML_MergesWithDefaults(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "partial.toml")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, []byte(`
+	writeTestFile(t, path, []byte(`
 [fetch]
 timeout = 10.0
-`), 0o644)
+`))
 
 	cfg := Load(path)
 
@@ -247,12 +255,11 @@ timeout = 10.0
 func TestLoad_InitializesNilProvidersMap(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "noproviders.toml")
-	os.MkdirAll(filepath.Dir(path), 0o755)
 	// TOML with no [providers] section at all
-	os.WriteFile(path, []byte(`
+	writeTestFile(t, path, []byte(`
 [fetch]
 timeout = 15.0
-`), 0o644)
+`))
 
 	cfg := Load(path)
 	if cfg.Providers == nil {
@@ -412,10 +419,9 @@ func TestApplyEnvOverrides_NotSet_LeavesDefaults(t *testing.T) {
 func TestLoad_RespectsEnvOverrides(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "config.toml")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, []byte(`
+	writeTestFile(t, path, []byte(`
 enabled_providers = ["claude", "copilot", "gemini"]
-`), 0o644)
+`))
 
 	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "cursor")
 
@@ -472,8 +478,7 @@ func TestGet_ReturnsCopy(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
 	configPath := filepath.Join(dir, "config", "config.toml")
-	os.MkdirAll(filepath.Dir(configPath), 0o755)
-	os.WriteFile(configPath, []byte(`enabled_providers = ["claude", "copilot"]`), 0o644)
+	writeTestFile(t, configPath, []byte(`enabled_providers = ["claude", "copilot"]`))
 
 	cfg5 := Get()
 	if len(cfg5.EnabledProviders) != 2 {
@@ -497,11 +502,10 @@ func TestReload_ReturnsCurrentConfig(t *testing.T) {
 func TestGet_LoadsOnFirstCall(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "config", "config.toml")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, []byte(`
+	writeTestFile(t, path, []byte(`
 [fetch]
 timeout = 77.0
-`), 0o644)
+`))
 
 	cfg := Get()
 	if cfg.Fetch.Timeout != 77.0 {
@@ -512,21 +516,20 @@ timeout = 77.0
 func TestReload_PicksUpChanges(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "config", "config.toml")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, []byte(`
+	writeTestFile(t, path, []byte(`
 [fetch]
 timeout = 10.0
-`), 0o644)
+`))
 
 	cfg1 := Get()
 	if cfg1.Fetch.Timeout != 10.0 {
 		t.Fatalf("initial Get() Fetch.Timeout = %v, want 10.0", cfg1.Fetch.Timeout)
 	}
 
-	os.WriteFile(path, []byte(`
+	writeTestFile(t, path, []byte(`
 [fetch]
 timeout = 20.0
-`), 0o644)
+`))
 
 	cfg2 := Reload()
 	if cfg2.Fetch.Timeout != 20.0 {
@@ -646,8 +649,7 @@ func TestLoadCachedSnapshot_MissingFile_ReturnsNil(t *testing.T) {
 func TestLoadCachedSnapshot_MalformedJSON_ReturnsNil(t *testing.T) {
 	setupTempDir(t)
 	path := SnapshotPath("broken")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, []byte("{not json}"), 0o644)
+	writeTestFile(t, path, []byte("{not json}"))
 
 	if got := LoadCachedSnapshot("broken"); got != nil {
 		t.Errorf("LoadCachedSnapshot() = %+v, want nil for malformed JSON", got)
@@ -657,8 +659,7 @@ func TestLoadCachedSnapshot_MalformedJSON_ReturnsNil(t *testing.T) {
 func TestLoadCachedSnapshot_EmptyFile_ReturnsNil(t *testing.T) {
 	setupTempDir(t)
 	path := SnapshotPath("empty")
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	os.WriteFile(path, []byte(""), 0o644)
+	writeTestFile(t, path, []byte(""))
 
 	if got := LoadCachedSnapshot("empty"); got != nil {
 		t.Errorf("LoadCachedSnapshot() = %+v, want nil for empty file", got)
@@ -1025,7 +1026,9 @@ func TestReadCredential_MissingFile_ReturnsNilNil(t *testing.T) {
 func TestDeleteCredential_ExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cred.json")
-	os.WriteFile(path, []byte("data"), 0o600)
+	if err := os.WriteFile(path, []byte("data"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 
 	if !DeleteCredential(path) {
 		t.Error("DeleteCredential() should return true for existing file")
@@ -1044,7 +1047,9 @@ func TestDeleteCredential_MissingFile(t *testing.T) {
 func TestFileExists(t *testing.T) {
 	dir := t.TempDir()
 	existingFile := filepath.Join(dir, "exists.txt")
-	os.WriteFile(existingFile, []byte("hi"), 0o644)
+	if err := os.WriteFile(existingFile, []byte("hi"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
 
 	if !fileExists(existingFile) {
 		t.Error("fileExists() should return true for existing file")
