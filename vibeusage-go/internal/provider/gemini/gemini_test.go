@@ -6,11 +6,13 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
+func ptrFloat64(f float64) *float64 { return &f }
+
 func TestParseTypedQuotaResponse_FullResponse(t *testing.T) {
 	quota := QuotaResponse{
 		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: 0.75, ResetTime: "2025-02-20T00:00:00Z"},
-			{ModelID: "models/gemini-1.5-pro", RemainingFraction: 0.5, ResetTime: "2025-02-20T00:00:00Z"},
+			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(0.75), ResetTime: "2025-02-20T00:00:00Z"},
+			{ModelID: "models/gemini-1.5-pro", RemainingFraction: ptrFloat64(0.5), ResetTime: "2025-02-20T00:00:00Z"},
 		},
 	}
 	codeAssist := &CodeAssistResponse{UserTier: "premium"}
@@ -85,7 +87,7 @@ func TestParseTypedQuotaResponse_EmptyBuckets(t *testing.T) {
 func TestParseTypedQuotaResponse_NoUserTier(t *testing.T) {
 	quota := QuotaResponse{
 		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: 1.0},
+			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
 		},
 	}
 
@@ -103,7 +105,7 @@ func TestParseTypedQuotaResponse_NoUserTier(t *testing.T) {
 func TestParseTypedQuotaResponse_EmptyUserTier(t *testing.T) {
 	quota := QuotaResponse{
 		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: 1.0},
+			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
 		},
 	}
 	codeAssist := &CodeAssistResponse{}
@@ -122,7 +124,7 @@ func TestParseTypedQuotaResponse_EmptyUserTier(t *testing.T) {
 func TestParseTypedQuotaResponse_ModelNameParsing(t *testing.T) {
 	quota := QuotaResponse{
 		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: 1.0},
+			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
 		},
 	}
 

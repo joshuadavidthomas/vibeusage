@@ -9,14 +9,19 @@ type QuotaResponse struct {
 
 // QuotaBucket represents a single quota bucket for a model.
 type QuotaBucket struct {
-	ModelID           string  `json:"model_id,omitempty"`
-	RemainingFraction float64 `json:"remaining_fraction"`
-	ResetTime         string  `json:"reset_time,omitempty"`
+	ModelID           string   `json:"model_id,omitempty"`
+	RemainingFraction *float64 `json:"remaining_fraction,omitempty"`
+	ResetTime         string   `json:"reset_time,omitempty"`
 }
 
 // Utilization returns the usage percentage (0-100).
+// If remaining_fraction is absent, assumes full quota remaining (0% used).
 func (b *QuotaBucket) Utilization() int {
-	return int((1 - b.RemainingFraction) * 100)
+	rf := 1.0
+	if b.RemainingFraction != nil {
+		rf = *b.RemainingFraction
+	}
+	return int((1 - rf) * 100)
 }
 
 // ResetTimeUTC parses the reset_time as a time.Time.

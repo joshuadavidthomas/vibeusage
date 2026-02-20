@@ -35,7 +35,7 @@ func TestQuotaResponse_UnmarshalFullResponse(t *testing.T) {
 	if b.ModelID != "models/gemini-2.0-flash" {
 		t.Errorf("model_id = %q, want %q", b.ModelID, "models/gemini-2.0-flash")
 	}
-	if b.RemainingFraction != 0.75 {
+	if b.RemainingFraction == nil || *b.RemainingFraction != 0.75 {
 		t.Errorf("remaining_fraction = %v, want 0.75", b.RemainingFraction)
 	}
 	if b.ResetTime != "2025-02-20T00:00:00Z" {
@@ -59,13 +59,14 @@ func TestQuotaResponse_UnmarshalEmpty(t *testing.T) {
 func TestQuotaBucket_Utilization(t *testing.T) {
 	tests := []struct {
 		name              string
-		remainingFraction float64
+		remainingFraction *float64
 		want              int
 	}{
-		{"75% remaining", 0.75, 25},
-		{"0% remaining", 0.0, 100},
-		{"100% remaining", 1.0, 0},
-		{"50% remaining", 0.5, 50},
+		{"75% remaining", ptrFloat64(0.75), 25},
+		{"0% remaining", ptrFloat64(0.0), 100},
+		{"100% remaining", ptrFloat64(1.0), 0},
+		{"50% remaining", ptrFloat64(0.5), 50},
+		{"nil defaults to 0% used", nil, 0},
 	}
 
 	for _, tt := range tests {
