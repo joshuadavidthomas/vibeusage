@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
@@ -90,6 +91,92 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 
 	if len(mock.InputCalls) != 1 {
 		t.Fatalf("expected 1 Input call, got %d", len(mock.InputCalls))
+	}
+}
+
+func TestAuthStatusCommand_HasTableBorders(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldNoColor := noColor
+	noColor = false
+	defer func() { noColor = oldNoColor }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	oldJSON := jsonOutput
+	jsonOutput = false
+	defer func() { jsonOutput = oldJSON }()
+
+	authStatusCommand()
+
+	output := buf.String()
+
+	if !strings.Contains(output, "╭") {
+		t.Errorf("expected lipgloss rounded border in auth status, got:\n%s", output)
+	}
+}
+
+func TestAuthStatusCommand_ContainsHeaders(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	oldJSON := jsonOutput
+	jsonOutput = false
+	defer func() { jsonOutput = oldJSON }()
+
+	authStatusCommand()
+
+	output := buf.String()
+	for _, header := range []string{"Provider", "Status", "Source"} {
+		if !strings.Contains(output, header) {
+			t.Errorf("output missing header %q\n\nGot:\n%s", header, output)
+		}
+	}
+}
+
+func TestAuthStatusCommand_QuietMode(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = true
+	defer func() { quiet = oldQuiet }()
+
+	oldJSON := jsonOutput
+	jsonOutput = false
+	defer func() { jsonOutput = oldJSON }()
+
+	authStatusCommand()
+
+	output := buf.String()
+	if strings.Contains(output, "╭") {
+		t.Error("quiet mode should not use table borders")
 	}
 }
 
