@@ -95,3 +95,32 @@ func TestNewTable_NoTitle(t *testing.T) {
 		t.Error("expected headers without title")
 	}
 }
+
+func TestNewTable_NoColorOmitsANSI(t *testing.T) {
+	result := NewTableWithOptions(
+		[]string{"Name", "Value"},
+		[][]string{{"test", "123"}},
+		TableOptions{NoColor: true, Title: "Test"},
+	)
+
+	// ANSI escape sequences start with \x1b[
+	if strings.Contains(result, "\x1b[") {
+		t.Errorf("no-color output should not contain ANSI escape codes, got:\n%q", result)
+	}
+}
+
+func TestNewTable_ColorDefault(t *testing.T) {
+	result := NewTableWithOptions(
+		[]string{"Name", "Value"},
+		[][]string{{"test", "123"}},
+		TableOptions{NoColor: false, Title: "Test"},
+	)
+
+	// In non-TTY (test), lipgloss auto-strips colors, but table should still render
+	if !strings.Contains(result, "Test") {
+		t.Error("expected title in colored output")
+	}
+	if !strings.Contains(result, "Name") {
+		t.Error("expected headers in colored output")
+	}
+}
