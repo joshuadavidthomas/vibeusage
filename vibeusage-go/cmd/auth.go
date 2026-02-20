@@ -97,6 +97,7 @@ func authStatusCommand() error {
 	))
 
 	if len(unconfigured) > 0 {
+		outln()
 		outln("To configure a provider, run:")
 		for _, pid := range unconfigured {
 			out("  vibeusage auth %s\n", pid)

@@ -45,8 +45,15 @@ func displayAllCredentialStatus() error {
 		return nil
 	}
 
+	ids := make([]string, 0, len(allStatus))
+	for id := range allStatus {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
 	if quiet {
-		for pid, info := range allStatus {
+		for _, pid := range ids {
+			info := allStatus[pid]
 			hasCreds := info["has_credentials"].(bool)
 			status := "not configured"
 			if hasCreds {
@@ -56,12 +63,6 @@ func displayAllCredentialStatus() error {
 		}
 		return nil
 	}
-
-	ids := make([]string, 0, len(allStatus))
-	for id := range allStatus {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 
 	var rows [][]string
 	for _, pid := range ids {
@@ -84,6 +85,7 @@ func displayAllCredentialStatus() error {
 		display.TableOptions{Title: "Credential Status", NoColor: noColor},
 	))
 
+	outln()
 	outln("Set credentials with:")
 	outln("  vibeusage key <provider> set")
 	return nil
