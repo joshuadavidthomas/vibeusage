@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
@@ -237,7 +238,7 @@ func (s *OAuthStrategy) parseUsageResponse(quotaData, userData map[string]any) *
 				}
 			}
 
-			displayName := strings.Title(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
+			displayName := strutil.TitleCase(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
 			periods = append(periods, models.UsagePeriod{
 				Name:        displayName,
 				Utilization: utilization,

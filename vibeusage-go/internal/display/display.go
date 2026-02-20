@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var (
@@ -16,8 +17,7 @@ var (
 	boldStyle      = lipgloss.NewStyle().Bold(true)
 	greenStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	yellowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	redStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	cyanStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	redStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 
 	panelBorder = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -74,7 +74,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, verbose bo
 	var b strings.Builder
 
 	// Title
-	b.WriteString(titleStyle.Render(strings.Title(snapshot.Provider)))
+	b.WriteString(titleStyle.Render(strutil.TitleCase(snapshot.Provider)))
 	b.WriteByte('\n')
 	b.WriteString(separatorStyle.Render(strings.Repeat("━", 60)))
 	b.WriteByte('\n')
@@ -199,7 +199,7 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool) string {
 	}
 
 	content := strings.TrimRight(b.String(), "\n")
-	title := strings.Title(snapshot.Provider)
+	title := strutil.TitleCase(snapshot.Provider)
 	return panelBorder.Render(title + "\n" + content)
 }
 
