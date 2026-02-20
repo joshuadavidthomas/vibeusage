@@ -2,13 +2,13 @@ package claude
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -32,48 +32,34 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("Failed to get organization ID"), nil
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	sessionCookie := httpclient.WithCookie("sessionKey", sessionKey)
 
 	// Fetch usage
-	usageURL := "https://claude.ai/api/organizations/" + orgID + "/usage"
-	req, _ := http.NewRequest("GET", usageURL, nil)
-	req.AddCookie(&http.Cookie{Name: "sessionKey", Value: sessionKey})
-
-	resp, err := client.Do(req)
+	usageURL := webBaseURL + "/" + orgID + "/usage"
+	var usageResp WebUsageResponse
+	resp, err := client.GetJSON(usageURL, &usageResp, sessionCookie)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
 		return fetch.ResultFatal("Session key expired or invalid"), nil
 	}
 	if resp.StatusCode != 200 {
-		return fetch.ResultFail("Usage request failed: " + resp.Status), nil
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var usageResp WebUsageResponse
-	if err := json.Unmarshal(body, &usageResp); err != nil {
+	if resp.JSONErr != nil {
 		return fetch.ResultFail("Invalid usage response"), nil
 	}
 
 	// Fetch overage
 	var overage *models.OverageUsage
-	overageURL := "https://claude.ai/api/organizations/" + orgID + "/overage_spend_limit"
-	oReq, _ := http.NewRequest("GET", overageURL, nil)
-	oReq.AddCookie(&http.Cookie{Name: "sessionKey", Value: sessionKey})
-
-	oResp, err := client.Do(oReq)
-	if err == nil {
-		defer oResp.Body.Close()
-		if oResp.StatusCode == 200 {
-			oBody, _ := io.ReadAll(oResp.Body)
-			var overageResp WebOverageResponse
-			if json.Unmarshal(oBody, &overageResp) == nil {
-				overage = overageResp.ToOverageUsage()
-			}
-		}
+	overageURL := webBaseURL + "/" + orgID + "/overage_spend_limit"
+	var overageResp WebOverageResponse
+	oResp, err := client.GetJSON(overageURL, &overageResp, sessionCookie)
+	if err == nil && oResp.StatusCode == 200 && oResp.JSONErr == nil {
+		overage = overageResp.ToOverageUsage()
 	}
 
 	snapshot := s.parseWebUsageResponse(usageResp, overage)
@@ -103,22 +89,12 @@ func (s *WebStrategy) getOrgID(sessionKey string) string {
 		return cached
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	req, _ := http.NewRequest("GET", "https://claude.ai/api/organizations", nil)
-	req.AddCookie(&http.Cookie{Name: "sessionKey", Value: sessionKey})
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return ""
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return ""
-	}
-
-	body, _ := io.ReadAll(resp.Body)
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var orgs []WebOrganization
-	if err := json.Unmarshal(body, &orgs); err != nil {
+	resp, err := client.GetJSON(webBaseURL, &orgs,
+		httpclient.WithCookie("sessionKey", sessionKey),
+	)
+	if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
 		return ""
 	}
 

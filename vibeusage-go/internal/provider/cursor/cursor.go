@@ -2,14 +2,14 @@ package cursor
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
+	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -35,6 +35,11 @@ func (c Cursor) FetchStatus() models.ProviderStatus {
 	return provider.FetchStatuspageStatus("https://status.cursor.com/api/v2/status.json")
 }
 
+const (
+	usageSummaryURL = "https://www.cursor.com/api/usage-summary"
+	authMeURL       = "https://www.cursor.com/api/auth/me"
+)
+
 func init() {
 	provider.Register(Cursor{})
 }
@@ -55,19 +60,18 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("No session token found"), nil
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	sessionCookie := httpclient.WithCookie("__Secure-next-auth.session-token", sessionToken)
+	userAgent := httpclient.WithHeader("User-Agent", "Mozilla/5.0")
 
 	// Fetch usage
-	req, _ := http.NewRequest("POST", "https://www.cursor.com/api/usage-summary", nil)
-	req.AddCookie(&http.Cookie{Name: "__Secure-next-auth.session-token", Value: sessionToken})
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0")
-
-	resp, err := client.Do(req)
+	var usageResp UsageSummaryResponse
+	resp, err := client.PostJSON(usageSummaryURL, nil, &usageResp,
+		sessionCookie, userAgent,
+	)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
 		return fetch.ResultFatal("Session token expired or invalid"), nil
@@ -76,31 +80,20 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("User not found or no active subscription"), nil
 	}
 	if resp.StatusCode != 200 {
-		return fetch.ResultFail("Usage request failed: " + resp.Status), nil
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var usageResp UsageSummaryResponse
-	if err := json.Unmarshal(body, &usageResp); err != nil {
+	if resp.JSONErr != nil {
 		return fetch.ResultFail("Invalid usage response"), nil
 	}
 
 	// Fetch user data
 	var userResp *UserMeResponse
-	userReq, _ := http.NewRequest("GET", "https://www.cursor.com/api/auth/me", nil)
-	userReq.AddCookie(&http.Cookie{Name: "__Secure-next-auth.session-token", Value: sessionToken})
-	userReq.Header.Set("User-Agent", "Mozilla/5.0")
-
-	userHTTPResp, err := client.Do(userReq)
-	if err == nil {
-		defer userHTTPResp.Body.Close()
-		if userHTTPResp.StatusCode == 200 {
-			userBody, _ := io.ReadAll(userHTTPResp.Body)
-			var u UserMeResponse
-			if json.Unmarshal(userBody, &u) == nil {
-				userResp = &u
-			}
-		}
+	var u UserMeResponse
+	uResp, err := client.GetJSON(authMeURL, &u,
+		sessionCookie, userAgent,
+	)
+	if err == nil && uResp.StatusCode == 200 && uResp.JSONErr == nil {
+		userResp = &u
 	}
 
 	snapshot := s.parseTypedResponse(usageResp, userResp)

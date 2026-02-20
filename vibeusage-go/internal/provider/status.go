@@ -1,36 +1,24 @@
 package provider
 
 import (
-	"encoding/json"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
 // FetchStatuspageStatus fetches status from a Statuspage.io endpoint.
 func FetchStatuspageStatus(url string) models.ProviderStatus {
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		return models.ProviderStatus{Level: models.StatusUnknown}
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return models.ProviderStatus{Level: models.StatusUnknown}
-	}
-
+	client := httpclient.NewWithTimeout(10 * time.Second)
 	var data struct {
 		Status struct {
 			Indicator   string `json:"indicator"`
 			Description string `json:"description"`
 		} `json:"status"`
 	}
-	if err := json.Unmarshal(body, &data); err != nil {
+	resp, err := client.GetJSON(url, &data)
+	if err != nil || resp.JSONErr != nil {
 		return models.ProviderStatus{Level: models.StatusUnknown}
 	}
 

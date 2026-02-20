@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -45,7 +43,7 @@ const (
 	deviceCodeURL = "https://github.com/login/device/code"
 	tokenURL      = "https://github.com/login/oauth/access_token"
 	usageURL      = "https://api.github.com/copilot_internal/user"
-	clientID      = "Iv1.b507a08c87ecfe98"
+	clientID      = "Iv1.b507a08c87ecfe98" // VS Code Copilot OAuth app client ID
 )
 
 type DeviceFlowStrategy struct{}
@@ -68,16 +66,15 @@ func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
-	req, _ := http.NewRequest("GET", usageURL, nil)
-	req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
-	req.Header.Set("Accept", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	var userResp UserResponse
+	resp, err := client.GetJSON(usageURL, &userResp,
+		httpclient.WithBearer(creds.AccessToken),
+		httpclient.WithHeader("Accept", "application/json"),
+	)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
 		return fetch.ResultFatal("OAuth token expired. Run `vibeusage auth copilot` to re-authenticate."), nil
@@ -89,12 +86,9 @@ func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("Copilot API not found. Account may not have Copilot access."), nil
 	}
 	if resp.StatusCode != 200 {
-		return fetch.ResultFail("Usage request failed: " + resp.Status), nil
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
-
-	body, _ := io.ReadAll(resp.Body)
-	var userResp UserResponse
-	if err := json.Unmarshal(body, &userResp); err != nil {
+	if resp.JSONErr != nil {
 		return fetch.ResultFail("Invalid response from Copilot API"), nil
 	}
 
@@ -175,28 +169,23 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 // RunDeviceFlow runs the interactive GitHub device flow for auth.
 // Output is written to w, allowing callers to control where messages go.
 func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 
 	// Request device code
-	form := url.Values{
-		"client_id": {clientID},
-		"scope":     {"read:user"},
-	}
-
-	req, _ := http.NewRequest("POST", deviceCodeURL, strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := client.Do(req)
+	var dcResp DeviceCodeResponse
+	resp, err := client.PostForm(deviceCodeURL,
+		map[string]string{
+			"client_id": clientID,
+			"scope":     "read:user",
+		},
+		&dcResp,
+		httpclient.WithHeader("Accept", "application/json"),
+	)
 	if err != nil {
 		return false, fmt.Errorf("failed to request device code: %w", err)
 	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	var dcResp DeviceCodeResponse
-	if err := json.Unmarshal(body, &dcResp); err != nil {
-		return false, fmt.Errorf("invalid device code response: %w", err)
+	if resp.JSONErr != nil {
+		return false, fmt.Errorf("invalid device code response: %w", resp.JSONErr)
 	}
 
 	deviceCode := dcResp.DeviceCode
@@ -230,29 +219,23 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			time.Sleep(time.Duration(interval) * time.Second)
 		}
 
-		pollForm := url.Values{
-			"client_id":   {clientID},
-			"device_code": {deviceCode},
-			"grant_type":  {"urn:ietf:params:oauth:grant-type:device_code"},
-		}
-
-		pollReq, _ := http.NewRequest("POST", tokenURL, strings.NewReader(pollForm.Encode()))
-		pollReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		pollReq.Header.Set("Accept", "application/json")
-
-		pollResp, err := client.Do(pollReq)
+		var tokenResp TokenResponse
+		pollResp, err := client.PostForm(tokenURL,
+			map[string]string{
+				"client_id":   clientID,
+				"device_code": deviceCode,
+				"grant_type":  "urn:ietf:params:oauth:grant-type:device_code",
+			},
+			&tokenResp,
+			httpclient.WithHeader("Accept", "application/json"),
+		)
 		if err != nil {
 			if attempt < 3 {
 				continue
 			}
 			return false, fmt.Errorf("network error: %w", err)
 		}
-
-		pollBody, _ := io.ReadAll(pollResp.Body)
-		pollResp.Body.Close()
-
-		var tokenResp TokenResponse
-		if err := json.Unmarshal(pollBody, &tokenResp); err != nil {
+		if pollResp.JSONErr != nil {
 			continue
 		}
 
