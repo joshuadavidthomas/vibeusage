@@ -1,6 +1,7 @@
 package cursor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -54,7 +55,7 @@ func (s *WebStrategy) IsAvailable() bool {
 	return err == nil
 }
 
-func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
+func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	sessionToken := s.loadSessionToken()
 	if sessionToken == "" {
 		return fetch.ResultFail("No session token found"), nil
@@ -66,7 +67,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 
 	// Fetch usage
 	var usageResp UsageSummaryResponse
-	resp, err := client.PostJSON(usageSummaryURL, nil, &usageResp,
+	resp, err := client.PostJSONCtx(ctx, usageSummaryURL, nil, &usageResp,
 		sessionCookie, userAgent,
 	)
 	if err != nil {
@@ -89,7 +90,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	// Fetch user data
 	var userResp *UserMeResponse
 	var u UserMeResponse
-	uResp, err := client.GetJSON(authMeURL, &u,
+	uResp, err := client.GetJSONCtx(ctx, authMeURL, &u,
 		sessionCookie, userAgent,
 	)
 	if err == nil && uResp.StatusCode == 200 && uResp.JSONErr == nil {

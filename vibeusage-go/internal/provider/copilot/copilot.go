@@ -1,6 +1,7 @@
 package copilot
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,7 +57,7 @@ func (s *DeviceFlowStrategy) IsAvailable() bool {
 	return err == nil
 }
 
-func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
+func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	creds := s.loadCredentials()
 	if creds == nil {
 		return fetch.ResultFail("No OAuth credentials found. Run `vibeusage auth copilot` to authenticate."), nil
@@ -68,7 +69,7 @@ func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var userResp UserResponse
-	resp, err := client.GetJSON(usageURL, &userResp,
+	resp, err := client.GetJSONCtx(ctx, usageURL, &userResp,
 		httpclient.WithBearer(creds.AccessToken),
 		httpclient.WithHeader("Accept", "application/json"),
 	)

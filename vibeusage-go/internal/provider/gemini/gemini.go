@@ -1,6 +1,7 @@
 package gemini
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -79,7 +80,7 @@ func (s *OAuthStrategy) credentialPaths() []string {
 	}
 }
 
-func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
+func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	creds := s.loadCredentials()
 	if creds == nil {
 		return fetch.ResultFail("No OAuth credentials found"), nil
@@ -90,14 +91,14 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := s.refreshToken(creds)
+		refreshed := s.refreshToken(ctx, creds)
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
 		}
 		creds = refreshed
 	}
 
-	quotaResp, codeAssistResp := s.fetchQuotaData(creds.AccessToken)
+	quotaResp, codeAssistResp := s.fetchQuotaData(ctx, creds.AccessToken)
 	if quotaResp == nil {
 		return fetch.ResultFail("Failed to fetch quota data"), nil
 	}
@@ -127,14 +128,14 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 	return nil
 }
 
-func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials {
+func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
 	if creds.RefreshToken == "" {
 		return nil
 	}
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var tokenResp TokenResponse
-	resp, err := client.PostForm(googleTokenURL,
+	resp, err := client.PostFormCtx(ctx, googleTokenURL,
 		map[string]string{
 			"grant_type":    "refresh_token",
 			"refresh_token": creds.RefreshToken,
@@ -173,7 +174,7 @@ func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials 
 	return updated
 }
 
-func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *CodeAssistResponse) {
+func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*QuotaResponse, *CodeAssistResponse) {
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	bearer := httpclient.WithBearer(accessToken)
 	var quotaResp *QuotaResponse
@@ -181,7 +182,7 @@ func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *Cod
 
 	// Quota
 	var qr QuotaResponse
-	qResp, err := client.PostJSON(quotaURL,
+	qResp, err := client.PostJSONCtx(ctx, quotaURL,
 		json.RawMessage("{}"), &qr, bearer,
 	)
 	if err == nil && qResp.StatusCode == 200 && qResp.JSONErr == nil {
@@ -190,7 +191,7 @@ func (s *OAuthStrategy) fetchQuotaData(accessToken string) (*QuotaResponse, *Cod
 
 	// User tier
 	var ca CodeAssistResponse
-	tResp, err := client.PostJSON(codeAssistURL,
+	tResp, err := client.PostJSONCtx(ctx, codeAssistURL,
 		json.RawMessage("{}"), &ca, bearer,
 	)
 	if err == nil && tResp.StatusCode == 200 && tResp.JSONErr == nil {
@@ -262,7 +263,7 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 	return false
 }
 
-func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
+func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	apiKey := s.loadAPIKey()
 	if apiKey == "" {
 		return fetch.ResultFail("No API key found. Set GEMINI_API_KEY or use 'vibeusage key set gemini'"), nil
@@ -271,7 +272,7 @@ func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
 	// Validate key by fetching models
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var modelsResp ModelsResponse
-	resp, err := client.GetJSON(modelsURL+"?key="+apiKey, &modelsResp)
+	resp, err := client.GetJSONCtx(ctx, modelsURL+"?key="+apiKey, &modelsResp)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}

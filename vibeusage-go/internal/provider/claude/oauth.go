@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -27,7 +28,7 @@ func (s *OAuthStrategy) IsAvailable() bool {
 	return false
 }
 
-func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
+func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	creds := s.loadCredentials()
 	if creds == nil {
 		return fetch.ResultFail("No OAuth credentials found"), nil
@@ -38,7 +39,7 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := s.refreshToken(creds)
+		refreshed := s.refreshToken(ctx, creds)
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
 		}
@@ -47,7 +48,7 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var usageResp OAuthUsageResponse
-	resp, err := client.GetJSON(oauthUsageURL, &usageResp,
+	resp, err := client.GetJSONCtx(ctx, oauthUsageURL, &usageResp,
 		httpclient.WithBearer(creds.AccessToken),
 		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
 	)
@@ -107,14 +108,14 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 	return nil
 }
 
-func (s *OAuthStrategy) refreshToken(creds *OAuthCredentials) *OAuthCredentials {
+func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
 	if creds.RefreshToken == "" {
 		return nil
 	}
 
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	var tokenResp OAuthTokenResponse
-	resp, err := client.PostForm(oauthTokenURL,
+	resp, err := client.PostFormCtx(ctx, oauthTokenURL,
 		map[string]string{
 			"grant_type":    "refresh_token",
 			"refresh_token": creds.RefreshToken,
