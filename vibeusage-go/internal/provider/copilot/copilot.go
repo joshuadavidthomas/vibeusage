@@ -64,13 +64,12 @@ func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("No OAuth credentials found. Run `vibeusage auth copilot` to authenticate."), nil
 	}
 
-	accessToken, _ := creds["access_token"].(string)
-	if accessToken == "" {
+	if creds.AccessToken == "" {
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
 	req, _ := http.NewRequest("GET", usageURL, nil)
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
 	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -94,12 +93,12 @@ func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]any
-	if err := json.Unmarshal(body, &data); err != nil {
+	var userResp UserResponse
+	if err := json.Unmarshal(body, &userResp); err != nil {
 		return fetch.ResultFail("Invalid response from Copilot API"), nil
 	}
 
-	snapshot := s.parseUsageResponse(data)
+	snapshot := s.parseTypedUsageResponse(userResp)
 	if snapshot == nil {
 		return fetch.ResultFail("Failed to parse Copilot usage response"), nil
 	}
@@ -107,98 +106,46 @@ func (s *DeviceFlowStrategy) Fetch() (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *DeviceFlowStrategy) loadCredentials() map[string]any {
+func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
 	data, err := config.ReadCredential(config.CredentialPath("copilot", "oauth"))
 	if err != nil || data == nil {
 		return nil
 	}
-	var creds map[string]any
+	var creds OAuthCredentials
 	if err := json.Unmarshal(data, &creds); err != nil {
 		return nil
 	}
-	return creds
+	if creds.AccessToken == "" {
+		return nil
+	}
+	return &creds
 }
 
-func (s *DeviceFlowStrategy) parseUsageResponse(data map[string]any) *models.UsageSnapshot {
+func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	// Parse reset date
 	var resetsAt *time.Time
-	if resetStr, ok := data["quota_reset_date_utc"].(string); ok {
-		resetStr = strings.Replace(resetStr, "Z", "+00:00", 1)
-		if t, err := time.Parse(time.RFC3339, resetStr); err == nil {
+	if resp.QuotaResetDateUTC != "" {
+		if t, err := time.Parse(time.RFC3339, resp.QuotaResetDateUTC); err == nil {
 			resetsAt = &t
 		}
 	}
 
-	// Parse quota_snapshots
-	if quotas, ok := data["quota_snapshots"].(map[string]any); ok {
-		// Premium interactions
-		if premium, ok := quotas["premium_interactions"].(map[string]any); ok {
-			entitlement, _ := premium["entitlement"].(float64)
-			remaining, _ := premium["remaining"].(float64)
-			unlimited, _ := premium["unlimited"].(bool)
-
-			var utilization int
-			if unlimited && entitlement == 0 {
-				utilization = 0
-			} else if entitlement > 0 {
-				used := entitlement - remaining
-				utilization = int((used / entitlement) * 100)
-			}
-
-			if unlimited || entitlement > 0 {
-				periods = append(periods, models.UsagePeriod{
-					Name:        "Monthly (Premium)",
-					Utilization: utilization,
-					PeriodType:  models.PeriodMonthly,
-					ResetsAt:    resetsAt,
-				})
-			}
+	if resp.QuotaSnapshots != nil {
+		type quotaEntry struct {
+			quota *Quota
+			name  string
 		}
-
-		// Chat
-		if chat, ok := quotas["chat"].(map[string]any); ok {
-			entitlement, _ := chat["entitlement"].(float64)
-			remaining, _ := chat["remaining"].(float64)
-			unlimited, _ := chat["unlimited"].(bool)
-
-			if unlimited && entitlement == 0 {
-				periods = append(periods, models.UsagePeriod{
-					Name:        "Monthly (Chat)",
-					Utilization: 0,
-					PeriodType:  models.PeriodMonthly,
-					ResetsAt:    resetsAt,
-				})
-			} else if entitlement > 0 {
-				used := entitlement - remaining
-				periods = append(periods, models.UsagePeriod{
-					Name:        "Monthly (Chat)",
-					Utilization: int((used / entitlement) * 100),
-					PeriodType:  models.PeriodMonthly,
-					ResetsAt:    resetsAt,
-				})
-			}
+		entries := []quotaEntry{
+			{resp.QuotaSnapshots.PremiumInteractions, "Monthly (Premium)"},
+			{resp.QuotaSnapshots.Chat, "Monthly (Chat)"},
+			{resp.QuotaSnapshots.Completions, "Monthly (Completions)"},
 		}
-
-		// Completions
-		if completions, ok := quotas["completions"].(map[string]any); ok {
-			entitlement, _ := completions["entitlement"].(float64)
-			remaining, _ := completions["remaining"].(float64)
-			unlimited, _ := completions["unlimited"].(bool)
-
-			if unlimited && entitlement == 0 {
+		for _, e := range entries {
+			if e.quota != nil && e.quota.HasUsage() {
 				periods = append(periods, models.UsagePeriod{
-					Name:        "Monthly (Completions)",
-					Utilization: 0,
-					PeriodType:  models.PeriodMonthly,
-					ResetsAt:    resetsAt,
-				})
-			} else if entitlement > 0 {
-				used := entitlement - remaining
-				periods = append(periods, models.UsagePeriod{
-					Name:        "Monthly (Completions)",
-					Utilization: int((used / entitlement) * 100),
+					Name:        e.name,
+					Utilization: e.quota.Utilization(),
 					PeriodType:  models.PeriodMonthly,
 					ResetsAt:    resetsAt,
 				})
@@ -211,8 +158,8 @@ func (s *DeviceFlowStrategy) parseUsageResponse(data map[string]any) *models.Usa
 	}
 
 	var identity *models.ProviderIdentity
-	if plan, ok := data["copilot_plan"].(string); ok {
-		identity = &models.ProviderIdentity{Plan: plan}
+	if resp.CopilotPlan != "" {
+		identity = &models.ProviderIdentity{Plan: resp.CopilotPlan}
 	}
 
 	now := time.Now().UTC()
@@ -247,17 +194,17 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var dcResp map[string]any
+	var dcResp DeviceCodeResponse
 	if err := json.Unmarshal(body, &dcResp); err != nil {
 		return false, fmt.Errorf("invalid device code response: %w", err)
 	}
 
-	deviceCode, _ := dcResp["device_code"].(string)
-	userCode, _ := dcResp["user_code"].(string)
-	verificationURI, _ := dcResp["verification_uri"].(string)
-	interval := 5
-	if iv, ok := dcResp["interval"].(float64); ok {
-		interval = int(iv)
+	deviceCode := dcResp.DeviceCode
+	userCode := dcResp.UserCode
+	verificationURI := dcResp.VerificationURI
+	interval := dcResp.Interval
+	if interval == 0 {
+		interval = 5
 	}
 
 	// Display instructions
@@ -304,13 +251,14 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		pollBody, _ := io.ReadAll(pollResp.Body)
 		pollResp.Body.Close()
 
-		var tokenData map[string]any
-		if err := json.Unmarshal(pollBody, &tokenData); err != nil {
+		var tokenResp TokenResponse
+		if err := json.Unmarshal(pollBody, &tokenResp); err != nil {
 			continue
 		}
 
-		if _, ok := tokenData["access_token"]; ok {
-			content, _ := json.Marshal(tokenData)
+		if tokenResp.AccessToken != "" {
+			creds := OAuthCredentials{AccessToken: tokenResp.AccessToken}
+			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
 			if !quiet {
 				fmt.Fprintln(w, "\n  ✓ Authentication successful!")
@@ -318,8 +266,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			return true, nil
 		}
 
-		errStr, _ := tokenData["error"].(string)
-		switch errStr {
+		switch tokenResp.Error {
 		case "authorization_pending":
 			continue
 		case "slow_down":
@@ -336,9 +283,9 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			}
 			return false, nil
 		default:
-			desc, _ := tokenData["error_description"].(string)
+			desc := tokenResp.ErrorDescription
 			if desc == "" {
-				desc = errStr
+				desc = tokenResp.Error
 			}
 			return false, fmt.Errorf("authentication error: %s", desc)
 		}

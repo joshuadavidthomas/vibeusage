@@ -60,24 +60,22 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 		return fetch.ResultFail("No OAuth credentials found"), nil
 	}
 
-	accessToken, _ := creds["access_token"].(string)
-	if accessToken == "" {
+	if creds.AccessToken == "" {
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
-	if s.needsRefresh(creds) {
+	if creds.NeedsRefresh() {
 		refreshed := s.refreshToken(creds)
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
 		}
 		creds = refreshed
-		accessToken, _ = creds["access_token"].(string)
 	}
 
 	usageURL := s.getUsageURL()
 
 	req, _ := http.NewRequest("GET", usageURL, nil)
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -97,12 +95,12 @@ func (s *OAuthStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var data map[string]any
-	if err := json.Unmarshal(body, &data); err != nil {
+	var usageResp UsageResponse
+	if err := json.Unmarshal(body, &usageResp); err != nil {
 		return fetch.ResultFail("Invalid response from usage endpoint"), nil
 	}
 
-	snapshot := s.parseUsageResponse(data)
+	snapshot := s.parseTypedUsageResponse(usageResp)
 	if snapshot == nil {
 		return fetch.ResultFail("Failed to parse usage response"), nil
 	}
@@ -118,47 +116,31 @@ func (s *OAuthStrategy) credentialPaths() []string {
 	}
 }
 
-func (s *OAuthStrategy) loadCredentials() map[string]any {
+func (s *OAuthStrategy) loadCredentials() *Credentials {
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
 		if err != nil || data == nil {
 			continue
 		}
-		var creds map[string]any
-		if err := json.Unmarshal(data, &creds); err != nil {
+		var cliCreds CLICredentials
+		if err := json.Unmarshal(data, &cliCreds); err != nil {
 			continue
 		}
-		// Handle Codex CLI nested tokens
-		if tokens, ok := creds["tokens"].(map[string]any); ok {
-			creds = tokens
+		if creds := cliCreds.EffectiveCredentials(); creds != nil {
+			return creds
 		}
-		return creds
 	}
 	return nil
 }
 
-func (s *OAuthStrategy) needsRefresh(creds map[string]any) bool {
-	expiresAt, ok := creds["expires_at"].(string)
-	if !ok {
-		return false
-	}
-	expiry, err := time.Parse(time.RFC3339, expiresAt)
-	if err != nil {
-		return true
-	}
-	threshold := time.Now().UTC().AddDate(0, 0, 8)
-	return threshold.After(expiry)
-}
-
-func (s *OAuthStrategy) refreshToken(creds map[string]any) map[string]any {
-	refreshToken, _ := creds["refresh_token"].(string)
-	if refreshToken == "" {
+func (s *OAuthStrategy) refreshToken(creds *Credentials) *Credentials {
+	if creds.RefreshToken == "" {
 		return nil
 	}
 
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
-		"refresh_token": {refreshToken},
+		"refresh_token": {creds.RefreshToken},
 		"client_id":     {"app_EMoamEEZ73f0CkXaXp7hrann"},
 	}
 
@@ -167,28 +149,38 @@ func (s *OAuthStrategy) refreshToken(creds map[string]any) map[string]any {
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
 		return nil
 	}
 	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	var data map[string]any
-	if err := json.Unmarshal(body, &data); err != nil {
+	if resp.StatusCode != 200 {
 		return nil
 	}
 
-	if expiresIn, ok := data["expires_in"].(float64); ok {
-		data["expires_at"] = time.Now().UTC().Add(time.Duration(expiresIn) * time.Second).Format(time.RFC3339)
-	}
-	if _, ok := data["refresh_token"]; !ok {
-		data["refresh_token"] = refreshToken
+	body, _ := io.ReadAll(resp.Body)
+	var tokenResp TokenResponse
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		return nil
 	}
 
-	content, _ := json.Marshal(data)
+	updated := &Credentials{
+		AccessToken:  tokenResp.AccessToken,
+		RefreshToken: tokenResp.RefreshToken,
+	}
+
+	if tokenResp.ExpiresIn > 0 {
+		updated.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
+	}
+
+	// Preserve refresh token if the server didn't issue a new one
+	if updated.RefreshToken == "" {
+		updated.RefreshToken = creds.RefreshToken
+	}
+
+	content, _ := json.Marshal(updated)
 	_ = config.WriteCredential(config.CredentialPath("codex", "oauth"), content)
 
-	return data
+	return updated
 }
 
 func (s *OAuthStrategy) getUsageURL() string {
@@ -214,69 +206,55 @@ func (s *OAuthStrategy) getUsageURL() string {
 	return "https://chatgpt.com/backend-api/wham/usage"
 }
 
-func (s *OAuthStrategy) parseUsageResponse(data map[string]any) *models.UsageSnapshot {
+func (s *OAuthStrategy) parseTypedUsageResponse(resp UsageResponse) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	rateLimits, _ := data["rate_limit"].(map[string]any)
-	if rateLimits == nil {
-		rateLimits, _ = data["rate_limits"].(map[string]any)
-	}
-
-	// Primary (session)
-	primary := getNestedMap(rateLimits, "primary_window", "primary")
-	if primary != nil {
-		util := int(getFloat(primary, "used_percent"))
-		var resetsAt *time.Time
-		if ts := getFloat(primary, "reset_at", "reset_timestamp"); ts > 0 {
-			t := time.Unix(int64(ts), 0).UTC()
-			resetsAt = &t
+	rl := resp.EffectiveRateLimits()
+	if rl != nil {
+		if primary := rl.EffectivePrimary(); primary != nil {
+			p := models.UsagePeriod{
+				Name:        "Session",
+				Utilization: int(primary.UsedPercent),
+				PeriodType:  models.PeriodSession,
+			}
+			if ts := primary.EffectiveResetTimestamp(); ts > 0 {
+				t := time.Unix(int64(ts), 0).UTC()
+				p.ResetsAt = &t
+			}
+			periods = append(periods, p)
 		}
-		periods = append(periods, models.UsagePeriod{
-			Name:        "Session",
-			Utilization: util,
-			PeriodType:  models.PeriodSession,
-			ResetsAt:    resetsAt,
-		})
-	}
 
-	// Secondary (weekly)
-	secondary := getNestedMap(rateLimits, "secondary_window", "secondary")
-	if secondary != nil {
-		util := int(getFloat(secondary, "used_percent"))
-		var resetsAt *time.Time
-		if ts := getFloat(secondary, "reset_at", "reset_timestamp"); ts > 0 {
-			t := time.Unix(int64(ts), 0).UTC()
-			resetsAt = &t
+		if secondary := rl.EffectiveSecondary(); secondary != nil {
+			p := models.UsagePeriod{
+				Name:        "Weekly",
+				Utilization: int(secondary.UsedPercent),
+				PeriodType:  models.PeriodWeekly,
+			}
+			if ts := secondary.EffectiveResetTimestamp(); ts > 0 {
+				t := time.Unix(int64(ts), 0).UTC()
+				p.ResetsAt = &t
+			}
+			periods = append(periods, p)
 		}
-		periods = append(periods, models.UsagePeriod{
-			Name:        "Weekly",
-			Utilization: util,
-			PeriodType:  models.PeriodWeekly,
-			ResetsAt:    resetsAt,
-		})
 	}
 
 	if len(periods) == 0 {
 		return nil
 	}
 
-	// Credits
 	var overage *models.OverageUsage
-	if credits, ok := data["credits"].(map[string]any); ok {
-		if hasCredits, _ := credits["has_credits"].(bool); hasCredits {
-			balance, _ := credits["balance"].(float64)
-			overage = &models.OverageUsage{
-				Used:      0,
-				Limit:     balance,
-				Currency:  "credits",
-				IsEnabled: true,
-			}
+	if resp.Credits != nil && resp.Credits.HasCredits {
+		overage = &models.OverageUsage{
+			Used:      0,
+			Limit:     resp.Credits.Balance,
+			Currency:  "credits",
+			IsEnabled: true,
 		}
 	}
 
 	var identity *models.ProviderIdentity
-	if planType, ok := data["plan_type"].(string); ok {
-		identity = &models.ProviderIdentity{Plan: planType}
+	if resp.PlanType != "" {
+		identity = &models.ProviderIdentity{Plan: resp.PlanType}
 	}
 
 	now := time.Now().UTC()
@@ -288,22 +266,4 @@ func (s *OAuthStrategy) parseUsageResponse(data map[string]any) *models.UsageSna
 		Identity:  identity,
 		Source:    "oauth",
 	}
-}
-
-func getNestedMap(m map[string]any, keys ...string) map[string]any {
-	for _, k := range keys {
-		if v, ok := m[k].(map[string]any); ok {
-			return v
-		}
-	}
-	return nil
-}
-
-func getFloat(m map[string]any, keys ...string) float64 {
-	for _, k := range keys {
-		if v, ok := m[k].(float64); ok {
-			return v
-		}
-	}
-	return 0
 }

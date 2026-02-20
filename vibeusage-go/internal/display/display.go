@@ -44,7 +44,7 @@ func colorStyle(color string) lipgloss.Style {
 }
 
 func RenderBar(utilization int, width int, color string) string {
-	filled := utilization * width / 100
+	filled := max(0, min(utilization*width/100, width))
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
 	return colorStyle(color).Render(bar)
 }

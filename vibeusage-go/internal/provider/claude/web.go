@@ -108,10 +108,13 @@ func (s *WebStrategy) getOrgID(sessionKey string) string {
 	req.AddCookie(&http.Cookie{Name: "sessionKey", Value: sessionKey})
 
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
 		return ""
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return ""
+	}
 
 	body, _ := io.ReadAll(resp.Body)
 	var orgs []WebOrganization
