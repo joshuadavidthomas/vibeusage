@@ -61,6 +61,19 @@ func DefaultConfig() Config {
 	}
 }
 
+func (c Config) clone() Config {
+	out := c
+	if c.EnabledProviders != nil {
+		out.EnabledProviders = make([]string, len(c.EnabledProviders))
+		copy(out.EnabledProviders, c.EnabledProviders)
+	}
+	out.Providers = make(map[string]ProviderConfig, len(c.Providers))
+	for k, v := range c.Providers {
+		out.Providers[k] = v
+	}
+	return out
+}
+
 func (c Config) IsProviderEnabled(providerID string) bool {
 	if pc, ok := c.Providers[providerID]; ok && !pc.Enabled {
 		return false
@@ -85,18 +98,18 @@ func Get() Config {
 	configMu.RLock()
 	if c := globalConfig; c != nil {
 		configMu.RUnlock()
-		return *c
+		return c.clone()
 	}
 	configMu.RUnlock()
 
 	configMu.Lock()
 	defer configMu.Unlock()
 	if globalConfig != nil {
-		return *globalConfig
+		return globalConfig.clone()
 	}
 	c := Load("")
 	globalConfig = &c
-	return c
+	return c.clone()
 }
 
 func Reload() Config {
@@ -104,7 +117,7 @@ func Reload() Config {
 	defer configMu.Unlock()
 	c := Load("")
 	globalConfig = &c
-	return c
+	return c.clone()
 }
 
 func Load(path string) Config {

@@ -441,11 +441,46 @@ func TestGetAndReload_NoConcurrentRace(t *testing.T) {
 
 func TestGet_ReturnsCopy(t *testing.T) {
 	setupTempDir(t)
+
+	// Scalar field isolation
 	cfg := Get()
 	cfg.Fetch.Timeout = 999
 	cfg2 := Get()
 	if cfg2.Fetch.Timeout == 999 {
-		t.Error("Get() should return a copy, not a reference to global state")
+		t.Error("Get() should return a copy: scalar field mutation leaked")
+	}
+
+	// Map isolation: mutating Providers on one copy must not affect another
+	cfg3 := Get()
+	cfg3.Providers["injected"] = ProviderConfig{Enabled: true}
+	cfg4 := Get()
+	if _, ok := cfg4.Providers["injected"]; ok {
+		t.Error("Get() should return a copy: Providers map mutation leaked")
+	}
+
+	// Slice isolation: mutating EnabledProviders must not affect another copy
+	configMu.Lock()
+	globalConfig = nil
+	configMu.Unlock()
+
+	dir := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
+	configPath := filepath.Join(dir, "config", "config.toml")
+	os.MkdirAll(filepath.Dir(configPath), 0o755)
+	os.WriteFile(configPath, []byte(`enabled_providers = ["claude", "copilot"]`), 0o644)
+
+	configMu.Lock()
+	globalConfig = nil
+	configMu.Unlock()
+
+	cfg5 := Get()
+	if len(cfg5.EnabledProviders) != 2 {
+		t.Fatalf("expected 2 enabled providers, got %d", len(cfg5.EnabledProviders))
+	}
+	cfg5.EnabledProviders[0] = "MUTATED"
+	cfg6 := Get()
+	if cfg6.EnabledProviders[0] == "MUTATED" {
+		t.Error("Get() should return a copy: EnabledProviders slice mutation leaked")
 	}
 }
 
@@ -675,8 +710,12 @@ func TestClearSnapshotCache_SpecificProvider(t *testing.T) {
 
 	snap1 := models.UsageSnapshot{Provider: "claude"}
 	snap2 := models.UsageSnapshot{Provider: "copilot"}
-	CacheSnapshot(snap1)
-	CacheSnapshot(snap2)
+	if err := CacheSnapshot(snap1); err != nil {
+		t.Fatalf("CacheSnapshot(claude) error: %v", err)
+	}
+	if err := CacheSnapshot(snap2); err != nil {
+		t.Fatalf("CacheSnapshot(copilot) error: %v", err)
+	}
 
 	ClearSnapshotCache("claude")
 
@@ -693,8 +732,12 @@ func TestClearSnapshotCache_AllProviders(t *testing.T) {
 
 	snap1 := models.UsageSnapshot{Provider: "claude"}
 	snap2 := models.UsageSnapshot{Provider: "copilot"}
-	CacheSnapshot(snap1)
-	CacheSnapshot(snap2)
+	if err := CacheSnapshot(snap1); err != nil {
+		t.Fatalf("CacheSnapshot(claude) error: %v", err)
+	}
+	if err := CacheSnapshot(snap2); err != nil {
+		t.Fatalf("CacheSnapshot(copilot) error: %v", err)
+	}
 
 	ClearSnapshotCache("")
 
@@ -709,8 +752,12 @@ func TestClearSnapshotCache_AllProviders(t *testing.T) {
 func TestClearOrgIDCache_SpecificProvider(t *testing.T) {
 	setupTempDir(t)
 
-	CacheOrgID("claude", "org-1")
-	CacheOrgID("copilot", "org-2")
+	if err := CacheOrgID("claude", "org-1"); err != nil {
+		t.Fatalf("CacheOrgID(claude) error: %v", err)
+	}
+	if err := CacheOrgID("copilot", "org-2"); err != nil {
+		t.Fatalf("CacheOrgID(copilot) error: %v", err)
+	}
 
 	ClearOrgIDCache("claude")
 
@@ -725,8 +772,12 @@ func TestClearOrgIDCache_SpecificProvider(t *testing.T) {
 func TestClearOrgIDCache_AllProviders(t *testing.T) {
 	setupTempDir(t)
 
-	CacheOrgID("claude", "org-1")
-	CacheOrgID("copilot", "org-2")
+	if err := CacheOrgID("claude", "org-1"); err != nil {
+		t.Fatalf("CacheOrgID(claude) error: %v", err)
+	}
+	if err := CacheOrgID("copilot", "org-2"); err != nil {
+		t.Fatalf("CacheOrgID(copilot) error: %v", err)
+	}
 
 	ClearOrgIDCache("")
 
@@ -742,8 +793,12 @@ func TestClearProviderCache_RemovesBoth(t *testing.T) {
 	setupTempDir(t)
 
 	snap := models.UsageSnapshot{Provider: "claude"}
-	CacheSnapshot(snap)
-	CacheOrgID("claude", "org-1")
+	if err := CacheSnapshot(snap); err != nil {
+		t.Fatalf("CacheSnapshot error: %v", err)
+	}
+	if err := CacheOrgID("claude", "org-1"); err != nil {
+		t.Fatalf("CacheOrgID error: %v", err)
+	}
 
 	ClearProviderCache("claude")
 
@@ -760,10 +815,18 @@ func TestClearAllCache_SpecificProvider(t *testing.T) {
 
 	snap1 := models.UsageSnapshot{Provider: "claude"}
 	snap2 := models.UsageSnapshot{Provider: "copilot"}
-	CacheSnapshot(snap1)
-	CacheSnapshot(snap2)
-	CacheOrgID("claude", "org-1")
-	CacheOrgID("copilot", "org-2")
+	if err := CacheSnapshot(snap1); err != nil {
+		t.Fatalf("CacheSnapshot(claude) error: %v", err)
+	}
+	if err := CacheSnapshot(snap2); err != nil {
+		t.Fatalf("CacheSnapshot(copilot) error: %v", err)
+	}
+	if err := CacheOrgID("claude", "org-1"); err != nil {
+		t.Fatalf("CacheOrgID(claude) error: %v", err)
+	}
+	if err := CacheOrgID("copilot", "org-2"); err != nil {
+		t.Fatalf("CacheOrgID(copilot) error: %v", err)
+	}
 
 	ClearAllCache("claude")
 
@@ -786,10 +849,18 @@ func TestClearAllCache_AllProviders(t *testing.T) {
 
 	snap1 := models.UsageSnapshot{Provider: "claude"}
 	snap2 := models.UsageSnapshot{Provider: "copilot"}
-	CacheSnapshot(snap1)
-	CacheSnapshot(snap2)
-	CacheOrgID("claude", "org-1")
-	CacheOrgID("copilot", "org-2")
+	if err := CacheSnapshot(snap1); err != nil {
+		t.Fatalf("CacheSnapshot(claude) error: %v", err)
+	}
+	if err := CacheSnapshot(snap2); err != nil {
+		t.Fatalf("CacheSnapshot(copilot) error: %v", err)
+	}
+	if err := CacheOrgID("claude", "org-1"); err != nil {
+		t.Fatalf("CacheOrgID(claude) error: %v", err)
+	}
+	if err := CacheOrgID("copilot", "org-2"); err != nil {
+		t.Fatalf("CacheOrgID(copilot) error: %v", err)
+	}
 
 	ClearAllCache("")
 
@@ -1185,8 +1256,12 @@ func TestCacheSnapshot_OverwritesExisting(t *testing.T) {
 		Source:   "v2",
 	}
 
-	CacheSnapshot(snap1)
-	CacheSnapshot(snap2)
+	if err := CacheSnapshot(snap1); err != nil {
+		t.Fatalf("CacheSnapshot(v1) error: %v", err)
+	}
+	if err := CacheSnapshot(snap2); err != nil {
+		t.Fatalf("CacheSnapshot(v2) error: %v", err)
+	}
 
 	loaded := LoadCachedSnapshot("claude")
 	if loaded == nil {
@@ -1308,7 +1383,9 @@ func TestCacheSnapshot_WritesValidJSON(t *testing.T) {
 		Provider: "claude",
 		Source:   "test",
 	}
-	CacheSnapshot(snap)
+	if err := CacheSnapshot(snap); err != nil {
+		t.Fatalf("CacheSnapshot error: %v", err)
+	}
 
 	data, err := os.ReadFile(SnapshotPath("claude"))
 	if err != nil {
