@@ -355,28 +355,38 @@ Browser cookie strategies are fully implemented but not registered in `fetch_str
 
 ---
 
-#### Phase 9.3: Improve Auth Command Instructions
+#### Phase 9.3: Improve Auth Command Instructions ✅ COMPLETE
 **Goal**: Make instruction-only auth commands more helpful
 
 Even without interactive flows, the current instructions are sparse.
 
 **Tasks**:
-- [ ] Claude auth instructions
+- [x] Claude auth instructions
   - [x] Already has detailed DevTools navigation
-  - [ ] Add expected cookie format/prefix validation
-- [ ] Codex auth instructions
-  - [ ] Add `~/.codex/auth.json` file format example
-  - [ ] Explain what the OAuth token looks like
-- [ ] Cursor auth instructions
-  - [ ] Add which cookie names to look for
-  - [ ] Add step-by-step DevTools navigation (like Claude)
-  - [ ] Show expected cookie format
-- [ ] Gemini auth instructions
-  - [ ] Add `~/.gemini/oauth_creds.json` file format example
-  - [ ] Explain credential structure
-- [ ] Copilot auth instructions (after device flow)
-  - [ ] Show VS Code hosts.json location as alternative
-  - [ ] Explain token format
+  - [x] Add expected cookie format/prefix validation (sk-ant-sid01- prefix shown)
+  - [x] Add expiration note (session keys expire periodically)
+  - [x] Add alternative credential path (~/.claude/.credentials.json)
+- [x] Codex auth instructions
+  - [x] Add `~/.codex/auth.json` file format example (tokens.access_token structure)
+  - [x] Explain what the OAuth token looks like
+  - [x] Add OPENAI_API_KEY environment variable option
+  - [x] Show three authentication options (CLI, env var, manual)
+- [x] Cursor auth instructions
+  - [x] Add which cookie names to look for (WorkosCursorSessionToken, etc.)
+  - [x] Add step-by-step DevTools navigation (like Claude)
+  - [x] Show expected cookie format (JWT/encoded string starting with eyJ)
+- [x] Gemini auth instructions
+  - [x] Add `~/.gemini/oauth_creds.json` file format example
+  - [x] Explain credential structure (access_token, refresh_token, expires_at)
+  - [x] Add GEMINI_API_KEY environment variable option
+  - [x] Add API key as alternative auth method
+- [x] Copilot auth instructions (after device flow)
+  - [x] Show VS Code hosts.json location (~/.config/github-copilot/hosts.json)
+  - [x] Explain token format (gho_ for OAuth, ghu_ for user tokens)
+  - [x] Show preferred device flow command (vibeusage auth copilot)
+  - [x] Add GITHUB_TOKEN environment variable option
+
+**Verification**: All 1118 tests pass (18 new tests added), 82% coverage
 
 **Value**: Low - Nice to have, doesn't add functionality
 
@@ -430,9 +440,9 @@ Even without interactive flows, the current instructions are sparse.
 
 ### Upcoming (Authentication Gaps)
 9. **Priority 9**: Interactive Authentication
-   - Phase 9.1: Copilot device flow 🚨 NEXT
-   - Phase 9.2: Claude + Cursor browser cookies 🚨 NEXT
-   - Phase 9.3: Better auth instructions (Later)
+   - Phase 9.1: Copilot device flow ✅
+   - Phase 9.2: Claude + Cursor browser cookies ✅
+   - Phase 9.3: Better auth instructions ✅
    - Phase 9.4: Keyring integration (Later)
 
 ---

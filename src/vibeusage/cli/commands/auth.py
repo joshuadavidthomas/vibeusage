@@ -380,7 +380,18 @@ Get your session key from claude.ai:
 2. Open browser DevTools (F12 or Cmd+Option+I)
 3. Go to Application/Storage → Cookies → https://claude.ai
 4. Find the [bold]sessionKey[/bold] cookie
-5. Copy its value (starts with sk-ant-sid01-)
+5. Copy its value (starts with [bold]sk-ant-sid01-[/bold])
+
+[bold]Expected format:[/bold]
+  sk-ant-sid01-<long alphanumeric string>
+  The key is typically 100+ characters long.
+
+[bold]Note:[/bold] Session keys expire periodically (usually after a few days
+to a week). You'll need to re-run [bold]vibeusage auth claude[/bold] when
+the key expires.
+
+[bold]Alternative:[/bold] If you have the Claude CLI installed, vibeusage can
+also read credentials from [bold]~/.claude/.credentials.json[/bold] automatically.
 
 [dim]The session key allows vibeusage to fetch your usage data.[/dim]""",
         title="Instructions",
@@ -398,21 +409,51 @@ def _show_provider_auth_instructions(
     instructions_map = {
         "codex": """[bold cyan]Codex (ChatGPT) Authentication[/bold cyan]
 
-Codex authentication uses OAuth credentials.
-
-[dim]Run the official Codex CLI to authenticate:[/dim]
+[bold]Option 1: Codex CLI (recommended)[/bold]
+Run the official Codex CLI to authenticate:
   [dim]codex auth login[/dim]
 
-[dim]Or set credentials manually with your OAuth token:[/dim]
-  [dim]vibeusage key codex set[/dim]""",
+vibeusage will automatically read credentials from
+[bold]~/.codex/auth.json[/bold]
+
+[bold]Option 2: Environment variable[/bold]
+Set the [bold]OPENAI_API_KEY[/bold] environment variable:
+  [dim]export OPENAI_API_KEY="sk-..."[/dim]
+
+[bold]Option 3: Manual credential[/bold]
+  [dim]vibeusage key codex set[/dim]
+
+[bold]Credential file format[/bold] (~/.codex/auth.json):
+  {
+    "tokens": {
+      "access_token": "<OAuth access token>",
+      "refresh_token": "<OAuth refresh token>",
+      "expires_at": "<ISO 8601 timestamp>"
+    }
+  }""",
         "copilot": """[bold cyan]GitHub Copilot Authentication[/bold cyan]
 
-[green]Running interactive device flow...[/green]
+[bold]Option 1: Device flow (recommended)[/bold]
+Run the interactive device flow to authenticate:
+  [dim]vibeusage auth copilot[/dim]
 
-This will open a browser window where you can authorize vibeusage to access your Copilot usage data.
+This opens a browser where you authorize vibeusage with GitHub.
+The OAuth token (prefixed [bold]gho_[/bold]) is saved automatically.
 
-[dim]Or set credentials manually with your OAuth token:[/dim]
-  [dim]vibeusage key copilot set[/dim]""",
+[bold]Option 2: VS Code / GitHub CLI credentials[/bold]
+If you have GitHub Copilot configured in VS Code or the GitHub CLI,
+vibeusage can read credentials from:
+  [bold]~/.config/github-copilot/hosts.json[/bold]
+
+[bold]Option 3: Environment variable[/bold]
+Set the [bold]GITHUB_TOKEN[/bold] environment variable.
+
+[bold]Option 4: Manual credential[/bold]
+  [dim]vibeusage key copilot set[/dim]
+
+[bold]Token format:[/bold]
+  GitHub OAuth tokens start with [bold]gho_[/bold] (OAuth) or [bold]ghu_[/bold] (user).
+  Example: gho_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx""",
         "cursor": """[bold cyan]Cursor Authentication[/bold cyan]
 
 Cursor uses session cookies from the browser.
@@ -423,13 +464,31 @@ Cursor uses session cookies from the browser.
   [dim]vibeusage key cursor set[/dim]""",
         "gemini": """[bold cyan]Gemini Authentication[/bold cyan]
 
-Gemini uses Google OAuth credentials.
-
-[dim]Run the official Gemini CLI to authenticate:[/dim]
+[bold]Option 1: Gemini CLI (recommended)[/bold]
+Run the official Gemini CLI to authenticate:
   [dim]gemini auth login[/dim]
 
-[dim]Or set credentials manually with your OAuth token:[/dim]
-  [dim]vibeusage key gemini set[/dim]""",
+vibeusage will automatically read credentials from
+[bold]~/.gemini/oauth_creds.json[/bold]
+
+[bold]Option 2: API key[/bold]
+Set the [bold]GEMINI_API_KEY[/bold] environment variable:
+  [dim]export GEMINI_API_KEY="AIza..."[/dim]
+
+Or save an API key file:
+  [dim]vibeusage key gemini set[/dim]
+
+[bold]Option 3: Manual OAuth credential[/bold]
+  [dim]vibeusage key gemini set[/dim]
+
+[bold]Credential file format[/bold] (~/.gemini/oauth_creds.json):
+  {
+    "access_token": "<Google OAuth access token>",
+    "refresh_token": "<Google OAuth refresh token>",
+    "expires_at": "<ISO 8601 timestamp>"
+  }
+
+[dim]Tokens are automatically refreshed when they expire.[/dim]""",
     }
 
     instructions = instructions_map.get(
@@ -457,6 +516,10 @@ Get your session token from cursor.com:
    • [bold]__Secure-next-auth.session-token[/bold]
    • [bold]next-auth.session-token[/bold]
 5. Copy its value
+
+[bold]Expected format:[/bold]
+  The token is a long encoded string, typically a JWT starting
+  with [bold]eyJ[/bold] or a session identifier. It can be 100+ characters.
 
 [dim]The session token allows vibeusage to fetch your usage data.[/dim]""",
         title="Instructions",

@@ -1117,3 +1117,158 @@ class TestShowProviderAuthInstructions:
         auth_module._show_provider_auth_instructions(console, "codex", quiet=True)
         output = console.file.getvalue()
         assert output == ""
+
+
+class TestImprovedClaudeAuthInstructions:
+    """Tests for improved Claude auth instructions (Phase 9.3)."""
+
+    def test_claude_instructions_show_cookie_format(self):
+        """Claude instructions mention expected cookie format prefix."""
+        console = Console(file=StringIO())
+        auth_module._show_claude_auth_instructions(console, quiet=False)
+        output = console.file.getvalue()
+        assert "sk-ant-sid01-" in output
+
+    def test_claude_instructions_mention_expiration(self):
+        """Claude instructions mention cookie expiration behavior."""
+        console = Console(file=StringIO())
+        auth_module._show_claude_auth_instructions(console, quiet=False)
+        output = console.file.getvalue()
+        assert "expir" in output.lower()
+
+    def test_claude_instructions_mention_alternative_credential_path(self):
+        """Claude instructions mention the CLI credential path as alternative."""
+        console = Console(file=StringIO())
+        auth_module._show_claude_auth_instructions(console, quiet=False)
+        output = console.file.getvalue()
+        assert ".claude" in output
+
+
+class TestImprovedCodexAuthInstructions:
+    """Tests for improved Codex auth instructions (Phase 9.3)."""
+
+    def test_codex_instructions_show_file_format(self):
+        """Codex instructions show the auth.json file format."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "codex", quiet=False)
+        output = console.file.getvalue()
+        assert "auth.json" in output
+
+    def test_codex_instructions_show_credential_path(self):
+        """Codex instructions show the ~/.codex/ credential path."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "codex", quiet=False)
+        output = console.file.getvalue()
+        assert "~/.codex/" in output
+
+    def test_codex_instructions_show_token_structure(self):
+        """Codex instructions explain token JSON structure."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "codex", quiet=False)
+        output = console.file.getvalue()
+        assert "access_token" in output
+
+    def test_codex_instructions_mention_env_var(self):
+        """Codex instructions mention the OPENAI_API_KEY env var."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "codex", quiet=False)
+        output = console.file.getvalue()
+        assert "OPENAI_API_KEY" in output
+
+
+class TestImprovedCursorAuthInstructions:
+    """Tests for improved Cursor auth instructions (Phase 9.3)."""
+
+    def test_cursor_instructions_mention_format_hint(self):
+        """Cursor instructions mention expected token format."""
+        console = Console(file=StringIO())
+        auth_module._show_cursor_auth_instructions(console, quiet=False)
+        output = console.file.getvalue()
+        # Should mention it's a long encoded string
+        assert (
+            "long" in output.lower()
+            or "encoded" in output.lower()
+            or "JWT" in output
+            or "eyJ" in output
+        )
+
+    def test_cursor_instructions_mention_all_cookie_names(self):
+        """Cursor instructions list all possible cookie names."""
+        console = Console(file=StringIO())
+        auth_module._show_cursor_auth_instructions(console, quiet=False)
+        output = console.file.getvalue()
+        assert "WorkosCursorSessionToken" in output
+        assert "__Secure-next-auth.session-token" in output
+        assert "next-auth.session-token" in output
+
+
+class TestImprovedGeminiAuthInstructions:
+    """Tests for improved Gemini auth instructions (Phase 9.3)."""
+
+    def test_gemini_instructions_show_credential_path(self):
+        """Gemini instructions show the ~/.gemini/ credential path."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "gemini", quiet=False)
+        output = console.file.getvalue()
+        assert "~/.gemini/" in output
+
+    def test_gemini_instructions_show_file_format(self):
+        """Gemini instructions show the oauth_creds.json file format."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "gemini", quiet=False)
+        output = console.file.getvalue()
+        assert "oauth_creds.json" in output
+
+    def test_gemini_instructions_show_token_structure(self):
+        """Gemini instructions explain token JSON structure."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "gemini", quiet=False)
+        output = console.file.getvalue()
+        assert "access_token" in output
+        assert "refresh_token" in output
+
+    def test_gemini_instructions_mention_env_var(self):
+        """Gemini instructions mention the GEMINI_API_KEY env var."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "gemini", quiet=False)
+        output = console.file.getvalue()
+        assert "GEMINI_API_KEY" in output
+
+    def test_gemini_instructions_mention_api_key_alternative(self):
+        """Gemini instructions mention API key as alternative auth method."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "gemini", quiet=False)
+        output = console.file.getvalue()
+        assert "API key" in output or "api_key" in output
+
+
+class TestImprovedCopilotAuthInstructions:
+    """Tests for improved Copilot auth instructions (Phase 9.3)."""
+
+    def test_copilot_instructions_mention_hosts_json(self):
+        """Copilot instructions mention VS Code hosts.json location."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "copilot", quiet=False)
+        output = console.file.getvalue()
+        assert "hosts.json" in output
+
+    def test_copilot_instructions_show_credential_path(self):
+        """Copilot instructions show the github-copilot config path."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "copilot", quiet=False)
+        output = console.file.getvalue()
+        assert "github-copilot" in output
+
+    def test_copilot_instructions_explain_token_format(self):
+        """Copilot instructions explain token format."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "copilot", quiet=False)
+        output = console.file.getvalue()
+        assert "gho_" in output or "ghu_" in output
+
+    def test_copilot_instructions_mention_device_flow(self):
+        """Copilot instructions mention the preferred device flow auth."""
+        console = Console(file=StringIO())
+        auth_module._show_provider_auth_instructions(console, "copilot", quiet=False)
+        output = console.file.getvalue()
+        assert "vibeusage auth copilot" in output
