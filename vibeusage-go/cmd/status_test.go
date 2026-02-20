@@ -60,6 +60,10 @@ func TestDisplayStatusTable_HasTableBorders(t *testing.T) {
 	noColor = false
 	defer func() { noColor = oldNoColor }()
 
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
 	displayStatusTable(statuses, 0)
 
 	output := buf.String()
@@ -110,6 +114,10 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
 	oldVerbose := verbose
 	verbose = true
 	defer func() { verbose = oldVerbose }()
@@ -134,6 +142,10 @@ func TestDisplayStatusTable_Headers(t *testing.T) {
 	oldNoColor := noColor
 	noColor = true
 	defer func() { noColor = oldNoColor }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
 
 	displayStatusTable(statuses, 0)
 
