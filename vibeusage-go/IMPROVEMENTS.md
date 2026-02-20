@@ -197,16 +197,16 @@ func WithBearer(token string) RequestOption { ... }
 
 ### Tasks
 
-- [ ] Create `internal/httpclient/` package with shared client
-- [ ] Define `RequestOption` pattern for headers/cookies/auth
-- [ ] Add `GetJSON`, `PostJSON`, `PostForm` convenience methods
-- [ ] Migrate Claude strategies to use shared client
-- [ ] Migrate Codex strategy to use shared client
-- [ ] Migrate Copilot strategy to use shared client
-- [ ] Migrate Cursor strategy to use shared client
-- [ ] Migrate Gemini strategies to use shared client
-- [ ] Migrate status fetchers to use shared client
-- [ ] Read timeout from config instead of hardcoding `30 * time.Second`
+- [x] Create `internal/httpclient/` package with shared client
+- [x] Define `RequestOption` pattern for headers/cookies/auth
+- [x] Add `GetJSON`, `PostJSON`, `PostForm` convenience methods
+- [x] Migrate Claude strategies to use shared client
+- [x] Migrate Codex strategy to use shared client
+- [x] Migrate Copilot strategy to use shared client
+- [x] Migrate Cursor strategy to use shared client
+- [x] Migrate Gemini strategies to use shared client
+- [x] Migrate status fetchers to use shared client
+- [x] Read timeout from config instead of hardcoding `30 * time.Second`
 
 ## 6. Context Threading Through Strategy Interface
 
