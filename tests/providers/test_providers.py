@@ -150,17 +150,18 @@ class TestClaudeProvider:
         strategies = provider.fetch_strategies()
 
         assert isinstance(strategies, list)
-        assert len(strategies) == 3
+        assert len(strategies) == 4
 
     def test_fetch_strategy_order(self):
         """Strategies are in correct priority order."""
         provider = ClaudeProvider()
         strategies = provider.fetch_strategies()
 
-        # Should be OAuth, Web, CLI in that order
+        # Should be OAuth, Web, Browser, CLI in that order
         assert "OAuth" in str(type(strategies[0]))
         assert "Web" in str(type(strategies[1]))
-        assert "CLI" in str(type(strategies[2]))
+        assert "BrowserCookie" in str(type(strategies[2]))
+        assert "CLI" in str(type(strategies[3]))
 
     def test_fetch_status(self):
         """fetch_status returns async operation."""
@@ -429,6 +430,136 @@ class TestClaudeBrowserCookieStrategy:
         import browser_cookie3
 
         # Module should have browser attribute methods
-        assert hasattr(browser_cookie3, "chrome") or hasattr(
-            browser_cookie3, "safari"
-        ) or hasattr(browser_cookie3, "firefox")
+        assert (
+            hasattr(browser_cookie3, "chrome")
+            or hasattr(browser_cookie3, "safari")
+            or hasattr(browser_cookie3, "firefox")
+        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_fails_when_no_cookie_library(self):
+        """fetch returns failure when browser_cookie3 not importable."""
+        import builtins
+
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name in ("browser_cookie3", "pycookiecheat"):
+                raise ImportError(f"No module named '{name}'")
+            return original_import(name, *args, **kwargs)
+
+        strategy = self.strategy_cls()
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = await strategy.fetch()
+
+        assert result.success is False
+        assert "browser_cookie3" in result.error or "pycookiecheat" in result.error
+
+    @pytest.mark.asyncio
+    async def test_fetch_extracts_cookie_and_delegates(self):
+        """fetch extracts cookie from browser and delegates to WebStrategy."""
+        strategy = self.strategy_cls()
+
+        mock_cookie = MagicMock()
+        mock_cookie.name = "sessionKey"
+        mock_cookie.value = "sk-ant-sid01-extracted-key"
+
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.chrome.return_value = [mock_cookie]
+
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            with patch.object(strategy, "_save_session_key") as mock_save:
+                with patch(
+                    "vibeusage.providers.claude.web.ClaudeWebStrategy.fetch"
+                ) as mock_web_fetch:
+                    from vibeusage.strategies.base import FetchResult
+
+                    mock_web_fetch.return_value = FetchResult(
+                        success=True, snapshot=MagicMock()
+                    )
+                    result = await strategy.fetch()
+
+        assert result.success is True
+        mock_save.assert_called_once_with("sk-ant-sid01-extracted-key")
+
+    @pytest.mark.asyncio
+    async def test_fetch_tries_multiple_browsers(self):
+        """fetch tries next browser when first fails."""
+        strategy = self.strategy_cls()
+
+        mock_cookie = MagicMock()
+        mock_cookie.name = "sessionKey"
+        mock_cookie.value = "sk-ant-sid01-from-firefox"
+
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.safari = None  # Safari not available
+        mock_browser_cookie3.chrome.side_effect = Exception("Chrome locked")
+        mock_browser_cookie3.firefox.return_value = [mock_cookie]
+
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            with patch.object(strategy, "_save_session_key"):
+                with patch(
+                    "vibeusage.providers.claude.web.ClaudeWebStrategy.fetch"
+                ) as mock_web_fetch:
+                    from vibeusage.strategies.base import FetchResult
+
+                    mock_web_fetch.return_value = FetchResult(
+                        success=True, snapshot=MagicMock()
+                    )
+                    result = await strategy.fetch()
+
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_fetch_fails_when_no_cookie_found(self):
+        """fetch returns failure when no matching cookie found."""
+        strategy = self.strategy_cls()
+
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.safari = None
+        mock_browser_cookie3.chrome.return_value = []  # No cookies
+        mock_browser_cookie3.firefox.return_value = []
+        mock_browser_cookie3.brave = None
+        mock_browser_cookie3.edge = None
+
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            result = await strategy.fetch()
+
+        assert result.success is False
+        assert "Could not extract" in result.error
+
+    @pytest.mark.asyncio
+    async def test_fetch_ignores_wrong_cookie_names(self):
+        """fetch ignores cookies that don't match expected names."""
+        strategy = self.strategy_cls()
+
+        wrong_cookie = MagicMock()
+        wrong_cookie.name = "otherCookie"
+        wrong_cookie.value = "not-what-we-want"
+
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.safari = None
+        mock_browser_cookie3.chrome.return_value = [wrong_cookie]
+        mock_browser_cookie3.firefox.return_value = []
+        mock_browser_cookie3.brave = None
+        mock_browser_cookie3.edge = None
+
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            result = await strategy.fetch()
+
+        assert result.success is False
+
+    def test_save_session_key_writes_json(self):
+        """_save_session_key writes JSON to correct path."""
+        strategy = self.strategy_cls()
+
+        with patch("vibeusage.providers.claude.web.write_credential") as mock_write:
+            strategy._save_session_key("sk-ant-sid01-test-key")
+
+            mock_write.assert_called_once()
+            args = mock_write.call_args
+            written_data = args[0][1]
+            import json
+
+            parsed = json.loads(written_data)
+            assert parsed["session_key"] == "sk-ant-sid01-test-key"

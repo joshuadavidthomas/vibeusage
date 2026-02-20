@@ -5,6 +5,7 @@ from __future__ import annotations
 from vibeusage.models import ProviderStatus
 from vibeusage.providers.base import Provider
 from vibeusage.providers.base import ProviderMetadata
+from vibeusage.providers.cursor.web import CursorBrowserCookieStrategy
 from vibeusage.providers.cursor.web import CursorWebStrategy
 
 
@@ -24,10 +25,12 @@ class CursorProvider(Provider):
         """Return ordered list of fetch strategies for Cursor.
 
         Priority order:
-        1. Web - stored session token from browser cookies
+        1. Web - stored session token from credential storage
+        2. Browser - extract session token from browser cookies
         """
         return [
             CursorWebStrategy(),
+            CursorBrowserCookieStrategy(),
         ]
 
     async def fetch_status(self) -> ProviderStatus:

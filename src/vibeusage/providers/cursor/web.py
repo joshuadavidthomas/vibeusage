@@ -161,7 +161,7 @@ class CursorWebStrategy(FetchStrategy):
                         elif isinstance(end_date, int):
                             # Unix timestamp in milliseconds
                             resets_at = datetime.fromtimestamp(end_date / 1000, tz=UTC)
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         pass
 
             periods.append(
@@ -185,7 +185,7 @@ class CursorWebStrategy(FetchStrategy):
                         currency="USD",
                         is_enabled=True,
                     )
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
 
         # Parse user identity
@@ -288,7 +288,8 @@ class CursorBrowserCookieStrategy(FetchStrategy):
 
     def _save_session_token(self, session_token: str) -> None:
         """Save session token to credential storage."""
-        data = json.dumps({"session_token": session_token}).encode()
         from vibeusage.config.credentials import write_credential
 
-        write_credential(CursorWebStrategy.SESSION_PATH, data)
+        path = credential_path("cursor", "session")
+        data = json.dumps({"session_token": session_token}).encode()
+        write_credential(path, data)

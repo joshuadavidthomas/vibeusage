@@ -73,7 +73,9 @@ class TestAuthCommand:
         ctx = MagicMock()
         ctx.meta = {"verbose": False, "quiet": False, "json": False}
 
-        with patch.object(auth_module, "list_provider_ids", return_value=["claude", "codex"]):
+        with patch.object(
+            auth_module, "list_provider_ids", return_value=["claude", "codex"]
+        ):
             console = Console(file=StringIO())
             with patch.object(auth_module, "Console", return_value=console):
                 with pytest.raises(TyperExit) as exc_info:
@@ -116,15 +118,21 @@ class TestAuthStatusCommand:
             auth_module, "list_provider_ids", return_value=["claude", "codex"]
         ):
             with patch.object(
-                auth_module, "check_provider_credentials", side_effect=[(True, "vibeusage"), (False, None)]
+                auth_module,
+                "check_provider_credentials",
+                side_effect=[(True, "vibeusage"), (False, None)],
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", side_effect=[
+                    auth_module,
+                    "find_provider_credential",
+                    side_effect=[
                         ("oauth", Path("/cred1"), Path("/cred1")),
-                        (None, None, None)
-                    ]
+                        (None, None, None),
+                    ],
                 ):
-                    with patch("vibeusage.display.json.output_json_pretty") as mock_json:
+                    with patch(
+                        "vibeusage.display.json.output_json_pretty"
+                    ) as mock_json:
                         auth_module.auth_status_command(
                             show_all=False, json_mode=True, verbose=False, quiet=False
                         )
@@ -138,16 +146,20 @@ class TestAuthStatusCommand:
 
     def test_auth_status_json_mode_provider_cli_source(self):
         """JSON mode with provider_cli source."""
-        with patch.object(
-            auth_module, "list_provider_ids", return_value=["codex"]
-        ):
+        with patch.object(auth_module, "list_provider_ids", return_value=["codex"]):
             with patch.object(
-                auth_module, "check_provider_credentials", return_value=(True, "provider_cli")
+                auth_module,
+                "check_provider_credentials",
+                return_value=(True, "provider_cli"),
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", return_value=("provider_cli", Path("/cli/cred"), Path("/cli/cred"))
+                    auth_module,
+                    "find_provider_credential",
+                    return_value=("provider_cli", Path("/cli/cred"), Path("/cli/cred")),
                 ):
-                    with patch("vibeusage.display.json.output_json_pretty") as mock_json:
+                    with patch(
+                        "vibeusage.display.json.output_json_pretty"
+                    ) as mock_json:
                         auth_module.auth_status_command(
                             show_all=False, json_mode=True, verbose=False, quiet=False
                         )
@@ -156,16 +168,18 @@ class TestAuthStatusCommand:
 
     def test_auth_status_json_mode_env_source(self):
         """JSON mode with env source."""
-        with patch.object(
-            auth_module, "list_provider_ids", return_value=["gemini"]
-        ):
+        with patch.object(auth_module, "list_provider_ids", return_value=["gemini"]):
             with patch.object(
                 auth_module, "check_provider_credentials", return_value=(True, "env")
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", return_value=("env", Path("/env/cred"), Path("/env/cred"))
+                    auth_module,
+                    "find_provider_credential",
+                    return_value=("env", Path("/env/cred"), Path("/env/cred")),
                 ):
-                    with patch("vibeusage.display.json.output_json_pretty") as mock_json:
+                    with patch(
+                        "vibeusage.display.json.output_json_pretty"
+                    ) as mock_json:
                         auth_module.auth_status_command(
                             show_all=False, json_mode=True, verbose=False, quiet=False
                         )
@@ -174,16 +188,20 @@ class TestAuthStatusCommand:
 
     def test_auth_status_json_mode_unknown_source(self):
         """Unknown source value falls back to itself."""
-        with patch.object(
-            auth_module, "list_provider_ids", return_value=["test"]
-        ):
+        with patch.object(auth_module, "list_provider_ids", return_value=["test"]):
             with patch.object(
-                auth_module, "check_provider_credentials", return_value=(True, "unknown_source")
+                auth_module,
+                "check_provider_credentials",
+                return_value=(True, "unknown_source"),
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", return_value=("unknown", Path("/cred"), Path("/cred"))
+                    auth_module,
+                    "find_provider_credential",
+                    return_value=("unknown", Path("/cred"), Path("/cred")),
                 ):
-                    with patch("vibeusage.display.json.output_json_pretty") as mock_json:
+                    with patch(
+                        "vibeusage.display.json.output_json_pretty"
+                    ) as mock_json:
                         auth_module.auth_status_command(
                             show_all=False, json_mode=True, verbose=False, quiet=False
                         )
@@ -198,7 +216,9 @@ class TestAuthStatusCommand:
                 auth_module, "list_provider_ids", return_value=["claude", "codex"]
             ):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(True, "vibeusage"), (False, None)]
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[(True, "vibeusage"), (False, None)],
                 ):
                     auth_module.auth_status_command(
                         show_all=False, json_mode=False, verbose=False, quiet=True
@@ -215,15 +235,24 @@ class TestAuthStatusCommand:
                 auth_module, "list_provider_ids", return_value=["claude", "codex"]
             ):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(True, "vibeusage"), (False, None), (False, None), (False, None)]
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[
+                        (True, "vibeusage"),
+                        (False, None),
+                        (False, None),
+                        (False, None),
+                    ],
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", side_effect=[
+                        auth_module,
+                        "find_provider_credential",
+                        side_effect=[
                             ("oauth", Path("/cred"), Path("/cred")),
                             (None, None, None),
                             (None, None, None),
-                            (None, None, None)
-                        ]
+                            (None, None, None),
+                        ],
                     ):
                         auth_module.auth_status_command(
                             show_all=False, json_mode=False, verbose=False, quiet=False
@@ -240,20 +269,30 @@ class TestAuthStatusCommand:
                 auth_module, "list_provider_ids", return_value=["claude"]
             ):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(True, "vibeusage"), (True, "vibeusage"), (True, "vibeusage")]
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[
+                        (True, "vibeusage"),
+                        (True, "vibeusage"),
+                        (True, "vibeusage"),
+                    ],
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", side_effect=[
+                        auth_module,
+                        "find_provider_credential",
+                        side_effect=[
                             ("oauth", Path("/cred"), Path("/cred")),
                             ("oauth", Path("/cred"), Path("/cred")),
-                            ("oauth", Path("/cred"), Path("/cred"))
-                        ]
+                            ("oauth", Path("/cred"), Path("/cred")),
+                        ],
                     ):
                         auth_module.auth_status_command(
                             show_all=False, json_mode=False, verbose=False, quiet=False
                         )
                         output = console.file.getvalue()
-                        assert "Authenticated" in output or "vibeusage storage" in output
+                        assert (
+                            "Authenticated" in output or "vibeusage storage" in output
+                        )
 
     def test_auth_status_normal_mode_unconfigured(self):
         """Unconfigured provider shows correct status in table."""
@@ -263,20 +302,27 @@ class TestAuthStatusCommand:
                 auth_module, "list_provider_ids", return_value=["copilot"]
             ):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(False, None), (False, None), (False, None)]
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[(False, None), (False, None), (False, None)],
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", side_effect=[
+                        auth_module,
+                        "find_provider_credential",
+                        side_effect=[
                             (None, None, None),
                             (None, None, None),
-                            (None, None, None)
-                        ]
+                            (None, None, None),
+                        ],
                     ):
                         auth_module.auth_status_command(
                             show_all=False, json_mode=False, verbose=False, quiet=False
                         )
                         output = console.file.getvalue()
-                        assert "Not configured" in output or "not configured" in output.lower()
+                        assert (
+                            "Not configured" in output
+                            or "not configured" in output.lower()
+                        )
 
     def test_auth_status_shows_unconfigured_instructions(self):
         """Shows setup instructions for unconfigured providers."""
@@ -286,15 +332,24 @@ class TestAuthStatusCommand:
                 auth_module, "list_provider_ids", return_value=["claude", "codex"]
             ):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(True, "vibeusage"), (False, None), (False, None), (False, None)]
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[
+                        (True, "vibeusage"),
+                        (False, None),
+                        (False, None),
+                        (False, None),
+                    ],
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", side_effect=[
+                        auth_module,
+                        "find_provider_credential",
+                        side_effect=[
                             ("oauth", Path("/cred"), Path("/cred")),
                             (None, None, None),
                             (None, None, None),
-                            (None, None, None)
-                        ]
+                            (None, None, None),
+                        ],
                     ):
                         auth_module.auth_status_command(
                             show_all=False, json_mode=False, verbose=False, quiet=False
@@ -310,14 +365,22 @@ class TestAuthStatusCommand:
                 auth_module, "list_provider_ids", return_value=["claude"]
             ):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(True, "vibeusage"), (True, "vibeusage"), (True, "vibeusage")]
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[
+                        (True, "vibeusage"),
+                        (True, "vibeusage"),
+                        (True, "vibeusage"),
+                    ],
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", side_effect=[
+                        auth_module,
+                        "find_provider_credential",
+                        side_effect=[
                             ("oauth", Path("/test/cred.json"), Path("/test/cred.json")),
                             ("oauth", Path("/test/cred.json"), Path("/test/cred.json")),
-                            ("oauth", Path("/test/cred.json"), Path("/test/cred.json"))
-                        ]
+                            ("oauth", Path("/test/cred.json"), Path("/test/cred.json")),
+                        ],
                     ):
                         auth_module.auth_status_command(
                             show_all=False, json_mode=False, verbose=True, quiet=False
@@ -330,18 +393,20 @@ class TestAuthStatusCommand:
         """Verbose handles None credential paths."""
         console = Console(file=StringIO())
         with patch.object(auth_module, "Console", return_value=console):
-            with patch.object(
-                auth_module, "list_provider_ids", return_value=["codex"]
-            ):
+            with patch.object(auth_module, "list_provider_ids", return_value=["codex"]):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(False, None), (False, None), (False, None)]
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[(False, None), (False, None), (False, None)],
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", side_effect=[
+                        auth_module,
+                        "find_provider_credential",
+                        side_effect=[
                             (None, None, None),
                             (None, None, None),
-                            (None, None, None)
-                        ]
+                            (None, None, None),
+                        ],
                     ):
                         auth_module.auth_status_command(
                             show_all=False, json_mode=False, verbose=True, quiet=False
@@ -355,13 +420,19 @@ class TestAuthStatusCommand:
         console = Console(file=StringIO())
         with patch.object(auth_module, "Console", return_value=console):
             with patch.object(
-                auth_module, "list_provider_ids", return_value=["claude", "codex", "copilot"]
+                auth_module,
+                "list_provider_ids",
+                return_value=["claude", "codex", "copilot"],
             ):
                 with patch.object(
-                    auth_module, "check_provider_credentials", side_effect=[(False, None)] * 9
+                    auth_module,
+                    "check_provider_credentials",
+                    side_effect=[(False, None)] * 9,
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", side_effect=[(None, None, None)] * 9
+                        auth_module,
+                        "find_provider_credential",
+                        side_effect=[(None, None, None)] * 9,
                     ):
                         auth_module.auth_status_command(
                             show_all=False, json_mode=False, verbose=False, quiet=False
@@ -390,10 +461,37 @@ class TestAuthClaudeCommand:
                     assert "Success" in output
 
     def test_auth_claude_no_session_key_prompts(self):
-        """No session key shows instructions and prompts."""
+        """No session key shows instructions and prompts when browser extraction fails."""
         console = Console(file=StringIO())
         with patch.object(auth_module, "Console", return_value=console):
-            with patch("typer.prompt", return_value="sk-ant-sid01-test123"):
+            with patch.object(
+                auth_module,
+                "_try_browser_cookie_extraction",
+                return_value=None,
+            ):
+                with patch("typer.prompt", return_value="sk-ant-sid01-test123"):
+                    with patch.object(
+                        auth_module, "credential_path", return_value=Path("/cred.json")
+                    ):
+                        with patch.object(auth_module, "write_credential"):
+                            auth_module.auth_claude_command(
+                                session_key=None, verbose=False, quiet=False
+                            )
+                            output = console.file.getvalue()
+                            assert (
+                                "Instructions" in output
+                                or "Claude Authentication" in output
+                            )
+
+    def test_auth_claude_browser_extraction_success(self):
+        """Browser extraction skips prompt when cookie found."""
+        console = Console(file=StringIO())
+        with patch.object(auth_module, "Console", return_value=console):
+            with patch.object(
+                auth_module,
+                "_try_browser_cookie_extraction",
+                return_value="sk-ant-sid01-extracted",
+            ):
                 with patch.object(
                     auth_module, "credential_path", return_value=Path("/cred.json")
                 ):
@@ -402,7 +500,9 @@ class TestAuthClaudeCommand:
                             session_key=None, verbose=False, quiet=False
                         )
                         output = console.file.getvalue()
-                        assert "Instructions" in output or "Claude Authentication" in output
+                        assert "Success" in output
+                        # Should NOT show instructions since browser extraction worked
+                        assert "Instructions" not in output
 
     def test_auth_claude_invalid_format_warns(self):
         """Invalid format shows warning."""
@@ -441,7 +541,9 @@ class TestAuthClaudeCommand:
             ):
                 with patch.object(auth_module, "write_credential"):
                     auth_module.auth_claude_command(
-                        session_key="sk-ant-sid01-1234567890abcdefghijklmnop", verbose=True, quiet=False
+                        session_key="sk-ant-sid01-1234567890abcdefghijklmnop",
+                        verbose=True,
+                        quiet=False,
                     )
                     output = console.file.getvalue()
                     # The code shows first 20 chars: session_key[:20] + "..."
@@ -496,6 +598,277 @@ class TestAuthClaudeCommand:
                     assert exc_info.value.exit_code == ExitCode.GENERAL_ERROR
 
 
+class TestAuthCursorCommand:
+    """Tests for auth_cursor_command function."""
+
+    def test_auth_cursor_with_session_token(self):
+        """Valid session token saves successfully."""
+        console = Console(file=StringIO())
+        with patch.object(auth_module, "Console", return_value=console):
+            with patch.object(
+                auth_module, "credential_path", return_value=Path("/cred.json")
+            ):
+                with patch.object(auth_module, "write_credential"):
+                    auth_module.auth_cursor_command(
+                        session_token="cursor-test-token", verbose=False, quiet=False
+                    )
+                    output = console.file.getvalue()
+                    assert "Success" in output
+
+    def test_auth_cursor_no_token_browser_extraction_success(self):
+        """Browser extraction skips prompt when cookie found."""
+        console = Console(file=StringIO())
+        with patch.object(auth_module, "Console", return_value=console):
+            with patch.object(
+                auth_module,
+                "_try_browser_cookie_extraction",
+                return_value="extracted-cursor-token",
+            ):
+                with patch.object(
+                    auth_module, "credential_path", return_value=Path("/cred.json")
+                ):
+                    with patch.object(auth_module, "write_credential"):
+                        auth_module.auth_cursor_command(
+                            session_token=None, verbose=False, quiet=False
+                        )
+                        output = console.file.getvalue()
+                        assert "Success" in output
+                        assert "Instructions" not in output
+
+    def test_auth_cursor_no_token_prompts_on_extraction_fail(self):
+        """Falls back to manual prompt when browser extraction fails."""
+        console = Console(file=StringIO())
+        with patch.object(auth_module, "Console", return_value=console):
+            with patch.object(
+                auth_module,
+                "_try_browser_cookie_extraction",
+                return_value=None,
+            ):
+                with patch("typer.prompt", return_value="manual-cursor-token"):
+                    with patch.object(
+                        auth_module, "credential_path", return_value=Path("/cred.json")
+                    ):
+                        with patch.object(auth_module, "write_credential"):
+                            auth_module.auth_cursor_command(
+                                session_token=None, verbose=False, quiet=False
+                            )
+                            output = console.file.getvalue()
+                            assert "Cursor Authentication" in output
+                            assert "Success" in output
+
+    def test_auth_cursor_verbose_shows_prefix(self):
+        """Verbose mode shows session token prefix."""
+        console = Console(file=StringIO())
+        with patch.object(auth_module, "Console", return_value=console):
+            with patch.object(
+                auth_module, "credential_path", return_value=Path("/cred.json")
+            ):
+                with patch.object(auth_module, "write_credential"):
+                    auth_module.auth_cursor_command(
+                        session_token="cursor-session-1234567890abcdef",
+                        verbose=True,
+                        quiet=False,
+                    )
+                    output = console.file.getvalue()
+                    assert "cursor-session-12345..." in output
+
+    def test_auth_cursor_quiet_no_output(self):
+        """Quiet mode suppresses success output."""
+        console = Console(file=StringIO())
+        with patch.object(auth_module, "Console", return_value=console):
+            with patch.object(
+                auth_module, "credential_path", return_value=Path("/cred.json")
+            ):
+                with patch.object(auth_module, "write_credential"):
+                    auth_module.auth_cursor_command(
+                        session_token="test-token", verbose=False, quiet=True
+                    )
+                    output = console.file.getvalue()
+                    assert "Success" not in output
+
+    def test_auth_cursor_write_error(self):
+        """Exception during write is handled."""
+        console = Console(file=StringIO())
+        with patch.object(auth_module, "Console", return_value=console):
+            with patch.object(
+                auth_module, "credential_path", return_value=Path("/cred.json")
+            ):
+                with patch.object(
+                    auth_module,
+                    "write_credential",
+                    side_effect=OSError("Write failed"),
+                ):
+                    with pytest.raises(TyperExit) as exc_info:
+                        auth_module.auth_cursor_command(
+                            session_token="test-token", verbose=False, quiet=False
+                        )
+                    assert exc_info.value.exit_code == ExitCode.GENERAL_ERROR
+                    output = console.file.getvalue()
+                    assert "Error saving credential" in output
+
+
+class TestAuthCommandRoutesCursor:
+    """Tests for auth_command routing cursor to auth_cursor_command."""
+
+    def test_auth_command_with_provider_cursor(self):
+        """Provider='cursor' calls auth_cursor_command."""
+        ctx = MagicMock()
+        ctx.meta = {"verbose": False, "quiet": False, "json": False}
+
+        with patch.object(
+            auth_module, "auth_cursor_command", return_value=None
+        ) as mock_cursor:
+            auth_module.auth_command(ctx, "cursor", False, False, False)
+            mock_cursor.assert_called_once_with(verbose=False, quiet=False)
+
+
+class TestTryBrowserCookieExtraction:
+    """Tests for _try_browser_cookie_extraction helper."""
+
+    def test_returns_none_when_no_library(self):
+        """Returns None when browser_cookie3 not importable."""
+        import builtins
+
+        original_import = builtins.__import__
+
+        def mock_import(name, *args, **kwargs):
+            if name in ("browser_cookie3", "pycookiecheat"):
+                raise ImportError(f"No module named '{name}'")
+            return original_import(name, *args, **kwargs)
+
+        console = Console(file=StringIO())
+        with patch("builtins.__import__", side_effect=mock_import):
+            result = auth_module._try_browser_cookie_extraction(
+                console,
+                provider="test",
+                cookie_domains=[".test.com"],
+                cookie_names=["testCookie"],
+                verbose=True,
+                quiet=False,
+            )
+
+        assert result is None
+        output = console.file.getvalue()
+        assert "not available" in output
+
+    def test_returns_cookie_value_on_success(self):
+        """Returns cookie value when found."""
+        mock_cookie = MagicMock()
+        mock_cookie.name = "sessionKey"
+        mock_cookie.value = "extracted-value"
+
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.chrome.return_value = [mock_cookie]
+
+        console = Console(file=StringIO())
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            result = auth_module._try_browser_cookie_extraction(
+                console,
+                provider="claude",
+                cookie_domains=[".claude.ai"],
+                cookie_names=["sessionKey"],
+                verbose=False,
+                quiet=False,
+            )
+
+        assert result == "extracted-value"
+        output = console.file.getvalue()
+        assert "Found" in output
+
+    def test_returns_none_when_no_cookie_found(self):
+        """Returns None when no matching cookie found."""
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.safari = None
+        mock_browser_cookie3.chrome.return_value = []
+        mock_browser_cookie3.firefox.return_value = []
+        mock_browser_cookie3.brave = None
+        mock_browser_cookie3.edge = None
+        mock_browser_cookie3.arc = None
+
+        console = Console(file=StringIO())
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            result = auth_module._try_browser_cookie_extraction(
+                console,
+                provider="test",
+                cookie_domains=[".test.com"],
+                cookie_names=["testCookie"],
+                verbose=True,
+                quiet=False,
+            )
+
+        assert result is None
+        output = console.file.getvalue()
+        assert "No session cookie found" in output
+
+    def test_quiet_suppresses_output(self):
+        """Quiet mode suppresses extraction messages."""
+        mock_cookie = MagicMock()
+        mock_cookie.name = "sessionKey"
+        mock_cookie.value = "extracted-value"
+
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.chrome.return_value = [mock_cookie]
+
+        console = Console(file=StringIO())
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            result = auth_module._try_browser_cookie_extraction(
+                console,
+                provider="claude",
+                cookie_domains=[".claude.ai"],
+                cookie_names=["sessionKey"],
+                verbose=False,
+                quiet=True,
+            )
+
+        assert result == "extracted-value"
+        output = console.file.getvalue()
+        assert output == ""
+
+    def test_handles_browser_exception_gracefully(self):
+        """Continues to next browser when one throws."""
+        mock_cookie = MagicMock()
+        mock_cookie.name = "testCookie"
+        mock_cookie.value = "from-firefox"
+
+        mock_browser_cookie3 = MagicMock()
+        mock_browser_cookie3.safari = None
+        mock_browser_cookie3.chrome.side_effect = Exception("DB locked")
+        mock_browser_cookie3.firefox.return_value = [mock_cookie]
+
+        console = Console(file=StringIO())
+        with patch.dict("sys.modules", {"browser_cookie3": mock_browser_cookie3}):
+            result = auth_module._try_browser_cookie_extraction(
+                console,
+                provider="test",
+                cookie_domains=[".test.com"],
+                cookie_names=["testCookie"],
+                verbose=False,
+                quiet=False,
+            )
+
+        assert result == "from-firefox"
+
+
+class TestShowCursorAuthInstructions:
+    """Tests for _show_cursor_auth_instructions function."""
+
+    def test_show_cursor_instructions_normal(self):
+        """Instructions are displayed."""
+        console = Console(file=StringIO())
+        auth_module._show_cursor_auth_instructions(console, quiet=False)
+        output = console.file.getvalue()
+        assert "Cursor Authentication" in output
+        assert "cursor.com" in output
+        assert "WorkosCursorSessionToken" in output
+
+    def test_show_cursor_instructions_quiet(self):
+        """Quiet mode suppresses output."""
+        console = Console(file=StringIO())
+        auth_module._show_cursor_auth_instructions(console, quiet=True)
+        output = console.file.getvalue()
+        assert output == ""
+
+
 class TestAuthGenericCommand:
     """Tests for auth_generic_command function."""
 
@@ -504,12 +877,18 @@ class TestAuthGenericCommand:
         console = Console(file=StringIO())
         with patch.object(auth_module, "Console", return_value=console):
             with patch.object(
-                auth_module, "check_provider_credentials", return_value=(True, "vibeusage")
+                auth_module,
+                "check_provider_credentials",
+                return_value=(True, "vibeusage"),
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", return_value=("oauth", Path("/cred"), Path("/cred"))
+                    auth_module,
+                    "find_provider_credential",
+                    return_value=("oauth", Path("/cred"), Path("/cred")),
                 ):
-                    auth_module.auth_generic_command("codex", verbose=False, quiet=False)
+                    auth_module.auth_generic_command(
+                        "codex", verbose=False, quiet=False
+                    )
                     output = console.file.getvalue()
                     assert "codex is already authenticated" in output
                     assert "vibeusage storage" in output
@@ -519,12 +898,18 @@ class TestAuthGenericCommand:
         console = Console(file=StringIO())
         with patch.object(auth_module, "Console", return_value=console):
             with patch.object(
-                auth_module, "check_provider_credentials", return_value=(True, "provider_cli")
+                auth_module,
+                "check_provider_credentials",
+                return_value=(True, "provider_cli"),
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", return_value=("provider_cli", Path("/cli/cred"), Path("/cli/cred"))
+                    auth_module,
+                    "find_provider_credential",
+                    return_value=("provider_cli", Path("/cli/cred"), Path("/cli/cred")),
                 ):
-                    auth_module.auth_generic_command("codex", verbose=False, quiet=False)
+                    auth_module.auth_generic_command(
+                        "codex", verbose=False, quiet=False
+                    )
                     output = console.file.getvalue()
                     assert "codex is already authenticated" in output
                     assert "provider CLI" in output
@@ -537,9 +922,13 @@ class TestAuthGenericCommand:
                 auth_module, "check_provider_credentials", return_value=(True, "env")
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", return_value=("env", Path("/env"), Path("/env"))
+                    auth_module,
+                    "find_provider_credential",
+                    return_value=("env", Path("/env"), Path("/env")),
                 ):
-                    auth_module.auth_generic_command("gemini", verbose=False, quiet=False)
+                    auth_module.auth_generic_command(
+                        "gemini", verbose=False, quiet=False
+                    )
                     output = console.file.getvalue()
                     assert "gemini is already authenticated" in output
                     assert "environment variable" in output
@@ -548,16 +937,20 @@ class TestAuthGenericCommand:
         """Unknown source value handling."""
         console = Console(file=StringIO())
         with patch.object(auth_module, "Console", return_value=console):
-            with patch.object(
-                auth_module, "list_provider_ids", return_value=["test"]
-            ):
+            with patch.object(auth_module, "list_provider_ids", return_value=["test"]):
                 with patch.object(
-                    auth_module, "check_provider_credentials", return_value=(True, "unknown_source")
+                    auth_module,
+                    "check_provider_credentials",
+                    return_value=(True, "unknown_source"),
                 ):
                     with patch.object(
-                        auth_module, "find_provider_credential", return_value=("unknown", Path("/cred"), Path("/cred"))
+                        auth_module,
+                        "find_provider_credential",
+                        return_value=("unknown", Path("/cred"), Path("/cred")),
                     ):
-                        auth_module.auth_generic_command("test", verbose=False, quiet=False)
+                        auth_module.auth_generic_command(
+                            "test", verbose=False, quiet=False
+                        )
                         output = console.file.getvalue()
                         assert "test is already authenticated" in output
 
@@ -566,12 +959,22 @@ class TestAuthGenericCommand:
         console = Console(file=StringIO())
         with patch.object(auth_module, "Console", return_value=console):
             with patch.object(
-                auth_module, "check_provider_credentials", return_value=(True, "vibeusage")
+                auth_module,
+                "check_provider_credentials",
+                return_value=(True, "vibeusage"),
             ):
                 with patch.object(
-                    auth_module, "find_provider_credential", return_value=("oauth", Path("/test/cred.json"), Path("/test/cred.json"))
+                    auth_module,
+                    "find_provider_credential",
+                    return_value=(
+                        "oauth",
+                        Path("/test/cred.json"),
+                        Path("/test/cred.json"),
+                    ),
                 ):
-                    auth_module.auth_generic_command("cursor", verbose=True, quiet=False)
+                    auth_module.auth_generic_command(
+                        "cursor", verbose=True, quiet=False
+                    )
                     output = console.file.getvalue()
                     assert "Location:" in output
                     assert "/test/cred.json" in output
@@ -596,7 +999,9 @@ class TestAuthGenericCommand:
                 auth_module, "list_provider_ids", return_value=["claude", "codex"]
             ):
                 with pytest.raises(TyperExit) as exc_info:
-                    auth_module.auth_generic_command("invalid", verbose=False, quiet=False)
+                    auth_module.auth_generic_command(
+                        "invalid", verbose=False, quiet=False
+                    )
                 assert exc_info.value.exit_code == ExitCode.CONFIG_ERROR
 
     def test_auth_generic_codex_instructions(self):
@@ -700,7 +1105,9 @@ class TestShowProviderAuthInstructions:
     def test_show_instructions_unknown_provider(self):
         """Generic template for unknown provider."""
         console = Console(file=StringIO())
-        auth_module._show_provider_auth_instructions(console, "unknownprovider", quiet=False)
+        auth_module._show_provider_auth_instructions(
+            console, "unknownprovider", quiet=False
+        )
         output = console.file.getvalue()
         assert "authentication" in output.lower()
 
