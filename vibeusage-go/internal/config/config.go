@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -126,7 +127,7 @@ func Save(cfg Config, path string) error {
 	if path == "" {
 		path = ConfigFile()
 	}
-	if err := os.MkdirAll(strings.TrimSuffix(path, "/config.toml"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
 	f, err := os.Create(path)

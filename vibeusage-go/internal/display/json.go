@@ -2,7 +2,6 @@ package display
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"time"
 
@@ -115,21 +114,4 @@ func OutputStatusJSON(statuses map[string]models.ProviderStatus) {
 	OutputJSON(data)
 }
 
-// OutputErrorJSON outputs an error as JSON.
-func OutputErrorJSON(message, category, severity, providerID string) {
-	data := map[string]any{
-		"error": map[string]any{
-			"message":   message,
-			"category":  category,
-			"severity":  severity,
-			"provider":  providerID,
-			"timestamp": time.Now().Format(time.RFC3339),
-		},
-	}
-	OutputJSON(data)
-}
 
-// Fprintln is a convenience wrapper.
-func Fprintln(format string, args ...any) {
-	fmt.Println(fmt.Sprintf(format, args...))
-}

@@ -2,6 +2,7 @@ package models
 
 import (
 	"math"
+	"strconv"
 	"time"
 )
 
@@ -197,30 +198,9 @@ func FormatResetCountdown(d *time.Duration) string {
 	return formatM(minutes)
 }
 
-func formatDH(d, h int) string { return itoa(d) + "d " + itoa(h) + "h" }
-func formatHM(h, m int) string { return itoa(h) + "h " + itoa(m) + "m" }
-func formatM(m int) string     { return itoa(m) + "m" }
-
-func itoa(i int) string {
-	if i < 0 {
-		return "-" + uitoa(uint(-i))
-	}
-	return uitoa(uint(i))
-}
-
-func uitoa(u uint) string {
-	if u == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for u > 0 {
-		i--
-		buf[i] = byte(u%10) + '0'
-		u /= 10
-	}
-	return string(buf[i:])
-}
+func formatDH(d, h int) string { return strconv.Itoa(d) + "d " + strconv.Itoa(h) + "h" }
+func formatHM(h, m int) string { return strconv.Itoa(h) + "h " + strconv.Itoa(m) + "m" }
+func formatM(m int) string     { return strconv.Itoa(m) + "m" }
 
 func PaceToColor(paceRatio *float64, utilization int) string {
 	if paceRatio == nil {

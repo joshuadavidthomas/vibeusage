@@ -93,12 +93,13 @@ func fetchAndDisplayAll(refresh bool) error {
 
 	providerMap := buildProviderMap()
 
+	useCache := !refresh
 	var outcomes map[string]fetch.FetchOutcome
 
 	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
 		providerIDs := enabledProviderIDs(providerMap)
 		err := spinner.Run(providerIDs, func(onComplete func(spinner.CompletionInfo)) {
-			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, func(o fetch.FetchOutcome) {
+			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
 			})
 		})
@@ -106,7 +107,7 @@ func fetchAndDisplayAll(refresh bool) error {
 			return fmt.Errorf("spinner error: %w", err)
 		}
 	} else {
-		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, nil)
+		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, nil)
 	}
 
 	durationMs := time.Since(start).Milliseconds()
