@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
@@ -11,8 +10,10 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/copilot"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var authCmd = &cobra.Command{
@@ -72,31 +73,29 @@ func authStatusCommand() error {
 			if hasCreds {
 				status = "authenticated"
 			}
-			fmt.Printf("%s: %s\n", pid, status)
+			out("%s: %s\n", pid, status)
 		}
 		return nil
 	}
 
-	fmt.Println("Authentication Status")
-	fmt.Println(strings.Repeat("─", 60))
-	fmt.Printf("%-12s %-16s %s\n", "Provider", "Status", "Source")
-	fmt.Println(strings.Repeat("─", 60))
+	outln("Authentication Status")
+	out("%-12s %-16s %s\n", "Provider", "Status", "Source")
 
 	var unconfigured []string
 	for _, pid := range allProviders {
 		hasCreds, source := config.CheckProviderCredentials(pid)
 		if hasCreds {
-			fmt.Printf("%-12s %-16s %s\n", pid, "✓ Authenticated", sourceToLabel(source))
+			out("%-12s %-16s %s\n", pid, "✓ Authenticated", sourceToLabel(source))
 		} else {
-			fmt.Printf("%-12s %-16s %s\n", pid, "✗ Not configured", "—")
+			out("%-12s %-16s %s\n", pid, "✗ Not configured", "—")
 			unconfigured = append(unconfigured, pid)
 		}
 	}
 
 	if len(unconfigured) > 0 {
-		fmt.Println("\nTo configure a provider, run:")
+		outln("\nTo configure a provider, run:")
 		for _, pid := range unconfigured {
-			fmt.Printf("  vibeusage auth %s\n", pid)
+			out("  vibeusage auth %s\n", pid)
 		}
 	}
 
@@ -105,34 +104,24 @@ func authStatusCommand() error {
 
 func authClaude() error {
 	if !quiet {
-		fmt.Println("Claude Authentication")
-		fmt.Println()
-		fmt.Println("Get your session key from claude.ai:")
-		fmt.Println("  1. Open https://claude.ai in your browser")
-		fmt.Println("  2. Open DevTools (F12 or Cmd+Option+I)")
-		fmt.Println("  3. Go to Application → Cookies → https://claude.ai")
-		fmt.Println("  4. Find the sessionKey cookie")
-		fmt.Println("  5. Copy its value (starts with sk-ant-sid01-)")
-		fmt.Println()
+		outln("Claude Authentication")
+		outln()
+		outln("Get your session key from claude.ai:")
+		outln("  1. Open https://claude.ai in your browser")
+		outln("  2. Open DevTools (F12 or Cmd+Option+I)")
+		outln("  3. Go to Application → Cookies → https://claude.ai")
+		outln("  4. Find the sessionKey cookie")
+		outln("  5. Copy its value (starts with sk-ant-sid01-)")
+		outln()
 	}
 
-	fmt.Print("Session key: ")
-	var sessionKey string
-	fmt.Scanln(&sessionKey)
-	sessionKey = strings.TrimSpace(sessionKey)
-
-	if sessionKey == "" {
-		return fmt.Errorf("session key cannot be empty")
-	}
-
-	if !strings.HasPrefix(sessionKey, "sk-ant-sid01-") && !quiet {
-		fmt.Println("Warning: Session key doesn't match expected format (sk-ant-sid01-...)")
-		fmt.Print("Save anyway? [y/N] ")
-		var confirm string
-		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" {
-			return nil
-		}
+	sessionKey, err := prompt.Default.Input(prompt.InputConfig{
+		Title:       "Session key",
+		Placeholder: "sk-ant-sid01-...",
+		Validate:    prompt.ValidateClaudeSessionKey,
+	})
+	if err != nil {
+		return err
 	}
 
 	credData, _ := json.Marshal(map[string]string{"session_key": sessionKey})
@@ -141,31 +130,31 @@ func authClaude() error {
 	}
 
 	if !quiet {
-		fmt.Println("✓ Claude session key saved")
+		outln("✓ Claude session key saved")
 	}
 	return nil
 }
 
 func authCursor() error {
 	if !quiet {
-		fmt.Println("Cursor Authentication")
-		fmt.Println()
-		fmt.Println("Get your session token from cursor.com:")
-		fmt.Println("  1. Open https://cursor.com in your browser")
-		fmt.Println("  2. Open DevTools (F12 or Cmd+Option+I)")
-		fmt.Println("  3. Go to Application → Cookies → https://cursor.com")
-		fmt.Println("  4. Find one of: WorkosCursorSessionToken, __Secure-next-auth.session-token")
-		fmt.Println("  5. Copy its value")
-		fmt.Println()
+		outln("Cursor Authentication")
+		outln()
+		outln("Get your session token from cursor.com:")
+		outln("  1. Open https://cursor.com in your browser")
+		outln("  2. Open DevTools (F12 or Cmd+Option+I)")
+		outln("  3. Go to Application → Cookies → https://cursor.com")
+		outln("  4. Find one of: WorkosCursorSessionToken, __Secure-next-auth.session-token")
+		outln("  5. Copy its value")
+		outln()
 	}
 
-	fmt.Print("Session token: ")
-	var sessionToken string
-	fmt.Scanln(&sessionToken)
-	sessionToken = strings.TrimSpace(sessionToken)
-
-	if sessionToken == "" {
-		return fmt.Errorf("session token cannot be empty")
+	sessionToken, err := prompt.Default.Input(prompt.InputConfig{
+		Title:       "Session token",
+		Placeholder: "paste token here",
+		Validate:    prompt.ValidateNotEmpty,
+	})
+	if err != nil {
+		return err
 	}
 
 	credData, _ := json.Marshal(map[string]string{"session_token": sessionToken})
@@ -174,30 +163,33 @@ func authCursor() error {
 	}
 
 	if !quiet {
-		fmt.Println("✓ Cursor session token saved")
+		outln("✓ Cursor session token saved")
 	}
 	return nil
 }
 
 func authCopilot() error {
-	// Check if already authenticated
 	hasCreds, source := config.CheckProviderCredentials("copilot")
 	if hasCreds && !quiet {
-		fmt.Printf("✓ Copilot is already authenticated (%s)\n", sourceToLabel(source))
-		fmt.Print("Re-authenticate? [y/N] ")
-		var confirm string
-		fmt.Scanln(&confirm)
-		if strings.ToLower(confirm) != "y" {
+		out("✓ Copilot is already authenticated (%s)\n", sourceToLabel(source))
+
+		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title: "Re-authenticate?",
+		})
+		if err != nil {
+			return err
+		}
+		if !reauth {
 			return nil
 		}
 	}
 
-	success, err := copilot.RunDeviceFlow(quiet)
+	success, err := copilot.RunDeviceFlow(outWriter, quiet)
 	if err != nil {
 		return err
 	}
 	if !success {
-		os.Exit(2)
+		return fmt.Errorf("authentication failed")
 	}
 	return nil
 }
@@ -207,15 +199,16 @@ func authGeneric(providerID string) error {
 
 	if hasCreds {
 		if !quiet {
-			fmt.Printf("✓ %s is already authenticated (%s)\n", strings.Title(providerID), sourceToLabel(source))
+			out("✓ %s is already authenticated (%s)\n",
+				strutil.TitleCase(providerID), sourceToLabel(source))
 		}
 		return nil
 	}
 
 	if !quiet {
-		fmt.Printf("%s Authentication\n\n", strings.Title(providerID))
-		fmt.Printf("Set credentials manually:\n")
-		fmt.Printf("  vibeusage key %s set\n", providerID)
+		out("%s Authentication\n\n", strutil.TitleCase(providerID))
+		outln("Set credentials manually:")
+		out("  vibeusage key %s set\n", providerID)
 	}
 	return nil
 }

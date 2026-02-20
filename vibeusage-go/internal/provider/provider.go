@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
@@ -46,13 +45,4 @@ func ListIDs() []string {
 		ids = append(ids, id)
 	}
 	return ids
-}
-
-func IsEnabled(id string) bool {
-	cfg := config.Get()
-	return cfg.IsProviderEnabled(id)
-}
-
-func init() {
-	// Registration happens in each provider's init()
 }

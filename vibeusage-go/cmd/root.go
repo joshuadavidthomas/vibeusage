@@ -8,12 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 
 	// Register all providers
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/claude"
@@ -54,7 +57,6 @@ func init() {
 	rootCmd.AddCommand(keyCmd)
 	rootCmd.AddCommand(initCmd)
 
-	// Provider alias commands
 	for _, id := range []string{"claude", "codex", "copilot", "cursor", "gemini"} {
 		rootCmd.AddCommand(makeProviderCmd(id))
 	}
@@ -66,16 +68,14 @@ func Execute() error {
 
 func runDefaultUsage(cmd *cobra.Command, args []string) error {
 	if v, _ := cmd.Flags().GetBool("version"); v {
-		fmt.Printf("vibeusage %s\n", version)
+		out("vibeusage %s\n", version)
 		return nil
 	}
 
-	// Resolve conflicts
 	if verbose && quiet {
 		verbose = false
 	}
 
-	// First-run check
 	if config.IsFirstRun() && !jsonOutput && !quiet {
 		showFirstRunMessage()
 		return nil
@@ -84,12 +84,32 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 	return fetchAndDisplayAll(false)
 }
 
+func isTerminal() bool {
+	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
+}
+
 func fetchAndDisplayAll(refresh bool) error {
 	ctx := context.Background()
 	start := time.Now()
 
 	providerMap := buildProviderMap()
-	outcomes := fetch.FetchEnabledProviders(ctx, providerMap, nil)
+
+	useCache := !refresh
+	var outcomes map[string]fetch.FetchOutcome
+
+	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
+		providerIDs := enabledProviderIDs(providerMap)
+		err := spinner.Run(providerIDs, func(onComplete func(spinner.CompletionInfo)) {
+			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, func(o fetch.FetchOutcome) {
+				onComplete(outcomeToCompletion(o))
+			})
+		})
+		if err != nil {
+			return fmt.Errorf("spinner error: %w", err)
+		}
+	} else {
+		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, nil)
+	}
 
 	durationMs := time.Since(start).Milliseconds()
 
@@ -100,6 +120,32 @@ func fetchAndDisplayAll(refresh bool) error {
 
 	displayMultipleSnapshots(outcomes, durationMs)
 	return nil
+}
+
+func enabledProviderIDs(providerMap map[string][]fetch.Strategy) []string {
+	cfg := config.Get()
+	var ids []string
+	for pid := range providerMap {
+		if cfg.IsProviderEnabled(pid) {
+			ids = append(ids, pid)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func outcomeToCompletion(o fetch.FetchOutcome) spinner.CompletionInfo {
+	durationMs := 0
+	for _, a := range o.Attempts {
+		durationMs += a.DurationMs
+	}
+	return spinner.CompletionInfo{
+		ProviderID: o.ProviderID,
+		Source:     o.Source,
+		DurationMs: durationMs,
+		Success:    o.Success,
+		Error:      o.Error,
+	}
 }
 
 func buildProviderMap() map[string][]fetch.Strategy {
@@ -121,9 +167,9 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 
 	if !hasData {
 		if !quiet {
-			fmt.Println("No usage data available")
-			fmt.Println("\nConfigure credentials with:")
-			fmt.Println("  vibeusage key <provider> set")
+			outln("No usage data available")
+			outln("\nConfigure credentials with:")
+			outln("  vibeusage key <provider> set")
 		}
 		return
 	}
@@ -131,7 +177,6 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 	cfg := config.Get()
 	staleThreshold := cfg.Fetch.StaleThresholdMinutes
 
-	// Sort providers for consistent output
 	ids := make([]string, 0, len(outcomes))
 	for id := range outcomes {
 		ids = append(ids, id)
@@ -151,31 +196,30 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 
 		snap := *outcome.Snapshot
 
-		// Stale warning
 		if outcome.Cached && !quiet {
 			if w := display.RenderStaleWarning(snap, staleThreshold); w != "" {
-				fmt.Println(w)
-				fmt.Println()
+				outln(w)
+				outln()
 			}
 		}
 
 		if quiet {
 			for _, p := range snap.Periods {
-				fmt.Printf("%s %s: %d%%\n", pid, p.Name, p.Utilization)
+				out("%s %s: %d%%\n", pid, p.Name, p.Utilization)
 			}
 		} else {
-			fmt.Println(display.RenderProviderPanel(snap, outcome.Cached))
+			outln(display.RenderProviderPanel(snap, outcome.Cached))
 		}
 	}
 
 	if verbose && !quiet {
 		if durationMs > 0 {
-			fmt.Printf("\nTotal fetch time: %dms\n", durationMs)
+			out("\nTotal fetch time: %dms\n", durationMs)
 		}
 		if len(errors) > 0 {
-			fmt.Println("\nErrors:")
+			outln("\nErrors:")
 			for _, e := range errors {
-				fmt.Printf("  %s: %s\n", e.id, e.err)
+				out("  %s: %s\n", e.id, e.err)
 			}
 		}
 	}
@@ -183,9 +227,10 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 
 func makeProviderCmd(providerID string) *cobra.Command {
 	var refresh bool
+	titleName := strutil.TitleCase(providerID)
 	cmd := &cobra.Command{
 		Use:   providerID,
-		Short: "Show usage for " + strings.Title(providerID),
+		Short: "Show usage for " + titleName,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fetchAndDisplayProvider(providerID, refresh)
 		},
@@ -204,7 +249,20 @@ func fetchAndDisplayProvider(providerID string, refresh bool) error {
 	start := time.Now()
 
 	strategies := p.FetchStrategies()
-	outcome := fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+
+	var outcome fetch.FetchOutcome
+
+	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
+		err := spinner.Run([]string{providerID}, func(onComplete func(spinner.CompletionInfo)) {
+			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+			onComplete(outcomeToCompletion(outcome))
+		})
+		if err != nil {
+			return fmt.Errorf("spinner error: %w", err)
+		}
+	} else {
+		outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+	}
 
 	durationMs := time.Since(start).Milliseconds()
 
@@ -215,7 +273,7 @@ func fetchAndDisplayProvider(providerID string, refresh bool) error {
 
 	if !outcome.Success || outcome.Snapshot == nil {
 		if !quiet {
-			fmt.Printf("Error: %s\n", outcome.Error)
+			out("Error: %s\n", outcome.Error)
 		}
 		os.Exit(1)
 	}
@@ -224,7 +282,7 @@ func fetchAndDisplayProvider(providerID string, refresh bool) error {
 
 	if quiet {
 		for _, p := range snap.Periods {
-			fmt.Printf("%s %s: %d%%\n", providerID, p.Name, p.Utilization)
+			out("%s %s: %d%%\n", providerID, p.Name, p.Utilization)
 		}
 		return nil
 	}
@@ -232,40 +290,40 @@ func fetchAndDisplayProvider(providerID string, refresh bool) error {
 	cfg := config.Get()
 	if outcome.Cached {
 		if w := display.RenderStaleWarning(snap, cfg.Fetch.StaleThresholdMinutes); w != "" {
-			fmt.Println(w)
-			fmt.Println()
+			outln(w)
+			outln()
 		}
 	}
 
 	if verbose {
 		if durationMs > 0 {
-			fmt.Printf("Fetched in %dms\n", durationMs)
+			out("Fetched in %dms\n", durationMs)
 		}
 		if snap.Identity != nil && snap.Identity.Email != "" {
-			fmt.Printf("Account: %s\n", snap.Identity.Email)
+			out("Account: %s\n", snap.Identity.Email)
 		}
 		if outcome.Source != "" {
-			fmt.Printf("Source: %s\n", outcome.Source)
+			out("Source: %s\n", outcome.Source)
 		}
-		fmt.Println()
+		outln()
 	}
 
-	fmt.Print(display.RenderSingleProvider(snap, outcome.Cached, verbose))
+	fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached, verbose))
 	return nil
 }
 
 func showFirstRunMessage() {
-	fmt.Println()
-	fmt.Println("  ✨ Welcome to vibeusage!")
-	fmt.Println()
-	fmt.Println("  No providers are configured yet.")
-	fmt.Println("  Track your usage across AI providers in one place.")
-	fmt.Println()
-	fmt.Println("  Quick start:")
-	fmt.Println("    vibeusage init        - Run the setup wizard")
-	fmt.Println("    vibeusage init --quick - Quick setup with Claude")
-	fmt.Println()
-	fmt.Println("  Or set up a provider directly:")
+	outln()
+	outln("  ✨ Welcome to vibeusage!")
+	outln()
+	outln("  No providers are configured yet.")
+	outln("  Track your usage across AI providers in one place.")
+	outln()
+	outln("  Quick start:")
+	outln("    vibeusage init        - Run the setup wizard")
+	outln("    vibeusage init --quick - Quick setup with Claude")
+	outln()
+	outln("  Or set up a provider directly:")
 
 	ids := provider.ListIDs()
 	sort.Strings(ids)
@@ -274,7 +332,7 @@ func showFirstRunMessage() {
 		count = len(ids)
 	}
 	for _, id := range ids[:count] {
-		fmt.Printf("    vibeusage auth %s\n", id)
+		out("    vibeusage auth %s\n", id)
 	}
-	fmt.Println()
+	outln()
 }

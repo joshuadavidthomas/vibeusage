@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
@@ -36,23 +35,6 @@ func LoadCachedSnapshot(providerID string) *models.UsageSnapshot {
 		return nil
 	}
 	return &snap
-}
-
-func IsSnapshotFresh(providerID string, staleMinutes int) bool {
-	snap := LoadCachedSnapshot(providerID)
-	if snap == nil {
-		return false
-	}
-	return time.Since(snap.FetchedAt).Minutes() < float64(staleMinutes)
-}
-
-func GetSnapshotAgeMinutes(providerID string) *int {
-	snap := LoadCachedSnapshot(providerID)
-	if snap == nil {
-		return nil
-	}
-	age := int(time.Since(snap.FetchedAt).Minutes())
-	return &age
 }
 
 // Org ID caching

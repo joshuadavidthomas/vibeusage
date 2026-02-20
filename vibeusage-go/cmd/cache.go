@@ -66,15 +66,15 @@ var cacheShowCmd = &cobra.Command{
 
 		if quiet {
 			for _, pid := range ids {
-				fmt.Printf("%s: %s\n", pid, cacheData[pid].Snapshot)
+				out("%s: %s\n", pid, cacheData[pid].Snapshot)
 			}
 			return nil
 		}
 
-		fmt.Println("Cache Status")
-		fmt.Println(strings.Repeat("─", 50))
-		fmt.Printf("%-12s %-12s %-8s %s\n", "Provider", "Snapshot", "Org ID", "Age")
-		fmt.Println(strings.Repeat("─", 50))
+		outln("Cache Status")
+		outln(strings.Repeat("─", 50))
+		out("%-12s %-12s %-8s %s\n", "Provider", "Snapshot", "Org ID", "Age")
+		outln(strings.Repeat("─", 50))
 
 		for _, pid := range ids {
 			info := cacheData[pid]
@@ -105,10 +105,10 @@ var cacheShowCmd = &cobra.Command{
 				}
 			}
 
-			fmt.Printf("%-12s %-12s %-8s %s\n", pid, snapStatus, orgStatus, ageStr)
+			out("%-12s %-12s %-8s %s\n", pid, snapStatus, orgStatus, ageStr)
 		}
 
-		fmt.Printf("\nCache directory: %s\n", config.CacheDir())
+		out("\nCache directory: %s\n", config.CacheDir())
 		return nil
 	},
 }
@@ -141,7 +141,7 @@ var cacheClearCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Printf("✓ %s\n", msg)
+		out("✓ %s\n", msg)
 		return nil
 	},
 }

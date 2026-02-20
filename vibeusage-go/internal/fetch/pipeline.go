@@ -94,7 +94,6 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 				Success:    false,
 				Attempts:   attempts,
 				Error:      result.Error,
-				Fatal:      true,
 			}
 		}
 

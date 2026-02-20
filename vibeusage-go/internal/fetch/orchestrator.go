@@ -8,7 +8,8 @@ import (
 )
 
 // FetchAllProviders fetches usage from all providers concurrently.
-func FetchAllProviders(ctx context.Context, providerMap map[string][]Strategy, onComplete func(FetchOutcome)) map[string]FetchOutcome {
+// When useCache is true, stale cached data is used as a fallback if all strategies fail.
+func FetchAllProviders(ctx context.Context, providerMap map[string][]Strategy, useCache bool, onComplete func(FetchOutcome)) map[string]FetchOutcome {
 	cfg := config.Get()
 	maxConcurrent := cfg.Fetch.MaxConcurrent
 	if maxConcurrent <= 0 {
@@ -27,7 +28,7 @@ func FetchAllProviders(ctx context.Context, providerMap map[string][]Strategy, o
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			outcome := ExecutePipeline(ctx, providerID, strats, true)
+			outcome := ExecutePipeline(ctx, providerID, strats, useCache)
 
 			mu.Lock()
 			outcomes[providerID] = outcome
@@ -44,7 +45,8 @@ func FetchAllProviders(ctx context.Context, providerMap map[string][]Strategy, o
 }
 
 // FetchEnabledProviders fetches only enabled providers.
-func FetchEnabledProviders(ctx context.Context, providerMap map[string][]Strategy, onComplete func(FetchOutcome)) map[string]FetchOutcome {
+// When useCache is true, stale cached data is used as a fallback if all strategies fail.
+func FetchEnabledProviders(ctx context.Context, providerMap map[string][]Strategy, useCache bool, onComplete func(FetchOutcome)) map[string]FetchOutcome {
 	cfg := config.Get()
 	enabledMap := make(map[string][]Strategy)
 	for pid, strategies := range providerMap {
@@ -52,5 +54,5 @@ func FetchEnabledProviders(ctx context.Context, providerMap map[string][]Strateg
 			enabledMap[pid] = strategies
 		}
 	}
-	return FetchAllProviders(ctx, enabledMap, onComplete)
+	return FetchAllProviders(ctx, enabledMap, useCache, onComplete)
 }

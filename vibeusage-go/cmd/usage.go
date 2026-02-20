@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/spf13/cobra"
 )
 
 var usageCmd = &cobra.Command{

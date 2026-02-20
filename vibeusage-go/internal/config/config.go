@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -15,9 +16,9 @@ type DisplayConfig struct {
 }
 
 type FetchConfig struct {
-	Timeout              float64 `toml:"timeout" json:"timeout"`
-	MaxConcurrent        int     `toml:"max_concurrent" json:"max_concurrent"`
-	StaleThresholdMinutes int    `toml:"stale_threshold_minutes" json:"stale_threshold_minutes"`
+	Timeout               float64 `toml:"timeout" json:"timeout"`
+	MaxConcurrent         int     `toml:"max_concurrent" json:"max_concurrent"`
+	StaleThresholdMinutes int     `toml:"stale_threshold_minutes" json:"stale_threshold_minutes"`
 }
 
 type CredentialsConfig struct {
@@ -48,8 +49,8 @@ func DefaultConfig() Config {
 			ResetFormat:   "countdown",
 		},
 		Fetch: FetchConfig{
-			Timeout:              30.0,
-			MaxConcurrent:        5,
+			Timeout:               30.0,
+			MaxConcurrent:         5,
 			StaleThresholdMinutes: 60,
 		},
 		Credentials: CredentialsConfig{
@@ -126,7 +127,7 @@ func Save(cfg Config, path string) error {
 	if path == "" {
 		path = ConfigFile()
 	}
-	if err := os.MkdirAll(strings.TrimSuffix(path, "/config.toml"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
 	f, err := os.Create(path)

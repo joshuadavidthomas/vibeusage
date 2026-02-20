@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -62,15 +61,15 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 	if quiet {
 		for _, pid := range ids {
 			s := statuses[pid]
-			fmt.Printf("%s: %s %s\n", pid, display.StatusSymbol(s.Level), string(s.Level))
+			out("%s: %s %s\n", pid, display.StatusSymbol(s.Level), string(s.Level))
 		}
 		return
 	}
 
-	fmt.Println("Provider Status")
-	fmt.Println(strings.Repeat("─", 70))
-	fmt.Printf("%-12s %-8s %-30s %s\n", "Provider", "Status", "Description", "Updated")
-	fmt.Println(strings.Repeat("─", 70))
+	outln("Provider Status")
+	outln(strings.Repeat("─", 70))
+	out("%-12s %-8s %-30s %s\n", "Provider", "Status", "Description", "Updated")
+	outln(strings.Repeat("─", 70))
 
 	for _, pid := range ids {
 		s := statuses[pid]
@@ -78,7 +77,7 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 		if len(desc) > 30 {
 			desc = desc[:27] + "..."
 		}
-		fmt.Printf("%-12s %-8s %-30s %s\n",
+		out("%-12s %-8s %-30s %s\n",
 			pid,
 			display.StatusSymbol(s.Level),
 			desc,
@@ -87,6 +86,6 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 	}
 
 	if verbose && durationMs > 0 {
-		fmt.Printf("\nFetched in %dms\n", durationMs)
+		out("\nFetched in %dms\n", durationMs)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 type Gemini struct{}
@@ -237,7 +239,7 @@ func (s *OAuthStrategy) parseUsageResponse(quotaData, userData map[string]any) *
 				}
 			}
 
-			displayName := strings.Title(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
+			displayName := strutil.TitleCase(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
 			periods = append(periods, models.UsagePeriod{
 				Name:        displayName,
 				Utilization: utilization,
@@ -348,7 +350,7 @@ func (s *APIKeyStrategy) Fetch() (fetch.FetchResult, error) {
 		},
 		Identity: &models.ProviderIdentity{
 			Plan:         "API Key",
-			Organization: "Available models: " + itoa(modelCount),
+			Organization: "Available models: " + strconv.Itoa(modelCount),
 		},
 		Source: "api_key",
 	}
@@ -472,16 +474,4 @@ func convertGeminiCLIFormat(data map[string]any) map[string]any {
 func nextMidnightUTC() time.Time {
 	now := time.Now().UTC()
 	return time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
-}
-
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	s := ""
-	for i > 0 {
-		s = string(rune('0'+i%10)) + s
-		i /= 10
-	}
-	return s
 }

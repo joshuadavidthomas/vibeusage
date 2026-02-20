@@ -34,16 +34,13 @@ type FetchAttempt struct {
 
 // FetchOutcome is the complete result of fetching from a provider.
 type FetchOutcome struct {
-	ProviderID    string         `json:"provider_id"`
-	Success       bool           `json:"success"`
-	Snapshot      *models.UsageSnapshot `json:"snapshot,omitempty"`
-	Source        string         `json:"source,omitempty"`
-	Attempts      []FetchAttempt `json:"attempts"`
-	Error         string         `json:"error,omitempty"`
-	Cached        bool           `json:"cached"`
-	Gated         bool           `json:"gated"`
-	Fatal         bool           `json:"fatal"`
-	GateRemaining string         `json:"gate_remaining,omitempty"`
+	ProviderID string                `json:"provider_id"`
+	Success    bool                  `json:"success"`
+	Snapshot   *models.UsageSnapshot `json:"snapshot,omitempty"`
+	Source     string                `json:"source,omitempty"`
+	Attempts   []FetchAttempt        `json:"attempts"`
+	Error      string                `json:"error,omitempty"`
+	Cached     bool                  `json:"cached"`
 }
 
 // Strategy is the interface all fetch strategies must implement.
