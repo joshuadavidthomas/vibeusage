@@ -3,7 +3,6 @@ package cursor
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -88,7 +87,7 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	uResp, err := client.GetJSON("https://www.cursor.com/api/auth/me", &u,
 		sessionCookie, userAgent,
 	)
-	if err == nil && uResp.StatusCode == http.StatusOK && uResp.JSONErr == nil {
+	if err == nil && uResp.StatusCode == 200 && uResp.JSONErr == nil {
 		userResp = &u
 	}
 

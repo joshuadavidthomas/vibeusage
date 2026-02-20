@@ -152,6 +152,39 @@ func TestPostJSON_WithBody(t *testing.T) {
 	}
 }
 
+func TestPostJSON_NilBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		ct := r.Header.Get("Content-Type")
+		if ct != "application/json" {
+			t.Errorf("expected Content-Type application/json, got %s", ct)
+		}
+		// Body should be empty when nil is passed
+		body := make([]byte, 1)
+		n, _ := r.Body.Read(body)
+		if n != 0 {
+			t.Errorf("expected empty body, got %d bytes", n)
+		}
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	c := New()
+	var out map[string]string
+	httpResp, err := c.PostJSON(srv.URL, nil, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if httpResp.StatusCode != 200 {
+		t.Errorf("expected 200, got %d", httpResp.StatusCode)
+	}
+	if out["status"] != "ok" {
+		t.Errorf("unexpected response: %v", out)
+	}
+}
+
 func TestPostForm(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
