@@ -213,7 +213,7 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 				out("%s %s: %d%%\n", pid, p.Name, p.Utilization)
 			}
 		} else {
-			outln(display.RenderProviderPanel(snap, outcome.Cached))
+			outln(display.RenderProviderPanel(snap))
 		}
 	}
 
@@ -312,7 +312,7 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 		outln()
 	}
 
-	fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached, verbose))
+	fmt.Fprint(outWriter, display.RenderSingleProvider(snap))
 	return nil
 }
 

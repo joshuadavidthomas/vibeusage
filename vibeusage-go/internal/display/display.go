@@ -70,7 +70,7 @@ func FormatPeriodLine(period models.UsagePeriod, nameWidth int) string {
 }
 
 // RenderSingleProvider renders a single provider in expanded format.
-func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, verbose bool) string {
+func RenderSingleProvider(snapshot models.UsageSnapshot) string {
 	var b strings.Builder
 
 	// Title
@@ -144,7 +144,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, verbose bo
 }
 
 // RenderProviderPanel renders a provider in compact panel format for multi-provider view.
-func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool) string {
+func RenderProviderPanel(snapshot models.UsageSnapshot) string {
 	var b strings.Builder
 
 	session, weekly, daily, monthly := groupPeriods(snapshot.Periods)
