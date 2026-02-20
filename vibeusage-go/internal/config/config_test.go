@@ -297,7 +297,10 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 		t.Errorf("Fetch.Timeout = %v, want 99.0", loaded.Fetch.Timeout)
 	}
 	if len(loaded.EnabledProviders) != 2 {
-		t.Errorf("EnabledProviders len = %d, want 2", len(loaded.EnabledProviders))
+		t.Fatalf("EnabledProviders len = %d, want 2", len(loaded.EnabledProviders))
+	}
+	if loaded.EnabledProviders[0] != "claude" || loaded.EnabledProviders[1] != "copilot" {
+		t.Errorf("EnabledProviders = %v, want [claude copilot]", loaded.EnabledProviders)
 	}
 	if loaded.Display.PaceColors {
 		t.Error("Display.PaceColors should be false after roundtrip")
@@ -468,10 +471,6 @@ func TestGet_ReturnsCopy(t *testing.T) {
 	configPath := filepath.Join(dir, "config", "config.toml")
 	os.MkdirAll(filepath.Dir(configPath), 0o755)
 	os.WriteFile(configPath, []byte(`enabled_providers = ["claude", "copilot"]`), 0o644)
-
-	configMu.Lock()
-	globalConfig = nil
-	configMu.Unlock()
 
 	cfg5 := Get()
 	if len(cfg5.EnabledProviders) != 2 {
