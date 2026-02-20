@@ -65,12 +65,14 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	oReq.AddCookie(&http.Cookie{Name: "sessionKey", Value: sessionKey})
 
 	oResp, err := client.Do(oReq)
-	if err == nil && oResp.StatusCode == 200 {
-		oBody, _ := io.ReadAll(oResp.Body)
-		oResp.Body.Close()
-		var oData map[string]any
-		if json.Unmarshal(oBody, &oData) == nil {
-			overage = parseOverage(oData)
+	if err == nil {
+		defer oResp.Body.Close()
+		if oResp.StatusCode == 200 {
+			oBody, _ := io.ReadAll(oResp.Body)
+			var oData map[string]any
+			if json.Unmarshal(oBody, &oData) == nil {
+				overage = parseOverage(oData)
+			}
 		}
 	}
 
