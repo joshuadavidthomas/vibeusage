@@ -28,7 +28,9 @@ func TestCacheShowCmd_HasTableBorders(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	cacheShowCmd.RunE(cacheShowCmd, nil)
+	if err := cacheShowCmd.RunE(cacheShowCmd, nil); err != nil {
+		t.Fatalf("cacheShowCmd error: %v", err)
+	}
 
 	output := buf.String()
 
@@ -58,7 +60,9 @@ func TestCacheShowCmd_ContainsHeaders(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	cacheShowCmd.RunE(cacheShowCmd, nil)
+	if err := cacheShowCmd.RunE(cacheShowCmd, nil); err != nil {
+		t.Fatalf("cacheShowCmd error: %v", err)
+	}
 
 	output := buf.String()
 	for _, header := range []string{"Provider", "Snapshot", "Org ID", "Age"} {
@@ -85,7 +89,9 @@ func TestCacheShowCmd_QuietMode(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	cacheShowCmd.RunE(cacheShowCmd, nil)
+	if err := cacheShowCmd.RunE(cacheShowCmd, nil); err != nil {
+		t.Fatalf("cacheShowCmd error: %v", err)
+	}
 
 	output := buf.String()
 
@@ -115,7 +121,9 @@ func TestCacheShowCmd_ShowsCacheDir(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	cacheShowCmd.RunE(cacheShowCmd, nil)
+	if err := cacheShowCmd.RunE(cacheShowCmd, nil); err != nil {
+		t.Fatalf("cacheShowCmd error: %v", err)
+	}
 
 	output := buf.String()
 	if !strings.Contains(output, "Cache directory:") {
