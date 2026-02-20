@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var providerDescriptions = map[string]string{
@@ -96,7 +96,7 @@ func interactiveWizard() error {
 		}
 		desc := providerDescriptions[pid]
 		if desc == "" {
-			desc = strings.ToUpper(pid[:1]) + pid[1:] + " AI"
+			desc = strutil.TitleCase(pid) + " AI"
 		}
 		label := status + pid + " — " + desc
 		options = append(options, prompt.SelectOption{Label: label, Value: pid})

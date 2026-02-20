@@ -13,6 +13,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/copilot"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var authCmd = &cobra.Command{
@@ -45,10 +46,6 @@ var authCmd = &cobra.Command{
 
 func init() {
 	authCmd.Flags().Bool("status", false, "Show authentication status")
-}
-
-func reloadConfig() {
-	config.Reload()
 }
 
 func authStatusCommand() error {
@@ -203,13 +200,13 @@ func authGeneric(providerID string) error {
 	if hasCreds {
 		if !quiet {
 			out("✓ %s is already authenticated (%s)\n",
-				strings.ToUpper(providerID[:1])+providerID[1:], sourceToLabel(source))
+				strutil.TitleCase(providerID), sourceToLabel(source))
 		}
 		return nil
 	}
 
 	if !quiet {
-		out("%s Authentication\n\n", strings.ToUpper(providerID[:1])+providerID[1:])
+		out("%s Authentication\n\n", strutil.TitleCase(providerID))
 		outln("Set credentials manually:")
 		out("  vibeusage key %s set\n", providerID)
 	}

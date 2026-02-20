@@ -11,6 +11,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var keyCmd = &cobra.Command{
@@ -89,7 +90,7 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 		credType = "oauth"
 	}
 
-	titleName := strings.ToUpper(providerID[:1]) + providerID[1:]
+	titleName := strutil.TitleCase(providerID)
 
 	provCmd := &cobra.Command{
 		Use:   providerID,

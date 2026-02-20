@@ -16,6 +16,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
+	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 
 	// Register all providers
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/claude"
@@ -226,7 +227,7 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 
 func makeProviderCmd(providerID string) *cobra.Command {
 	var refresh bool
-	titleName := strings.ToUpper(providerID[:1]) + providerID[1:]
+	titleName := strutil.TitleCase(providerID)
 	cmd := &cobra.Command{
 		Use:   providerID,
 		Short: "Show usage for " + titleName,

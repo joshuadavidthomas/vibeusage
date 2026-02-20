@@ -37,11 +37,3 @@ func FormatCompletionText(info CompletionInfo) string {
 	}
 	return fmt.Sprintf("%s (%s, %s)", info.ProviderID, info.Source, FormatDuration(info.DurationMs))
 }
-
-// FormatCompletion formats a single provider completion line with symbol.
-func FormatCompletion(info CompletionInfo) string {
-	if !info.Success {
-		return "✗ " + FormatCompletionText(info)
-	}
-	return "✓ " + FormatCompletionText(info)
-}
