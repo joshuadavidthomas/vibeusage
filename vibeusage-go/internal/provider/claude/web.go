@@ -53,8 +53,8 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var usageData map[string]any
-	if err := json.Unmarshal(body, &usageData); err != nil {
+	var usageResp WebUsageResponse
+	if err := json.Unmarshal(body, &usageResp); err != nil {
 		return fetch.ResultFail("Invalid usage response"), nil
 	}
 
@@ -69,18 +69,14 @@ func (s *WebStrategy) Fetch() (fetch.FetchResult, error) {
 		defer oResp.Body.Close()
 		if oResp.StatusCode == 200 {
 			oBody, _ := io.ReadAll(oResp.Body)
-			var oData map[string]any
-			if json.Unmarshal(oBody, &oData) == nil {
-				overage = parseOverage(oData)
+			var overageResp WebOverageResponse
+			if json.Unmarshal(oBody, &overageResp) == nil {
+				overage = overageResp.ToOverageUsage()
 			}
 		}
 	}
 
-	snapshot := s.parseUsageResponse(usageData, overage)
-	if snapshot == nil {
-		return fetch.ResultFail("Failed to parse usage response"), nil
-	}
-
+	snapshot := s.parseWebUsageResponse(usageResp, overage)
 	return fetch.ResultOK(*snapshot), nil
 }
 
@@ -90,13 +86,13 @@ func (s *WebStrategy) loadSessionKey() string {
 	if err != nil || data == nil {
 		return ""
 	}
-	var creds map[string]any
+	var creds WebSessionCredentials
 	if err := json.Unmarshal(data, &creds); err != nil {
 		// Try raw string
 		return string(data)
 	}
-	if sk, ok := creds["session_key"].(string); ok {
-		return sk
+	if creds.SessionKey != "" {
+		return creds.SessionKey
 	}
 	return ""
 }
@@ -118,52 +114,44 @@ func (s *WebStrategy) getOrgID(sessionKey string) string {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var orgs []map[string]any
+	var orgs []WebOrganization
 	if err := json.Unmarshal(body, &orgs); err != nil {
 		return ""
 	}
 
-	// Find org with "chat" capability
+	orgID := s.findChatOrgID(orgs)
+	if orgID != "" {
+		_ = config.CacheOrgID("claude", orgID)
+	}
+	return orgID
+}
+
+// findChatOrgID finds the first organization with "chat" capability,
+// falling back to the first organization if none have it.
+func (s *WebStrategy) findChatOrgID(orgs []WebOrganization) string {
 	for _, org := range orgs {
-		if caps, ok := org["capabilities"].([]any); ok {
-			for _, cap := range caps {
-				if capStr, ok := cap.(string); ok && capStr == "chat" {
-					orgID := getStringField(org, "uuid", "id")
-					if orgID != "" {
-						_ = config.CacheOrgID("claude", orgID)
-						return orgID
-					}
-				}
+		if org.HasCapability("chat") {
+			if id := org.OrgID(); id != "" {
+				return id
 			}
 		}
 	}
 
 	// Fallback to first org
 	if len(orgs) > 0 {
-		orgID := getStringField(orgs[0], "uuid", "id")
-		if orgID != "" {
-			_ = config.CacheOrgID("claude", orgID)
-			return orgID
-		}
+		return orgs[0].OrgID()
 	}
 	return ""
 }
 
-func (s *WebStrategy) parseUsageResponse(data map[string]any, overage *models.OverageUsage) *models.UsageSnapshot {
-	if data == nil {
-		return nil
-	}
-
+func (s *WebStrategy) parseWebUsageResponse(resp WebUsageResponse, overage *models.OverageUsage) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	usageAmount, _ := data["usage_amount"].(float64)
-	usageLimit, _ := data["usage_limit"].(float64)
-
-	if usageLimit > 0 {
-		utilization := int((usageAmount / usageLimit) * 100)
+	if resp.UsageLimit > 0 {
+		utilization := int((resp.UsageAmount / resp.UsageLimit) * 100)
 		var resetsAt *time.Time
-		if periodEnd, ok := data["period_end"].(string); ok {
-			if t, err := time.Parse(time.RFC3339, periodEnd); err == nil {
+		if resp.PeriodEnd != "" {
+			if t, err := time.Parse(time.RFC3339, resp.PeriodEnd); err == nil {
 				resetsAt = &t
 			}
 		}
@@ -176,11 +164,12 @@ func (s *WebStrategy) parseUsageResponse(data map[string]any, overage *models.Ov
 	}
 
 	var identity *models.ProviderIdentity
-	if _, ok := data["email"]; ok {
-		email, _ := data["email"].(string)
-		org, _ := data["organization"].(string)
-		plan, _ := data["plan"].(string)
-		identity = &models.ProviderIdentity{Email: email, Organization: org, Plan: plan}
+	if resp.Email != "" || resp.Organization != "" || resp.Plan != "" {
+		identity = &models.ProviderIdentity{
+			Email:        resp.Email,
+			Organization: resp.Organization,
+			Plan:         resp.Plan,
+		}
 	}
 
 	now := time.Now().UTC()
@@ -192,28 +181,4 @@ func (s *WebStrategy) parseUsageResponse(data map[string]any, overage *models.Ov
 		Identity:  identity,
 		Source:    "web",
 	}
-}
-
-func parseOverage(data map[string]any) *models.OverageUsage {
-	hasLimit, _ := data["has_hard_limit"].(bool)
-	if !hasLimit {
-		return nil
-	}
-	used, _ := data["current_spend"].(float64)
-	limit, _ := data["hard_limit"].(float64)
-	return &models.OverageUsage{
-		Used:      used,
-		Limit:     limit,
-		Currency:  "USD",
-		IsEnabled: true,
-	}
-}
-
-func getStringField(m map[string]any, keys ...string) string {
-	for _, k := range keys {
-		if v, ok := m[k].(string); ok && v != "" {
-			return v
-		}
-	}
-	return ""
 }
