@@ -192,8 +192,8 @@ func TestIsProviderEnabled(t *testing.T) {
 // Load and Save
 
 func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
-	setupTempDir(t)
-	cfg := Load(filepath.Join(t.TempDir(), "nonexistent.toml"))
+	dir := setupTempDir(t)
+	cfg := Load(filepath.Join(dir, "nonexistent.toml"))
 	def := DefaultConfig()
 
 	if cfg.Fetch.Timeout != def.Fetch.Timeout {
@@ -419,6 +419,7 @@ enabled_providers = ["claude", "copilot", "gemini"]
 // Get and Reload (existing tests plus new ones)
 
 func TestGetAndReload_NoConcurrentRace(t *testing.T) {
+	setupTempDir(t)
 	var wg sync.WaitGroup
 	_ = Get()
 	for i := 0; i < 10; i++ {
@@ -436,6 +437,7 @@ func TestGetAndReload_NoConcurrentRace(t *testing.T) {
 }
 
 func TestGet_ReturnsCopy(t *testing.T) {
+	setupTempDir(t)
 	cfg := Get()
 	cfg.Fetch.Timeout = 999
 	cfg2 := Get()
@@ -445,6 +447,7 @@ func TestGet_ReturnsCopy(t *testing.T) {
 }
 
 func TestReload_ReturnsCurrentConfig(t *testing.T) {
+	setupTempDir(t)
 	cfg := Reload()
 	if cfg.Fetch.Timeout <= 0 {
 		t.Error("Reload() should return a valid config with positive timeout")
