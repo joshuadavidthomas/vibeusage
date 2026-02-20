@@ -95,12 +95,12 @@ for _, row := range data {
 
 ### Tasks
 
-- [ ] Create shared table helper in `internal/display/` that wraps lipgloss/table
-- [ ] Migrate `displayStatusTable` to use lipgloss table
-- [ ] Migrate `cacheShowCmd` display to use lipgloss table
-- [ ] Migrate `displayAllCredentialStatus` to use lipgloss table
-- [ ] Migrate `authStatusCommand` display to use lipgloss table
-- [ ] Respect `--no-color` flag in table styling
+- [x] Create shared table helper in `internal/display/` that wraps lipgloss/table
+- [x] Migrate `displayStatusTable` to use lipgloss table
+- [x] Migrate `cacheShowCmd` display to use lipgloss table
+- [x] Migrate `displayAllCredentialStatus` to use lipgloss table
+- [x] Migrate `authStatusCommand` display to use lipgloss table
+- [x] Respect `--no-color` flag in table styling
 
 ## 4. Typed JSON Response Structs
 
