@@ -295,7 +295,7 @@ func titleCase(s string) string {
 - [x] Set up test infrastructure (decide on testify vs stdlib-only)
 - [x] Write `models` package tests (table-driven)
 - [x] Write `config` package tests (with temp dirs)
-- [ ] Write `fetch` pipeline tests (with mock strategies)
+- [x] Write `fetch` pipeline tests (with mock strategies)
 - [ ] Write `display` package tests
 - [ ] Write provider parse tests (with fixture JSON files)
 - [ ] Write CLI integration tests
