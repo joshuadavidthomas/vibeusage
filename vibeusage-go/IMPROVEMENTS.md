@@ -297,7 +297,7 @@ func titleCase(s string) string {
 - [x] Write `config` package tests (with temp dirs)
 - [x] Write `fetch` pipeline tests (with mock strategies)
 - [x] Write `display` package tests
-- [ ] Write provider parse tests (with fixture JSON files)
+- [x] Write provider parse tests (with fixture JSON files)
 - [ ] Write CLI integration tests
 
 ## 9. `charmbracelet/log` for Verbose Output
