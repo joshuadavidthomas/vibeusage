@@ -1,12 +1,9 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# Go build output
+vibeusage
+*.exe
 
-# Virtual environments
-.venv
+# Test binary
+*.test
 
-.coverage
+# Coverage
+*.out

@@ -19,19 +19,12 @@ A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, G
 
 ### Prerequisites
 
-- Python 3.14 or later
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
+- Go 1.25.6 or later
 
-### Install with uv (recommended)
-
-```bash
-uv pip install vibeusage
-```
-
-### Install with pip
+### Install with go install
 
 ```bash
-pip install vibeusage
+go install github.com/joshuadavidthomas/vibeusage@latest
 ```
 
 ### Install from source
@@ -39,7 +32,7 @@ pip install vibeusage
 ```bash
 git clone https://github.com/joshuadavidthomas/vibeusage.git
 cd vibeusage
-uv pip install -e .
+go build -o vibeusage .
 ```
 
 ## Quick Start
@@ -337,103 +330,34 @@ Returns structured data for scripting:
 }
 ```
 
-## Troubleshooting
-
-### "Strategy not available" Error
-
-This means vibeusage couldn't find credentials for the provider. Run:
-
-```bash
-vibeusage auth <provider>
-```
-
-### Session Key Expired (Claude)
-
-Claude session keys expire periodically. Re-authenticate:
-
-```bash
-vibeusage auth claude
-```
-
-### Cache Showing Old Data
-
-Force a refresh:
-
-```bash
-vibeusage --refresh
-```
-
-Or clear the cache entirely:
-
-```bash
-vibeusage cache clear
-```
-
-### Permission Errors on Credentials
-
-Check file permissions:
-
-```bash
-ls -la ~/.config/vibeusage/credentials/
-```
-
-Credential files should be `0600` (read/write for owner only). Fix with:
-
-```bash
-chmod 600 ~/.config/vibeusage/credentials/*/*
-```
-
-### Network Timeout
-
-Increase timeout in config.toml:
-
-```toml
-[fetch]
-timeout = 60
-```
-
-Or use the cached data with the `--quiet` flag to suppress stale warnings.
-
-### Browser Cookie Extraction Fails (Cursor)
-
-Some browsers require additional libraries. Install:
-
-```bash
-pip install browser-cookie3
-# or
-pip install pycookiecheat
-```
-
-Alternatively, manually extract cookies and use `vibeusage key set cursor`.
-
 ## Development
 
-### Setup Development Environment
+### Setup
 
 ```bash
 git clone https://github.com/joshuadavidthomas/vibeusage.git
 cd vibeusage
-uv sync
+go mod download
 ```
 
 ### Run Tests
 
 ```bash
-uv run pytest
-uv run pytest --cov
+go test ./...
+go test ./... -race -v
+go test ./... -cover
 ```
 
-### Type Checking
+### Build
 
 ```bash
-uvx ty check
+go build -o vibeusage .
 ```
 
-### Linting
+### Lint
 
 ```bash
-uvx ruff check
-uvx ruff format
+golangci-lint run
 ```
 
 ## License
