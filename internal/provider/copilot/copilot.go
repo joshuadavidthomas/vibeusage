@@ -90,7 +90,7 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
 	if resp.JSONErr != nil {
-		return fetch.ResultFail("Invalid response from Copilot API"), nil
+		return fetch.ResultFail(fmt.Sprintf("Invalid response from Copilot API: %v", resp.JSONErr)), nil
 	}
 
 	snapshot := s.parseTypedUsageResponse(userResp)

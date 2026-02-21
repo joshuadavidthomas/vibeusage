@@ -51,7 +51,7 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
 	if resp.JSONErr != nil {
-		return fetch.ResultFail("Invalid usage response"), nil
+		return fetch.ResultFail(fmt.Sprintf("Invalid usage response: %v", resp.JSONErr)), nil
 	}
 
 	// Fetch overage

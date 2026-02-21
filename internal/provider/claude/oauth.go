@@ -66,7 +66,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
 	}
 	if resp.JSONErr != nil {
-		return fetch.ResultFail("Invalid response from usage endpoint"), nil
+		return fetch.ResultFail(fmt.Sprintf("Invalid response from usage endpoint: %v", resp.JSONErr)), nil
 	}
 
 	snapshot := s.parseOAuthUsageResponse(usageResp)
