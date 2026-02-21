@@ -18,10 +18,7 @@ type model struct {
 	quitting  bool
 }
 
-var (
-	checkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	crossStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-)
+var checkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 
 func newModel(providerIDs []string) model {
 	s := spinner.New()
