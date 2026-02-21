@@ -100,11 +100,9 @@ kimi-cli stores OAuth tokens at `~/.local/share/kimi-cli/credentials/kimi-code.j
 }
 ```
 
-Check this path in `IsAvailable()` before falling back to our own credential store. Note `expires_at` is a Unix timestamp float — if expired, refresh using the refresh token and save back to our store.
+Check this path in `IsAvailable()` before falling back to our own credential store. Note `expires_at` is a Unix timestamp float — tokens expire in ~15 minutes. If expired, refresh using the refresh token and save back to our store.
 
-The kimi-cli share dir varies by OS:
-- Linux: `~/.local/share/kimi-cli/`
-- macOS: `~/Library/Application Support/kimi-cli/`
+The kimi-cli share dir is `~/.kimi/` (hardcoded as `Path.home() / ".kimi"`, overridable via `KIMI_SHARE_DIR` env var).
 
 #### 3. API key fallback
 
@@ -119,40 +117,51 @@ Authorization: Bearer <access_token or api_key>
 
 Base URL overridable via `KIMI_CODE_BASE_URL` env var.
 
-**Response format** (from [kimi-cli `usage.py`](https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/ui/shell/usage.py)):
+**Verified response** (real device flow token, free tier):
 ```json
 {
+  "user": {
+    "userId": "d5s8j1fftae5hmncss20",
+    "region": "REGION_OVERSEA",
+    "membership": {
+      "level": "LEVEL_BASIC"
+    },
+    "businessId": ""
+  },
   "usage": {
-    "used": 54,
-    "limit": 100,
-    "remaining": 46,
-    "name": "Weekly limit",
-    "reset_at": "2026-01-26T13:59:00Z"
+    "limit": "100",
+    "remaining": "100",
+    "resetTime": "2026-02-25T04:01:38Z"
   },
   "limits": [
     {
-      "name": "5h limit",
-      "detail": {
-        "used": 37,
-        "limit": 100,
-        "remaining": 63,
-        "reset_at": "2026-02-20T16:59:00Z"
-      },
       "window": {
         "duration": 300,
-        "timeUnit": "MINUTE"
+        "timeUnit": "TIME_UNIT_MINUTE"
+      },
+      "detail": {
+        "limit": "100",
+        "remaining": "100",
+        "resetTime": "2026-02-21T08:01:38Z"
       }
     }
   ]
 }
 ```
 
-**Field name variants** (kimi-cli handles both):
-- Reset time: `reset_at` / `resetAt` / `reset_time` / `resetTime`
-- Usage: `used` and/or `remaining` (compute `used = limit - remaining`)
-- Labels: `name` / `title` / `scope`
+**Field details**:
+- `user.membership.level`: plan tier (`"LEVEL_BASIC"` = free; likely `"LEVEL_PRO"` etc for paid)
+- `user.region`: `"REGION_OVERSEA"` — may affect display name
+- `usage`: overall summary — `limit` and `remaining` are **strings** (not ints!), `resetTime` is ISO 8601
+- `limits[].window`: `duration: 300, timeUnit: "TIME_UNIT_MINUTE"` → 5 hours → `PeriodSession`
+- `limits[].detail`: same shape as `usage` but for the specific window
+- No `used` field — compute as `limit - remaining`
+- No `name` field on limits — derive from window (e.g. "5h limit", "Weekly")
+- Reset times are camelCase `resetTime` (not snake_case `reset_at` as kimi-cli's parser suggested)
 
-Use `json.RawMessage` or Go struct tags with both snake_case and camelCase? Simplest: define struct with `json:"reset_at"` and also try `resetAt` manually if the first is empty. Or just use the snake_case version since that's what the response actually uses (camelCase is a defensive fallback).
+**Mapping to vibeusage periods**:
+- `usage` → summary period: `PeriodWeekly` (reset ~4 days out)
+- `limits[0]` with `duration: 300, TIME_UNIT_MINUTE` → `PeriodSession` (5h window)
 
 ### Implementation
 
@@ -170,19 +179,23 @@ Use `json.RawMessage` or Go struct tags with both snake_case and camelCase? Simp
 | `cmd/root.go` | Blank import + add `"kimi"` to provider list |
 | `cmd/auth.go` | `case "kimi": return authKimi()` (device flow, like Copilot) |
 | `cmd/key.go` | Add `"kimi"` to key loop + `"kimi": "api_key"` to `credentialKeyMap` |
-| `internal/config/credentials.go` | `ProviderCLIPaths`: `"kimi": {"~/.local/share/kimi-cli/credentials/kimi-code.json"}` |
+| `internal/config/credentials.go` | `ProviderCLIPaths`: `"kimi": {"~/.kimi/credentials/kimi-code.json"}` |
 | `internal/config/credentials.go` | `ProviderEnvVars`: `"kimi": "KIMI_CODE_API_KEY"` |
 
 #### Status monitoring
 
 No known status page. Return `StatusUnknown`.
 
+### Resolved questions
+
+- ✅ Response format verified — camelCase fields, `limit`/`remaining` are strings
+- ✅ Subscription tier: `user.membership.level` (`"LEVEL_BASIC"` for free)
+- ✅ Credential path: `~/.kimi/credentials/kimi-code.json` (not `~/.local/share/kimi-cli/`)
+- ✅ Token lifetime: ~15 minutes (`expires_at` is Unix float), needs inline refresh
+
 ### Open questions
 
-- [ ] Verify response format with real device flow token
-- [ ] Does the API return subscription tier info? (kimi-cli doesn't seem to fetch it)
-- [ ] What does the response look like for a free vs paid account?
-- [ ] Does `expires_at` in the token need to be checked before each request? kimi-cli has a background refresh loop — we should refresh inline if expired.
+- [ ] What does `membership.level` look like for paid tiers? (`"LEVEL_PRO"`? `"LEVEL_PREMIUM"`?)
 
 ## Z.ai (Zhipu AI)
 
