@@ -8,20 +8,22 @@ import (
 
 // ProviderCLIPaths maps provider IDs to their CLI credential file paths.
 var ProviderCLIPaths = map[string][]string{
-	"claude":  {"~/.claude/.credentials.json"},
-	"codex":   {"~/.codex/auth.json"},
-	"gemini":  {"~/.gemini/oauth_creds.json"},
-	"copilot": {"~/.config/github-copilot/hosts.json"},
-	"cursor":  {"~/.cursor/mcp-state.json"},
+	"antigravity": {"~/.config/Antigravity/credentials.json"},
+	"claude":      {"~/.claude/.credentials.json"},
+	"codex":       {"~/.codex/auth.json"},
+	"gemini":      {"~/.gemini/oauth_creds.json"},
+	"copilot":     {"~/.config/github-copilot/hosts.json"},
+	"cursor":      {"~/.cursor/mcp-state.json"},
 }
 
 // ProviderEnvVars maps provider IDs to their environment variable names.
 var ProviderEnvVars = map[string]string{
-	"claude":  "ANTHROPIC_API_KEY",
-	"codex":   "OPENAI_API_KEY",
-	"gemini":  "GEMINI_API_KEY",
-	"copilot": "GITHUB_TOKEN",
-	"cursor":  "CURSOR_API_KEY",
+	"antigravity": "ANTIGRAVITY_API_KEY",
+	"claude":      "ANTHROPIC_API_KEY",
+	"codex":       "OPENAI_API_KEY",
+	"gemini":      "GEMINI_API_KEY",
+	"copilot":     "GITHUB_TOKEN",
+	"cursor":      "CURSOR_API_KEY",
 }
 
 func CredentialPath(providerID, credType string) string {

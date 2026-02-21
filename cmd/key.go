@@ -23,7 +23,7 @@ var keyCmd = &cobra.Command{
 }
 
 func init() {
-	for _, id := range []string{"claude", "codex", "copilot", "cursor", "gemini"} {
+	for _, id := range []string{"antigravity", "claude", "codex", "copilot", "cursor", "gemini"} {
 		keyCmd.AddCommand(makeKeyProviderCmd(id))
 	}
 }
@@ -89,17 +89,18 @@ func displayAllCredentialStatus() error {
 // credentialKey returns the JSON field name used when storing a credential
 // for a provider. This must match what the provider's loadCredentials reads.
 var credentialKeyMap = map[string]string{
-	"claude":  "session_key",
-	"codex":   "access_token",
-	"copilot": "access_token",
-	"cursor":  "session_token",
-	"gemini":  "access_token",
+	"antigravity": "access_token",
+	"claude":      "session_key",
+	"codex":       "access_token",
+	"copilot":     "access_token",
+	"cursor":      "session_token",
+	"gemini":      "access_token",
 }
 
 func makeKeyProviderCmd(providerID string) *cobra.Command {
 	credType := "session"
 	switch providerID {
-	case "codex", "copilot", "gemini":
+	case "antigravity", "codex", "copilot", "gemini":
 		credType = "oauth"
 	}
 
