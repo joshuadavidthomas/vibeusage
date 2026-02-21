@@ -214,36 +214,11 @@ Two equivalent base URLs:
 - International: `https://api.z.ai`
 - China: `https://open.bigmodel.cn`
 
-#### Web session token (localStorage)
+#### Dashboard auth (investigated, not worth it)
 
-Z.ai uses **no auth cookies**. The cookies on the site (`sensorsdata*`, `machine_identifier`, `cid`, `acw_tc`) are all analytics/tracking. Auth is a JWT stored in **localStorage**:
+Z.ai uses no auth cookies. The dashboard stores a JWT in localStorage (`z-ai-open-platform-token-production`) which works as a Bearer token. But since there's no way to read browser localStorage programmatically, the user would have to open DevTools and paste it manually — at that point, creating a dedicated API key is simpler and more stable (the JWT may have a server-side TTL despite having no `exp` claim).
 
-- `z-ai-open-platform-token-production` — the token used for API calls
-- `z-ai-website-token` — possibly the same or a site-scoped variant
-
-The dashboard reads this from localStorage and sends it as `Authorization: Bearer <jwt>` to the same API endpoints that API keys use. So both sources are interchangeable — one strategy handles both.
-
-**JWT structure** (HS512, no `exp` claim — appears to not expire):
-```json
-{
-  "user_type": "PERSONAL",
-  "user_id": 5214519,
-  "api_key": null,
-  "user_key": "01d80be3-...",
-  "customer_id": "26321765812398606",
-  "customer": {
-    "channel": "Z_AI",
-    "userType": "PERSONAL",
-    ...
-  }
-}
-```
-
-When `api_key` is null, it's a web session token (not a generated API key). Both work identically with the quota endpoint.
-
-For `vibeusage auth zai`, prompt the user with two options:
-1. Paste an API key (from dashboard → API key management)
-2. Paste the JWT from localStorage (DevTools → Application → Local Storage → `z-ai-open-platform-token-production`)
+For `vibeusage auth zai`, just prompt for an API key with instructions to create one at `https://z.ai/manage-apikey/apikey-list`.
 
 ### API endpoints
 
@@ -337,7 +312,6 @@ No known status page. Return `StatusUnknown`.
 ### Open questions
 
 - [ ] What are all possible `unit` values? (confirmed: 3=hours, 5=months — what are 1, 2, 4?)
-- [ ] How long does the localStorage JWT last? (no `exp` claim, server may enforce TTL)
 
 ## Minimax
 
@@ -350,9 +324,7 @@ Chinese AI provider with M2.5 model. Subscription plans with 5-hour refresh cycl
 - Period type: `PeriodSession` (5-hour rolling window)
 - 1 prompt ≈ 15 model calls
 
-### Auth strategies (2 tiers)
-
-#### 1. API key (primary)
+### Auth strategy: API key
 
 From [Minimax FAQ](https://platform.minimax.io/docs/coding-plan/faq):
 
@@ -363,12 +335,6 @@ Content-Type: application/json
 ```
 
 Note: Minimax has separate API keys for coding plans vs pay-as-you-go. Only the Coding Plan key works for quota tracking. Key from: `https://platform.minimax.io/user-center/payment/coding-plan`
-
-#### 2. Web session cookie (secondary)
-
-The Minimax dashboard at `https://platform.minimax.io` shows coding plan usage. Like Z.ai, the browser holds a session cookie after login that could authenticate quota requests.
-
-**TODO**: Need to identify the session cookie name. User needs to check DevTools → Application → Cookies on the Minimax dashboard after logging in.
 
 ### API endpoint
 
@@ -383,7 +349,7 @@ Authorization: Bearer <api_key_or_session_token>
 
 #### New files
 
-- `internal/provider/minimax/minimax.go` — Provider, metadata, APIKeyStrategy, WebStrategy
+- `internal/provider/minimax/minimax.go` — Provider, metadata, APIKeyStrategy
 - `internal/provider/minimax/response.go` — Response types (TBD from real API response)
 - `internal/provider/minimax/response_test.go` — Parse tests once format is known
 
@@ -406,7 +372,7 @@ No known status page. Return `StatusUnknown`.
 - [ ] Does it return remaining count, total, percentage, or all?
 - [ ] Does it include reset time?
 - [ ] Is plan tier info included?
-- [ ] What is the session cookie name on platform.minimax.io? (user needs to check DevTools)
+
 
 ## Kiro (AWS)
 
@@ -476,13 +442,12 @@ Single bearer token strategy — API keys and localStorage JWTs use the same `Au
 
 ### Phase 4: Minimax
 
-Bearer token auth, but unknown response format. Need to identify whether the dashboard also uses localStorage JWTs (like Z.ai) or cookies.
+API key auth, but unknown response format.
 
-1. Identify Minimax dashboard auth mechanism (user checks DevTools)
-2. Make a real request to `/coding_plan/remains` to determine response format
-3. Create `internal/provider/minimax/` with bearer token strategy
-4. Wire into CLI
-5. Test with real token
+1. Make a real request to `/coding_plan/remains` to determine response format
+2. Create `internal/provider/minimax/` with API key strategy
+3. Wire into CLI
+4. Test with real API key
 
 ### Phase 5: Kiro
 
