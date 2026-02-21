@@ -72,7 +72,7 @@ func TestMultipleOptions(t *testing.T) {
 		if beta != "oauth-2025-04-20" {
 			t.Errorf("expected anthropic-beta header, got %s", beta)
 		}
-		json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
 	}))
 	defer srv.Close()
 

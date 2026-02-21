@@ -151,7 +151,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: false},
 			},
 			providerID: "claude",
-			want:        false,
+			want:       false,
 		},
 		{
 			name:             "explicit Enabled:false overrides nil EnabledProviders",
@@ -160,7 +160,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: false},
 			},
 			providerID: "claude",
-			want:        false,
+			want:       false,
 		},
 		{
 			name:             "explicit Enabled:true with nil EnabledProviders is enabled",
@@ -169,7 +169,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: true},
 			},
 			providerID: "claude",
-			want:        true,
+			want:       true,
 		},
 		{
 			name:             "provider not in Providers map and not in allowlist",
@@ -185,7 +185,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: true},
 			},
 			providerID: "claude",
-			want:        false,
+			want:       false,
 		},
 	}
 	for _, tt := range tests {
@@ -1121,7 +1121,7 @@ func TestFindProviderCredential_VibeusageTakesPrecedenceOverEnv(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "sk-test-key")
 
 	credPath := CredentialPath("claude", "session")
-	WriteCredential(credPath, []byte(`{"key":"val"}`))
+	_ = WriteCredential(credPath, []byte(`{"key":"val"}`))
 
 	_, source, _ := FindProviderCredential("claude")
 	if source != "vibeusage" {
@@ -1137,7 +1137,7 @@ func TestFindProviderCredential_CredentialTypes(t *testing.T) {
 		t.Run(credType, func(t *testing.T) {
 			setupTempDirWithCredentialIsolation(t)
 			credPath := CredentialPath("claude", credType)
-			WriteCredential(credPath, []byte(`{}`))
+			_ = WriteCredential(credPath, []byte(`{}`))
 
 			found, source, _ := FindProviderCredential("claude")
 			if !found {
@@ -1154,7 +1154,7 @@ func TestFindProviderCredential_CredentialTypes(t *testing.T) {
 
 func TestCheckProviderCredentials_Found(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
-	WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
+	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
 
 	hasCreds, source := CheckProviderCredentials("claude")
 	if !hasCreds {
@@ -1193,7 +1193,7 @@ func TestGetAllCredentialStatus_ReturnsAllProviders(t *testing.T) {
 func TestGetAllCredentialStatus_ReflectsCredentials(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
 
-	WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
+	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
 
 	status := GetAllCredentialStatus()
 
@@ -1222,7 +1222,7 @@ func TestIsFirstRun_NoCreds(t *testing.T) {
 
 func TestIsFirstRun_WithCreds(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
-	WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
+	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
 
 	if IsFirstRun() {
 		t.Error("IsFirstRun() should be false when credentials exist")
@@ -1241,8 +1241,8 @@ func TestCountConfiguredProviders_None(t *testing.T) {
 func TestCountConfiguredProviders_Some(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
 
-	WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
-	WriteCredential(CredentialPath("copilot", "session"), []byte(`{}`))
+	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
+	_ = WriteCredential(CredentialPath("copilot", "session"), []byte(`{}`))
 
 	if got := CountConfiguredProviders(); got != 2 {
 		t.Errorf("CountConfiguredProviders() = %d, want 2", got)

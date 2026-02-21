@@ -3,9 +3,13 @@ package display
 import (
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
+
+func timePtr(t time.Time) *time.Time { return &t }
 
 func TestStatusSymbol_NoColor_NoANSI(t *testing.T) {
 	levels := []models.StatusLevel{
@@ -60,5 +64,563 @@ func TestStatusSymbol_WithColor_ReturnsNonEmpty(t *testing.T) {
 		if result == "" {
 			t.Errorf("StatusSymbol(%q, false) should not be empty", level)
 		}
+	}
+}
+
+// RenderBar tests
+
+func TestRenderBar_Boundaries(t *testing.T) {
+	tests := []struct {
+		name        string
+		utilization int
+		width       int
+		wantFilled  int
+		wantEmpty   int
+	}{
+		{"0% utilization", 0, 20, 0, 20},
+		{"100% utilization", 100, 20, 20, 0},
+		{"50% utilization", 50, 20, 10, 10},
+		{"25% utilization", 25, 20, 5, 15},
+		{"negative clamped to 0", -10, 20, 0, 20},
+		{"over 100 clamped to width", 150, 20, 20, 0},
+		{"width 10", 50, 10, 5, 5},
+		{"width 1 at 100%", 100, 1, 1, 0},
+		{"width 1 at 0%", 0, 1, 0, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := RenderBar(tt.utilization, tt.width, "")
+			// Count filled and empty runes (no color = plain text)
+			filled := strings.Count(result, "█")
+			empty := strings.Count(result, "░")
+
+			if filled != tt.wantFilled {
+				t.Errorf("filled blocks = %d, want %d", filled, tt.wantFilled)
+			}
+			if empty != tt.wantEmpty {
+				t.Errorf("empty blocks = %d, want %d", empty, tt.wantEmpty)
+			}
+		})
+	}
+}
+
+func TestRenderBar_TotalRunesEqualWidth(t *testing.T) {
+	for util := 0; util <= 100; util += 10 {
+		result := RenderBar(util, 20, "")
+		filled := strings.Count(result, "█")
+		empty := strings.Count(result, "░")
+		total := filled + empty
+		if total != 20 {
+			t.Errorf("RenderBar(%d, 20): total runes = %d, want 20", util, total)
+		}
+	}
+}
+
+func TestRenderBar_ColorDoesNotAffectContent(t *testing.T) {
+	// With color, the string is wrapped in ANSI escape codes,
+	// but should still contain the bar characters
+	for _, color := range []string{"green", "yellow", "red"} {
+		result := RenderBar(50, 10, color)
+		if !strings.Contains(result, "█") {
+			t.Errorf("RenderBar with color=%q should contain filled block", color)
+		}
+		if !strings.Contains(result, "░") {
+			t.Errorf("RenderBar with color=%q should contain empty block", color)
+		}
+	}
+}
+
+// FormatPeriodLine tests
+
+func TestFormatPeriodLine_ContainsName(t *testing.T) {
+	period := models.UsagePeriod{
+		Name:        "Monthly",
+		Utilization: 42,
+		PeriodType:  models.PeriodMonthly,
+	}
+
+	result := FormatPeriodLine(period, 16)
+	if !strings.Contains(result, "Monthly") {
+		t.Errorf("expected period name in output, got: %q", result)
+	}
+}
+
+func TestFormatPeriodLine_ContainsPercentage(t *testing.T) {
+	period := models.UsagePeriod{
+		Name:        "Daily",
+		Utilization: 75,
+		PeriodType:  models.PeriodDaily,
+	}
+
+	result := FormatPeriodLine(period, 16)
+	if !strings.Contains(result, "75%") {
+		t.Errorf("expected '75%%' in output, got: %q", result)
+	}
+}
+
+func TestFormatPeriodLine_ContainsBar(t *testing.T) {
+	period := models.UsagePeriod{
+		Name:        "Session",
+		Utilization: 50,
+		PeriodType:  models.PeriodSession,
+	}
+
+	result := FormatPeriodLine(period, 16)
+	if !strings.Contains(result, "█") {
+		t.Errorf("expected filled bar character in output, got: %q", result)
+	}
+	if !strings.Contains(result, "░") {
+		t.Errorf("expected empty bar character in output, got: %q", result)
+	}
+}
+
+func TestFormatPeriodLine_TruncatesLongName(t *testing.T) {
+	period := models.UsagePeriod{
+		Name:        "VeryLongPeriodNameThatExceedsWidth",
+		Utilization: 10,
+		PeriodType:  models.PeriodDaily,
+	}
+
+	result := FormatPeriodLine(period, 10)
+	// The full original name should NOT appear
+	if strings.Contains(result, "VeryLongPeriodNameThatExceedsWidth") {
+		t.Errorf("expected name to be truncated, got: %q", result)
+	}
+	// But the truncated portion should
+	if !strings.Contains(result, "VeryLongPe") {
+		t.Errorf("expected truncated name 'VeryLongPe' in output, got: %q", result)
+	}
+}
+
+func TestFormatPeriodLine_IncludesResetCountdown(t *testing.T) {
+	reset := time.Now().Add(3 * time.Hour)
+	period := models.UsagePeriod{
+		Name:        "Daily",
+		Utilization: 60,
+		PeriodType:  models.PeriodDaily,
+		ResetsAt:    &reset,
+	}
+
+	result := FormatPeriodLine(period, 16)
+	if !strings.Contains(result, "resets in") {
+		t.Errorf("expected 'resets in' countdown, got: %q", result)
+	}
+}
+
+func TestFormatPeriodLine_NoResetWhenNil(t *testing.T) {
+	period := models.UsagePeriod{
+		Name:        "Monthly",
+		Utilization: 30,
+		PeriodType:  models.PeriodMonthly,
+		ResetsAt:    nil,
+	}
+
+	result := FormatPeriodLine(period, 16)
+	if strings.Contains(result, "resets in") {
+		t.Errorf("should not contain 'resets in' when ResetsAt is nil, got: %q", result)
+	}
+}
+
+// FormatStatusUpdated tests
+
+func TestFormatStatusUpdated(t *testing.T) {
+	tests := []struct {
+		name string
+		time *time.Time
+		want string
+	}{
+		{"nil returns unknown", nil, "unknown"},
+		{"just now", timePtr(time.Now()), "just now"},
+		{"5 minutes ago", timePtr(time.Now().Add(-5 * time.Minute)), "5m ago"},
+		{"1 minute ago", timePtr(time.Now().Add(-1 * time.Minute)), "1m ago"},
+		{"2 hours ago", timePtr(time.Now().Add(-2 * time.Hour)), "2h ago"},
+		{"1 hour ago", timePtr(time.Now().Add(-1 * time.Hour)), "1h ago"},
+		{"2 days ago", timePtr(time.Now().Add(-48 * time.Hour)), "2d ago"},
+		{"1 day ago", timePtr(time.Now().Add(-24 * time.Hour)), "1d ago"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatStatusUpdated(tt.time)
+			if got != tt.want {
+				t.Errorf("FormatStatusUpdated() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// RenderStaleWarning tests
+
+func TestRenderStaleWarning_FreshData(t *testing.T) {
+	snap := models.UsageSnapshot{
+		FetchedAt: time.Now(),
+	}
+
+	result := RenderStaleWarning(snap, 60)
+	if result != "" {
+		t.Errorf("expected empty string for fresh data, got: %q", result)
+	}
+}
+
+func TestRenderStaleWarning_StaleMinutes(t *testing.T) {
+	snap := models.UsageSnapshot{
+		FetchedAt: time.Now().Add(-45 * time.Minute),
+	}
+
+	result := RenderStaleWarning(snap, 30)
+	if !strings.Contains(result, "minute") {
+		t.Errorf("expected 'minute' in stale warning, got: %q", result)
+	}
+	if !strings.Contains(result, "⚠") {
+		t.Errorf("expected warning symbol in output, got: %q", result)
+	}
+	if !strings.Contains(result, "--refresh") {
+		t.Errorf("expected '--refresh' hint, got: %q", result)
+	}
+}
+
+func TestRenderStaleWarning_StaleHours(t *testing.T) {
+	snap := models.UsageSnapshot{
+		FetchedAt: time.Now().Add(-3 * time.Hour),
+	}
+
+	result := RenderStaleWarning(snap, 60)
+	if !strings.Contains(result, "hour") {
+		t.Errorf("expected 'hour' in stale warning, got: %q", result)
+	}
+}
+
+func TestRenderStaleWarning_SingularMinute(t *testing.T) {
+	// Exactly 1 minute stale with threshold of 1
+	snap := models.UsageSnapshot{
+		FetchedAt: time.Now().Add(-1*time.Minute - 30*time.Second),
+	}
+
+	result := RenderStaleWarning(snap, 1)
+	if !strings.Contains(result, "1 minute") {
+		t.Errorf("expected '1 minute' (singular), got: %q", result)
+	}
+	if strings.Contains(result, "minutes") {
+		t.Errorf("expected singular 'minute', not 'minutes', got: %q", result)
+	}
+}
+
+func TestRenderStaleWarning_SingularHour(t *testing.T) {
+	snap := models.UsageSnapshot{
+		FetchedAt: time.Now().Add(-61 * time.Minute),
+	}
+
+	result := RenderStaleWarning(snap, 1)
+	if !strings.Contains(result, "1 hour") {
+		t.Errorf("expected '1 hour' (singular), got: %q", result)
+	}
+	if strings.Contains(result, "hours") {
+		t.Errorf("expected singular 'hour', not 'hours', got: %q", result)
+	}
+}
+
+func TestRenderStaleWarning_PluralHours(t *testing.T) {
+	snap := models.UsageSnapshot{
+		FetchedAt: time.Now().Add(-150 * time.Minute),
+	}
+
+	result := RenderStaleWarning(snap, 1)
+	if !strings.Contains(result, "hours") {
+		t.Errorf("expected 'hours' (plural), got: %q", result)
+	}
+}
+
+func TestRenderStaleWarning_AtThreshold(t *testing.T) {
+	// Exactly at threshold should not warn (< not <=)
+	snap := models.UsageSnapshot{
+		FetchedAt: time.Now().Add(-59*time.Minute - 50*time.Second),
+	}
+
+	result := RenderStaleWarning(snap, 60)
+	if result != "" {
+		t.Errorf("expected empty at threshold boundary, got: %q", result)
+	}
+}
+
+// RenderSingleProvider tests
+
+func TestRenderSingleProvider_ContainsProviderName(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderSingleProvider(snap)
+	if !strings.Contains(result, "Claude") {
+		t.Errorf("expected title-cased provider name 'Claude', got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_ContainsSeparator(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderSingleProvider(snap)
+	if !strings.Contains(result, "━") {
+		t.Errorf("expected separator in output, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_SessionAndLongerPeriods(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "cursor",
+		Periods: []models.UsagePeriod{
+			{Name: "Session", Utilization: 80, PeriodType: models.PeriodSession},
+			{Name: "Monthly", Utilization: 40, PeriodType: models.PeriodMonthly},
+		},
+	}
+
+	result := RenderSingleProvider(snap)
+	if !strings.Contains(result, "80%") {
+		t.Errorf("expected session utilization '80%%', got: %q", result)
+	}
+	if !strings.Contains(result, "40%") {
+		t.Errorf("expected monthly utilization '40%%', got: %q", result)
+	}
+	if !strings.Contains(result, "Monthly") {
+		t.Errorf("expected 'Monthly' section header, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_WithOverage(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage: &models.OverageUsage{
+			Used:      5.50,
+			Limit:     100.00,
+			Currency:  "USD",
+			IsEnabled: true,
+		},
+	}
+
+	result := RenderSingleProvider(snap)
+	if !strings.Contains(result, "Extra Usage") {
+		t.Errorf("expected 'Extra Usage' for overage, got: %q", result)
+	}
+	if !strings.Contains(result, "$5.50") {
+		t.Errorf("expected '$5.50' in overage, got: %q", result)
+	}
+	if !strings.Contains(result, "$100.00") {
+		t.Errorf("expected '$100.00' in overage, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_NoOverageWhenDisabled(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+		Overage: &models.OverageUsage{
+			Used:      5.0,
+			Limit:     100.0,
+			Currency:  "USD",
+			IsEnabled: false,
+		},
+	}
+
+	result := RenderSingleProvider(snap)
+	if strings.Contains(result, "Extra Usage") {
+		t.Errorf("should not show overage when disabled, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_NoPeriods(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "empty",
+		Periods:  nil,
+	}
+
+	result := RenderSingleProvider(snap)
+	if !strings.Contains(result, "Empty") {
+		t.Errorf("expected title-cased provider name, got: %q", result)
+	}
+}
+
+// RenderProviderPanel tests
+
+func TestRenderProviderPanel_ContainsProviderTitle(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "copilot",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 60, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderProviderPanel(snap)
+	if !strings.Contains(result, "Copilot") {
+		t.Errorf("expected title-cased provider name 'Copilot', got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_HasBorder(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderProviderPanel(snap)
+	// Rounded border characters
+	if !strings.Contains(result, "╭") || !strings.Contains(result, "╰") {
+		t.Errorf("expected rounded border characters, got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_FiltersModelSpecificPeriods(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods: []models.UsagePeriod{
+			{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly, Model: ""},
+			{Name: "Sonnet", Utilization: 70, PeriodType: models.PeriodMonthly, Model: "claude-3-sonnet"},
+		},
+	}
+
+	result := RenderProviderPanel(snap)
+	if !strings.Contains(result, "50%") {
+		t.Errorf("expected general period '50%%', got: %q", result)
+	}
+	// Model-specific period should be filtered in compact view
+	if strings.Contains(result, "Sonnet") {
+		t.Errorf("should not include model-specific period 'Sonnet' in panel, got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_RenamesWeeklyDaily(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "gemini",
+		Periods: []models.UsagePeriod{
+			{Name: "some_weekly_label", Utilization: 30, PeriodType: models.PeriodWeekly},
+			{Name: "some_daily_label", Utilization: 45, PeriodType: models.PeriodDaily},
+		},
+	}
+
+	result := RenderProviderPanel(snap)
+	// Names without parentheses should be normalized
+	if !strings.Contains(result, "Weekly") {
+		t.Errorf("expected 'Weekly' label for weekly period, got: %q", result)
+	}
+	if !strings.Contains(result, "Daily") {
+		t.Errorf("expected 'Daily' label for daily period, got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_WithOverage(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage: &models.OverageUsage{
+			Used:      10.0,
+			Limit:     50.0,
+			Currency:  "USD",
+			IsEnabled: true,
+		},
+	}
+
+	result := RenderProviderPanel(snap)
+	if !strings.Contains(result, "Extra:") {
+		t.Errorf("expected compact 'Extra:' format for overage, got: %q", result)
+	}
+	if !strings.Contains(result, "$10.00") {
+		t.Errorf("expected '$10.00' in overage, got: %q", result)
+	}
+}
+
+// groupPeriods tests (internal, tested via package-level access)
+
+func TestGroupPeriods(t *testing.T) {
+	periods := []models.UsagePeriod{
+		{Name: "s1", PeriodType: models.PeriodSession},
+		{Name: "d1", PeriodType: models.PeriodDaily},
+		{Name: "w1", PeriodType: models.PeriodWeekly},
+		{Name: "m1", PeriodType: models.PeriodMonthly},
+		{Name: "s2", PeriodType: models.PeriodSession},
+		{Name: "d2", PeriodType: models.PeriodDaily},
+	}
+
+	session, weekly, daily, monthly := groupPeriods(periods)
+
+	if len(session) != 2 {
+		t.Errorf("session count = %d, want 2", len(session))
+	}
+	if len(weekly) != 1 {
+		t.Errorf("weekly count = %d, want 1", len(weekly))
+	}
+	if len(daily) != 2 {
+		t.Errorf("daily count = %d, want 2", len(daily))
+	}
+	if len(monthly) != 1 {
+		t.Errorf("monthly count = %d, want 1", len(monthly))
+	}
+}
+
+func TestGroupPeriods_Empty(t *testing.T) {
+	session, weekly, daily, monthly := groupPeriods(nil)
+	if session != nil || weekly != nil || daily != nil || monthly != nil {
+		t.Error("expected all nil slices for nil input")
+	}
+}
+
+// pickLonger tests (internal)
+
+func TestPickLonger_Priority(t *testing.T) {
+	weekly := []models.UsagePeriod{{Name: "w"}}
+	daily := []models.UsagePeriod{{Name: "d"}}
+	monthly := []models.UsagePeriod{{Name: "m"}}
+
+	tests := []struct {
+		name    string
+		weekly  []models.UsagePeriod
+		daily   []models.UsagePeriod
+		monthly []models.UsagePeriod
+		want    string
+	}{
+		{"weekly first", weekly, daily, monthly, "Weekly"},
+		{"daily when no weekly", nil, daily, monthly, "Daily"},
+		{"monthly when no weekly or daily", nil, nil, monthly, "Monthly"},
+		{"empty when all nil", nil, nil, nil, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pickLonger(tt.weekly, tt.daily, tt.monthly)
+			if got.header != tt.want {
+				t.Errorf("pickLonger() header = %q, want %q", got.header, tt.want)
+			}
+		})
+	}
+}
+
+// colorStyle tests (internal)
+
+func TestColorStyle_ValidColors(t *testing.T) {
+	for _, color := range []string{"green", "yellow", "red"} {
+		style := colorStyle(color)
+		rendered := style.Render("test")
+		if rendered == "" {
+			t.Errorf("colorStyle(%q).Render should produce non-empty output", color)
+		}
+	}
+}
+
+func TestColorStyle_UnknownColor(t *testing.T) {
+	style := colorStyle("purple")
+	rendered := style.Render("test")
+	// Unknown color returns unstyled, should still contain the text
+	if !strings.Contains(rendered, "test") {
+		t.Errorf("colorStyle(unknown) should still render text, got: %q", rendered)
+	}
+}
+
+func TestColorStyle_EmptyColor(t *testing.T) {
+	style := colorStyle("")
+	rendered := style.Render("test")
+	runeCount := utf8.RuneCountInString(rendered)
+	if runeCount < 4 {
+		t.Errorf("colorStyle('').Render('test') should have at least 4 runes, got %d", runeCount)
 	}
 }

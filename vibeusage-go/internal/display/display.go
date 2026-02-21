@@ -123,7 +123,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot) string {
 				reset = dimStyle.Render("resets in " + models.FormatResetCountdown(d))
 			}
 
-			b.WriteString(fmt.Sprintf("%-18s  %s %4s    %s\n", boldStyle.Render(name), bar, pct, reset))
+			fmt.Fprintf(&b, "%-18s  %s %4s    %s\n", boldStyle.Render(name), bar, pct, reset)
 		}
 	}
 
@@ -195,7 +195,7 @@ func RenderProviderPanel(snapshot models.UsageSnapshot) string {
 		if o.Currency == "USD" {
 			sym = "$"
 		}
-		b.WriteString(fmt.Sprintf("Extra: %s%.2f / %s%.2f %s\n", sym, o.Used, sym, o.Limit, o.Currency))
+		fmt.Fprintf(&b, "Extra: %s%.2f / %s%.2f %s\n", sym, o.Used, sym, o.Limit, o.Currency)
 	}
 
 	content := strings.TrimRight(b.String(), "\n")

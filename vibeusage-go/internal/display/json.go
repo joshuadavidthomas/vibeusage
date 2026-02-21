@@ -13,7 +13,7 @@ import (
 func OutputJSON(w io.Writer, data any) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	enc.Encode(data)
+	_ = enc.Encode(data)
 }
 
 // SnapshotToJSON converts a snapshot to a JSON-friendly map.

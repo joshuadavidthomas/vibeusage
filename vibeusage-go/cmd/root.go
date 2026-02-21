@@ -314,7 +314,7 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 		outln()
 	}
 
-	fmt.Fprint(outWriter, display.RenderSingleProvider(snap))
+	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap))
 	return nil
 }
 

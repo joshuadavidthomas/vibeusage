@@ -199,19 +199,19 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 
 	// Display instructions
 	if !quiet {
-		fmt.Fprintln(w, "\n🔐 GitHub Device Flow Authentication")
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "  1. Open %s\n", verificationURI)
+		_, _ = fmt.Fprintln(w, "\n🔐 GitHub Device Flow Authentication")
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintf(w, "  1. Open %s\n", verificationURI)
 		if len(userCode) == 8 {
-			fmt.Fprintf(w, "  2. Enter code: %s-%s\n", userCode[:4], userCode[4:])
+			_, _ = fmt.Fprintf(w, "  2. Enter code: %s-%s\n", userCode[:4], userCode[4:])
 		} else {
-			fmt.Fprintf(w, "  2. Enter code: %s\n", userCode)
+			_, _ = fmt.Fprintf(w, "  2. Enter code: %s\n", userCode)
 		}
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "  Waiting for authorization...")
+		_, _ = fmt.Fprintln(w)
+		_, _ = fmt.Fprintln(w, "  Waiting for authorization...")
 	} else {
-		fmt.Fprintln(w, verificationURI)
-		fmt.Fprintf(w, "Code: %s\n", userCode)
+		_, _ = fmt.Fprintln(w, verificationURI)
+		_, _ = fmt.Fprintf(w, "Code: %s\n", userCode)
 	}
 
 	// Poll for token
@@ -245,7 +245,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
 			if !quiet {
-				fmt.Fprintln(w, "\n  ✓ Authentication successful!")
+				_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
 			}
 			return true, nil
 		}
@@ -258,12 +258,12 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			continue
 		case "expired_token":
 			if !quiet {
-				fmt.Fprintln(w, "\n  ✗ Device code expired.")
+				_, _ = fmt.Fprintln(w, "\n  ✗ Device code expired.")
 			}
 			return false, nil
 		case "access_denied":
 			if !quiet {
-				fmt.Fprintln(w, "\n  ✗ Authorization denied by user.")
+				_, _ = fmt.Fprintln(w, "\n  ✗ Authorization denied by user.")
 			}
 			return false, nil
 		default:
@@ -276,7 +276,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	}
 
 	if !quiet {
-		fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
+		_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
 	}
 	return false, nil
 }

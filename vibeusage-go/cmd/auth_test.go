@@ -115,7 +115,7 @@ func TestAuthStatusCommand_HasTableBorders(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	authStatusCommand()
+	_ = authStatusCommand()
 
 	output := buf.String()
 
@@ -145,7 +145,7 @@ func TestAuthStatusCommand_ContainsHeaders(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	authStatusCommand()
+	_ = authStatusCommand()
 
 	output := buf.String()
 	for _, header := range []string{"Provider", "Status", "Source"} {
@@ -172,7 +172,7 @@ func TestAuthStatusCommand_QuietMode(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	authStatusCommand()
+	_ = authStatusCommand()
 
 	output := buf.String()
 	if strings.Contains(output, "╭") {
@@ -186,8 +186,8 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
 
 	credDir := filepath.Join(tmpDir, "credentials", "copilot")
-	os.MkdirAll(credDir, 0o755)
-	os.WriteFile(filepath.Join(credDir, "oauth.json"), []byte(`{"access_token":"test"}`), 0o600)
+	_ = os.MkdirAll(credDir, 0o755)
+	_ = os.WriteFile(filepath.Join(credDir, "oauth.json"), []byte(`{"access_token":"test"}`), 0o600)
 
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
