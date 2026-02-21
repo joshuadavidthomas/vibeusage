@@ -3,19 +3,11 @@ name: test
 on:
   push:
     branches: [main]
-    paths:
-      - "vibeusage-go/**"
   pull_request:
-    paths:
-      - "vibeusage-go/**"
 
 concurrency:
   group: test-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-
-defaults:
-  run:
-    working-directory: vibeusage-go
 
 jobs:
   test:
@@ -25,7 +17,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: vibeusage-go/go.mod
+          go-version-file: go.mod
 
       - name: Run tests
         run: go test ./... -race -v

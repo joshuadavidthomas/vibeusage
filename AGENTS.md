@@ -1,34 +1,34 @@
 ## Commands
-- `uv sync`: Sync the project's dependencies with the environment.
-- `uv run vibeusage --help`: Show CLI help
-- `uv run pytest`: Run all tests
-- `uv run pytest tests/ -v`: Run tests with verbose output
-- `uv run pytest tests/ --cov`: Run tests with coverage report
+- `go build`: Build the binary
+- `go run .`: Run the CLI
+- `go test ./...`: Run all tests
+- `go test ./... -race -v`: Run tests with race detector and verbose output
+- `go test ./... -cover`: Run tests with coverage
 
 ## Validation
 
 Run these after implementing to get immediate feedback:
 
-- Tests: `uv run pytest tests/ -v`
-- Coverage: `uv run pytest tests/ --cov`
-- Typecheck: `uvx ty check`
-- Lint: `uvx ruff check`
-- Format: `uvx ruff format`
+- Tests: `go test ./... -v`
+- Race detector: `go test ./... -race`
+- Coverage: `go test ./... -cover`
+- Lint: `golangci-lint run`
+- Format check: `gofmt -l .`
+- Tidy: `go mod tidy`
 
 ## Operational Notes
 
-Succinct learnings about how to RUN the project:
-
-- CLI entry point: `uv run vibeusage [OPTIONS] COMMAND [ARGS]`
-- Test suite: 308 passing tests covering models, errors, config, display, core, CLI, providers
-- Coverage: 44% (target: 80%+)
-- Use `uv run pytest -x` to stop at first failure
-- Use `uv run pytest -k "test_name"` to run specific tests
+- CLI entry point: `go run . [OPTIONS] COMMAND [ARGS]`
+- Module: `github.com/joshuadavidthomas/vibeusage`
+- Uses cobra for CLI, charmbracelet libs for TUI (huh, lipgloss, bubbletea, log)
 
 ### Codebase Patterns
 
-- msgspec.Struct for all data models - frozen=True for immutability
-- ATyper (cli/atyper.py) - async wrapper around Typer
-- Provider registry via decorator pattern in providers/__init__.py
-- Error classification through errors/classify.py for all exceptions
-- Display utilities in display/rich.py and display/json.py
+- Typed JSON response structs per provider (no `map[string]any`)
+- Shared HTTP client in `internal/httpclient/` with `RequestOption` pattern
+- `context.Context` threaded through all strategy `Fetch` calls
+- `internal/prompt/` wraps `charmbracelet/huh` forms with testable mock interface
+- `internal/spinner/` wraps bubbletea for fetch progress display
+- `internal/display/table.go` wraps `lipgloss/table` for all tabular output
+- `internal/strutil/title.go` replaces deprecated `strings.Title`
+- `charmbracelet/log` for structured verbose/debug output

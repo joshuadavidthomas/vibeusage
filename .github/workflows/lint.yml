@@ -3,19 +3,11 @@ name: lint
 on:
   push:
     branches: [main]
-    paths:
-      - "vibeusage-go/**"
   pull_request:
-    paths:
-      - "vibeusage-go/**"
 
 concurrency:
   group: lint-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-
-defaults:
-  run:
-    working-directory: vibeusage-go
 
 jobs:
   fmt:
@@ -25,7 +17,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: vibeusage-go/go.mod
+          go-version-file: go.mod
 
       - name: Check formatting
         run: |
@@ -43,11 +35,10 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: vibeusage-go/go.mod
+          go-version-file: go.mod
 
       - uses: golangci/golangci-lint-action@v9
         with:
-          working-directory: vibeusage-go
           args: --timeout=5m
 
   tidy:
@@ -57,7 +48,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: vibeusage-go/go.mod
+          go-version-file: go.mod
 
       - name: Check go.mod/go.sum
         run: |
