@@ -151,7 +151,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: false},
 			},
 			providerID: "claude",
-			want:        false,
+			want:       false,
 		},
 		{
 			name:             "explicit Enabled:false overrides nil EnabledProviders",
@@ -160,7 +160,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: false},
 			},
 			providerID: "claude",
-			want:        false,
+			want:       false,
 		},
 		{
 			name:             "explicit Enabled:true with nil EnabledProviders is enabled",
@@ -169,7 +169,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: true},
 			},
 			providerID: "claude",
-			want:        true,
+			want:       true,
 		},
 		{
 			name:             "provider not in Providers map and not in allowlist",
@@ -185,7 +185,7 @@ func TestIsProviderEnabled(t *testing.T) {
 				"claude": {Enabled: true},
 			},
 			providerID: "claude",
-			want:        false,
+			want:       false,
 		},
 	}
 	for _, tt := range tests {

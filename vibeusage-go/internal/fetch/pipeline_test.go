@@ -18,8 +18,8 @@ type mockStrategy struct {
 	fetchFn   func(ctx context.Context) (FetchResult, error)
 }
 
-func (m *mockStrategy) Name() string                                    { return m.name }
-func (m *mockStrategy) IsAvailable() bool                               { return m.available }
+func (m *mockStrategy) Name() string                                   { return m.name }
+func (m *mockStrategy) IsAvailable() bool                              { return m.available }
 func (m *mockStrategy) Fetch(ctx context.Context) (FetchResult, error) { return m.fetchFn(ctx) }
 
 // setupFetchTestEnv redirects config and cache to a temp directory,

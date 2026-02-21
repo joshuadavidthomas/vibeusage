@@ -266,9 +266,9 @@ func TestParseOAuthUsageResponse_InvalidResetsAt(t *testing.T) {
 
 func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 	tests := []struct {
-		name    string
-		creds   OAuthCredentials
-		want    bool
+		name  string
+		creds OAuthCredentials
+		want  bool
 	}{
 		{
 			name:  "no expiry",
