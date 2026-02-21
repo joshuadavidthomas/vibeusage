@@ -41,6 +41,8 @@ var authCmd = &cobra.Command{
 			return authCopilot()
 		case "kimi":
 			return authKimi()
+		case "zai":
+			return authZai()
 		default:
 			return authGeneric(providerID)
 		}
@@ -224,6 +226,51 @@ func authKimi() error {
 	}
 	if !success {
 		return fmt.Errorf("authentication failed")
+	}
+	return nil
+}
+
+func authZai() error {
+	hasCreds, source := config.CheckProviderCredentials("zai")
+	if hasCreds && !quiet {
+		out("✓ Z.ai is already authenticated (%s)\n", sourceToLabel(source))
+
+		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title: "Re-authenticate?",
+		})
+		if err != nil {
+			return err
+		}
+		if !reauth {
+			return nil
+		}
+	}
+
+	if !quiet {
+		outln("Z.ai Authentication")
+		outln()
+		outln("Get your API key from Z.ai:")
+		outln("  1. Open https://z.ai/manage-apikey/apikey-list")
+		outln("  2. Create a new API key (or copy an existing one)")
+		outln()
+	}
+
+	apiKey, err := prompt.Default.Input(prompt.InputConfig{
+		Title:       "API key",
+		Placeholder: "paste API key here",
+		Validate:    prompt.ValidateNotEmpty,
+	})
+	if err != nil {
+		return err
+	}
+
+	credData, _ := json.Marshal(map[string]string{"api_key": apiKey})
+	if err := config.WriteCredential(config.CredentialPath("zai", "apikey"), credData); err != nil {
+		return fmt.Errorf("error saving credential: %w", err)
+	}
+
+	if !quiet {
+		outln("✓ Z.ai API key saved")
 	}
 	return nil
 }
