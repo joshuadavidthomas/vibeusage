@@ -14,6 +14,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
@@ -40,7 +41,13 @@ var rootCmd = &cobra.Command{
 	Short:        "Track usage across agentic LLM providers",
 	Long:         "A unified CLI tool that aggregates usage statistics from Claude, Codex, Copilot, Cursor, and Gemini.",
 	SilenceUsage: true,
-	RunE:         runDefaultUsage,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if verbose && quiet {
+			verbose = false
+		}
+		configureLogger()
+	},
+	RunE: runDefaultUsage,
 }
 
 func init() {
@@ -73,14 +80,20 @@ func ExecuteContext(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
 }
 
+// configureLogger sets up the structured logger based on CLI flags.
+func configureLogger() {
+	logging.Configure(logging.Logger, logging.Flags{
+		Verbose: verbose,
+		Quiet:   quiet,
+		NoColor: noColor,
+		JSON:    jsonOutput,
+	})
+}
+
 func runDefaultUsage(cmd *cobra.Command, args []string) error {
 	if v, _ := cmd.Flags().GetBool("version"); v {
 		out("vibeusage %s\n", version)
 		return nil
-	}
-
-	if verbose && quiet {
-		verbose = false
 	}
 
 	if config.IsFirstRun() && !jsonOutput && !quiet {
@@ -218,16 +231,11 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 		}
 	}
 
-	if verbose && !quiet {
-		if durationMs > 0 {
-			out("\nTotal fetch time: %dms\n", durationMs)
-		}
-		if len(errors) > 0 {
-			outln("\nErrors:")
-			for _, e := range errors {
-				out("  %s: %s\n", e.id, e.err)
-			}
-		}
+	if durationMs > 0 {
+		logging.Logger.Debug("fetch complete", "total_duration_ms", durationMs)
+	}
+	for _, e := range errors {
+		logging.Logger.Debug("provider error", "provider", e.id, "error", e.err)
 	}
 }
 
@@ -301,18 +309,17 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 		}
 	}
 
-	if verbose {
-		if durationMs > 0 {
-			out("Fetched in %dms\n", durationMs)
-		}
-		if snap.Identity != nil && snap.Identity.Email != "" {
-			out("Account: %s\n", snap.Identity.Email)
-		}
-		if outcome.Source != "" {
-			out("Source: %s\n", outcome.Source)
-		}
-		outln()
+	logFields := []any{"provider", providerID}
+	if durationMs > 0 {
+		logFields = append(logFields, "duration_ms", durationMs)
 	}
+	if snap.Identity != nil && snap.Identity.Email != "" {
+		logFields = append(logFields, "account", snap.Identity.Email)
+	}
+	if outcome.Source != "" {
+		logFields = append(logFields, "source", outcome.Source)
+	}
+	logging.Logger.Debug("fetch complete", logFields...)
 
 	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap))
 	return nil
