@@ -250,96 +250,30 @@ func TestFormatStatusUpdated(t *testing.T) {
 	}
 }
 
-// RenderStaleWarning tests
+// formatAge tests
 
-func TestRenderStaleWarning_FreshData(t *testing.T) {
-	snap := models.UsageSnapshot{
-		FetchedAt: time.Now(),
-	}
-
-	result := RenderStaleWarning(snap, 60)
-	if result != "" {
-		t.Errorf("expected empty string for fresh data, got: %q", result)
-	}
-}
-
-func TestRenderStaleWarning_StaleMinutes(t *testing.T) {
-	snap := models.UsageSnapshot{
-		FetchedAt: time.Now().Add(-45 * time.Minute),
-	}
-
-	result := RenderStaleWarning(snap, 30)
-	if !strings.Contains(result, "minute") {
-		t.Errorf("expected 'minute' in stale warning, got: %q", result)
-	}
-	if !strings.Contains(result, "⚠") {
-		t.Errorf("expected warning symbol in output, got: %q", result)
-	}
-	if !strings.Contains(result, "--refresh") {
-		t.Errorf("expected '--refresh' hint, got: %q", result)
-	}
-}
-
-func TestRenderStaleWarning_StaleHours(t *testing.T) {
-	snap := models.UsageSnapshot{
-		FetchedAt: time.Now().Add(-3 * time.Hour),
+func TestFormatAge(t *testing.T) {
+	tests := []struct {
+		name string
+		d    time.Duration
+		want string
+	}{
+		{"under a minute", 30 * time.Second, "<1m"},
+		{"1 minute", 1 * time.Minute, "1m"},
+		{"45 minutes", 45 * time.Minute, "45m"},
+		{"1 hour", 61 * time.Minute, "1h"},
+		{"3 hours", 3 * time.Hour, "3h"},
+		{"1 day", 25 * time.Hour, "1d"},
+		{"2 days", 50 * time.Hour, "2d"},
 	}
 
-	result := RenderStaleWarning(snap, 60)
-	if !strings.Contains(result, "hour") {
-		t.Errorf("expected 'hour' in stale warning, got: %q", result)
-	}
-}
-
-func TestRenderStaleWarning_SingularMinute(t *testing.T) {
-	// Exactly 1 minute stale with threshold of 1
-	snap := models.UsageSnapshot{
-		FetchedAt: time.Now().Add(-1*time.Minute - 30*time.Second),
-	}
-
-	result := RenderStaleWarning(snap, 1)
-	if !strings.Contains(result, "1 minute") {
-		t.Errorf("expected '1 minute' (singular), got: %q", result)
-	}
-	if strings.Contains(result, "minutes") {
-		t.Errorf("expected singular 'minute', not 'minutes', got: %q", result)
-	}
-}
-
-func TestRenderStaleWarning_SingularHour(t *testing.T) {
-	snap := models.UsageSnapshot{
-		FetchedAt: time.Now().Add(-61 * time.Minute),
-	}
-
-	result := RenderStaleWarning(snap, 1)
-	if !strings.Contains(result, "1 hour") {
-		t.Errorf("expected '1 hour' (singular), got: %q", result)
-	}
-	if strings.Contains(result, "hours") {
-		t.Errorf("expected singular 'hour', not 'hours', got: %q", result)
-	}
-}
-
-func TestRenderStaleWarning_PluralHours(t *testing.T) {
-	snap := models.UsageSnapshot{
-		FetchedAt: time.Now().Add(-150 * time.Minute),
-	}
-
-	result := RenderStaleWarning(snap, 1)
-	if !strings.Contains(result, "hours") {
-		t.Errorf("expected 'hours' (plural), got: %q", result)
-	}
-}
-
-func TestRenderStaleWarning_AtThreshold(t *testing.T) {
-	// Exactly at threshold should not warn (< not <=)
-	snap := models.UsageSnapshot{
-		FetchedAt: time.Now().Add(-59*time.Minute - 50*time.Second),
-	}
-
-	result := RenderStaleWarning(snap, 60)
-	if result != "" {
-		t.Errorf("expected empty at threshold boundary, got: %q", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatAge(tt.d)
+			if got != tt.want {
+				t.Errorf("formatAge(%v) = %q, want %q", tt.d, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -351,7 +285,7 @@ func TestRenderSingleProvider_ContainsProviderName(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap)
+	result := RenderSingleProvider(snap, false)
 	if !strings.Contains(result, "Claude") {
 		t.Errorf("expected title-cased provider name 'Claude', got: %q", result)
 	}
@@ -363,7 +297,7 @@ func TestRenderSingleProvider_ContainsSeparator(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap)
+	result := RenderSingleProvider(snap, false)
 	if !strings.Contains(result, "━") {
 		t.Errorf("expected separator in output, got: %q", result)
 	}
@@ -378,7 +312,7 @@ func TestRenderSingleProvider_SessionAndLongerPeriods(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap)
+	result := RenderSingleProvider(snap, false)
 	if !strings.Contains(result, "80%") {
 		t.Errorf("expected session utilization '80%%', got: %q", result)
 	}
@@ -402,7 +336,7 @@ func TestRenderSingleProvider_WithOverage(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap)
+	result := RenderSingleProvider(snap, false)
 	if !strings.Contains(result, "Extra Usage") {
 		t.Errorf("expected 'Extra Usage' for overage, got: %q", result)
 	}
@@ -426,7 +360,7 @@ func TestRenderSingleProvider_NoOverageWhenDisabled(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap)
+	result := RenderSingleProvider(snap, false)
 	if strings.Contains(result, "Extra Usage") {
 		t.Errorf("should not show overage when disabled, got: %q", result)
 	}
@@ -438,9 +372,35 @@ func TestRenderSingleProvider_NoPeriods(t *testing.T) {
 		Periods:  nil,
 	}
 
-	result := RenderSingleProvider(snap)
+	result := RenderSingleProvider(snap, false)
 	if !strings.Contains(result, "Empty") {
 		t.Errorf("expected title-cased provider name, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_CachedIndicator(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider:  "claude",
+		FetchedAt: time.Now().Add(-2 * time.Hour),
+		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderSingleProvider(snap, true)
+	if !strings.Contains(result, "2h ago") {
+		t.Errorf("expected '2h ago' age indicator for stale data, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_NoAgeIndicatorWhenFresh(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider:  "claude",
+		FetchedAt: time.Now(),
+		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderSingleProvider(snap, false)
+	if strings.Contains(result, "ago") {
+		t.Errorf("should not show age indicator for fresh data, got: %q", result)
 	}
 }
 
@@ -452,7 +412,7 @@ func TestRenderProviderPanel_ContainsProviderTitle(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 60, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderProviderPanel(snap)
+	result := RenderProviderPanel(snap, false)
 	if !strings.Contains(result, "Copilot") {
 		t.Errorf("expected title-cased provider name 'Copilot', got: %q", result)
 	}
@@ -464,7 +424,7 @@ func TestRenderProviderPanel_HasBorder(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderProviderPanel(snap)
+	result := RenderProviderPanel(snap, false)
 	// Rounded border characters
 	if !strings.Contains(result, "╭") || !strings.Contains(result, "╰") {
 		t.Errorf("expected rounded border characters, got: %q", result)
@@ -480,7 +440,7 @@ func TestRenderProviderPanel_FiltersModelSpecificPeriods(t *testing.T) {
 		},
 	}
 
-	result := RenderProviderPanel(snap)
+	result := RenderProviderPanel(snap, false)
 	if !strings.Contains(result, "50%") {
 		t.Errorf("expected general period '50%%', got: %q", result)
 	}
@@ -499,7 +459,7 @@ func TestRenderProviderPanel_RenamesWeeklyDaily(t *testing.T) {
 		},
 	}
 
-	result := RenderProviderPanel(snap)
+	result := RenderProviderPanel(snap, false)
 	// Names without parentheses should be normalized
 	if !strings.Contains(result, "Weekly") {
 		t.Errorf("expected 'Weekly' label for weekly period, got: %q", result)
@@ -521,12 +481,38 @@ func TestRenderProviderPanel_WithOverage(t *testing.T) {
 		},
 	}
 
-	result := RenderProviderPanel(snap)
+	result := RenderProviderPanel(snap, false)
 	if !strings.Contains(result, "Extra:") {
 		t.Errorf("expected compact 'Extra:' format for overage, got: %q", result)
 	}
 	if !strings.Contains(result, "$10.00") {
 		t.Errorf("expected '$10.00' in overage, got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_AgeIndicator(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider:  "claude",
+		FetchedAt: time.Now().Add(-3 * time.Hour),
+		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderProviderPanel(snap, true)
+	if !strings.Contains(result, "3h ago") {
+		t.Errorf("expected '3h ago' in panel title, got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_NoAgeIndicatorWhenFresh(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider:  "claude",
+		FetchedAt: time.Now(),
+		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := RenderProviderPanel(snap, false)
+	if strings.Contains(result, "ago") {
+		t.Errorf("should not show age indicator for fresh data, got: %q", result)
 	}
 }
 

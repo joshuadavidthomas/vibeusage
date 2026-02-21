@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestParseUsageResponse_FullResponse(t *testing.T) {
 				ResetAt:     1740100000,
 			},
 		},
-		Credits:  &Credits{HasCredits: true, Balance: 50.0},
+		Credits:  &Credits{HasCredits: true, RawBalance: json.RawMessage(`50.0`)},
 		PlanType: "plus",
 	}
 
@@ -132,7 +133,7 @@ func TestParseUsageResponse_NoCredits(t *testing.T) {
 		RateLimit: &RateLimits{
 			PrimaryWindow: &RateWindow{UsedPercent: 10.0},
 		},
-		Credits: &Credits{HasCredits: false, Balance: 0},
+		Credits: &Credits{HasCredits: false, RawBalance: json.RawMessage(`0`)},
 	}
 
 	s := OAuthStrategy{}

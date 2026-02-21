@@ -246,8 +246,8 @@ func TestExecutePipeline_UnavailableStrategy(t *testing.T) {
 	if len(outcome.Attempts) != 1 {
 		t.Errorf("expected 1 attempt, got %d", len(outcome.Attempts))
 	}
-	if outcome.Attempts[0].Error != "Strategy not available" {
-		t.Errorf("expected 'Strategy not available', got '%s'", outcome.Attempts[0].Error)
+	if outcome.Attempts[0].Error != "not configured" {
+		t.Errorf("expected 'not configured', got '%s'", outcome.Attempts[0].Error)
 	}
 }
 
@@ -406,10 +406,10 @@ func TestExecutePipeline_GoErrorFallsBackToNextStrategy(t *testing.T) {
 func TestExecutePipeline_CacheFallback(t *testing.T) {
 	setupFetchTestEnv(t)
 
-	// Pre-populate cache
+	// Pre-populate cache with recent data (within default 60min threshold)
 	cachedSnap := models.UsageSnapshot{
 		Provider:  "test-provider",
-		FetchedAt: time.Now().Add(-1 * time.Hour).UTC(),
+		FetchedAt: time.Now().Add(-10 * time.Minute).UTC(),
 		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
 		Source:    "previous-fetch",
 	}
@@ -442,6 +442,77 @@ func TestExecutePipeline_CacheFallback(t *testing.T) {
 	}
 	if outcome.Snapshot.Provider != "test-provider" {
 		t.Errorf("cached snapshot provider = %q, want %q", outcome.Snapshot.Provider, "test-provider")
+	}
+}
+
+func TestExecutePipeline_CacheFallbackServesStaleWhenFetchAttempted(t *testing.T) {
+	setupFetchTestEnv(t)
+
+	// Pre-populate cache with old data (beyond default 60min threshold)
+	cachedSnap := models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-2 * time.Hour).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+		Source:    "previous-fetch",
+	}
+	if err := config.CacheSnapshot(cachedSnap); err != nil {
+		t.Fatalf("failed to pre-populate cache: %v", err)
+	}
+
+	// Strategy has credentials (available=true) but the fetch itself fails
+	strategy := &mockStrategy{
+		name:      "failing",
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			return ResultFail("API error"), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+
+	// Should still serve stale cache — credentials exist, API is just down
+	if !outcome.Success {
+		t.Fatalf("expected success from cache fallback when fetch was attempted, got error: %s", outcome.Error)
+	}
+	if !outcome.Cached {
+		t.Error("expected Cached=true")
+	}
+}
+
+func TestExecutePipeline_CacheFallbackRejectsStaleWhenNotConfigured(t *testing.T) {
+	setupFetchTestEnv(t)
+
+	// Pre-populate cache with old data (beyond default 60min threshold)
+	cachedSnap := models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-2 * time.Hour).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+		Source:    "previous-fetch",
+	}
+	if err := config.CacheSnapshot(cachedSnap); err != nil {
+		t.Fatalf("failed to pre-populate cache: %v", err)
+	}
+
+	// No credentials — strategy is unavailable
+	strategy := &mockStrategy{
+		name:      "unavailable",
+		available: false,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			t.Fatal("should not call Fetch on unavailable strategy")
+			return FetchResult{}, nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+
+	// Should NOT serve stale cache when no credentials exist
+	if outcome.Success {
+		t.Error("expected failure when cached data is stale and no credentials configured")
+	}
+	if outcome.Cached {
+		t.Error("Cached should be false when data is too old and unconfigured")
 	}
 }
 
@@ -595,8 +666,8 @@ func TestExecutePipeline_AttemptsRecordErrors(t *testing.T) {
 	if outcome.Attempts[0].Strategy != "unavail" {
 		t.Errorf("attempt[0] strategy = %q, want %q", outcome.Attempts[0].Strategy, "unavail")
 	}
-	if outcome.Attempts[0].Error != "Strategy not available" {
-		t.Errorf("attempt[0] error = %q, want %q", outcome.Attempts[0].Error, "Strategy not available")
+	if outcome.Attempts[0].Error != "not configured" {
+		t.Errorf("attempt[0] error = %q, want %q", outcome.Attempts[0].Error, "not configured")
 	}
 
 	// Attempt 1: ResultFail

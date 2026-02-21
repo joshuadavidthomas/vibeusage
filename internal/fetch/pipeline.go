@@ -18,7 +18,7 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 			attempts = append(attempts, FetchAttempt{
 				Strategy: strategy.Name(),
 				Success:  false,
-				Error:    "Strategy not available",
+				Error:    "not configured",
 			})
 			continue
 		}
@@ -105,16 +105,43 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 		})
 	}
 
-	// All strategies failed — try cache fallback
+	// Did any strategy actually attempt a fetch (had credentials)?
+	anyAttempted := false
+	for _, a := range attempts {
+		if a.Error != "not configured" {
+			anyAttempted = true
+			break
+		}
+	}
+
+	// All strategies failed — try cache fallback.
+	// If a real fetch was attempted (credentials exist, API failed),
+	// always serve cache — the service is probably just down.
+	// If nothing was even attempted (no credentials), only serve
+	// cache within the stale threshold — old data with no way to
+	// refresh is misleading.
 	if useCache {
 		if cached := config.LoadCachedSnapshot(providerID); cached != nil {
-			return FetchOutcome{
-				ProviderID: providerID,
-				Success:    true,
-				Snapshot:   cached,
-				Source:     "cache",
-				Attempts:   attempts,
-				Cached:     true,
+			if anyAttempted {
+				return FetchOutcome{
+					ProviderID: providerID,
+					Success:    true,
+					Snapshot:   cached,
+					Source:     "cache",
+					Attempts:   attempts,
+					Cached:     true,
+				}
+			}
+			ageMinutes := int(time.Since(cached.FetchedAt).Minutes())
+			if ageMinutes < cfg.Fetch.StaleThresholdMinutes {
+				return FetchOutcome{
+					ProviderID: providerID,
+					Success:    true,
+					Snapshot:   cached,
+					Source:     "cache",
+					Attempts:   attempts,
+					Cached:     true,
+				}
 			}
 		}
 	}

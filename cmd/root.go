@@ -34,6 +34,7 @@ var (
 	noColor    bool
 	verbose    bool
 	quiet      bool
+	refresh    bool
 )
 
 var rootCmd = &cobra.Command{
@@ -55,9 +56,9 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Minimal output")
+	rootCmd.PersistentFlags().BoolVarP(&refresh, "refresh", "r", false, "Disable cache fallback — fresh data or error")
 	rootCmd.Flags().Bool("version", false, "Show version and exit")
 
-	rootCmd.AddCommand(usageCmd)
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(configCmd)
@@ -101,25 +102,24 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	return fetchAndDisplayAll(cmd.Context(), false)
+	return fetchAndDisplayAll(cmd.Context())
 }
 
 func isTerminal() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
-func fetchAndDisplayAll(ctx context.Context, refresh bool) error {
+func fetchAndDisplayAll(ctx context.Context) error {
 	start := time.Now()
 
 	providerMap := buildProviderMap()
 
-	useCache := !refresh
 	var outcomes map[string]fetch.FetchOutcome
 
 	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
-		providerIDs := enabledProviderIDs(providerMap)
-		err := spinner.Run(providerIDs, func(onComplete func(spinner.CompletionInfo)) {
-			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, func(o fetch.FetchOutcome) {
+		spinnerIDs := availableProviderIDs(providerMap)
+		err := spinner.Run(spinnerIDs, func(onComplete func(spinner.CompletionInfo)) {
+			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
 			})
 		})
@@ -127,7 +127,7 @@ func fetchAndDisplayAll(ctx context.Context, refresh bool) error {
 			return fmt.Errorf("spinner error: %w", err)
 		}
 	} else {
-		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, nil)
+		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, nil)
 	}
 
 	durationMs := time.Since(start).Milliseconds()
@@ -153,15 +153,30 @@ func enabledProviderIDs(providerMap map[string][]fetch.Strategy) []string {
 	return ids
 }
 
-func outcomeToCompletion(o fetch.FetchOutcome) spinner.CompletionInfo {
-	durationMs := 0
-	for _, a := range o.Attempts {
-		durationMs += a.DurationMs
+// availableProviderIDs returns enabled provider IDs that have at least one
+// available strategy. Used to filter what the spinner tracks — providers
+// with no credentials are silently excluded.
+func availableProviderIDs(providerMap map[string][]fetch.Strategy) []string {
+	cfg := config.Get()
+	var ids []string
+	for pid, strategies := range providerMap {
+		if !cfg.IsProviderEnabled(pid) {
+			continue
+		}
+		for _, s := range strategies {
+			if s.IsAvailable() {
+				ids = append(ids, pid)
+				break
+			}
+		}
 	}
+	sort.Strings(ids)
+	return ids
+}
+
+func outcomeToCompletion(o fetch.FetchOutcome) spinner.CompletionInfo {
 	return spinner.CompletionInfo{
 		ProviderID: o.ProviderID,
-		Source:     o.Source,
-		DurationMs: durationMs,
 		Success:    o.Success,
 		Error:      o.Error,
 	}
@@ -193,41 +208,38 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 		return
 	}
 
-	cfg := config.Get()
-	staleThreshold := cfg.Fetch.StaleThresholdMinutes
-
 	ids := make([]string, 0, len(outcomes))
 	for id := range outcomes {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
 
-	var errors []struct{ id, err string }
+	type providerError struct{ id, err string }
+	var errors []providerError
 
 	for _, pid := range ids {
 		outcome := outcomes[pid]
 		if !outcome.Success || outcome.Snapshot == nil {
 			if outcome.Error != "" {
-				errors = append(errors, struct{ id, err string }{pid, outcome.Error})
+				errors = append(errors, providerError{pid, outcome.Error})
 			}
 			continue
 		}
 
 		snap := *outcome.Snapshot
 
-		if outcome.Cached && !quiet {
-			if w := display.RenderStaleWarning(snap, staleThreshold); w != "" {
-				outln(w)
-				outln()
-			}
-		}
-
 		if quiet {
 			for _, p := range snap.Periods {
 				out("%s %s: %d%%\n", pid, p.Name, p.Utilization)
 			}
 		} else {
-			outln(display.RenderProviderPanel(snap))
+			outln(display.RenderProviderPanel(snap, outcome.Cached))
+		}
+	}
+
+	if !quiet && len(errors) > 0 {
+		for _, e := range errors {
+			outln(display.RenderProviderError(e.id, e.err))
 		}
 	}
 
@@ -240,20 +252,17 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 }
 
 func makeProviderCmd(providerID string) *cobra.Command {
-	var refresh bool
 	titleName := strutil.TitleCase(providerID)
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   providerID,
 		Short: "Show usage for " + titleName,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchAndDisplayProvider(cmd.Context(), providerID, refresh)
+			return fetchAndDisplayProvider(cmd.Context(), providerID)
 		},
 	}
-	cmd.Flags().BoolVarP(&refresh, "refresh", "r", false, "Bypass cache and fetch fresh data")
-	return cmd
 }
 
-func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh bool) error {
+func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	p, ok := provider.Get(providerID)
 	if !ok {
 		return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
@@ -301,14 +310,6 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 		return nil
 	}
 
-	cfg := config.Get()
-	if outcome.Cached {
-		if w := display.RenderStaleWarning(snap, cfg.Fetch.StaleThresholdMinutes); w != "" {
-			outln(w)
-			outln()
-		}
-	}
-
 	logFields := []any{"provider", providerID}
 	if durationMs > 0 {
 		logFields = append(logFields, "duration_ms", durationMs)
@@ -321,7 +322,7 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 	}
 	logging.Logger.Debug("fetch complete", logFields...)
 
-	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap))
+	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached))
 	return nil
 }
 

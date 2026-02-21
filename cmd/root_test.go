@@ -23,7 +23,7 @@ func resetPathFlags(t *testing.T) {
 // Root command tests
 
 func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
-	expected := []string{"usage", "auth", "status", "config", "cache", "key", "init"}
+	expected := []string{"auth", "status", "config", "cache", "key", "init"}
 	for _, name := range expected {
 		found := false
 		for _, cmd := range rootCmd.Commands() {

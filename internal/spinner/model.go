@@ -18,10 +18,7 @@ type model struct {
 	quitting  bool
 }
 
-var (
-	checkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	crossStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-)
+var checkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 
 func newModel(providerIDs []string) model {
 	s := spinner.New()
@@ -76,21 +73,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	// When done, return empty — the spinner is transient progress UI
+	if m.quitting {
+		return ""
+	}
+
 	var b strings.Builder
 
-	// Show completed providers
+	// Show completed providers (only successes)
 	for _, c := range m.completed {
-		if c.Success {
-			b.WriteString(checkStyle.Render("✓"))
-		} else {
-			b.WriteString(crossStyle.Render("✗"))
+		if !c.Success {
+			continue
 		}
+		b.WriteString(checkStyle.Render("✓"))
 		b.WriteString(" ")
 		b.WriteString(FormatCompletionText(c))
 		b.WriteString("\n")
 	}
 
-	// Show spinner with in-flight providers if not done
+	// Show spinner with in-flight providers
 	if len(m.inflight) > 0 {
 		b.WriteString(m.spinner.View())
 		b.WriteString(" ")

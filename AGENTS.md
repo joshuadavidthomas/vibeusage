@@ -1,20 +1,19 @@
 ## Commands
-- `go build`: Build the binary
-- `go run .`: Run the CLI
-- `go test ./...`: Run all tests
-- `go test ./... -race -v`: Run tests with race detector and verbose output
-- `go test ./... -cover`: Run tests with coverage
+
+- `just test`: Run tests
+- `just lint`: Run linter
+- `just fmt`: Format code
+- `just build`: Build the binary
+- `just coverage`: Run tests with coverage
+- `just tidy`: Tidy go.mod/go.sum
 
 ## Validation
 
 Run these after implementing to get immediate feedback:
 
-- Tests: `go test ./... -v`
-- Race detector: `go test ./... -race`
-- Coverage: `go test ./... -cover`
-- Lint: `golangci-lint run`
-- Format check: `gofmt -l .`
-- Tidy: `go mod tidy`
+- Tests: `just test`
+- Lint: `just lint`
+- Format: `just fmt`
 
 ## Operational Notes
 
@@ -24,11 +23,16 @@ Run these after implementing to get immediate feedback:
 
 ### Codebase Patterns
 
-- Typed JSON response structs per provider (no `map[string]any`)
+- Typed JSON response structs per provider (no `map[string]any`); use `json.RawMessage` for fields that vary between string/number
 - Shared HTTP client in `internal/httpclient/` with `RequestOption` pattern
 - `context.Context` threaded through all strategy `Fetch` calls
 - `internal/prompt/` wraps `charmbracelet/huh` forms with testable mock interface
-- `internal/spinner/` wraps bubbletea for fetch progress display
+- `internal/spinner/` wraps bubbletea for transient fetch progress (clears on completion)
 - `internal/display/table.go` wraps `lipgloss/table` for all tabular output
 - `internal/strutil/title.go` replaces deprecated `strings.Title`
 - `charmbracelet/log` for structured verbose/debug output
+- ANSI-aware padding: don't use `%-*s` with styled text; pad manually after styling
+- Cache fallback: always serves stale cache when credentials exist (API down); rejects stale cache when unconfigured
+- `--refresh` global flag disables cache fallback entirely
+- Error messages: include underlying errors (e.g. JSON parse errors) — don't swallow them
+- Error hints: only suggest `vibeusage auth` when the error is actually about credentials
