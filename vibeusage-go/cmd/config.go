@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -126,7 +127,7 @@ var configResetCmd = &cobra.Command{
 
 		cfgPath := config.ConfigFile()
 		if err := os.Remove(cfgPath); err != nil && !os.IsNotExist(err) {
-			return err
+			return fmt.Errorf("resetting config: %w", err)
 		}
 
 		if jsonOutput {

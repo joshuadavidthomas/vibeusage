@@ -1,6 +1,8 @@
 package spinner
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -32,5 +34,8 @@ func Run(providerIDs []string, fetchFn func(onComplete func(CompletionInfo))) er
 
 	_, err := p.Run()
 	<-done
-	return err
+	if err != nil {
+		return fmt.Errorf("running spinner: %w", err)
+	}
+	return nil
 }

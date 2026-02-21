@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -15,13 +16,16 @@ func SnapshotPath(providerID string) string {
 func CacheSnapshot(snapshot models.UsageSnapshot) error {
 	path := SnapshotPath(snapshot.Provider)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return fmt.Errorf("caching snapshot for %s: %w", snapshot.Provider, err)
 	}
 	data, err := json.Marshal(snapshot)
 	if err != nil {
-		return err
+		return fmt.Errorf("caching snapshot for %s: %w", snapshot.Provider, err)
 	}
-	return os.WriteFile(path, data, 0o644)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("caching snapshot for %s: %w", snapshot.Provider, err)
+	}
+	return nil
 }
 
 func LoadCachedSnapshot(providerID string) *models.UsageSnapshot {
@@ -45,9 +49,12 @@ func OrgIDPath(providerID string) string {
 func CacheOrgID(providerID, orgID string) error {
 	path := OrgIDPath(providerID)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return fmt.Errorf("caching org ID for %s: %w", providerID, err)
 	}
-	return os.WriteFile(path, []byte(orgID), 0o644)
+	if err := os.WriteFile(path, []byte(orgID), 0o644); err != nil {
+		return fmt.Errorf("caching org ID for %s: %w", providerID, err)
+	}
+	return nil
 }
 
 func LoadCachedOrgID(providerID string) string {
