@@ -3,397 +3,123 @@
 Reference implementations:
 - [jlcodes99/cockpit-tools](https://github.com/jlcodes99/cockpit-tools) (Antigravity, Kiro)
 - [zai-org/zai-coding-plugins](https://github.com/zai-org/zai-coding-plugins) (Z.ai quota API)
-- [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) (Kimi usage API)
+- [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) (Kimi device flow + usage API)
 
-## Antigravity (Google's AI IDE)
+## Antigravity (Google's AI IDE) — ✅ DONE
 
-Google's flagship AI IDE, launched Nov 2025 alongside Gemini 3. Built on the Windsurf acquisition ($2.4B). Uses the same Google OAuth infrastructure as Gemini, making this the easier of the two providers to add.
+Implemented on branch `add-antigravity-provider`.
 
-### What to track
+### What was built
 
-- Per-model quota as `remainingFraction` (percentage-based, maps directly to `UsagePeriod.Utilization`)
-- Reset times per model
-- Subscription tier: FREE / PRO / ULTRA (maps to `ProviderIdentity.Plan`)
-- Period type: `PeriodSession` for Pro/Ultra (5-hour refresh), `PeriodWeekly` for Free tier
+- **OAuth strategy** reading credentials from Antigravity's vscdb (`state.vscdb` via `sqlite3` CLI)
+- **Quota endpoint**: `POST https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels` with empty `{}` body and `User-Agent: antigravity`
+- **Tier detection via `loadCodeAssist`**: `POST /v1internal:loadCodeAssist` with `ideType: "ANTIGRAVITY"` metadata — but this returns the product name ("Antigravity"), not the subscription tier
+- **Subscription parsing from protobuf**: The real subscription (e.g. "Google AI Pro") lives in field 36 of the protobuf blob in the vscdb auth status. Parsed with `google.golang.org/protobuf/encoding/protowire`.
+- **Period type inference**: Pro/Ultra → `PeriodSession` (5h windows), Free → `PeriodWeekly`
+- **Summary period**: Compact panel view shows highest utilization across all models; expanded view shows per-model breakdown
+- **XDG-compliant paths**: Uses `os.UserConfigDir()` instead of hardcoded `.config`
+- **Status monitoring**: Reuses Google Apps Status (same infra as Gemini)
 
-### Auth strategy: Google OAuth (reuse Gemini)
+### Key learnings
 
-Antigravity uses the same Google OAuth2 flow as Gemini but with different client credentials and scopes.
+- `fetchAvailableModels` (not `retrieveUserQuota`) is the right endpoint — returns per-model `quotaInfo` with `remainingFraction` and `resetTime`
+- The `loadCodeAssist` tier info is misleading — it shows the product tier, not the Google One subscription
+- Protobuf field 36 in vscdb `userStatusProtoBinaryBase64` contains the real subscription: `{tierID: "g1-pro-tier", tierName: "Google AI Pro"}`
+- Models without `resetTime` (tab completion, internal) should be filtered out
 
-**Client credentials** (from cockpit-tools `src-tauri/src/modules/oauth.rs`):
-- Client ID: `1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com`
-- Client Secret: `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`
-- Token URL: `https://oauth2.googleapis.com/token` (same as Gemini)
+## Kimi / Moonshot
 
-**Scopes**:
-- `https://www.googleapis.com/auth/cloud-platform`
-- `https://www.googleapis.com/auth/userinfo.email`
-- `https://www.googleapis.com/auth/userinfo.profile`
-- `https://www.googleapis.com/auth/cclog`
-- `https://www.googleapis.com/auth/experimentsandconfigs`
-
-**Credential reuse**: Antigravity stores credentials at `~/.config/Antigravity/` (Linux), similar to how Gemini CLI stores at `~/.gemini/`. Check if Antigravity stores an OAuth token file we can read directly.
-
-### API endpoints
-
-**Quota endpoint** (from cockpit-tools `src-tauri/src/modules/quota.rs`):
-- Production: `https://cloudcode-pa.googleapis.com/...` (same base as Gemini's `quotaURL`)
-- Request metadata must include `ideType: "ANTIGRAVITY"` and `pluginType: "GEMINI"`
-
-```json
-{
-  "metadata": {
-    "ideType": "ANTIGRAVITY",
-    "platform": "PLATFORM_UNSPECIFIED",
-    "pluginType": "GEMINI"
-  }
-}
-```
-
-**Response format**: Same `QuotaResponse` shape as Gemini — array of `QuotaBucket` with `model_id`, `remaining_fraction`, `reset_time`. The existing `gemini/response.go` types should work as-is.
-
-### Implementation
-
-#### New files
-
-- `internal/provider/antigravity/antigravity.go` — Provider struct, metadata, strategy list, status
-- `internal/provider/antigravity/response.go` — Response types (likely reuse/alias Gemini types if identical, or define separately if the quota request metadata differs enough)
-
-#### Approach
-
-The Gemini provider already calls `cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota` with an empty `{}` body. Antigravity uses the same endpoint but with a metadata payload specifying `ideType: "ANTIGRAVITY"`. Two options:
-
-1. **Separate provider with shared types** (preferred) — New `antigravity` package that imports Gemini's response types but has its own OAuth credentials, quota request payload, and credential paths. Keeps providers independently testable.
-2. **Shared strategy code** — Extract common Google OAuth + quota logic into a shared package. More DRY but adds coupling. Consider this as a follow-up refactor if the duplication becomes painful.
-
-#### Wiring changes
-
-| File | Change |
-|---|---|
-| `cmd/root.go:23-28` | Add `_ "github.com/joshuadavidthomas/vibeusage/internal/provider/antigravity"` blank import |
-| `cmd/root.go:69` | Add `"antigravity"` to the provider ID list |
-| `cmd/key.go:26` | Add `"antigravity"` to the key command loop |
-| `cmd/key.go:91-97` | Add `"antigravity": "access_token"` to `credentialKeyMap` |
-| `cmd/auth.go:34-42` | Falls through to `authGeneric` (fine for now, could add custom flow later) |
-| `internal/config/credentials.go:12-17` | Add `"antigravity": {"~/.config/Antigravity/credentials.json"}` to `ProviderCLIPaths` (verify actual path) |
-| `internal/config/credentials.go:21-26` | Add `"antigravity": "GOOGLE_APPLICATION_CREDENTIALS"` or similar to `ProviderEnvVars` (if applicable) |
-
-#### Status monitoring
-
-Use the same Google Apps Status approach as Gemini (`fetchGeminiStatus`), or extract it into a shared helper since both providers care about the same Google infrastructure incidents. Filter for Antigravity-specific keywords: `"antigravity"`, `"gemini"`, `"cloud code"`, `"generative ai"`.
-
-### Open questions
-
-- [ ] What is the exact Antigravity credential file path on Linux? cockpit-tools shows `~/.config/Antigravity/` — verify by installing Antigravity
-- [ ] Does the quota endpoint URL differ from Gemini's, or is it the same URL with different metadata?
-- [ ] Is the `ideType: "ANTIGRAVITY"` metadata required, or does it work with Gemini credentials and an empty body?
-- [ ] Should we share/extract Google OAuth logic between Gemini and Antigravity?
-
-## Kiro (AWS's AI IDE)
-
-AWS's AI coding IDE. Uses OAuth 2.0 + PKCE with AWS-hosted endpoints. Credits-based quota model with bonus/free-trial tracking. The API response format is known to be unstable (cockpit-tools implements 7+ fallback paths per metric).
+Chinese AI provider with K2.5 model. KimiCode is an open-source CLI agent. The kimi-cli source code gives us the full auth flow and usage API.
 
 ### What to track
 
-- Prompt credits: used / total (convert to `UsagePeriod.Utilization` as percentage)
-- Bonus credits: used / total (separate `UsagePeriod` or `OverageUsage`)
-- Bonus/trial expiry: days remaining
-- Plan name and tier
-- Usage reset time
-- Period type: `PeriodMonthly` (credits-based)
-
-### Auth strategy: OAuth 2.0 + PKCE
-
-**Endpoints** (from cockpit-tools `src-tauri/src/modules/kiro_oauth.rs`):
-- Auth portal: Kiro-hosted, opens browser for login
-- Token endpoint: POST with `code`, `code_verifier`, `redirect_uri`
-- Refresh endpoint: POST with `refresh_token`
-- Callback: Local HTTP server on `localhost` handling `/oauth/callback` and `/signin/callback`
-
-**PKCE flow**:
-1. Generate `state`, `code_verifier`, `code_challenge` (SHA-256)
-2. Start local TCP server for callback
-3. Open browser to auth portal with PKCE parameters
-4. Handle callback — extract `code` from query params (handles both `snake_case` and `camelCase` parameter names)
-5. Exchange code for tokens
-6. Store tokens at `~/.config/vibeusage/credentials/kiro/oauth.json`
-
-This is more complex than Gemini OAuth but similar in spirit to the Copilot device flow — both require an interactive step. The PKCE flow needs a local HTTP callback server.
-
-### API endpoints
-
-**Usage endpoint** (from cockpit-tools `src-tauri/src/modules/kiro_oauth.rs`):
-- `GET /getUsageLimits` with `Authorization: Bearer <token>`
-- Region-based endpoint routing:
-  - `us-east-1` → `https://q.us-east-1.amazonaws.com`
-  - `eu-central-1` → `https://q.eu-central-1.amazonaws.com`
-  - etc.
-
-**Response format**: Deeply nested JSON that varies between accounts/plans/API versions. cockpit-tools handles this with multi-path fallback resolution.
-
-### Credit resolution (multi-path fallback)
-
-The Kiro API response format has changed multiple times. cockpit-tools resolves each metric by trying multiple JSON paths in priority order. For vibeusage, implement this as a helper that tries paths sequentially:
-
-**Prompt credits total** (7 paths):
-1. Direct `credits_total` field
-2. Sum of `usageBreakdowns[*].usageTotal`
-3. `usageBreakdownList[0].usageLimitWithPrecision`
-4. `usageBreakdownList[0].usageLimit`
-5. `estimatedUsage.total`
-6. `usageBreakdowns.plan.totalCredits`
-7. Root `totalCredits`
-
-**Prompt credits used** (similar set of fallback paths)
-
-In Go, store the raw response as `json.RawMessage` and write helper functions that walk the paths using `json.Unmarshal` into intermediate maps/slices. This aligns with the existing pattern of typed structs + `json.RawMessage` for variable fields.
-
-### Implementation
-
-#### New files
-
-- `internal/provider/kiro/kiro.go` — Provider struct, metadata, OAuth PKCE strategy
-- `internal/provider/kiro/response.go` — Response types and multi-path credit resolution
-- `internal/provider/kiro/response_test.go` — Test credit resolution with fixtures from multiple API response formats
-
-#### PKCE auth flow
-
-Add to `cmd/auth.go` as a new case:
-```
-case "kiro":
-    return authKiro()
-```
-
-`authKiro()` would:
-1. Start a local HTTP server on a random port
-2. Generate PKCE parameters
-3. Open the Kiro auth URL in the browser
-4. Wait for callback with authorization code
-5. Exchange code for tokens
-6. Save tokens to `~/.config/vibeusage/credentials/kiro/oauth.json`
-
-Consider extracting a reusable PKCE helper since this pattern could be useful for future providers.
-
-#### Wiring changes
-
-| File | Change |
-|---|---|
-| `cmd/root.go:23-28` | Add `_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kiro"` blank import |
-| `cmd/root.go:69` | Add `"kiro"` to the provider ID list |
-| `cmd/auth.go:34-42` | Add `case "kiro": return authKiro()` |
-| `cmd/key.go:26` | Add `"kiro"` to the key command loop |
-| `cmd/key.go:91-97` | Add `"kiro": "access_token"` to `credentialKeyMap` |
-| `internal/config/credentials.go:12-17` | Add `"kiro": {"~/.config/kiro/credentials.json"}` to `ProviderCLIPaths` (verify actual path) |
-| `internal/config/credentials.go:21-26` | Add `"kiro": "KIRO_API_KEY"` to `ProviderEnvVars` (if applicable) |
-
-#### Status monitoring
-
-Kiro doesn't appear to have a public Statuspage.io page. Options:
-- Check AWS health dashboard for relevant services
-- Return `StatusUnknown` initially and add monitoring later
-- Check if Kiro has a status endpoint (undocumented)
-
-### Open questions
-
-- [ ] What are the exact Kiro OAuth endpoints (auth portal URL, token URL, redirect URI)?
-- [ ] What is the Kiro credential file path on Linux? cockpit-tools shows it's stored per-account — need to find single-user path
-- [ ] What region does the user's account use, and how do we detect it? From the token response? From a config file?
-- [ ] Does Kiro have a public status page?
-- [ ] What does the raw `/getUsageLimits` response actually look like? cockpit-tools' 7 fallback paths suggest high variance — we need real response samples
-- [ ] Should bonus credits map to a separate `UsagePeriod`, to `OverageUsage`, or to a new field on `UsageSnapshot`?
-
-## Z.ai (Zhipu AI GLM Coding Plans)
-
-Chinese AI provider offering GLM model access via subscription coding plans. Plans have 5-hour refresh cycles (like Claude) plus weekly limits. Auth is a simple API key/bearer token.
-
-### What to track
-
-- **5-hour token quota**: `TOKENS_LIMIT` type, reported as `percentage` (maps directly to `UsagePeriod.Utilization`)
-- **Monthly MCP usage**: `TIME_LIMIT` type, with `currentValue`, `usage` (total), and `usageDetails`
-- Period types: `PeriodSession` for 5-hour quota, `PeriodMonthly` for MCP usage
-- Subscription tier: Lite ($10/mo) / Pro ($30/mo) / Max ($56/mo)
-
-### Auth strategy: API key (bearer token)
-
-Simple bearer token auth, same pattern as the existing Gemini API key strategy.
-
-- API key managed at: `https://z.ai/manage-apikey/apikey-list`
-- Token format: `Authorization: <api_key>` (note: the Z.ai plugin uses `ANTHROPIC_AUTH_TOKEN` env var since it's designed for Claude Code integration, but we'd use our own env var)
-
-### API endpoints
-
-Discovered from the [glm-plan-usage plugin](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs):
-
-**Base URLs** (two platforms, same API):
-- Z.ai: `https://api.z.ai`
-- ZHIPU (Chinese): `https://open.bigmodel.cn`
-
-**Endpoints**:
-
-| Endpoint | Method | Query Params | Purpose |
-|---|---|---|---|
-| `/api/monitor/usage/quota/limit` | GET | None | **Primary** — Returns quota limits with percentages |
-| `/api/monitor/usage/model-usage` | GET | `startTime`, `endTime` | Token usage breakdown by model |
-| `/api/monitor/usage/tool-usage` | GET | `startTime`, `endTime` | Tool usage (web search, etc.) |
-
-**Headers**:
-```
-Authorization: <api_key>
-Accept-Language: en-US,en
-Content-Type: application/json
-```
-
-**Quota limit response format**:
-```json
-{
-  "data": {
-    "limits": [
-      {
-        "type": "TOKENS_LIMIT",
-        "percentage": 42
-      },
-      {
-        "type": "TIME_LIMIT",
-        "percentage": 15,
-        "currentValue": 180,
-        "usage": 1200,
-        "usageDetails": { ... }
-      }
-    ]
-  }
-}
-```
-
-The `TOKENS_LIMIT` percentage maps directly to utilization (5-hour window). The `TIME_LIMIT` tracks monthly MCP tool usage.
-
-**Time range params** (for model-usage and tool-usage):
-- Format: `yyyy-MM-dd HH:mm:ss`
-- Window: 24 hours (yesterday same hour to today same hour)
-
-### Implementation
-
-#### New files
-
-- `internal/provider/zai/zai.go` — Provider struct, metadata, API key strategy
-- `internal/provider/zai/response.go` — Response types for quota limit, model usage
-
-#### Approach
-
-The simplest provider to implement. Single strategy (API key), single primary endpoint (`/api/monitor/usage/quota/limit`), percentage-based response. Optionally also fetch model-usage for per-model breakdown.
-
-#### Wiring changes
-
-| File | Change |
-|---|---|
-| `cmd/root.go:23-28` | Add `_ "github.com/joshuadavidthomas/vibeusage/internal/provider/zai"` blank import |
-| `cmd/root.go:69` | Add `"zai"` to the provider ID list |
-| `cmd/key.go:26` | Add `"zai"` to the key command loop |
-| `cmd/key.go:91-97` | Add `"zai": "api_key"` to `credentialKeyMap` |
-| `cmd/auth.go` | Falls through to `authGeneric` |
-| `internal/config/credentials.go` | Add `"zai": "ZAI_API_KEY"` to `ProviderEnvVars` |
-
-#### Status monitoring
-
-No known public status page. Return `StatusUnknown` initially.
-
-### Open questions
-
-- [ ] Does the quota/limit endpoint return reset times, or just percentages?
-- [ ] Is the `percentage` field 0-100 or 0.0-1.0?
-- [ ] Does model-usage return per-model quota data, or just historical token counts?
-- [ ] Is there a way to detect the subscription tier from the API?
-
-## Minimax (Coding Plans)
-
-Chinese AI provider with M2.5 model (80.2% SWE-bench). Subscription plans with 5-hour refresh cycles. Has a documented REST API endpoint for quota checking.
-
-### What to track
-
-- Remaining prompts in current 5-hour window (convert to utilization percentage)
-- Plan tier: Starter ($10) / Plus ($20) / Max ($50) / Highspeed variants
-- Period type: `PeriodSession` (5-hour rolling window)
-- 1 prompt ≈ 15 model calls
-
-### Auth strategy: API key (bearer token)
-
-Minimax uses separate API keys for coding plans vs pay-as-you-go:
-- **Coding Plan API key**: From `https://platform.minimax.io/user-center/payment/coding-plan`
-- **Standard API key**: Different key, for token-based billing
-
-Only the Coding Plan API key works for quota tracking.
-
-### API endpoints
-
-**Quota endpoint** (from [Minimax FAQ](https://platform.minimax.io/docs/coding-plan/faq)):
-
-```
-GET https://www.minimax.io/v1/api/openplatform/coding_plan/remains
-Authorization: Bearer <CODING_PLAN_API_KEY>
-Content-Type: application/json
-```
-
-**Response format**: Not fully documented. Expected to contain remaining prompts, possibly with reset time information. Need to test with real credentials.
-
-### Implementation
-
-#### New files
-
-- `internal/provider/minimax/minimax.go` — Provider struct, metadata, API key strategy
-- `internal/provider/minimax/response.go` — Response types (to be determined from real API response)
-
-#### Approach
-
-Simple API key strategy. The main uncertainty is the response format — we need to make a real request to determine the structure. Start with a minimal implementation and iterate once we have sample responses.
-
-#### Wiring changes
-
-| File | Change |
-|---|---|
-| `cmd/root.go:23-28` | Add `_ "github.com/joshuadavidthomas/vibeusage/internal/provider/minimax"` blank import |
-| `cmd/root.go:69` | Add `"minimax"` to the provider ID list |
-| `cmd/key.go:26` | Add `"minimax"` to the key command loop |
-| `cmd/key.go:91-97` | Add `"minimax": "api_key"` to `credentialKeyMap` |
-| `cmd/auth.go` | Falls through to `authGeneric` |
-| `internal/config/credentials.go` | Add `"minimax": "MINIMAX_API_KEY"` to `ProviderEnvVars` |
-
-#### Status monitoring
-
-No known public status page. Return `StatusUnknown` initially.
-
-### Open questions
-
-- [ ] What is the exact response format from `/coding_plan/remains`? Need a real API call
-- [ ] Does it return remaining count, total, percentage, or all of the above?
-- [ ] Does it include reset time information?
-- [ ] Is plan tier information included in the response?
-
-## Moonshot / KimiCode
-
-Chinese AI provider with K2.5 model. KimiCode is an open-source CLI agent. Has subscription plans with 7-day rolling cycles (not 5-hour like others). Usage API exists at `https://api.kimi.com/coding/v1/usages`.
-
-### What to track
-
-- **Weekly usage summary**: `used` / `limit` with reset time (maps to `PeriodWeekly`)
-- **Per-window limits**: Array of limit entries, each with `used`, `limit`, `remaining`, and `window` (duration + timeUnit)
+- **Overall usage summary**: `used` / `limit` with reset time
+- **Per-window limits**: Array of limit entries with `used`, `limit`, `remaining`, `window` (duration + timeUnit)
 - Reset times: ISO 8601 timestamps
-- Period types: Mix of `PeriodWeekly` (7-day cycles) and `PeriodSession` (for sub-day windows, determined by `window.duration`)
+- Period types derived from `window.duration` + `timeUnit`:
+  - 300 MINUTE (5h) → `PeriodSession`
+  - 7 DAY → `PeriodWeekly`
+  - 24 HOUR → `PeriodDaily`
 
-### Auth strategy: API key (bearer token)
+### Auth strategies (3 tiers)
 
-- API key from Kimi Code console: `https://www.kimi.com/code/console`
-- Separate from Moonshot Open Platform API keys
-- Base URL overridable via `KIMI_CODE_BASE_URL` env var
+#### 1. Device flow OAuth (primary — like Copilot)
 
-### API endpoints
+From [kimi-cli `auth/oauth.py`](https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/oauth.py):
 
-Discovered from [KimiCode CLI source](https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/ui/shell/usage.py):
+```
+Client ID:  17e5f671-d194-4dfb-9706-5516cb48c098
+OAuth host: https://auth.kimi.com  (override: KIMI_CODE_OAUTH_HOST)
+
+POST /api/oauth/device_authorization
+  body: client_id=<client_id>
+  → { user_code, device_code, verification_uri_complete, interval, expires_in }
+
+POST /api/oauth/token  (poll)
+  body: client_id=<client_id>&device_code=<code>&grant_type=urn:ietf:params:oauth:grant-type:device_code
+  → { access_token, refresh_token, expires_in, scope, token_type }
+
+POST /api/oauth/token  (refresh)
+  body: client_id=<client_id>&grant_type=refresh_token&refresh_token=<token>
+  → same shape
+```
+
+Headers to include (from kimi-cli `_common_headers`):
+```
+X-Msh-Platform: vibeusage
+X-Msh-Version: <version>
+X-Msh-Device-Name: <hostname>
+X-Msh-Device-Model: <os arch>
+X-Msh-Os-Version: <os version>
+X-Msh-Device-Id: <persistent uuid>
+```
+
+This is almost identical to the Copilot device flow pattern. Implementation in `cmd/auth.go`:
+```go
+case "kimi":
+    return authKimi()
+```
+
+`authKimi()` follows the same pattern as `authCopilot()`:
+1. POST to device authorization endpoint
+2. Print user code and verification URL
+3. Open browser
+4. Poll token endpoint at `interval` seconds
+5. Save tokens to `~/.config/vibeusage/credentials/kimi/oauth.json`
+
+#### 2. Credential reuse from kimi-cli
+
+kimi-cli stores OAuth tokens at `~/.local/share/kimi-cli/credentials/kimi-code.json`:
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "expires_at": 1740000000.0,
+  "scope": "...",
+  "token_type": "bearer"
+}
+```
+
+Check this path in `IsAvailable()` before falling back to our own credential store. Note `expires_at` is a Unix timestamp float — if expired, refresh using the refresh token and save back to our store.
+
+The kimi-cli share dir varies by OS:
+- Linux: `~/.local/share/kimi-cli/`
+- macOS: `~/Library/Application Support/kimi-cli/`
+
+#### 3. API key fallback
+
+Users can also paste an API key from `https://www.kimi.com/code/console`. Simpler but no auto-refresh.
+
+### API endpoint
 
 ```
 GET https://api.kimi.com/coding/v1/usages
-Authorization: Bearer <api_key>
+Authorization: Bearer <access_token or api_key>
 ```
 
-**Response format** (from KimiCode parser):
+Base URL overridable via `KIMI_CODE_BASE_URL` env var.
+
+**Response format** (from [kimi-cli `usage.py`](https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/ui/shell/usage.py)):
 ```json
 {
   "usage": {
@@ -421,107 +147,285 @@ Authorization: Bearer <api_key>
 }
 ```
 
-**Field resolution** (KimiCode handles multiple field name variants):
-- Reset time: tries `reset_at`, `resetAt`, `reset_time`, `resetTime`
-- Duration-based reset: tries `reset_in`, `resetIn`, `ttl`, `window` (seconds)
-- Usage values: supports both `used` and `remaining` (computes `used = limit - remaining`)
-- Labels: tries `name`, `title`, `scope`
+**Field name variants** (kimi-cli handles both):
+- Reset time: `reset_at` / `resetAt` / `reset_time` / `resetTime`
+- Usage: `used` and/or `remaining` (compute `used = limit - remaining`)
+- Labels: `name` / `title` / `scope`
 
-**Window duration to period type mapping**:
-- `duration: 300, timeUnit: MINUTE` → 5 hours → `PeriodSession`
-- `duration: 7, timeUnit: DAY` → `PeriodWeekly`
-- `duration: 24, timeUnit: HOUR` → `PeriodDaily`
+Use `json.RawMessage` or Go struct tags with both snake_case and camelCase? Simplest: define struct with `json:"reset_at"` and also try `resetAt` manually if the first is empty. Or just use the snake_case version since that's what the response actually uses (camelCase is a defensive fallback).
 
 ### Implementation
 
 #### New files
 
-- `internal/provider/kimi/kimi.go` — Provider struct, metadata, API key strategy
-- `internal/provider/kimi/response.go` — Response types with flexible field resolution
+- `internal/provider/kimi/kimi.go` — Provider, metadata, DeviceFlowStrategy, APIKeyStrategy
+- `internal/provider/kimi/response.go` — Response types, window-to-period mapping
+- `internal/provider/kimi/response_test.go` — Parse tests with fixtures
+- `internal/provider/kimi/device_flow.go` — Device flow auth (extract to shared if Kiro needs it later)
 
-#### Approach
-
-Simple API key strategy with a well-understood response format (thanks to the open-source CLI). The response parsing needs to handle field name variants (snake_case and camelCase) and compute `used` from `remaining` when `used` isn't provided.
-
-The `window` field's `duration` + `timeUnit` maps naturally to vibeusage's `PeriodType`:
-- 300 MINUTE (5h) → `PeriodSession`
-- 7 DAY → `PeriodWeekly`
-
-#### Wiring changes
+#### Wiring
 
 | File | Change |
 |---|---|
-| `cmd/root.go:23-28` | Add `_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kimi"` blank import |
-| `cmd/root.go:69` | Add `"kimi"` to the provider ID list |
-| `cmd/key.go:26` | Add `"kimi"` to the key command loop |
-| `cmd/key.go:91-97` | Add `"kimi": "api_key"` to `credentialKeyMap` |
-| `cmd/auth.go` | Falls through to `authGeneric` |
-| `internal/config/credentials.go` | Add `"kimi": "KIMI_CODE_API_KEY"` to `ProviderEnvVars` |
+| `cmd/root.go` | Blank import + add `"kimi"` to provider list |
+| `cmd/auth.go` | `case "kimi": return authKimi()` (device flow, like Copilot) |
+| `cmd/key.go` | Add `"kimi"` to key loop + `"kimi": "api_key"` to `credentialKeyMap` |
+| `internal/config/credentials.go` | `ProviderCLIPaths`: `"kimi": {"~/.local/share/kimi-cli/credentials/kimi-code.json"}` |
+| `internal/config/credentials.go` | `ProviderEnvVars`: `"kimi": "KIMI_CODE_API_KEY"` |
 
 #### Status monitoring
 
-No known public status page. Return `StatusUnknown` initially.
+No known status page. Return `StatusUnknown`.
 
 ### Open questions
 
-- [ ] Is the example response format above accurate? Need to verify with real credentials
-- [ ] What subscription tiers exist and are they detectable from the API response?
-- [ ] Does the API return plan information?
-- [ ] Should we also support the Moonshot Open Platform API (pay-as-you-go) for token consumption tracking?
+- [ ] Verify response format with real device flow token
+- [ ] Does the API return subscription tier info? (kimi-cli doesn't seem to fetch it)
+- [ ] What does the response look like for a free vs paid account?
+- [ ] Does `expires_at` in the token need to be checked before each request? kimi-cli has a background refresh loop — we should refresh inline if expired.
 
-## Implementation order
+## Z.ai (Zhipu AI)
 
-### Phase 1: Antigravity
+Chinese AI provider offering GLM model access via subscription coding plans. Two auth approaches: API key for the quota endpoint, or web session cookie for the dashboard API.
 
-Lowest risk, highest code reuse. Same Google OAuth infra as Gemini, same quota response format, just different client credentials and request metadata.
+### What to track
 
-1. Create `internal/provider/antigravity/` with response types
-2. Implement OAuth strategy (adapt from Gemini)
-3. Wire into CLI
-4. Test with real Antigravity credentials
-5. Verify credential reuse from Antigravity installation
+- **Token quota**: `TOKENS_LIMIT` type, reported as `percentage` (maps to `Utilization`)
+- **MCP usage**: `TIME_LIMIT` type with `currentValue`, `usage`, `usageDetails`
+- Period types: `PeriodSession` for token quota (5h window), `PeriodMonthly` for MCP
+- Subscription tier: Lite / Pro / Max
 
-### Phase 2: Kiro
+### Auth strategies (2 tiers)
 
-More involved due to PKCE auth flow and unstable API response format.
+#### 1. API key (primary)
 
-1. Create `internal/provider/kiro/` with response types and multi-path resolution
-2. Implement PKCE auth flow in `cmd/auth.go` (consider extracting reusable PKCE helper)
-3. Implement credit-to-utilization conversion
-4. Wire into CLI
-5. Test with real Kiro credentials and multiple response format variants
+From [glm-plan-usage plugin](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs):
+
+```
+Authorization: <api_key>
+Accept-Language: en-US,en
+```
+
+API key from: `https://z.ai/manage-apikey/apikey-list`
+
+Two equivalent base URLs:
+- International: `https://api.z.ai`
+- China: `https://open.bigmodel.cn`
+
+#### 2. Web session cookie (secondary)
+
+The Z.ai dashboard at `https://z.ai` is a Next.js app. When logged in, the browser holds a session cookie that authenticates requests to the same API endpoints. This lets users skip API key creation — just grab the cookie from DevTools.
+
+**TODO**: Need to identify the session cookie name. The dashboard sets `acw_tc` (generic Alibaba Cloud WAF cookie) and `NEXT_LOCALE`, but the actual auth cookie only appears after login. User needs to check DevTools → Application → Cookies after logging in.
+
+Likely candidates:
+- A JWT or session token cookie (common in Next.js apps)
+- Could be the same `Authorization` header value stored as a cookie
+- May use `next-auth` session pattern (`__Secure-next-auth.session-token`)
+
+### API endpoints
+
+**Quota limit** (primary):
+```
+GET /api/monitor/usage/quota/limit
+→ { "data": { "limits": [
+      { "type": "TOKENS_LIMIT", "percentage": 42 },
+      { "type": "TIME_LIMIT", "percentage": 15, "currentValue": 180, "usage": 1200 }
+    ] } }
+```
+
+**Model usage** (optional, for per-model breakdown):
+```
+GET /api/monitor/usage/model-usage?startTime=...&endTime=...
+```
+
+**Tool usage** (optional):
+```
+GET /api/monitor/usage/tool-usage?startTime=...&endTime=...
+```
+
+Unauthenticated requests return: `{"code":1001,"msg":"Authentication parameter not received in Header","success":false}`
+
+### Implementation
+
+#### New files
+
+- `internal/provider/zai/zai.go` — Provider, metadata, APIKeyStrategy, WebStrategy
+- `internal/provider/zai/response.go` — Response types for quota limits
+
+#### Wiring
+
+| File | Change |
+|---|---|
+| `cmd/root.go` | Blank import + add `"zai"` to provider list |
+| `cmd/auth.go` | `case "zai": return authZai()` (prompt for API key or session cookie) |
+| `cmd/key.go` | Add `"zai"` to key loop + `"zai": "api_key"` to `credentialKeyMap` |
+| `internal/config/credentials.go` | `ProviderEnvVars`: `"zai": "ZAI_API_KEY"` |
+
+#### Status monitoring
+
+No known status page. Return `StatusUnknown`.
+
+### Open questions
+
+- [ ] What is the session cookie name on z.ai after login? (user needs to check DevTools)
+- [ ] Does the quota endpoint return reset times, or just percentages?
+- [ ] Is `percentage` 0-100 or 0.0-1.0?
+- [ ] Is there a way to detect subscription tier from the API?
+- [ ] Does the session cookie work with the same `/api/monitor/usage/quota/limit` endpoint, or does the dashboard hit a different internal endpoint?
+
+## Minimax
+
+Chinese AI provider with M2.5 model. Subscription plans with 5-hour refresh cycles. Has a documented REST API endpoint for quota checking.
+
+### What to track
+
+- Remaining prompts in current 5-hour window (convert to utilization percentage)
+- Plan tier: Starter ($10) / Plus ($20) / Max ($50) / Highspeed variants
+- Period type: `PeriodSession` (5-hour rolling window)
+- 1 prompt ≈ 15 model calls
+
+### Auth strategies (2 tiers)
+
+#### 1. API key (primary)
+
+From [Minimax FAQ](https://platform.minimax.io/docs/coding-plan/faq):
+
+```
+GET https://www.minimax.io/v1/api/openplatform/coding_plan/remains
+Authorization: Bearer <CODING_PLAN_API_KEY>
+Content-Type: application/json
+```
+
+Note: Minimax has separate API keys for coding plans vs pay-as-you-go. Only the Coding Plan key works for quota tracking. Key from: `https://platform.minimax.io/user-center/payment/coding-plan`
+
+#### 2. Web session cookie (secondary)
+
+The Minimax dashboard at `https://platform.minimax.io` shows coding plan usage. Like Z.ai, the browser holds a session cookie after login that could authenticate quota requests.
+
+**TODO**: Need to identify the session cookie name. User needs to check DevTools → Application → Cookies on the Minimax dashboard after logging in.
+
+### API endpoint
+
+```
+GET https://www.minimax.io/v1/api/openplatform/coding_plan/remains
+Authorization: Bearer <api_key_or_session_token>
+```
+
+**Response format**: Not documented. Expected to contain remaining prompts, possibly with reset time and plan info. Need to make a real request to determine structure.
+
+### Implementation
+
+#### New files
+
+- `internal/provider/minimax/minimax.go` — Provider, metadata, APIKeyStrategy, WebStrategy
+- `internal/provider/minimax/response.go` — Response types (TBD from real API response)
+- `internal/provider/minimax/response_test.go` — Parse tests once format is known
+
+#### Wiring
+
+| File | Change |
+|---|---|
+| `cmd/root.go` | Blank import + add `"minimax"` to provider list |
+| `cmd/auth.go` | `case "minimax": return authMinimax()` (prompt for API key or session cookie) |
+| `cmd/key.go` | Add `"minimax"` to key loop + `"minimax": "api_key"` to `credentialKeyMap` |
+| `internal/config/credentials.go` | `ProviderEnvVars`: `"minimax": "MINIMAX_API_KEY"` |
+
+#### Status monitoring
+
+No known status page. Return `StatusUnknown`.
+
+### Open questions
+
+- [ ] What is the exact response format from `/coding_plan/remains`?
+- [ ] Does it return remaining count, total, percentage, or all?
+- [ ] Does it include reset time?
+- [ ] Is plan tier info included?
+- [ ] What is the session cookie name on platform.minimax.io? (user needs to check DevTools)
+
+## Kiro (AWS)
+
+AWS's AI coding IDE. Most complex auth (PKCE) and most unstable API (7+ fallback paths per metric). **Lowest priority** — blocked on missing OAuth endpoint details.
+
+### What to track
+
+- Prompt credits: used / total → utilization percentage
+- Bonus credits: used / total (separate period or `OverageUsage`)
+- Bonus/trial expiry
+- Plan name, usage reset time
+- Period type: `PeriodMonthly`
+
+### Auth strategy: OAuth 2.0 + PKCE
+
+From cockpit-tools — needs a local HTTP callback server:
+
+1. Generate `state`, `code_verifier`, `code_challenge` (SHA-256)
+2. Start local TCP server for `/oauth/callback` and `/signin/callback`
+3. Open browser to Kiro auth portal
+4. Exchange code for tokens with `code_verifier`
+5. Refresh via `refresh_token` grant
+
+### API endpoint
+
+```
+GET /getUsageLimits
+Authorization: Bearer <token>
+```
+
+Region-based routing: `https://q.{region}.amazonaws.com`
+
+Response format is deeply nested and unstable. cockpit-tools uses 7+ fallback JSON paths per metric. Would use `json.RawMessage` + sequential path resolution in Go.
+
+### Open questions (blockers)
+
+- [ ] Exact OAuth endpoints (auth portal URL, token URL, redirect URI)
+- [ ] How to detect user's region
+- [ ] Real `/getUsageLimits` response sample
+- [ ] Credential file path on Linux
+
+## Implementation Order
+
+### Phase 1: Antigravity — ✅ DONE
+
+Branch `add-antigravity-provider`, 5 commits.
+
+### Phase 2: Kimi
+
+Best-documented remaining provider. Device flow auth is proven (Copilot uses same pattern). Open-source CLI gives us the full OAuth spec, usage endpoint, and response parser.
+
+1. Create `internal/provider/kimi/` with device flow + API key strategies
+2. Implement device flow in `cmd/auth.go` (model after `authCopilot`)
+3. Add credential reuse from kimi-cli installation
+4. Parse usage response with window-to-period mapping
+5. Wire into CLI
+6. Test with real device flow
 
 ### Phase 3: Z.ai
 
-Simple API key auth, well-understood quota endpoint from reverse-engineered plugin.
+Simple API key auth with well-understood endpoint. Web strategy depends on identifying the session cookie.
 
-1. Create `internal/provider/zai/` with response types
-2. Implement API key strategy with quota/limit endpoint
+1. Create `internal/provider/zai/` with API key strategy
+2. Parse quota/limit response (percentage-based)
 3. Wire into CLI
-4. Test with real Z.ai API key
+4. Test with real API key
+5. **After cookie identified**: Add web strategy
 
-### Phase 4: Kimi (Moonshot)
+### Phase 4: Minimax
 
-Simple API key auth, well-documented response format from open-source CLI.
+Simple API key auth but unknown response format. Web strategy depends on identifying the session cookie.
 
-1. Create `internal/provider/kimi/` with response types
-2. Implement API key strategy with flexible field resolution
-3. Map `window` duration to `PeriodType`
-4. Wire into CLI
-5. Test with real Kimi Code API key
+1. Make a real request to `/coding_plan/remains` to determine response format
+2. Create `internal/provider/minimax/` with API key strategy
+3. Wire into CLI
+4. Test with real API key
+5. **After cookie identified**: Add web strategy
 
-### Phase 5: Minimax
+### Phase 5: Kiro
 
-Simple API key auth, but undocumented response format.
-
-1. Test the `/coding_plan/remains` endpoint with real credentials to determine response format
-2. Create `internal/provider/minimax/` with response types
-3. Implement API key strategy
-4. Wire into CLI
+Blocked on OAuth details. Implement only when we have real endpoint info.
 
 ### Phase 6: Polish
 
-1. Consider extracting shared Google OAuth logic between Gemini and Antigravity
-2. Consider extracting reusable PKCE helper for future providers
-3. Add response format test fixtures from real API responses
-4. Update README with new provider docs
+1. Extract shared Google OAuth between Gemini and Antigravity (if duplication hurts)
+2. Extract shared device flow helper between Copilot and Kimi (if duplication hurts)
+3. Update README with new provider docs
