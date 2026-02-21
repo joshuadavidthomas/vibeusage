@@ -50,11 +50,33 @@ func TestUsageResponse_UnmarshalWithRateLimit(t *testing.T) {
 	if !resp.Credits.HasCredits {
 		t.Error("expected has_credits to be true")
 	}
-	if resp.Credits.Balance != 50.0 {
-		t.Errorf("balance = %v, want 50.0", resp.Credits.Balance)
+	if resp.Credits.Balance() != 50.0 {
+		t.Errorf("balance = %v, want 50.0", resp.Credits.Balance())
 	}
 	if resp.PlanType != "plus" {
 		t.Errorf("plan_type = %q, want %q", resp.PlanType, "plus")
+	}
+}
+
+func TestUsageResponse_UnmarshalWithStringBalance(t *testing.T) {
+	raw := `{
+		"rate_limit": {
+			"primary_window": {"used_percent": 42.0, "reset_at": 1740000000}
+		},
+		"credits": {"has_credits": true, "balance": "50.00"},
+		"plan_type": "plus"
+	}`
+
+	var resp UsageResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.Credits == nil {
+		t.Fatal("expected credits")
+	}
+	if resp.Credits.Balance() != 50.0 {
+		t.Errorf("balance = %v, want 50.0", resp.Credits.Balance())
 	}
 }
 

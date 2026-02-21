@@ -243,7 +243,7 @@ func (s *OAuthStrategy) parseTypedUsageResponse(resp UsageResponse) *models.Usag
 	if resp.Credits != nil && resp.Credits.HasCredits {
 		overage = &models.OverageUsage{
 			Used:      0,
-			Limit:     resp.Credits.Balance,
+			Limit:     resp.Credits.Balance(),
 			Currency:  "credits",
 			IsEnabled: true,
 		}

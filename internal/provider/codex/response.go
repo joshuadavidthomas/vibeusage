@@ -1,6 +1,10 @@
 package codex
 
-import "time"
+import (
+	"encoding/json"
+	"strconv"
+	"time"
+)
 
 // UsageResponse represents the response from the Codex/ChatGPT usage endpoint.
 // The API uses alternate key names: "rate_limit" vs "rate_limits".
@@ -62,9 +66,28 @@ func (w *RateWindow) EffectiveResetTimestamp() float64 {
 }
 
 // Credits represents available credits on the account.
+// Balance can be a number or string in the API response.
 type Credits struct {
-	HasCredits bool    `json:"has_credits"`
-	Balance    float64 `json:"balance"`
+	HasCredits bool            `json:"has_credits"`
+	RawBalance json.RawMessage `json:"balance"`
+}
+
+// Balance parses the balance field, handling both number and string representations.
+func (c *Credits) Balance() float64 {
+	if c.RawBalance == nil {
+		return 0
+	}
+	var f float64
+	if err := json.Unmarshal(c.RawBalance, &f); err == nil {
+		return f
+	}
+	var s string
+	if err := json.Unmarshal(c.RawBalance, &s); err == nil {
+		if v, err := strconv.ParseFloat(s, 64); err == nil {
+			return v
+		}
+	}
+	return 0
 }
 
 // TokenResponse represents the response from the OAuth token refresh endpoint.
