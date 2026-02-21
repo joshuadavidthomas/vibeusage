@@ -60,28 +60,28 @@ func LoadCachedOrgID(providerID string) string {
 
 func ClearOrgIDCache(providerID string) {
 	if providerID != "" {
-		os.Remove(OrgIDPath(providerID))
+		_ = os.Remove(OrgIDPath(providerID))
 		return
 	}
 	entries, _ := os.ReadDir(OrgIDsDir())
 	for _, e := range entries {
-		os.Remove(filepath.Join(OrgIDsDir(), e.Name()))
+		_ = os.Remove(filepath.Join(OrgIDsDir(), e.Name()))
 	}
 }
 
 func ClearProviderCache(providerID string) {
-	os.Remove(SnapshotPath(providerID))
-	os.Remove(OrgIDPath(providerID))
+	_ = os.Remove(SnapshotPath(providerID))
+	_ = os.Remove(OrgIDPath(providerID))
 }
 
 func ClearSnapshotCache(providerID string) {
 	if providerID != "" {
-		os.Remove(SnapshotPath(providerID))
+		_ = os.Remove(SnapshotPath(providerID))
 		return
 	}
 	entries, _ := os.ReadDir(SnapshotsDir())
 	for _, e := range entries {
-		os.Remove(filepath.Join(SnapshotsDir(), e.Name()))
+		_ = os.Remove(filepath.Join(SnapshotsDir(), e.Name()))
 	}
 }
 
