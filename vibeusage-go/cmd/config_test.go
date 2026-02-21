@@ -25,8 +25,8 @@ func TestConfigReset_UsesConfirm(t *testing.T) {
 
 	// Create a config file to reset
 	cfgDir := tmpDir
-	os.MkdirAll(cfgDir, 0o755)
-	os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte("[display]\n"), 0o644)
+	_ = os.MkdirAll(cfgDir, 0o755)
+	_ = os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte("[display]\n"), 0o644)
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -59,7 +59,7 @@ func TestConfigReset_UserDeclinesConfirm(t *testing.T) {
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
 
 	// Create a config file
-	os.WriteFile(filepath.Join(tmpDir, "config.toml"), []byte("[display]\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(tmpDir, "config.toml"), []byte("[display]\n"), 0o644)
 
 	var buf bytes.Buffer
 	outWriter = &buf

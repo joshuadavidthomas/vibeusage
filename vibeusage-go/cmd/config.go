@@ -52,7 +52,7 @@ var configShowCmd = &cobra.Command{
 		}
 
 		out("Config: %s\n\n", cfgPath)
-		toml.NewEncoder(outWriter).Encode(cfg)
+		_ = toml.NewEncoder(outWriter).Encode(cfg)
 		return nil
 	},
 }
@@ -149,10 +149,10 @@ var configEditCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfgPath := config.ConfigFile()
 
-		os.MkdirAll(config.ConfigDir(), 0o755)
+		_ = os.MkdirAll(config.ConfigDir(), 0o755)
 		if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 			cfg := config.DefaultConfig()
-			config.Save(cfg, cfgPath)
+			_ = config.Save(cfg, cfgPath)
 		}
 
 		editor := os.Getenv("EDITOR")

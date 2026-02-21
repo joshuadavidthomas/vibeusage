@@ -71,9 +71,9 @@ func TestKeyDelete_UsesConfirmPrompt(t *testing.T) {
 
 	// Create a credential to delete
 	credDir := filepath.Join(tmpDir, "credentials", "claude")
-	os.MkdirAll(credDir, 0o755)
+	_ = os.MkdirAll(credDir, 0o755)
 	credPath := filepath.Join(credDir, "session.json")
-	os.WriteFile(credPath, []byte(`{"key":"test"}`), 0o600)
+	_ = os.WriteFile(credPath, []byte(`{"key":"test"}`), 0o600)
 
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
@@ -115,9 +115,9 @@ func TestKeyDelete_UserDeclinesConfirm(t *testing.T) {
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
 
 	credDir := filepath.Join(tmpDir, "credentials", "claude")
-	os.MkdirAll(credDir, 0o755)
+	_ = os.MkdirAll(credDir, 0o755)
 	credPath := filepath.Join(credDir, "session.json")
-	os.WriteFile(credPath, []byte(`{"key":"test"}`), 0o600)
+	_ = os.WriteFile(credPath, []byte(`{"key":"test"}`), 0o600)
 
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
@@ -170,7 +170,7 @@ func TestDisplayAllCredentialStatus_HasTableBorders(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	displayAllCredentialStatus()
+	_ = displayAllCredentialStatus()
 
 	output := buf.String()
 
@@ -200,7 +200,7 @@ func TestDisplayAllCredentialStatus_ContainsHeaders(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	displayAllCredentialStatus()
+	_ = displayAllCredentialStatus()
 
 	output := buf.String()
 	for _, header := range []string{"Provider", "Status", "Source"} {
@@ -227,7 +227,7 @@ func TestDisplayAllCredentialStatus_QuietMode(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	displayAllCredentialStatus()
+	_ = displayAllCredentialStatus()
 
 	output := buf.String()
 	if strings.Contains(output, "╭") {

@@ -33,7 +33,7 @@ func TestGetJSON_Success(t *testing.T) {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp{Name: "test", Value: 42})
+		_ = json.NewEncoder(w).Encode(resp{Name: "test", Value: 42})
 	}))
 	defer srv.Close()
 
@@ -54,7 +54,7 @@ func TestGetJSON_Success(t *testing.T) {
 func TestGetJSON_Non200(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":"unauthorized"}`))
+		_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
 	}))
 	defer srv.Close()
 
@@ -75,7 +75,7 @@ func TestGetJSON_Non200(t *testing.T) {
 
 func TestGetJSON_InvalidJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`not json`))
+		_, _ = w.Write([]byte(`not json`))
 	}))
 	defer srv.Close()
 
@@ -95,7 +95,7 @@ func TestGetJSON_InvalidJSON(t *testing.T) {
 
 func TestGetJSON_NilOut(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"key":"val"}`))
+		_, _ = w.Write([]byte(`{"key":"val"}`))
 	}))
 	defer srv.Close()
 
@@ -134,8 +134,8 @@ func TestPostJSON_WithBody(t *testing.T) {
 			t.Errorf("expected Content-Type application/json, got %s", ct)
 		}
 		var in reqBody
-		json.NewDecoder(r.Body).Decode(&in)
-		json.NewEncoder(w).Encode(respBody{Output: "echo:" + in.Input})
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		_ = json.NewEncoder(w).Encode(respBody{Output: "echo:" + in.Input})
 	}))
 	defer srv.Close()
 
@@ -168,7 +168,7 @@ func TestPostJSON_NilBody(t *testing.T) {
 		if n != 0 {
 			t.Errorf("expected empty body, got %d bytes", n)
 		}
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -195,11 +195,11 @@ func TestPostForm(t *testing.T) {
 		if ct != "application/x-www-form-urlencoded" {
 			t.Errorf("expected form Content-Type, got %s", ct)
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("grant_type") != "refresh_token" {
 			t.Errorf("unexpected grant_type: %s", r.FormValue("grant_type"))
 		}
-		json.NewEncoder(w).Encode(map[string]string{"access_token": "new-token"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": "new-token"})
 	}))
 	defer srv.Close()
 
@@ -292,7 +292,7 @@ func TestDoCtx_ContextDeadlineExceeded(t *testing.T) {
 func TestDoCtx_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte(`OK`))
+		_, _ = w.Write([]byte(`OK`))
 	}))
 	defer srv.Close()
 
@@ -332,7 +332,7 @@ func TestGetJSONCtx_Success(t *testing.T) {
 		Name string `json:"name"`
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(resp{Name: "ctx-test"})
+		_ = json.NewEncoder(w).Encode(resp{Name: "ctx-test"})
 	}))
 	defer srv.Close()
 
@@ -380,8 +380,8 @@ func TestPostJSONCtx_Success(t *testing.T) {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 		var in reqBody
-		json.NewDecoder(r.Body).Decode(&in)
-		json.NewEncoder(w).Encode(respBody{Output: "echo:" + in.Input})
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		_ = json.NewEncoder(w).Encode(respBody{Output: "echo:" + in.Input})
 	}))
 	defer srv.Close()
 
@@ -418,11 +418,11 @@ func TestPostJSONCtx_Cancelled(t *testing.T) {
 
 func TestPostFormCtx_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.FormValue("grant_type") != "refresh_token" {
 			t.Errorf("unexpected grant_type: %s", r.FormValue("grant_type"))
 		}
-		json.NewEncoder(w).Encode(map[string]string{"access_token": "new"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": "new"})
 	}))
 	defer srv.Close()
 
