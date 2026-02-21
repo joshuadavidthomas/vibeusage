@@ -15,6 +15,7 @@ var ProviderCLIPaths = map[string][]string{
 	"copilot":     {"~/.config/github-copilot/hosts.json"},
 	"cursor":      {"~/.cursor/mcp-state.json"},
 	"kimi":        {"~/.kimi/credentials/kimi-code.json"},
+	"minimax":     {},
 	"zai":         {},
 }
 
@@ -27,6 +28,7 @@ var ProviderEnvVars = map[string]string{
 	"copilot":     "GITHUB_TOKEN",
 	"cursor":      "CURSOR_API_KEY",
 	"kimi":        "KIMI_CODE_API_KEY",
+	"minimax":     "MINIMAX_API_KEY",
 	"zai":         "ZAI_API_KEY",
 }
 
