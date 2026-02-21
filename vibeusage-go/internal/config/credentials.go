@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -76,13 +77,16 @@ func FindProviderCredential(providerID string) (bool, string, string) {
 func WriteCredential(path string, content []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+		return fmt.Errorf("writing credential: %w", err)
 	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, content, 0o600); err != nil {
-		return err
+		return fmt.Errorf("writing credential: %w", err)
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		return fmt.Errorf("writing credential: %w", err)
+	}
+	return nil
 }
 
 func ReadCredential(path string) ([]byte, error) {

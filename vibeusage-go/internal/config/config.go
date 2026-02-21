@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,14 +149,17 @@ func Save(cfg Config, path string) error {
 		path = ConfigFile()
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return fmt.Errorf("saving config: %w", err)
 	}
 	f, err := os.Create(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("saving config: %w", err)
 	}
 	defer func() { _ = f.Close() }()
-	return toml.NewEncoder(f).Encode(cfg)
+	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+	return nil
 }
 
 func applyEnvOverrides(cfg Config) Config {

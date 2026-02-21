@@ -334,7 +334,7 @@ log.Info("account", "email", snap.Identity.Email)
 
 These can be done opportunistically alongside the items above.
 
-- [ ] Replace hand-rolled `itoa` in `models.go` and `gemini.go` with `strconv.Itoa`
-- [ ] Remove duplicate `fileExists` helper (defined in both `config/credentials.go` and `provider/claude/web.go`)
-- [ ] Consistent error wrapping with `fmt.Errorf("...: %w", err)` throughout
-- [ ] `http.NewRequest` error handling (currently `req, _ := http.NewRequest(...)` ignores errors everywhere)
+- [x] Replace hand-rolled `itoa` in `models.go` and `gemini.go` with `strconv.Itoa`
+- [x] Remove duplicate `fileExists` helper (defined in both `config/credentials.go` and `provider/claude/web.go`)
+- [x] Consistent error wrapping with `fmt.Errorf("...: %w", err)` throughout
+- [x] `http.NewRequest` error handling (currently `req, _ := http.NewRequest(...)` ignores errors everywhere)

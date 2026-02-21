@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1400,5 +1401,101 @@ func TestCacheSnapshot_WritesValidJSON(t *testing.T) {
 	}
 	if !json.Valid(data) {
 		t.Errorf("snapshot file is not valid JSON: %s", data)
+	}
+}
+
+// Error wrapping: errors should contain contextual information
+
+func TestSave_ErrorWrapping_MkdirAll(t *testing.T) {
+	// Try to save to a path whose parent can't be created
+	path := filepath.Join("/dev/null", "impossible", "config.toml")
+	err := Save(DefaultConfig(), path)
+	if err == nil {
+		t.Fatal("Save() should return an error for invalid path")
+	}
+	if !strings.Contains(err.Error(), "saving config") {
+		t.Errorf("error should contain context 'saving config', got: %v", err)
+	}
+}
+
+func TestSave_ErrorWrapping_CreateFile(t *testing.T) {
+	dir := t.TempDir()
+	// Create a directory where the config file should be — os.Create will fail
+	dirAsFile := filepath.Join(dir, "config.toml")
+	if err := os.MkdirAll(dirAsFile, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	err := Save(DefaultConfig(), dirAsFile)
+	if err == nil {
+		t.Fatal("Save() should return an error when path is a directory")
+	}
+	if !strings.Contains(err.Error(), "saving config") {
+		t.Errorf("error should contain context 'saving config', got: %v", err)
+	}
+}
+
+func TestCacheSnapshot_ErrorWrapping(t *testing.T) {
+	// Point cache dir to an impossible location
+	t.Setenv("VIBEUSAGE_CACHE_DIR", "/dev/null/impossible")
+	configMu.Lock()
+	globalConfig = nil
+	configMu.Unlock()
+
+	snap := models.UsageSnapshot{Provider: "test"}
+	err := CacheSnapshot(snap)
+	if err == nil {
+		t.Fatal("CacheSnapshot() should return an error for invalid cache dir")
+	}
+	if !strings.Contains(err.Error(), "caching snapshot") {
+		t.Errorf("error should contain context 'caching snapshot', got: %v", err)
+	}
+}
+
+func TestCacheOrgID_ErrorWrapping(t *testing.T) {
+	t.Setenv("VIBEUSAGE_CACHE_DIR", "/dev/null/impossible")
+	configMu.Lock()
+	globalConfig = nil
+	configMu.Unlock()
+
+	err := CacheOrgID("test", "org-123")
+	if err == nil {
+		t.Fatal("CacheOrgID() should return an error for invalid cache dir")
+	}
+	if !strings.Contains(err.Error(), "caching org ID") {
+		t.Errorf("error should contain context 'caching org ID', got: %v", err)
+	}
+}
+
+func TestWriteCredential_ErrorWrapping_MkdirAll(t *testing.T) {
+	path := filepath.Join("/dev/null", "impossible", "cred.json")
+	err := WriteCredential(path, []byte("data"))
+	if err == nil {
+		t.Fatal("WriteCredential() should return an error for invalid path")
+	}
+	if !strings.Contains(err.Error(), "writing credential") {
+		t.Errorf("error should contain context 'writing credential', got: %v", err)
+	}
+}
+
+func TestWriteCredential_ErrorWrapping_WriteFile(t *testing.T) {
+	dir := t.TempDir()
+	// Make dir read-only so the write will fail
+	tmpDir := filepath.Join(dir, "readonly")
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	if err := os.Chmod(tmpDir, 0o555); err != nil {
+		t.Fatalf("setup chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(tmpDir, 0o755) })
+
+	path := filepath.Join(tmpDir, "cred.json")
+	err := WriteCredential(path, []byte("data"))
+	if err == nil {
+		t.Fatal("WriteCredential() should return an error when dir is read-only")
+	}
+	if !strings.Contains(err.Error(), "writing credential") {
+		t.Errorf("error should contain context 'writing credential', got: %v", err)
 	}
 }
