@@ -1,6 +1,5 @@
 ## Commands
 
-- `just check`: Run all checks (lint + test)
 - `just test`: Run tests
 - `just lint`: Run linter
 - `just fmt`: Format code
@@ -12,9 +11,8 @@
 
 Run these after implementing to get immediate feedback:
 
-- All checks: `just check`
-- Tests only: `just test`
-- Lint only: `just lint`
+- Tests: `just test`
+- Lint: `just lint`
 - Format: `just fmt`
 
 ## Operational Notes
