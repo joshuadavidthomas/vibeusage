@@ -186,12 +186,14 @@ Base URL overridable via `KIMI_CODE_BASE_URL` env var.
 
 No known status page. Return `StatusUnknown`.
 
-### Resolved questions
+### Verified
 
-- ✅ Response format verified — camelCase fields, `limit`/`remaining` are strings
+- ✅ Response format identical for both device flow tokens and API keys (`sk-kimi-...`)
+- ✅ camelCase fields, `limit`/`remaining` are strings
 - ✅ Subscription tier: `user.membership.level` (`"LEVEL_BASIC"` for free)
 - ✅ Credential path: `~/.kimi/credentials/kimi-code.json` (not `~/.local/share/kimi-cli/`)
 - ✅ Token lifetime: ~15 minutes (`expires_at` is Unix float), needs inline refresh
+- ✅ API keys work with the same endpoint — no functional difference in response
 
 ### Open questions
 
