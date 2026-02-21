@@ -3,17 +3,16 @@ package antigravity
 import (
 	"encoding/base64"
 	"testing"
+
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 func TestParseSubscriptionFromProto_ProTier(t *testing.T) {
-	// Build a minimal protobuf with field 36 containing subscription info:
-	// field 36 (message): { field 1: "g1-pro-tier", field 2: "Google AI Pro" }
-	inner := buildLengthDelimited(1, []byte("g1-pro-tier"))
-	inner = append(inner, buildLengthDelimited(2, []byte("Google AI Pro"))...)
-	proto := buildLengthDelimited(36, inner)
+	inner := protoBytes(1, []byte("g1-pro-tier"))
+	inner = append(inner, protoBytes(2, []byte("Google AI Pro"))...)
+	proto := protoBytes(36, inner)
 
-	b64 := base64.StdEncoding.EncodeToString(proto)
-	info := parseSubscriptionFromProto(b64)
+	info := parseSubscriptionFromProto(base64.StdEncoding.EncodeToString(proto))
 
 	if info == nil {
 		t.Fatal("expected non-nil subscription info")
@@ -26,71 +25,50 @@ func TestParseSubscriptionFromProto_ProTier(t *testing.T) {
 	}
 }
 
-func TestParseSubscriptionFromProto_NoField36(t *testing.T) {
-	// Protobuf with only field 3 (name) — no subscription
-	proto := buildLengthDelimited(3, []byte("Test User"))
-	b64 := base64.StdEncoding.EncodeToString(proto)
+func TestParseSubscriptionFromProto_WithOtherFields(t *testing.T) {
+	// Simulate a real proto with other fields before field 36
+	var proto []byte
+	proto = append(proto, protoBytes(3, []byte("Joshua Thomas"))...)
+	proto = append(proto, protoBytes(7, []byte("user@example.com"))...)
 
-	info := parseSubscriptionFromProto(b64)
+	inner := protoBytes(1, []byte("g1-ultra-tier"))
+	inner = append(inner, protoBytes(2, []byte("Google AI Ultra"))...)
+	proto = append(proto, protoBytes(36, inner)...)
+
+	info := parseSubscriptionFromProto(base64.StdEncoding.EncodeToString(proto))
+
+	if info == nil {
+		t.Fatal("expected non-nil subscription info")
+	}
+	if info.TierName != "Google AI Ultra" {
+		t.Errorf("tierName = %q, want %q", info.TierName, "Google AI Ultra")
+	}
+}
+
+func TestParseSubscriptionFromProto_NoField36(t *testing.T) {
+	proto := protoBytes(3, []byte("Test User"))
+
+	info := parseSubscriptionFromProto(base64.StdEncoding.EncodeToString(proto))
 	if info != nil {
 		t.Errorf("expected nil, got %+v", info)
 	}
 }
 
 func TestParseSubscriptionFromProto_Empty(t *testing.T) {
-	info := parseSubscriptionFromProto("")
-	if info != nil {
+	if info := parseSubscriptionFromProto(""); info != nil {
 		t.Errorf("expected nil for empty input, got %+v", info)
 	}
 }
 
 func TestParseSubscriptionFromProto_InvalidBase64(t *testing.T) {
-	info := parseSubscriptionFromProto("not-valid-base64!!!")
-	if info != nil {
+	if info := parseSubscriptionFromProto("not-valid-base64!!!"); info != nil {
 		t.Errorf("expected nil for invalid base64, got %+v", info)
 	}
 }
 
-func TestReadVarint(t *testing.T) {
-	tests := []struct {
-		name    string
-		data    []byte
-		want    uint64
-		wantOff int
-	}{
-		{"single byte", []byte{0x08}, 8, 1},
-		{"multi byte", []byte{0x80, 0x01}, 128, 2},
-		{"zero", []byte{0x00}, 0, 1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			val, off := readVarint(tt.data, 0)
-			if val != tt.want {
-				t.Errorf("val = %d, want %d", val, tt.want)
-			}
-			if off != tt.wantOff {
-				t.Errorf("offset = %d, want %d", off, tt.wantOff)
-			}
-		})
-	}
-}
-
-// buildLengthDelimited builds a protobuf field with wire type 2 (length-delimited).
-func buildLengthDelimited(fieldNum int, value []byte) []byte {
-	tag := uint64((fieldNum << 3) | 2)
-	var result []byte
-	result = appendVarint(result, tag)
-	result = appendVarint(result, uint64(len(value)))
-	result = append(result, value...)
-	return result
-}
-
-func appendVarint(buf []byte, val uint64) []byte {
-	for val >= 0x80 {
-		buf = append(buf, byte(val)|0x80)
-		val >>= 7
-	}
-	buf = append(buf, byte(val))
-	return buf
+// protoBytes encodes a length-delimited protobuf field.
+func protoBytes(num protowire.Number, val []byte) []byte {
+	b := protowire.AppendTag(nil, num, protowire.BytesType)
+	b = protowire.AppendBytes(b, val)
+	return b
 }
