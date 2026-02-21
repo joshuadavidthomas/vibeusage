@@ -250,19 +250,58 @@ For `vibeusage auth zai`, prompt the user with two options:
 **Quota limit** (primary):
 ```
 GET /api/monitor/usage/quota/limit
-→ { "data": { "limits": [
-      { "type": "TOKENS_LIMIT", "percentage": 42 },
-      { "type": "TIME_LIMIT", "percentage": 15, "currentValue": 180, "usage": 1200 }
-    ] } }
+Authorization: <api_key_or_jwt>
 ```
 
-**Model usage** (optional, for per-model breakdown):
+**Verified response** (real API key, Pro tier):
+```json
+{
+  "code": 200,
+  "msg": "Operation successful",
+  "data": {
+    "limits": [
+      {
+        "type": "TOKENS_LIMIT",
+        "unit": 3,
+        "number": 5,
+        "percentage": 1,
+        "nextResetTime": 1771661559241
+      },
+      {
+        "type": "TIME_LIMIT",
+        "unit": 5,
+        "number": 1,
+        "usage": 1000,
+        "currentValue": 0,
+        "remaining": 1000,
+        "percentage": 0,
+        "nextResetTime": 1773596236985,
+        "usageDetails": [
+          { "modelCode": "search-prime", "usage": 0 },
+          { "modelCode": "web-reader", "usage": 33 },
+          { "modelCode": "zread", "usage": 0 }
+        ]
+      }
+    ],
+    "level": "pro"
+  },
+  "success": true
+}
+```
+
+**Field details**:
+- `percentage`: 0-100 integer, maps directly to `Utilization`
+- `nextResetTime`: Unix timestamp in **milliseconds** (divide by 1000 for Go `time.Unix`)
+- `unit` + `number`: encodes the window duration
+  - `unit: 3, number: 5` → 5 hours → `PeriodSession`
+  - `unit: 5, number: 1` → 1 month → `PeriodMonthly`
+- `level`: subscription tier (`"pro"`, likely also `"lite"`, `"max"`)
+- `TOKENS_LIMIT`: token quota for the 5-hour window (the main metric)
+- `TIME_LIMIT`: monthly MCP tool usage with per-tool breakdown in `usageDetails`
+
+**Other endpoints** (optional, for per-model breakdown):
 ```
 GET /api/monitor/usage/model-usage?startTime=...&endTime=...
-```
-
-**Tool usage** (optional):
-```
 GET /api/monitor/usage/tool-usage?startTime=...&endTime=...
 ```
 
@@ -288,12 +327,17 @@ Unauthenticated requests return: `{"code":1001,"msg":"Authentication parameter n
 
 No known status page. Return `StatusUnknown`.
 
+### Resolved questions
+
+- ✅ `percentage` is 0-100 integer
+- ✅ Reset times: `nextResetTime` field, Unix millis
+- ✅ Subscription tier: `data.level` field (`"pro"`)
+- ✅ Window encoding: `unit` + `number` (unit 3 = hours, unit 5 = months)
+
 ### Open questions
 
-- [ ] Does the quota endpoint return reset times, or just percentages?
-- [ ] Is `percentage` 0-100 or 0.0-1.0?
-- [ ] Is there a way to detect subscription tier from the API?
-- [ ] How long does the localStorage JWT actually last? (no `exp` claim, but server may enforce TTL)
+- [ ] What are all possible `unit` values? (confirmed: 3=hours, 5=months — what are 1, 2, 4?)
+- [ ] How long does the localStorage JWT last? (no `exp` claim, server may enforce TTL)
 
 ## Minimax
 
