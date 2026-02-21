@@ -45,3 +45,63 @@ func indicatorToLevel(indicator string) models.StatusLevel {
 		return models.StatusUnknown
 	}
 }
+
+// FetchGoogleAppsStatus checks the Google Apps Status Dashboard for active
+// incidents matching any of the given keywords. Used by providers that run
+// on Google infrastructure (Gemini, Antigravity).
+func FetchGoogleAppsStatus(keywords []string) models.ProviderStatus {
+	const incidentURL = "https://www.google.com/appsstatus/dashboard/incidents.json"
+
+	client := httpclient.NewWithTimeout(10 * time.Second)
+	var incidents []googleIncident
+	resp, err := client.GetJSON(incidentURL, &incidents)
+	if err != nil || resp.JSONErr != nil {
+		return models.ProviderStatus{Level: models.StatusUnknown}
+	}
+
+	for _, incident := range incidents {
+		if incident.EndTime != "" {
+			continue // resolved
+		}
+		titleLower := strings.ToLower(incident.Title)
+
+		for _, keyword := range keywords {
+			if strings.Contains(titleLower, keyword) {
+				level := googleSeverityToLevel(incident.Severity)
+				now := time.Now().UTC()
+				return models.ProviderStatus{
+					Level:       level,
+					Description: incident.Title,
+					UpdatedAt:   &now,
+				}
+			}
+		}
+	}
+
+	now := time.Now().UTC()
+	return models.ProviderStatus{
+		Level:       models.StatusOperational,
+		Description: "All systems operational",
+		UpdatedAt:   &now,
+	}
+}
+
+// googleIncident represents a single incident from the Google Apps Status API.
+type googleIncident struct {
+	Title    string `json:"title,omitempty"`
+	Severity string `json:"severity,omitempty"`
+	EndTime  string `json:"end_time,omitempty"`
+}
+
+func googleSeverityToLevel(severity string) models.StatusLevel {
+	switch strings.ToLower(severity) {
+	case "low", "medium":
+		return models.StatusDegraded
+	case "high":
+		return models.StatusPartialOutage
+	case "critical", "severe":
+		return models.StatusMajorOutage
+	default:
+		return models.StatusDegraded
+	}
+}

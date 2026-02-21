@@ -15,6 +15,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
@@ -37,7 +38,9 @@ func (a Antigravity) FetchStrategies() []fetch.Strategy {
 }
 
 func (a Antigravity) FetchStatus() models.ProviderStatus {
-	return fetchAntigravityStatus()
+	return provider.FetchGoogleAppsStatus([]string{
+		"antigravity", "gemini", "cloud code", "generative ai", "ai studio",
+	})
 }
 
 func init() {
@@ -49,10 +52,8 @@ const (
 	antigravityClientID     = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
 	antigravityClientSecret = "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"
 
-	googleTokenURL       = "https://oauth2.googleapis.com/token"
 	fetchModelsURL       = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels"
 	loadCodeAssistURL    = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
-	googleIncidentURL    = "https://www.google.com/appsstatus/dashboard/incidents.json"
 	antigravityUserAgent = "antigravity"
 )
 
@@ -105,7 +106,11 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := s.refreshToken(ctx, creds)
+		refreshed := googleauth.RefreshToken(ctx, creds, googleauth.RefreshConfig{
+			ClientID:     antigravityClientID,
+			ClientSecret: antigravityClientSecret,
+			ProviderID:   "antigravity",
+		})
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
 		}
@@ -125,7 +130,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
+func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
 	// Try JSON credential files first
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
@@ -142,7 +147,7 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 		}
 
 		// Try direct OAuth credentials format
-		var oauthCreds OAuthCredentials
+		var oauthCreds googleauth.OAuthCredentials
 		if err := json.Unmarshal(data, &oauthCreds); err == nil && oauthCreds.AccessToken != "" {
 			return &oauthCreds
 		}
@@ -159,7 +164,7 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 
 // vscdbResult holds credentials and subscription info read from the vscdb.
 type vscdbResult struct {
-	creds        *OAuthCredentials
+	creds        *googleauth.OAuthCredentials
 	subscription *SubscriptionInfo
 	email        string
 }
@@ -196,7 +201,7 @@ func loadFromVSCDB() *vscdbResult {
 	}
 
 	result := &vscdbResult{
-		creds: &OAuthCredentials{
+		creds: &googleauth.OAuthCredentials{
 			AccessToken: authStatus.APIKey,
 			// No refresh token available from the vscdb — the Antigravity
 			// IDE manages token refresh internally.
@@ -206,52 +211,6 @@ func loadFromVSCDB() *vscdbResult {
 	}
 
 	return result
-}
-
-func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
-	if creds.RefreshToken == "" {
-		return nil
-	}
-
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
-	var tokenResp TokenResponse
-	resp, err := client.PostFormCtx(ctx, googleTokenURL,
-		map[string]string{
-			"grant_type":    "refresh_token",
-			"refresh_token": creds.RefreshToken,
-			"client_id":     antigravityClientID,
-			"client_secret": antigravityClientSecret,
-		},
-		&tokenResp,
-	)
-	if err != nil {
-		return nil
-	}
-	if resp.StatusCode != 200 {
-		return nil
-	}
-	if resp.JSONErr != nil {
-		return nil
-	}
-
-	updated := &OAuthCredentials{
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-	}
-
-	if tokenResp.ExpiresIn > 0 {
-		updated.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
-	}
-
-	// Preserve refresh token if the server didn't issue a new one
-	if updated.RefreshToken == "" {
-		updated.RefreshToken = creds.RefreshToken
-	}
-
-	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(config.CredentialPath("antigravity", "oauth"), content)
-
-	return updated
 }
 
 func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*FetchAvailableModelsResponse, *CodeAssistResponse) {
@@ -397,61 +356,4 @@ func summarizePeriods(periods []models.UsagePeriod, periodType models.PeriodType
 	}
 
 	return summary
-}
-
-// Status
-func fetchAntigravityStatus() models.ProviderStatus {
-	client := httpclient.NewWithTimeout(10 * time.Second)
-	var incidents []googleIncident
-	resp, err := client.GetJSON(googleIncidentURL, &incidents)
-	if err != nil || resp.JSONErr != nil {
-		return models.ProviderStatus{Level: models.StatusUnknown}
-	}
-
-	keywords := []string{"antigravity", "gemini", "cloud code", "generative ai", "ai studio"}
-
-	for _, incident := range incidents {
-		if incident.EndTime != "" {
-			continue
-		}
-		titleLower := strings.ToLower(incident.Title)
-
-		for _, keyword := range keywords {
-			if strings.Contains(titleLower, keyword) {
-				level := severityToLevel(incident.Severity)
-				now := time.Now().UTC()
-				return models.ProviderStatus{
-					Level:       level,
-					Description: incident.Title,
-					UpdatedAt:   &now,
-				}
-			}
-		}
-	}
-
-	now := time.Now().UTC()
-	return models.ProviderStatus{
-		Level:       models.StatusOperational,
-		Description: "All systems operational",
-		UpdatedAt:   &now,
-	}
-}
-
-type googleIncident struct {
-	Title    string `json:"title,omitempty"`
-	Severity string `json:"severity,omitempty"`
-	EndTime  string `json:"end_time,omitempty"`
-}
-
-func severityToLevel(severity string) models.StatusLevel {
-	switch strings.ToLower(severity) {
-	case "low", "medium":
-		return models.StatusDegraded
-	case "high":
-		return models.StatusPartialOutage
-	case "critical", "severe":
-		return models.StatusMajorOutage
-	default:
-		return models.StatusDegraded
-	}
 }

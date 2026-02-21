@@ -2,12 +2,12 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, and Gemini with consistent formatting, progress indicators, and offline support.
+A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, Gemini, Antigravity, Kimi, Z.ai, and Minimax with consistent formatting, progress indicators, and offline support.
 
 ## Features
 
 - **Unified Interface**: Single command to check usage across all configured providers
-- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini
+- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini, Antigravity, Kimi, Z.ai, Minimax
 - **Concurrent Fetching**: Check all providers in parallel
 - **Offline Support**: Displays cached data when network is unavailable
 - **JSON Output**: Scriptable with `--json` flag
@@ -61,6 +61,10 @@ vibeusage codex
 vibeusage copilot
 vibeusage cursor
 vibeusage gemini
+vibeusage antigravity
+vibeusage kimi
+vibeusage zai
+vibeusage minimax
 ```
 
 ### Authenticate with a Provider
@@ -147,6 +151,62 @@ vibeusage gemini
 vibeusage auth gemini
 ```
 
+### Antigravity (Google)
+
+**Required**: Antigravity IDE installed with active Google login
+
+Antigravity credentials are automatically detected from the IDE's state database. No manual setup is needed — just sign into the Antigravity IDE.
+
+```bash
+vibeusage antigravity
+```
+
+### Kimi (Moonshot AI)
+
+**Required**: OAuth token via device flow or API key
+
+```bash
+# Option 1: Device flow OAuth (recommended)
+vibeusage auth kimi
+
+# Option 2: Use API key
+export KIMI_CODE_API_KEY=your_api_key_here
+vibeusage kimi
+```
+
+For device flow, you'll be prompted to authorize in your browser. If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, vibeusage will automatically use its credentials from `~/.kimi/credentials/kimi-code.json`.
+
+### Z.ai (Zhipu AI)
+
+**Required**: API key
+
+```bash
+vibeusage auth zai
+```
+
+To get your API key:
+1. Open https://z.ai/manage-apikey/apikey-list
+2. Create a new API key (or copy an existing one)
+3. Paste it when prompted
+
+**Alternative**: Set the `ZAI_API_KEY` environment variable.
+
+### Minimax
+
+**Required**: Coding Plan API key
+
+```bash
+vibeusage auth minimax
+```
+
+To get your Coding Plan API key:
+1. Open https://platform.minimax.io/user-center/payment/coding-plan
+2. Copy your Coding Plan API key (starts with `sk-cp-`)
+
+**Note**: Standard API keys (`sk-api-`) won't work — you need a Coding Plan key.
+
+**Alternative**: Set the `MINIMAX_API_KEY` environment variable.
+
 ## Commands
 
 ### Global Options
@@ -187,6 +247,9 @@ vibeusage auth codex
 vibeusage auth copilot
 vibeusage auth cursor
 vibeusage auth gemini
+vibeusage auth kimi
+vibeusage auth minimax
+vibeusage auth zai
 
 # Show authentication status for all providers
 vibeusage auth --status
@@ -281,6 +344,9 @@ reuse_provider_credentials = true      # Auto-detect CLI credentials
 | `OPENAI_API_KEY` | OpenAI API key |
 | `GEMINI_API_KEY` | Gemini API key |
 | `GITHUB_TOKEN` | GitHub token for Copilot |
+| `KIMI_CODE_API_KEY` | Kimi API key |
+| `ZAI_API_KEY` | Z.ai API key |
+| `MINIMAX_API_KEY` | Minimax Coding Plan API key |
 
 ## Output Format
 

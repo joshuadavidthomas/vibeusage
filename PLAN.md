@@ -531,8 +531,11 @@ Branch `add-minimax-provider`, 1 commit.
 
 Blocked on OAuth details. Deprioritized — revisit if/when real endpoint info becomes available.
 
-### Phase 6: Polish
+### Phase 6: Polish — ✅ DONE
 
-1. Extract shared Google OAuth between Gemini and Antigravity (if duplication hurts)
-2. Extract shared device flow helper between Copilot and Kimi (if duplication hurts)
-3. Update README with new provider docs
+Branch `polish-phase-6`.
+
+1. ✅ Extracted shared Google OAuth into `internal/provider/googleauth/` — `OAuthCredentials`, `TokenResponse`, `NeedsRefresh()`, `RefreshToken()`, `ParseExpiryDate()` shared between Gemini and Antigravity
+2. ✅ Extracted shared Google Apps Status into `provider.FetchGoogleAppsStatus()` — replaces duplicated `fetchGeminiStatus()` / `fetchAntigravityStatus()`, `googleIncident`, `severityToLevel`
+3. ⏭ Device flow helper extraction skipped — Copilot and Kimi flows differ enough (headers, token saving, poll limits, browser open) that a shared helper would need a complex config struct; duplication doesn't hurt
+4. ✅ Updated README with new provider docs (Antigravity, Kimi, Z.ai, Minimax) — provider list, setup guides, auth commands, environment variables
