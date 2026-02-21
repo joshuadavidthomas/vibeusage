@@ -501,14 +501,18 @@ Branch `add-kimi-provider`, 1 commit.
 - Plan tier from user.membership.level
 - Tested with real device flow token
 
-### Phase 3: Z.ai
+### Phase 3: Z.ai — ✅ DONE
 
-Single bearer token strategy — API keys and localStorage JWTs use the same `Authorization: Bearer <token>` mechanism. No blockers.
+Branch `add-zai-provider`, 1 commit.
 
-1. Create `internal/provider/zai/` with bearer token strategy
-2. Parse quota/limit response (percentage-based)
-3. Wire into CLI + auth flow (prompt for API key or localStorage JWT)
-4. Test with real token
+- BearerTokenStrategy for API keys and JWT tokens
+- Quota endpoint: `GET /api/monitor/usage/quota/limit` with `Accept-Language: en-US,en`
+- TOKENS_LIMIT (5h session) and TIME_LIMIT (monthly MCP) period parsing
+- Percentage-based utilization (0-100, clamped)
+- Reset times from Unix millisecond timestamps
+- Plan tier from `data.level` (lite/pro/max)
+- Auth flow prompts for API key from `z.ai/manage-apikey/apikey-list`
+- Handles auth error code 1001 as fatal
 
 ### Phase 4: Minimax
 
