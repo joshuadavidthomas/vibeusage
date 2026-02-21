@@ -350,19 +350,14 @@ During `vibeusage auth minimax`, validate that the key starts with `sk-cp-`.
 ### API endpoint
 
 ```
-GET https://platform.minimax.io/v1/api/openplatform/coding_plan/remains?GroupId=<group_id>
+GET https://platform.minimax.io/v1/api/openplatform/coding_plan/remains
 Authorization: Bearer <coding_plan_api_key>
 Content-Type: application/json
 User-Agent: Mozilla/5.0 ...  (required — Cloudflare 1010 bot block without it)
 Referer: https://platform.minimax.io/
 ```
 
-Note: the host is `platform.minimax.io` (not `www.minimax.io`), and requires a `GroupId` query param. Also requires a browser-like `User-Agent` to pass Cloudflare bot detection.
-
-**TODO**: Where does `GroupId` come from? Likely from the user's account. Need to either:
-- Have the user provide it alongside the API key
-- Find an endpoint that returns it given just the API key
-- Check if it's embedded in the API key or derivable from account info
+Note: the host is `platform.minimax.io` (not `www.minimax.io`). Requires a browser-like `User-Agent` to pass Cloudflare bot detection. The dashboard sends a `GroupId` query param but it's **not required** — the API key already identifies the account.
 
 **Verified response** (real coding plan key, Plus tier):
 ```json
@@ -439,10 +434,10 @@ No known status page. Return `StatusUnknown`.
 - ✅ Reset time: `end_time` field (Unix millis)
 - ✅ Host is `platform.minimax.io` not `www.minimax.io`
 - ✅ Requires browser User-Agent (Cloudflare bot protection)
+- ✅ `GroupId` query param is optional — API key identifies the account
 
 ### Open questions
 
-- [ ] Where does `GroupId` come from? Is there an API to look it up from just the API key?
 - [ ] What are the `total_count` values per tier? (confirmed 1500 for Plus)
 - [ ] Is plan tier info available from any other endpoint?
 
@@ -515,12 +510,11 @@ Single bearer token strategy — API keys and localStorage JWTs use the same `Au
 
 ### Phase 4: Minimax
 
-API key auth, per-model response format verified. Minor complication: requires `GroupId` param and browser User-Agent.
+API key auth, per-model response format verified. No blockers.
 
-1. Figure out how to obtain/store `GroupId` (may need user to provide it during auth)
-2. Create `internal/provider/minimax/` with API key strategy
-3. Wire into CLI
-4. Test with real API key
+1. Create `internal/provider/minimax/` with API key strategy
+2. Wire into CLI
+3. Test with real API key
 
 ### Phase 5: Kiro
 
