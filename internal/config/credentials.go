@@ -14,6 +14,7 @@ var ProviderCLIPaths = map[string][]string{
 	"gemini":      {"~/.gemini/oauth_creds.json"},
 	"copilot":     {"~/.config/github-copilot/hosts.json"},
 	"cursor":      {"~/.cursor/mcp-state.json"},
+	"kimi":        {"~/.kimi/credentials/kimi-code.json"},
 }
 
 // ProviderEnvVars maps provider IDs to their environment variable names.
@@ -24,6 +25,7 @@ var ProviderEnvVars = map[string]string{
 	"gemini":      "GEMINI_API_KEY",
 	"copilot":     "GITHUB_TOKEN",
 	"cursor":      "CURSOR_API_KEY",
+	"kimi":        "KIMI_CODE_API_KEY",
 }
 
 func CredentialPath(providerID, credType string) string {

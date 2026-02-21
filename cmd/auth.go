@@ -13,6 +13,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/copilot"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/kimi"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
@@ -38,6 +39,8 @@ var authCmd = &cobra.Command{
 			return authCursor()
 		case "copilot":
 			return authCopilot()
+		case "kimi":
+			return authKimi()
 		default:
 			return authGeneric(providerID)
 		}
@@ -190,6 +193,32 @@ func authCopilot() error {
 	}
 
 	success, err := copilot.RunDeviceFlow(outWriter, quiet)
+	if err != nil {
+		return err
+	}
+	if !success {
+		return fmt.Errorf("authentication failed")
+	}
+	return nil
+}
+
+func authKimi() error {
+	hasCreds, source := config.CheckProviderCredentials("kimi")
+	if hasCreds && !quiet {
+		out("✓ Kimi is already authenticated (%s)\n", sourceToLabel(source))
+
+		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title: "Re-authenticate?",
+		})
+		if err != nil {
+			return err
+		}
+		if !reauth {
+			return nil
+		}
+	}
+
+	success, err := kimi.RunDeviceFlow(outWriter, quiet)
 	if err != nil {
 		return err
 	}
