@@ -15,6 +15,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
@@ -38,7 +39,9 @@ func (g Gemini) FetchStrategies() []fetch.Strategy {
 }
 
 func (g Gemini) FetchStatus() models.ProviderStatus {
-	return fetchGeminiStatus()
+	return provider.FetchGoogleAppsStatus([]string{
+		"gemini", "ai studio", "aistudio", "generative ai", "vertex ai", "cloud code",
+	})
 }
 
 func init() {
@@ -51,11 +54,9 @@ const (
 	geminiClientID     = "77185425430.apps.googleusercontent.com"
 	geminiClientSecret = "GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv"
 
-	googleTokenURL    = "https://oauth2.googleapis.com/token"
-	quotaURL          = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota"
-	codeAssistURL     = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
-	modelsURL         = "https://generativelanguage.googleapis.com/v1beta/models"
-	googleIncidentURL = "https://www.google.com/appsstatus/dashboard/incidents.json"
+	quotaURL      = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota"
+	codeAssistURL = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
+	modelsURL     = "https://generativelanguage.googleapis.com/v1beta/models"
 )
 
 // OAuth Strategy
@@ -91,7 +92,11 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := s.refreshToken(ctx, creds)
+		refreshed := googleauth.RefreshToken(ctx, creds, googleauth.RefreshConfig{
+			ClientID:     geminiClientID,
+			ClientSecret: geminiClientSecret,
+			ProviderID:   "gemini",
+		})
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
 		}
@@ -111,7 +116,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
+func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
 		if err != nil || data == nil {
@@ -126,52 +131,6 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 		}
 	}
 	return nil
-}
-
-func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
-	if creds.RefreshToken == "" {
-		return nil
-	}
-
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
-	var tokenResp TokenResponse
-	resp, err := client.PostFormCtx(ctx, googleTokenURL,
-		map[string]string{
-			"grant_type":    "refresh_token",
-			"refresh_token": creds.RefreshToken,
-			"client_id":     geminiClientID,
-			"client_secret": geminiClientSecret,
-		},
-		&tokenResp,
-	)
-	if err != nil {
-		return nil
-	}
-	if resp.StatusCode != 200 {
-		return nil
-	}
-	if resp.JSONErr != nil {
-		return nil
-	}
-
-	updated := &OAuthCredentials{
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-	}
-
-	if tokenResp.ExpiresIn > 0 {
-		updated.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
-	}
-
-	// Preserve refresh token if the server didn't issue a new one
-	if updated.RefreshToken == "" {
-		updated.RefreshToken = creds.RefreshToken
-	}
-
-	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(config.CredentialPath("gemini", "oauth"), content)
-
-	return updated
 }
 
 func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*QuotaResponse, *CodeAssistResponse) {
@@ -350,57 +309,6 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 		return strings.TrimSpace(string(data))
 	}
 	return ""
-}
-
-// Status
-func fetchGeminiStatus() models.ProviderStatus {
-	client := httpclient.NewWithTimeout(10 * time.Second)
-	var incidents []googleIncident
-	resp, err := client.GetJSON(googleIncidentURL, &incidents)
-	if err != nil || resp.JSONErr != nil {
-		return models.ProviderStatus{Level: models.StatusUnknown}
-	}
-
-	geminiKeywords := []string{"gemini", "ai studio", "aistudio", "generative ai", "vertex ai", "cloud code"}
-
-	for _, incident := range incidents {
-		if incident.EndTime != "" {
-			continue // ended
-		}
-		titleLower := strings.ToLower(incident.Title)
-
-		for _, keyword := range geminiKeywords {
-			if strings.Contains(titleLower, keyword) {
-				level := severityToLevel(incident.Severity)
-				now := time.Now().UTC()
-				return models.ProviderStatus{
-					Level:       level,
-					Description: incident.Title,
-					UpdatedAt:   &now,
-				}
-			}
-		}
-	}
-
-	now := time.Now().UTC()
-	return models.ProviderStatus{
-		Level:       models.StatusOperational,
-		Description: "All systems operational",
-		UpdatedAt:   &now,
-	}
-}
-
-func severityToLevel(severity string) models.StatusLevel {
-	switch strings.ToLower(severity) {
-	case "low", "medium":
-		return models.StatusDegraded
-	case "high":
-		return models.StatusPartialOutage
-	case "critical", "severe":
-		return models.StatusMajorOutage
-	default:
-		return models.StatusDegraded
-	}
 }
 
 func nextMidnightUTC() time.Time {

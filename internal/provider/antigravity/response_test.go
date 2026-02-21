@@ -204,67 +204,6 @@ func TestCodeAssistRequest_Marshal(t *testing.T) {
 	}
 }
 
-func TestTokenResponse_Unmarshal(t *testing.T) {
-	raw := `{
-		"access_token": "new-token",
-		"refresh_token": "new-refresh",
-		"expires_in": 3600
-	}`
-
-	var resp TokenResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if resp.AccessToken != "new-token" {
-		t.Errorf("access_token = %q, want %q", resp.AccessToken, "new-token")
-	}
-	if resp.RefreshToken != "new-refresh" {
-		t.Errorf("refresh_token = %q, want %q", resp.RefreshToken, "new-refresh")
-	}
-	if resp.ExpiresIn != 3600 {
-		t.Errorf("expires_in = %v, want 3600", resp.ExpiresIn)
-	}
-}
-
-func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
-	tests := []struct {
-		name  string
-		creds OAuthCredentials
-		want  bool
-	}{
-		{
-			name:  "no expiry",
-			creds: OAuthCredentials{AccessToken: "tok"},
-			want:  false,
-		},
-		{
-			name:  "expired",
-			creds: OAuthCredentials{AccessToken: "tok", ExpiresAt: "2020-01-01T00:00:00Z"},
-			want:  true,
-		},
-		{
-			name:  "far future",
-			creds: OAuthCredentials{AccessToken: "tok", ExpiresAt: "2099-01-01T00:00:00Z"},
-			want:  false,
-		},
-		{
-			name:  "invalid",
-			creds: OAuthCredentials{AccessToken: "tok", ExpiresAt: "garbage"},
-			want:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.creds.NeedsRefresh()
-			if got != tt.want {
-				t.Errorf("NeedsRefresh() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestAntigravityCredentials_AccessTokenFormat(t *testing.T) {
 	raw := `{
 		"access_token": "at-val",
@@ -320,27 +259,5 @@ func TestVscdbAuthStatus_Unmarshal(t *testing.T) {
 	}
 	if status.Email != "test@example.com" {
 		t.Errorf("email = %q, want %q", status.Email, "test@example.com")
-	}
-}
-
-func TestParseExpiryDate(t *testing.T) {
-	tests := []struct {
-		name string
-		v    any
-		want string
-	}{
-		{"float64 ms timestamp", float64(1740000000000), "2025-02-19T21:20:00Z"},
-		{"string", "2026-02-20T00:00:00Z", "2026-02-20T00:00:00Z"},
-		{"nil", nil, ""},
-		{"zero float64", float64(0), ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := parseExpiryDate(tt.v)
-			if got != tt.want {
-				t.Errorf("parseExpiryDate(%v) = %q, want %q", tt.v, got, tt.want)
-			}
-		})
 	}
 }

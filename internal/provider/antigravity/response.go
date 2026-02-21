@@ -1,6 +1,10 @@
 package antigravity
 
-import "time"
+import (
+	"time"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
+)
 
 // FetchAvailableModelsResponse represents the response from the
 // cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels endpoint.
@@ -85,32 +89,6 @@ type CodeAssistRequestMetadata struct {
 	PluginType string `json:"pluginType"`
 }
 
-// TokenResponse represents the response from the Google OAuth token refresh endpoint.
-type TokenResponse struct {
-	AccessToken  string  `json:"access_token"`
-	RefreshToken string  `json:"refresh_token,omitempty"`
-	ExpiresIn    float64 `json:"expires_in,omitempty"`
-}
-
-// OAuthCredentials represents stored OAuth credentials for Antigravity.
-type OAuthCredentials struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresAt    string `json:"expires_at,omitempty"`
-}
-
-// NeedsRefresh reports whether the credentials need refreshing.
-func (c OAuthCredentials) NeedsRefresh() bool {
-	if c.ExpiresAt == "" {
-		return false
-	}
-	expiry, err := time.Parse(time.RFC3339, c.ExpiresAt)
-	if err != nil {
-		return true
-	}
-	return time.Now().UTC().Add(5 * time.Minute).After(expiry)
-}
-
 // AntigravityCredentials represents a JSON credential file format.
 type AntigravityCredentials struct {
 	AccessToken  string `json:"access_token,omitempty"`
@@ -121,7 +99,7 @@ type AntigravityCredentials struct {
 }
 
 // ToOAuthCredentials converts the Antigravity credential format to OAuthCredentials.
-func (a *AntigravityCredentials) ToOAuthCredentials() *OAuthCredentials {
+func (a *AntigravityCredentials) ToOAuthCredentials() *googleauth.OAuthCredentials {
 	accessToken := a.AccessToken
 	if accessToken == "" {
 		accessToken = a.Token
@@ -129,13 +107,13 @@ func (a *AntigravityCredentials) ToOAuthCredentials() *OAuthCredentials {
 	if accessToken == "" {
 		return nil
 	}
-	creds := &OAuthCredentials{
+	creds := &googleauth.OAuthCredentials{
 		AccessToken:  accessToken,
 		RefreshToken: a.RefreshToken,
 		ExpiresAt:    a.ExpiresAt,
 	}
 	if creds.ExpiresAt == "" {
-		creds.ExpiresAt = parseExpiryDate(a.ExpiryDate)
+		creds.ExpiresAt = googleauth.ParseExpiryDate(a.ExpiryDate)
 	}
 	return creds
 }
@@ -147,17 +125,4 @@ type VscdbAuthStatus struct {
 	APIKey                      string `json:"apiKey,omitempty"`
 	Email                       string `json:"email,omitempty"`
 	UserStatusProtoBinaryBase64 string `json:"userStatusProtoBinaryBase64,omitempty"`
-}
-
-// parseExpiryDate converts a mixed-type expiry_date to an RFC3339 string.
-func parseExpiryDate(v any) string {
-	switch val := v.(type) {
-	case float64:
-		if val > 0 {
-			return time.UnixMilli(int64(val)).UTC().Format(time.RFC3339)
-		}
-	case string:
-		return val
-	}
-	return ""
 }

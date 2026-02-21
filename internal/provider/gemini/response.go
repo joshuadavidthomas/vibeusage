@@ -1,6 +1,10 @@
 package gemini
 
-import "time"
+import (
+	"time"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
+)
 
 // QuotaResponse represents the response from the Gemini quota endpoint.
 type QuotaResponse struct {
@@ -41,32 +45,6 @@ type CodeAssistResponse struct {
 	UserTier string `json:"user_tier,omitempty"`
 }
 
-// TokenResponse represents the response from the Google OAuth token refresh endpoint.
-type TokenResponse struct {
-	AccessToken  string  `json:"access_token"`
-	RefreshToken string  `json:"refresh_token,omitempty"`
-	ExpiresIn    float64 `json:"expires_in,omitempty"`
-}
-
-// OAuthCredentials represents stored OAuth credentials for Gemini.
-type OAuthCredentials struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresAt    string `json:"expires_at,omitempty"`
-}
-
-// NeedsRefresh reports whether the credentials need refreshing.
-func (c OAuthCredentials) NeedsRefresh() bool {
-	if c.ExpiresAt == "" {
-		return false
-	}
-	expiry, err := time.Parse(time.RFC3339, c.ExpiresAt)
-	if err != nil {
-		return true
-	}
-	return time.Now().UTC().Add(5 * time.Minute).After(expiry)
-}
-
 // GeminiCLICredentials represents the Gemini CLI "installed" format.
 type GeminiCLICredentials struct {
 	Installed *GeminiCLIInstalled `json:"installed,omitempty"`
@@ -87,7 +65,7 @@ type GeminiCLIInstalled struct {
 }
 
 // ToOAuthCredentials converts the CLI installed format to OAuthCredentials.
-func (g *GeminiCLIInstalled) ToOAuthCredentials() *OAuthCredentials {
+func (g *GeminiCLIInstalled) ToOAuthCredentials() *googleauth.OAuthCredentials {
 	accessToken := g.Token
 	if accessToken == "" {
 		accessToken = g.AccessToken
@@ -95,32 +73,32 @@ func (g *GeminiCLIInstalled) ToOAuthCredentials() *OAuthCredentials {
 	if accessToken == "" {
 		return nil
 	}
-	creds := &OAuthCredentials{
+	creds := &googleauth.OAuthCredentials{
 		AccessToken:  accessToken,
 		RefreshToken: g.RefreshToken,
 	}
-	creds.ExpiresAt = parseExpiryDate(g.ExpiryDate)
+	creds.ExpiresAt = googleauth.ParseExpiryDate(g.ExpiryDate)
 	return creds
 }
 
 // EffectiveCredentials returns OAuthCredentials from whichever format is present.
-func (g *GeminiCLICredentials) EffectiveCredentials() *OAuthCredentials {
+func (g *GeminiCLICredentials) EffectiveCredentials() *googleauth.OAuthCredentials {
 	// Try "installed" nested format first
 	if g.Installed != nil {
 		return g.Installed.ToOAuthCredentials()
 	}
 	// Try "token" + "refresh_token" format
 	if g.Token != "" {
-		creds := &OAuthCredentials{
+		creds := &googleauth.OAuthCredentials{
 			AccessToken:  g.Token,
 			RefreshToken: g.RefreshToken,
 		}
-		creds.ExpiresAt = parseExpiryDate(g.ExpiryDate)
+		creds.ExpiresAt = googleauth.ParseExpiryDate(g.ExpiryDate)
 		return creds
 	}
 	// Try "access_token" format
 	if g.AccessToken != "" {
-		return &OAuthCredentials{
+		return &googleauth.OAuthCredentials{
 			AccessToken:  g.AccessToken,
 			RefreshToken: g.RefreshToken,
 			ExpiresAt:    g.ExpiresAt,
@@ -137,24 +115,4 @@ type ModelsResponse struct {
 // GeminiModel represents a single model from the models endpoint.
 type GeminiModel struct {
 	Name string `json:"name,omitempty"`
-}
-
-// googleIncident represents a single incident from the Google Apps Status API.
-type googleIncident struct {
-	Title    string `json:"title,omitempty"`
-	Severity string `json:"severity,omitempty"`
-	EndTime  string `json:"end_time,omitempty"`
-}
-
-// parseExpiryDate converts a mixed-type expiry_date to an RFC3339 string.
-func parseExpiryDate(v any) string {
-	switch val := v.(type) {
-	case float64:
-		if val > 0 {
-			return time.UnixMilli(int64(val)).UTC().Format(time.RFC3339)
-		}
-	case string:
-		return val
-	}
-	return ""
 }
