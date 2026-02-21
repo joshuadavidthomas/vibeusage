@@ -341,24 +341,71 @@ Chinese AI provider with M2.5 model. Subscription plans with 5-hour refresh cycl
 
 ### Auth strategy: API key
 
-From [Minimax FAQ](https://platform.minimax.io/docs/coding-plan/faq):
-
-```
-GET https://www.minimax.io/v1/api/openplatform/coding_plan/remains
-Authorization: Bearer <CODING_PLAN_API_KEY>
-Content-Type: application/json
-```
-
-Note: Minimax has separate API keys for coding plans vs pay-as-you-go. Only the Coding Plan key works for quota tracking. Key from: `https://platform.minimax.io/user-center/payment/coding-plan`
+Note: Minimax has separate API keys for coding plans vs pay-as-you-go. Only the Coding Plan key (prefix `sk-cp-`) works for quota tracking. Key from: `https://platform.minimax.io/user-center/payment/coding-plan`
 
 ### API endpoint
 
 ```
-GET https://www.minimax.io/v1/api/openplatform/coding_plan/remains
-Authorization: Bearer <api_key_or_session_token>
+GET https://platform.minimax.io/v1/api/openplatform/coding_plan/remains?GroupId=<group_id>
+Authorization: Bearer <coding_plan_api_key>
+Content-Type: application/json
+User-Agent: Mozilla/5.0 ...  (required — Cloudflare 1010 bot block without it)
+Referer: https://platform.minimax.io/
 ```
 
-**Response format**: Not documented. Expected to contain remaining prompts, possibly with reset time and plan info. Need to make a real request to determine structure.
+Note: the host is `platform.minimax.io` (not `www.minimax.io`), and requires a `GroupId` query param. Also requires a browser-like `User-Agent` to pass Cloudflare bot detection.
+
+**TODO**: Where does `GroupId` come from? Likely from the user's account. Need to either:
+- Have the user provide it alongside the API key
+- Find an endpoint that returns it given just the API key
+- Check if it's embedded in the API key or derivable from account info
+
+**Verified response** (real coding plan key, Plus tier):
+```json
+{
+  "model_remains": [
+    {
+      "start_time": 1771650000000,
+      "end_time": 1771668000000,
+      "remains_time": 8196068,
+      "current_interval_total_count": 1500,
+      "current_interval_usage_count": 1500,
+      "model_name": "MiniMax-M2"
+    },
+    {
+      "start_time": 1771650000000,
+      "end_time": 1771668000000,
+      "remains_time": 8196068,
+      "current_interval_total_count": 1500,
+      "current_interval_usage_count": 1500,
+      "model_name": "MiniMax-M2.1"
+    },
+    {
+      "start_time": 1771650000000,
+      "end_time": 1771668000000,
+      "remains_time": 8196068,
+      "current_interval_total_count": 1500,
+      "current_interval_usage_count": 1500,
+      "model_name": "MiniMax-M2.5"
+    }
+  ],
+  "base_resp": {
+    "status_code": 0,
+    "status_msg": "success"
+  }
+}
+```
+
+**Field details**:
+- `model_remains[]`: per-model quota info
+- `start_time` / `end_time`: Unix millis, defines the 5-hour window (05:00–10:00 UTC)
+- `remains_time`: milliseconds remaining in the window (for countdown, not quota)
+- `current_interval_total_count`: total prompts in window (1500 = Plus tier)
+- `current_interval_usage_count`: prompts used (1500/1500 = 100% used)
+- `model_name`: model identifier
+- Utilization: `usage_count / total_count * 100`
+- Reset time: `end_time` (Unix millis)
+- No plan tier field in response — infer from `total_count` (500=Starter, 1500=Plus, 5000=Max?)
 
 ### Implementation
 
@@ -381,12 +428,19 @@ Authorization: Bearer <api_key_or_session_token>
 
 No known status page. Return `StatusUnknown`.
 
+### Resolved questions
+
+- ✅ Response format: per-model array with `total_count`, `usage_count`, `start_time`, `end_time`
+- ✅ Counts not percentages — compute utilization as `usage_count / total_count * 100`
+- ✅ Reset time: `end_time` field (Unix millis)
+- ✅ Host is `platform.minimax.io` not `www.minimax.io`
+- ✅ Requires browser User-Agent (Cloudflare bot protection)
+
 ### Open questions
 
-- [ ] What is the exact response format from `/coding_plan/remains`?
-- [ ] Does it return remaining count, total, percentage, or all?
-- [ ] Does it include reset time?
-- [ ] Is plan tier info included?
+- [ ] Where does `GroupId` come from? Is there an API to look it up from just the API key?
+- [ ] What are the `total_count` values per tier? (confirmed 1500 for Plus)
+- [ ] Is plan tier info available from any other endpoint?
 
 
 ## Kiro (AWS)
@@ -457,9 +511,9 @@ Single bearer token strategy — API keys and localStorage JWTs use the same `Au
 
 ### Phase 4: Minimax
 
-API key auth, but unknown response format.
+API key auth, per-model response format verified. Minor complication: requires `GroupId` param and browser User-Agent.
 
-1. Make a real request to `/coding_plan/remains` to determine response format
+1. Figure out how to obtain/store `GroupId` (may need user to provide it during auth)
 2. Create `internal/provider/minimax/` with API key strategy
 3. Wire into CLI
 4. Test with real API key
