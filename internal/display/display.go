@@ -271,10 +271,24 @@ func groupPeriods(periods []models.UsagePeriod) (session, weekly, daily, monthly
 }
 
 // RenderProviderError renders a compact error line for a failed provider.
+// Only suggests auth when the error is actually about missing credentials.
 func RenderProviderError(providerID string, errMsg string) string {
 	name := strutil.TitleCase(providerID)
-	return dimStyle.Render(name+": "+errMsg) +
-		dimStyle.Render("  (vibeusage auth "+providerID+")")
+	line := dimStyle.Render(name + ": " + errMsg)
+	if isCredentialError(errMsg) {
+		line += dimStyle.Render("  (vibeusage auth " + providerID + ")")
+	}
+	return line
+}
+
+func isCredentialError(errMsg string) bool {
+	lower := strings.ToLower(errMsg)
+	for _, s := range []string{"not configured", "no credentials", "no oauth", "no strategies"} {
+		if strings.Contains(lower, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // StatusSymbol returns a colored status indicator symbol.
