@@ -143,9 +143,10 @@ func (a *AntigravityCredentials) ToOAuthCredentials() *OAuthCredentials {
 // VscdbAuthStatus represents the JSON blob stored in Antigravity's VS Code
 // state database under the "antigravityAuthStatus" key.
 type VscdbAuthStatus struct {
-	Name   string `json:"name,omitempty"`
-	APIKey string `json:"apiKey,omitempty"`
-	Email  string `json:"email,omitempty"`
+	Name                        string `json:"name,omitempty"`
+	APIKey                      string `json:"apiKey,omitempty"`
+	Email                       string `json:"email,omitempty"`
+	UserStatusProtoBinaryBase64 string `json:"userStatusProtoBinaryBase64,omitempty"`
 }
 
 // parseExpiryDate converts a mixed-type expiry_date to an RFC3339 string.

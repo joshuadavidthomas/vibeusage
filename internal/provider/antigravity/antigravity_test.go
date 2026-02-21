@@ -277,14 +277,14 @@ func TestPeriodTypeForTier(t *testing.T) {
 		tier string
 		want models.PeriodType
 	}{
-		{"free", models.PeriodWeekly},
 		{"", models.PeriodWeekly},
-		{"Antigravity", models.PeriodWeekly},
-		{"antigravity", models.PeriodWeekly},
+		{"free", models.PeriodWeekly},
 		{"free-tier", models.PeriodWeekly},
-		{"premium", models.PeriodSession},
+		{"Antigravity", models.PeriodWeekly},
 		{"Google AI Pro", models.PeriodSession},
 		{"Google AI Ultra", models.PeriodSession},
+		{"g1-pro-tier", models.PeriodSession},
+		{"premium", models.PeriodSession},
 	}
 
 	for _, tt := range tests {

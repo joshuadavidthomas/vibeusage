@@ -57,7 +57,9 @@ const (
 )
 
 // OAuthStrategy fetches Antigravity quota using Google OAuth credentials.
-type OAuthStrategy struct{}
+type OAuthStrategy struct {
+	vscdb *vscdbResult // cached vscdb data (credentials + subscription)
+}
 
 func (s *OAuthStrategy) Name() string { return "oauth" }
 
@@ -75,17 +77,21 @@ func (s *OAuthStrategy) IsAvailable() bool {
 }
 
 func (s *OAuthStrategy) credentialPaths() []string {
-	home, _ := os.UserHomeDir()
-	return []string{
-		config.CredentialPath("antigravity", "oauth"),
-		filepath.Join(home, ".config", "Antigravity", "credentials.json"),
+	paths := []string{config.CredentialPath("antigravity", "oauth")}
+	if configDir, err := os.UserConfigDir(); err == nil {
+		paths = append(paths, filepath.Join(configDir, "Antigravity", "credentials.json"))
 	}
+	return paths
 }
 
 // vscdbPath returns the path to Antigravity's VS Code state database.
 func vscdbPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "Antigravity", "User", "globalStorage", "state.vscdb")
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		home, _ := os.UserHomeDir()
+		configDir = filepath.Join(home, ".config")
+	}
+	return filepath.Join(configDir, "Antigravity", "User", "globalStorage", "state.vscdb")
 }
 
 func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -143,18 +149,28 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 	}
 
 	// Try reading from Antigravity's VS Code state database
-	if creds := loadCredentialsFromVSCDB(); creds != nil {
-		return creds
+	if result := loadFromVSCDB(); result != nil {
+		s.vscdb = result
+		return result.creds
 	}
 
 	return nil
 }
 
-// loadCredentialsFromVSCDB reads OAuth credentials from Antigravity's
-// VS Code state database (state.vscdb). Antigravity stores auth status
-// as a JSON blob in a SQLite database under the "antigravityAuthStatus" key.
-// The apiKey field contains a Google OAuth access token (ya29.*).
-func loadCredentialsFromVSCDB() *OAuthCredentials {
+// vscdbResult holds credentials and subscription info read from the vscdb.
+type vscdbResult struct {
+	creds        *OAuthCredentials
+	subscription *SubscriptionInfo
+	email        string
+}
+
+// loadFromVSCDB reads OAuth credentials and subscription info from
+// Antigravity's VS Code state database (state.vscdb). Antigravity stores
+// auth status as a JSON blob in a SQLite database under the
+// "antigravityAuthStatus" key. The apiKey field contains a Google OAuth
+// access token (ya29.*), and the userStatusProtoBinaryBase64 field contains
+// a protobuf blob with subscription tier info.
+func loadFromVSCDB() *vscdbResult {
 	dbPath := vscdbPath()
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil
@@ -179,13 +195,17 @@ func loadCredentialsFromVSCDB() *OAuthCredentials {
 		return nil
 	}
 
-	return &OAuthCredentials{
-		AccessToken: authStatus.APIKey,
-		// No refresh token available from the vscdb — the Antigravity IDE
-		// manages token refresh internally. The access token may be expired,
-		// in which case the fetch will fail and the user needs to open
-		// Antigravity to refresh it.
+	result := &vscdbResult{
+		creds: &OAuthCredentials{
+			AccessToken: authStatus.APIKey,
+			// No refresh token available from the vscdb — the Antigravity
+			// IDE manages token refresh internally.
+		},
+		email:        authStatus.Email,
+		subscription: parseSubscriptionFromProto(authStatus.UserStatusProtoBinaryBase64),
 	}
+
+	return result
 }
 
 func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
@@ -270,21 +290,29 @@ func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) 
 }
 
 // periodTypeForTier returns the appropriate period type based on the user's plan.
-// Free tier uses weekly refresh cycles; paid tiers (Pro/Ultra) use 5-hour sessions.
+// Paid tiers (Pro/Ultra) use 5-hour sessions; free tier uses weekly cycles.
 func periodTypeForTier(tier string) models.PeriodType {
 	lower := strings.ToLower(tier)
 	switch {
-	case lower == "", lower == "free",
-		strings.Contains(lower, "free"),
-		lower == "antigravity":
-		return models.PeriodWeekly
-	default:
+	case strings.Contains(lower, "pro"),
+		strings.Contains(lower, "ultra"),
+		strings.Contains(lower, "premium"):
 		return models.PeriodSession
+	default:
+		return models.PeriodWeekly
 	}
 }
 
 func (s *OAuthStrategy) parseModelsResponse(modelsResp FetchAvailableModelsResponse, codeAssistResp *CodeAssistResponse) *models.UsageSnapshot {
-	tier := codeAssistResp.EffectiveTier()
+	// Determine plan name: prefer subscription info from protobuf (accurate),
+	// fall back to loadCodeAssist response (may show product name, not subscription).
+	tier := ""
+	if s.vscdb != nil && s.vscdb.subscription != nil {
+		tier = s.vscdb.subscription.TierName
+	}
+	if tier == "" {
+		tier = codeAssistResp.EffectiveTier()
+	}
 	periodType := periodTypeForTier(tier)
 
 	var periods []models.UsagePeriod
@@ -329,6 +357,9 @@ func (s *OAuthStrategy) parseModelsResponse(modelsResp FetchAvailableModelsRespo
 	var identity *models.ProviderIdentity
 	if tier != "" {
 		identity = &models.ProviderIdentity{Plan: tier}
+		if s.vscdb != nil && s.vscdb.email != "" {
+			identity.Email = s.vscdb.email
+		}
 	}
 
 	now := time.Now().UTC()
