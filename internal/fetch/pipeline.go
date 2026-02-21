@@ -18,7 +18,7 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 			attempts = append(attempts, FetchAttempt{
 				Strategy: strategy.Name(),
 				Success:  false,
-				Error:    "Strategy not available",
+				Error:    "not configured",
 			})
 			continue
 		}

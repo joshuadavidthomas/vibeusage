@@ -117,8 +117,8 @@ func fetchAndDisplayAll(ctx context.Context, refresh bool) error {
 	var outcomes map[string]fetch.FetchOutcome
 
 	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
-		providerIDs := enabledProviderIDs(providerMap)
-		err := spinner.Run(providerIDs, func(onComplete func(spinner.CompletionInfo)) {
+		spinnerIDs := availableProviderIDs(providerMap)
+		err := spinner.Run(spinnerIDs, func(onComplete func(spinner.CompletionInfo)) {
 			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
 			})
@@ -153,15 +153,30 @@ func enabledProviderIDs(providerMap map[string][]fetch.Strategy) []string {
 	return ids
 }
 
-func outcomeToCompletion(o fetch.FetchOutcome) spinner.CompletionInfo {
-	durationMs := 0
-	for _, a := range o.Attempts {
-		durationMs += a.DurationMs
+// availableProviderIDs returns enabled provider IDs that have at least one
+// available strategy. Used to filter what the spinner tracks — providers
+// with no credentials are silently excluded.
+func availableProviderIDs(providerMap map[string][]fetch.Strategy) []string {
+	cfg := config.Get()
+	var ids []string
+	for pid, strategies := range providerMap {
+		if !cfg.IsProviderEnabled(pid) {
+			continue
+		}
+		for _, s := range strategies {
+			if s.IsAvailable() {
+				ids = append(ids, pid)
+				break
+			}
+		}
 	}
+	sort.Strings(ids)
+	return ids
+}
+
+func outcomeToCompletion(o fetch.FetchOutcome) spinner.CompletionInfo {
 	return spinner.CompletionInfo{
 		ProviderID: o.ProviderID,
-		Source:     o.Source,
-		DurationMs: durationMs,
 		Success:    o.Success,
 		Error:      o.Error,
 	}
@@ -193,9 +208,6 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 		return
 	}
 
-	cfg := config.Get()
-	staleThreshold := cfg.Fetch.StaleThresholdMinutes
-
 	ids := make([]string, 0, len(outcomes))
 	for id := range outcomes {
 		ids = append(ids, id)
@@ -215,19 +227,12 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 
 		snap := *outcome.Snapshot
 
-		if outcome.Cached && !quiet {
-			if w := display.RenderStaleWarning(snap, staleThreshold); w != "" {
-				outln(w)
-				outln()
-			}
-		}
-
 		if quiet {
 			for _, p := range snap.Periods {
 				out("%s %s: %d%%\n", pid, p.Name, p.Utilization)
 			}
 		} else {
-			outln(display.RenderProviderPanel(snap))
+			outln(display.RenderProviderPanel(snap, outcome.Cached))
 		}
 	}
 
@@ -301,14 +306,6 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 		return nil
 	}
 
-	cfg := config.Get()
-	if outcome.Cached {
-		if w := display.RenderStaleWarning(snap, cfg.Fetch.StaleThresholdMinutes); w != "" {
-			outln(w)
-			outln()
-		}
-	}
-
 	logFields := []any{"provider", providerID}
 	if durationMs > 0 {
 		logFields = append(logFields, "duration_ms", durationMs)
@@ -321,7 +318,7 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh boo
 	}
 	logging.Logger.Debug("fetch complete", logFields...)
 
-	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap))
+	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached))
 	return nil
 }
 

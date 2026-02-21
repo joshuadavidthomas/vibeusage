@@ -246,8 +246,8 @@ func TestExecutePipeline_UnavailableStrategy(t *testing.T) {
 	if len(outcome.Attempts) != 1 {
 		t.Errorf("expected 1 attempt, got %d", len(outcome.Attempts))
 	}
-	if outcome.Attempts[0].Error != "Strategy not available" {
-		t.Errorf("expected 'Strategy not available', got '%s'", outcome.Attempts[0].Error)
+	if outcome.Attempts[0].Error != "not configured" {
+		t.Errorf("expected 'not configured', got '%s'", outcome.Attempts[0].Error)
 	}
 }
 
@@ -595,8 +595,8 @@ func TestExecutePipeline_AttemptsRecordErrors(t *testing.T) {
 	if outcome.Attempts[0].Strategy != "unavail" {
 		t.Errorf("attempt[0] strategy = %q, want %q", outcome.Attempts[0].Strategy, "unavail")
 	}
-	if outcome.Attempts[0].Error != "Strategy not available" {
-		t.Errorf("attempt[0] error = %q, want %q", outcome.Attempts[0].Error, "Strategy not available")
+	if outcome.Attempts[0].Error != "not configured" {
+		t.Errorf("attempt[0] error = %q, want %q", outcome.Attempts[0].Error, "not configured")
 	}
 
 	// Attempt 1: ResultFail

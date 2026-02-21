@@ -54,27 +54,35 @@ func FormatPeriodLine(period models.UsagePeriod, nameWidth int) string {
 	color := models.PaceToColor(paceRatio, period.Utilization)
 
 	bar := RenderBar(period.Utilization, 20, color)
-	pct := colorStyle(color).Render(fmt.Sprintf("%d%%", period.Utilization))
+
+	pctText := fmt.Sprintf("%d%%", period.Utilization)
+	pctStyled := colorStyle(color).Render(pctText)
+	pctPad := strings.Repeat(" ", max(0, 4-len(pctText)))
 
 	name := period.Name
 	if len(name) > nameWidth {
 		name = name[:nameWidth]
 	}
+	namePad := strings.Repeat(" ", max(0, nameWidth-len(name)))
 
 	reset := ""
 	if d := period.TimeUntilReset(); d != nil {
 		reset = dimStyle.Render("resets in " + models.FormatResetCountdown(d))
 	}
 
-	return fmt.Sprintf("%-*s  %s %4s    %s", nameWidth, boldStyle.Render(name), bar, pct, reset)
+	return boldStyle.Render(name) + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset
 }
 
 // RenderSingleProvider renders a single provider in expanded format.
-func RenderSingleProvider(snapshot models.UsageSnapshot) string {
+func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 	var b strings.Builder
 
 	// Title
-	b.WriteString(titleStyle.Render(strutil.TitleCase(snapshot.Provider)))
+	title := strutil.TitleCase(snapshot.Provider)
+	if cached {
+		title += dimStyle.Render(" (cached, " + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
+	}
+	b.WriteString(titleStyle.Render(title))
 	b.WriteByte('\n')
 	b.WriteString(separatorStyle.Render(strings.Repeat("━", 60)))
 	b.WriteByte('\n')
@@ -117,13 +125,20 @@ func RenderSingleProvider(snapshot models.UsageSnapshot) string {
 			paceRatio := p.PaceRatio()
 			color := models.PaceToColor(paceRatio, p.Utilization)
 			bar := RenderBar(p.Utilization, 20, color)
-			pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
+
+			pctText := fmt.Sprintf("%d%%", p.Utilization)
+			pctStyled := colorStyle(color).Render(pctText)
+			pctPad := strings.Repeat(" ", max(0, 4-len(pctText)))
+
+			const subNameWidth = 18
+			namePad := strings.Repeat(" ", max(0, subNameWidth-len(name)))
+
 			reset := ""
 			if d := p.TimeUntilReset(); d != nil {
 				reset = dimStyle.Render("resets in " + models.FormatResetCountdown(d))
 			}
 
-			fmt.Fprintf(&b, "%-18s  %s %4s    %s\n", boldStyle.Render(name), bar, pct, reset)
+			b.WriteString(boldStyle.Render(name) + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset + "\n")
 		}
 	}
 
@@ -144,7 +159,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot) string {
 }
 
 // RenderProviderPanel renders a provider in compact panel format for multi-provider view.
-func RenderProviderPanel(snapshot models.UsageSnapshot) string {
+func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool) string {
 	var b strings.Builder
 
 	session, weekly, daily, monthly := groupPeriods(snapshot.Periods)
@@ -200,32 +215,25 @@ func RenderProviderPanel(snapshot models.UsageSnapshot) string {
 
 	content := strings.TrimRight(b.String(), "\n")
 	title := strutil.TitleCase(snapshot.Provider)
+	if cached {
+		title += dimStyle.Render(" (cached, " + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
+	}
 	return panelBorder.Render(title + "\n" + content)
 }
 
-func RenderStaleWarning(snapshot models.UsageSnapshot, maxAgeMinutes int) string {
-	age := time.Since(snapshot.FetchedAt)
-	ageMinutes := int(age.Minutes())
-	if ageMinutes < maxAgeMinutes {
-		return ""
+// formatAge formats a duration as a compact human-readable age string.
+func formatAge(d time.Duration) string {
+	if d.Hours() >= 24 {
+		days := int(d.Hours() / 24)
+		return fmt.Sprintf("%dd", days)
 	}
-
-	var ageStr string
-	if ageMinutes < 60 {
-		ageStr = fmt.Sprintf("%d minute", ageMinutes)
-		if ageMinutes != 1 {
-			ageStr += "s"
-		}
-	} else {
-		hours := ageMinutes / 60
-		ageStr = fmt.Sprintf("%d hour", hours)
-		if hours != 1 {
-			ageStr += "s"
-		}
+	if d.Hours() >= 1 {
+		return fmt.Sprintf("%dh", int(d.Hours()))
 	}
-
-	return yellowStyle.Render(fmt.Sprintf("⚠ Showing cached data from %s ago", ageStr)) + "\n" +
-		dimStyle.Render("Run with --refresh to fetch fresh data")
+	if d.Minutes() >= 1 {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return "<1m"
 }
 
 type longerPeriods struct {

@@ -78,13 +78,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	var b strings.Builder
 
-	// Show completed providers
+	// Show completed providers (only successes)
 	for _, c := range m.completed {
-		if c.Success {
-			b.WriteString(checkStyle.Render("✓"))
-		} else {
-			b.WriteString(crossStyle.Render("✗"))
+		if !c.Success {
+			continue
 		}
+		b.WriteString(checkStyle.Render("✓"))
 		b.WriteString(" ")
 		b.WriteString(FormatCompletionText(c))
 		b.WriteString("\n")

@@ -29,8 +29,6 @@ func TestModelUpdateCompletion(t *testing.T) {
 	// Complete one provider
 	updated, cmd := m.Update(completionMsg{
 		ProviderID: "copilot",
-		Source:     "device_flow",
-		DurationMs: 189,
 		Success:    true,
 	})
 	m = updated.(model)
@@ -59,8 +57,6 @@ func TestModelUpdateAllComplete(t *testing.T) {
 	// Complete first
 	updated, _ := m.Update(completionMsg{
 		ProviderID: "claude",
-		Source:     "oauth",
-		DurationMs: 100,
 		Success:    true,
 	})
 	m = updated.(model)
@@ -68,8 +64,6 @@ func TestModelUpdateAllComplete(t *testing.T) {
 	// Complete second — should trigger quit
 	updated, cmd := m.Update(completionMsg{
 		ProviderID: "copilot",
-		Source:     "device_flow",
-		DurationMs: 200,
 		Success:    true,
 	})
 	m = updated.(model)
@@ -92,8 +86,6 @@ func TestModelUpdateDuplicateCompletion(t *testing.T) {
 	// Complete claude
 	updated, _ := m.Update(completionMsg{
 		ProviderID: "claude",
-		Source:     "oauth",
-		DurationMs: 100,
 		Success:    true,
 	})
 	m = updated.(model)
@@ -101,8 +93,6 @@ func TestModelUpdateDuplicateCompletion(t *testing.T) {
 	// Complete claude again (duplicate) — should be ignored
 	updated, _ = m.Update(completionMsg{
 		ProviderID: "claude",
-		Source:     "oauth",
-		DurationMs: 200,
 		Success:    true,
 	})
 	m = updated.(model)
@@ -144,8 +134,6 @@ func TestModelViewPartialCompletion(t *testing.T) {
 
 	updated, _ := m.Update(completionMsg{
 		ProviderID: "copilot",
-		Source:     "device_flow",
-		DurationMs: 189,
 		Success:    true,
 	})
 	m = updated.(model)
@@ -168,8 +156,6 @@ func TestModelViewAllDone(t *testing.T) {
 
 	updated, _ := m.Update(completionMsg{
 		ProviderID: "claude",
-		Source:     "oauth",
-		DurationMs: 342,
 		Success:    true,
 	})
 	m = updated.(model)
@@ -183,5 +169,36 @@ func TestModelViewAllDone(t *testing.T) {
 	// Should NOT contain "Fetching" since all are done
 	if strings.Contains(view, "Fetching") {
 		t.Errorf("expected no Fetching in final view, got %q", view)
+	}
+}
+
+func TestModelViewHidesFailures(t *testing.T) {
+	providers := []string{"claude", "cursor"}
+	m := newModel(providers)
+
+	// Complete cursor with failure
+	updated, _ := m.Update(completionMsg{
+		ProviderID: "cursor",
+		Success:    false,
+		Error:      "not configured",
+	})
+	m = updated.(model)
+
+	// Complete claude with success
+	updated, _ = m.Update(completionMsg{
+		ProviderID: "claude",
+		Success:    true,
+	})
+	m = updated.(model)
+
+	view := m.View()
+
+	// Should show successful provider
+	if !strings.Contains(view, "claude") {
+		t.Errorf("expected successful claude in view, got %q", view)
+	}
+	// Should NOT show the failure symbol
+	if strings.Contains(view, "✗") {
+		t.Errorf("should not show failure indicators in view, got %q", view)
 	}
 }

@@ -21,8 +21,6 @@ func TestOutcomeToCompletion_Success(t *testing.T) {
 
 	want := spinner.CompletionInfo{
 		ProviderID: "claude",
-		Source:     "oauth",
-		DurationMs: 342,
 		Success:    true,
 	}
 
@@ -46,7 +44,6 @@ func TestOutcomeToCompletion_Failure(t *testing.T) {
 
 	want := spinner.CompletionInfo{
 		ProviderID: "cursor",
-		DurationMs: 150, // sum of all attempts
 		Success:    false,
 		Error:      "auth failed",
 	}
@@ -69,13 +66,10 @@ func TestOutcomeToCompletion_Fallback(t *testing.T) {
 
 	got := outcomeToCompletion(o)
 
-	if got.DurationMs != 1000 {
-		t.Errorf("expected total duration 1000ms, got %d", got.DurationMs)
-	}
-	if got.Source != "code_assist" {
-		t.Errorf("expected source code_assist, got %s", got.Source)
-	}
 	if !got.Success {
 		t.Error("expected success=true")
+	}
+	if got.ProviderID != "gemini" {
+		t.Errorf("expected providerID gemini, got %s", got.ProviderID)
 	}
 }
