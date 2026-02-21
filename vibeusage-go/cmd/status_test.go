@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -110,6 +111,13 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 		"claude": {Level: models.StatusOperational, Description: "OK"},
 	}
 
+	// Capture logger output (verbose info goes to logger, not stdout)
+	var logBuf bytes.Buffer
+	oldLogger := logging.Logger
+	logging.Logger = logging.NewLogger(&logBuf)
+	logging.Configure(logging.Logger, logging.Flags{Verbose: true})
+	defer func() { logging.Logger = oldLogger }()
+
 	var buf bytes.Buffer
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
@@ -124,9 +132,9 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 
 	displayStatusTable(statuses, 250)
 
-	output := buf.String()
-	if !strings.Contains(output, "250ms") {
-		t.Errorf("verbose mode should show duration, got:\n%s", output)
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "250") {
+		t.Errorf("verbose mode should log duration, got:\n%s", logOutput)
 	}
 }
 

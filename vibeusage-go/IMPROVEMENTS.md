@@ -325,10 +325,10 @@ log.Info("account", "email", snap.Identity.Email)
 
 ### Tasks
 
-- [ ] Add `github.com/charmbracelet/log` dependency
-- [ ] Set log level based on `--verbose` / `--quiet` flags
-- [ ] Replace verbose `fmt.Printf` calls with structured log calls
-- [ ] Ensure log output respects `--no-color` and `--json` flags
+- [x] Add `github.com/charmbracelet/log` dependency
+- [x] Set log level based on `--verbose` / `--quiet` flags
+- [x] Replace verbose `fmt.Printf` calls with structured log calls
+- [x] Ensure log output respects `--no-color` and `--json` flags
 
 ## Bonus: Other Small Fixes
 
