@@ -12,11 +12,11 @@ import (
 // cleanup to restore them after the test, preventing inter-test leakage.
 func resetPathFlags(t *testing.T) {
 	t.Helper()
-	configPathCmd.Flags().Set("cache", "false")
-	configPathCmd.Flags().Set("credentials", "false")
+	_ = configPathCmd.Flags().Set("cache", "false")
+	_ = configPathCmd.Flags().Set("credentials", "false")
 	t.Cleanup(func() {
-		configPathCmd.Flags().Set("cache", "false")
-		configPathCmd.Flags().Set("credentials", "false")
+		_ = configPathCmd.Flags().Set("cache", "false")
+		_ = configPathCmd.Flags().Set("credentials", "false")
 	})
 }
 
@@ -300,7 +300,7 @@ func TestConfigPath_CacheFlag(t *testing.T) {
 	defer func() { jsonOutput = oldJSON }()
 
 	resetPathFlags(t)
-	configPathCmd.Flags().Set("cache", "true")
+	_ = configPathCmd.Flags().Set("cache", "true")
 
 	if err := configPathCmd.RunE(configPathCmd, nil); err != nil {
 		t.Fatalf("config path --cache error: %v", err)
