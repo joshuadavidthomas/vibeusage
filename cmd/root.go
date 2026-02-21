@@ -69,6 +69,7 @@ func init() {
 	rootCmd.AddCommand(cacheCmd)
 	rootCmd.AddCommand(keyCmd)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(routeCmd)
 
 	for _, id := range []string{"antigravity", "claude", "codex", "copilot", "cursor", "gemini", "kimi", "minimax", "zai"} {
 		rootCmd.AddCommand(makeProviderCmd(id))
