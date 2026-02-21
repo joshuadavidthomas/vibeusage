@@ -26,6 +26,7 @@ import (
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/copilot"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/cursor"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/gemini"
+	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kimi"
 )
 
 const version = "0.1.0"
@@ -41,7 +42,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:          "vibeusage",
 	Short:        "Track usage across agentic LLM providers",
-	Long:         "A unified CLI tool that aggregates usage statistics from Antigravity, Claude, Codex, Copilot, Cursor, and Gemini.",
+	Long:         "A unified CLI tool that aggregates usage statistics from Antigravity, Claude, Codex, Copilot, Cursor, Gemini, and Kimi.",
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if verbose && quiet {
@@ -67,7 +68,7 @@ func init() {
 	rootCmd.AddCommand(keyCmd)
 	rootCmd.AddCommand(initCmd)
 
-	for _, id := range []string{"antigravity", "claude", "codex", "copilot", "cursor", "gemini"} {
+	for _, id := range []string{"antigravity", "claude", "codex", "copilot", "cursor", "gemini", "kimi"} {
 		rootCmd.AddCommand(makeProviderCmd(id))
 	}
 }
