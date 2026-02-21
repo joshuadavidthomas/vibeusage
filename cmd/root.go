@@ -59,7 +59,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&refresh, "refresh", "r", false, "Disable cache fallback — fresh data or error")
 	rootCmd.Flags().Bool("version", false, "Show version and exit")
 
-	rootCmd.AddCommand(usageCmd)
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(configCmd)
