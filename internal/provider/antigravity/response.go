@@ -2,56 +2,87 @@ package antigravity
 
 import "time"
 
-// QuotaRequest represents the request body for the Antigravity quota endpoint.
-// Unlike Gemini which sends an empty body, Antigravity requires IDE metadata.
-type QuotaRequest struct {
-	Metadata QuotaRequestMetadata `json:"metadata"`
+// FetchAvailableModelsResponse represents the response from the
+// cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels endpoint.
+type FetchAvailableModelsResponse struct {
+	Models map[string]ModelInfo `json:"models,omitempty"`
 }
 
-// QuotaRequestMetadata identifies the requesting IDE to the quota API.
-type QuotaRequestMetadata struct {
-	IDEType    string `json:"ideType"`
-	Platform   string `json:"platform"`
-	PluginType string `json:"pluginType"`
+// ModelInfo represents a single model's info from the fetchAvailableModels response.
+type ModelInfo struct {
+	DisplayName string     `json:"displayName,omitempty"`
+	QuotaInfo   *QuotaInfo `json:"quotaInfo,omitempty"`
+	Recommended bool       `json:"recommended,omitempty"`
 }
 
-// QuotaResponse represents the response from the quota endpoint.
-type QuotaResponse struct {
-	QuotaBuckets []QuotaBucket `json:"quota_buckets,omitempty"`
-}
-
-// QuotaBucket represents a single quota bucket for a model.
-type QuotaBucket struct {
-	ModelID           string   `json:"model_id,omitempty"`
-	RemainingFraction *float64 `json:"remaining_fraction,omitempty"`
-	ResetTime         string   `json:"reset_time,omitempty"`
+// QuotaInfo contains the remaining fraction and reset time for a model.
+type QuotaInfo struct {
+	RemainingFraction *float64 `json:"remainingFraction,omitempty"`
+	ResetTime         string   `json:"resetTime,omitempty"`
 }
 
 // Utilization returns the usage percentage, clamped to [0, 100].
-// If remaining_fraction is absent, assumes full quota remaining (0% used).
-func (b *QuotaBucket) Utilization() int {
+// If remainingFraction is absent, assumes full quota remaining (0% used).
+func (q *QuotaInfo) Utilization() int {
+	if q == nil {
+		return 0
+	}
 	rf := 1.0
-	if b.RemainingFraction != nil {
-		rf = *b.RemainingFraction
+	if q.RemainingFraction != nil {
+		rf = *q.RemainingFraction
 	}
 	pct := int((1 - rf) * 100)
 	return max(0, min(pct, 100))
 }
 
-// ResetTimeUTC parses the reset_time as a time.Time.
-func (b *QuotaBucket) ResetTimeUTC() *time.Time {
-	if b.ResetTime == "" {
+// ResetTimeUTC parses the resetTime as a time.Time.
+func (q *QuotaInfo) ResetTimeUTC() *time.Time {
+	if q == nil || q.ResetTime == "" {
 		return nil
 	}
-	if t, err := time.Parse(time.RFC3339, b.ResetTime); err == nil {
+	if t, err := time.Parse(time.RFC3339, q.ResetTime); err == nil {
 		return &t
 	}
 	return nil
 }
 
-// CodeAssistResponse represents the response from the code assist endpoint.
+// CodeAssistResponse represents the response from the
+// cloudcode-pa.googleapis.com/v1internal:loadCodeAssist endpoint.
 type CodeAssistResponse struct {
-	UserTier string `json:"user_tier,omitempty"`
+	CurrentTier *TierInfo `json:"currentTier,omitempty"`
+	UserTier    string    `json:"user_tier,omitempty"` // fallback field
+}
+
+// TierInfo represents subscription tier information.
+type TierInfo struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+// EffectiveTier returns the user's tier name from whichever field is present.
+func (c *CodeAssistResponse) EffectiveTier() string {
+	if c == nil {
+		return ""
+	}
+	if c.CurrentTier != nil && c.CurrentTier.Name != "" {
+		return c.CurrentTier.Name
+	}
+	if c.CurrentTier != nil && c.CurrentTier.ID != "" {
+		return c.CurrentTier.ID
+	}
+	return c.UserTier
+}
+
+// CodeAssistRequest represents the request body for the loadCodeAssist endpoint.
+type CodeAssistRequest struct {
+	Metadata *CodeAssistRequestMetadata `json:"metadata,omitempty"`
+}
+
+// CodeAssistRequestMetadata identifies the requesting IDE.
+type CodeAssistRequestMetadata struct {
+	IDEType    string `json:"ideType"`
+	Platform   string `json:"platform"`
+	PluginType string `json:"pluginType"`
 }
 
 // TokenResponse represents the response from the Google OAuth token refresh endpoint.
@@ -80,15 +111,12 @@ func (c OAuthCredentials) NeedsRefresh() bool {
 	return time.Now().UTC().Add(5 * time.Minute).After(expiry)
 }
 
-// AntigravityCredentials represents the credential file format stored by
-// the Antigravity IDE. The exact format needs verification, but it likely
-// follows the Google OAuth pattern used by Gemini CLI.
+// AntigravityCredentials represents a JSON credential file format.
 type AntigravityCredentials struct {
-	// Flat format
 	AccessToken  string `json:"access_token,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 	ExpiresAt    string `json:"expires_at,omitempty"`
-	ExpiryDate   any    `json:"expiry_date,omitempty"` // Can be float64 (ms) or string
+	ExpiryDate   any    `json:"expiry_date,omitempty"`
 	Token        string `json:"token,omitempty"`
 }
 
@@ -110,6 +138,14 @@ func (a *AntigravityCredentials) ToOAuthCredentials() *OAuthCredentials {
 		creds.ExpiresAt = parseExpiryDate(a.ExpiryDate)
 	}
 	return creds
+}
+
+// VscdbAuthStatus represents the JSON blob stored in Antigravity's VS Code
+// state database under the "antigravityAuthStatus" key.
+type VscdbAuthStatus struct {
+	Name   string `json:"name,omitempty"`
+	APIKey string `json:"apiKey,omitempty"`
+	Email  string `json:"email,omitempty"`
 }
 
 // parseExpiryDate converts a mixed-type expiry_date to an RFC3339 string.

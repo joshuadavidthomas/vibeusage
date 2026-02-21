@@ -30,17 +30,31 @@ func TestFetchStrategies(t *testing.T) {
 	}
 }
 
-func TestParseQuotaResponse_FullResponse(t *testing.T) {
-	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.5-pro", RemainingFraction: ptrFloat64(0.75), ResetTime: "2026-02-20T05:00:00Z"},
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(0.5), ResetTime: "2026-02-20T05:00:00Z"},
+func TestParseModelsResponse_FullResponse(t *testing.T) {
+	modelsResp := FetchAvailableModelsResponse{
+		Models: map[string]ModelInfo{
+			"gemini-2.5-pro": {
+				DisplayName: "Gemini 2.5 Pro",
+				QuotaInfo: &QuotaInfo{
+					RemainingFraction: ptrFloat64(0.75),
+					ResetTime:         "2026-02-20T05:00:00Z",
+				},
+			},
+			"gemini-3-flash": {
+				DisplayName: "Gemini 3 Flash",
+				QuotaInfo: &QuotaInfo{
+					RemainingFraction: ptrFloat64(0.5),
+					ResetTime:         "2026-02-20T05:00:00Z",
+				},
+			},
 		},
 	}
-	codeAssist := &CodeAssistResponse{UserTier: "premium"}
+	codeAssist := &CodeAssistResponse{
+		CurrentTier: &TierInfo{ID: "pro-tier", Name: "Google AI Pro"},
+	}
 
 	s := OAuthStrategy{}
-	snapshot := s.parseQuotaResponse(quota, codeAssist)
+	snapshot := s.parseModelsResponse(modelsResp, codeAssist)
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
@@ -56,15 +70,19 @@ func TestParseQuotaResponse_FullResponse(t *testing.T) {
 		t.Fatalf("len(periods) = %d, want 2", len(snapshot.Periods))
 	}
 
+	// Periods are sorted by model name
 	p0 := snapshot.Periods[0]
+	if p0.Model != "gemini-2.5-pro" {
+		t.Errorf("period[0] model = %q, want %q", p0.Model, "gemini-2.5-pro")
+	}
 	if p0.Utilization != 25 {
 		t.Errorf("period[0] utilization = %d, want 25", p0.Utilization)
 	}
 	if p0.PeriodType != models.PeriodSession {
-		t.Errorf("period[0] period_type = %q, want %q (premium tier)", p0.PeriodType, models.PeriodSession)
+		t.Errorf("period[0] period_type = %q, want %q (paid tier)", p0.PeriodType, models.PeriodSession)
 	}
-	if p0.Model != "gemini-2.5-pro" {
-		t.Errorf("period[0] model = %q, want %q", p0.Model, "gemini-2.5-pro")
+	if p0.Name != "Gemini 2.5 Pro" {
+		t.Errorf("period[0] name = %q, want %q", p0.Name, "Gemini 2.5 Pro")
 	}
 	if p0.ResetsAt == nil {
 		t.Fatal("expected resets_at")
@@ -78,21 +96,29 @@ func TestParseQuotaResponse_FullResponse(t *testing.T) {
 	if snapshot.Identity == nil {
 		t.Fatal("expected identity")
 	}
-	if snapshot.Identity.Plan != "premium" {
-		t.Errorf("plan = %q, want %q", snapshot.Identity.Plan, "premium")
+	if snapshot.Identity.Plan != "Google AI Pro" {
+		t.Errorf("plan = %q, want %q", snapshot.Identity.Plan, "Google AI Pro")
 	}
 }
 
-func TestParseQuotaResponse_FreeTier(t *testing.T) {
-	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(0.9)},
+func TestParseModelsResponse_FreeTier(t *testing.T) {
+	modelsResp := FetchAvailableModelsResponse{
+		Models: map[string]ModelInfo{
+			"gemini-3-flash": {
+				DisplayName: "Gemini 3 Flash",
+				QuotaInfo: &QuotaInfo{
+					RemainingFraction: ptrFloat64(0.9),
+					ResetTime:         "2026-02-20T05:00:00Z",
+				},
+			},
 		},
 	}
-	codeAssist := &CodeAssistResponse{UserTier: "free"}
+	codeAssist := &CodeAssistResponse{
+		CurrentTier: &TierInfo{ID: "free-tier", Name: "Antigravity"},
+	}
 
 	s := OAuthStrategy{}
-	snapshot := s.parseQuotaResponse(quota, codeAssist)
+	snapshot := s.parseModelsResponse(modelsResp, codeAssist)
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
@@ -104,15 +130,57 @@ func TestParseQuotaResponse_FreeTier(t *testing.T) {
 	}
 }
 
-func TestParseQuotaResponse_NoTier(t *testing.T) {
-	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
+func TestParseModelsResponse_SkipsModelsWithoutResetTime(t *testing.T) {
+	modelsResp := FetchAvailableModelsResponse{
+		Models: map[string]ModelInfo{
+			"gemini-3-flash": {
+				DisplayName: "Gemini 3 Flash",
+				QuotaInfo: &QuotaInfo{
+					RemainingFraction: ptrFloat64(0.5),
+					ResetTime:         "2026-02-20T05:00:00Z",
+				},
+			},
+			"tab_flash_lite_preview": {
+				// No display name, no reset time — tab completion model
+				QuotaInfo: &QuotaInfo{
+					RemainingFraction: ptrFloat64(1.0),
+				},
+			},
+			"chat_20706": {
+				// No quota info at all
+			},
 		},
 	}
 
 	s := OAuthStrategy{}
-	snapshot := s.parseQuotaResponse(quota, nil)
+	snapshot := s.parseModelsResponse(modelsResp, nil)
+
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
+	if len(snapshot.Periods) != 1 {
+		t.Fatalf("len(periods) = %d, want 1 (should skip models without reset time)", len(snapshot.Periods))
+	}
+	if snapshot.Periods[0].Model != "gemini-3-flash" {
+		t.Errorf("period model = %q, want %q", snapshot.Periods[0].Model, "gemini-3-flash")
+	}
+}
+
+func TestParseModelsResponse_NoTier(t *testing.T) {
+	modelsResp := FetchAvailableModelsResponse{
+		Models: map[string]ModelInfo{
+			"gemini-3-flash": {
+				DisplayName: "Gemini 3 Flash",
+				QuotaInfo: &QuotaInfo{
+					RemainingFraction: ptrFloat64(1.0),
+					ResetTime:         "2026-02-20T05:00:00Z",
+				},
+			},
+		},
+	}
+
+	s := OAuthStrategy{}
+	snapshot := s.parseModelsResponse(modelsResp, nil)
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
@@ -121,18 +189,17 @@ func TestParseQuotaResponse_NoTier(t *testing.T) {
 		t.Error("expected nil identity when no code assist response")
 	}
 
-	// No tier info defaults to weekly (free tier assumption)
 	p := snapshot.Periods[0]
 	if p.PeriodType != models.PeriodWeekly {
 		t.Errorf("period_type = %q, want %q (no tier defaults to weekly)", p.PeriodType, models.PeriodWeekly)
 	}
 }
 
-func TestParseQuotaResponse_EmptyBuckets(t *testing.T) {
-	quota := QuotaResponse{}
+func TestParseModelsResponse_EmptyModels(t *testing.T) {
+	modelsResp := FetchAvailableModelsResponse{}
 
 	s := OAuthStrategy{}
-	snapshot := s.parseQuotaResponse(quota, nil)
+	snapshot := s.parseModelsResponse(modelsResp, nil)
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot (fallback period)")
@@ -143,27 +210,40 @@ func TestParseQuotaResponse_EmptyBuckets(t *testing.T) {
 	if snapshot.Periods[0].Name != "Usage" {
 		t.Errorf("period name = %q, want %q", snapshot.Periods[0].Name, "Usage")
 	}
-	if snapshot.Periods[0].Utilization != 0 {
-		t.Errorf("utilization = %d, want 0", snapshot.Periods[0].Utilization)
-	}
 }
 
-func TestParseQuotaResponse_EmptyUserTier(t *testing.T) {
-	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
+func TestParseModelsResponse_SortedByModelName(t *testing.T) {
+	modelsResp := FetchAvailableModelsResponse{
+		Models: map[string]ModelInfo{
+			"gemini-3-flash": {
+				DisplayName: "Gemini 3 Flash",
+				QuotaInfo:   &QuotaInfo{RemainingFraction: ptrFloat64(1.0), ResetTime: "2026-02-20T05:00:00Z"},
+			},
+			"claude-sonnet-4-6": {
+				DisplayName: "Claude Sonnet 4.6",
+				QuotaInfo:   &QuotaInfo{RemainingFraction: ptrFloat64(1.0), ResetTime: "2026-02-20T05:00:00Z"},
+			},
+			"gemini-2.5-pro": {
+				DisplayName: "Gemini 2.5 Pro",
+				QuotaInfo:   &QuotaInfo{RemainingFraction: ptrFloat64(1.0), ResetTime: "2026-02-20T05:00:00Z"},
+			},
 		},
 	}
-	codeAssist := &CodeAssistResponse{}
 
 	s := OAuthStrategy{}
-	snapshot := s.parseQuotaResponse(quota, codeAssist)
+	snapshot := s.parseModelsResponse(modelsResp, nil)
 
-	if snapshot == nil {
-		t.Fatal("expected non-nil snapshot")
+	if len(snapshot.Periods) != 3 {
+		t.Fatalf("len(periods) = %d, want 3", len(snapshot.Periods))
 	}
-	if snapshot.Identity != nil {
-		t.Error("expected nil identity when user_tier is empty")
+	if snapshot.Periods[0].Model != "claude-sonnet-4-6" {
+		t.Errorf("period[0] model = %q, want %q", snapshot.Periods[0].Model, "claude-sonnet-4-6")
+	}
+	if snapshot.Periods[1].Model != "gemini-2.5-pro" {
+		t.Errorf("period[1] model = %q, want %q", snapshot.Periods[1].Model, "gemini-2.5-pro")
+	}
+	if snapshot.Periods[2].Model != "gemini-3-flash" {
+		t.Errorf("period[2] model = %q, want %q", snapshot.Periods[2].Model, "gemini-3-flash")
 	}
 }
 
@@ -174,11 +254,12 @@ func TestPeriodTypeForTier(t *testing.T) {
 	}{
 		{"free", models.PeriodWeekly},
 		{"", models.PeriodWeekly},
+		{"Antigravity", models.PeriodWeekly},
+		{"antigravity", models.PeriodWeekly},
+		{"free-tier", models.PeriodWeekly},
 		{"premium", models.PeriodSession},
-		{"pro", models.PeriodSession},
-		{"ultra", models.PeriodSession},
-		{"FREE", models.PeriodWeekly},
-		{"Premium", models.PeriodSession},
+		{"Google AI Pro", models.PeriodSession},
+		{"Google AI Ultra", models.PeriodSession},
 	}
 
 	for _, tt := range tests {

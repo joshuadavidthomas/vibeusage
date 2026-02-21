@@ -8,75 +8,83 @@ import (
 
 func ptrFloat64(f float64) *float64 { return &f }
 
-func TestQuotaResponse_UnmarshalFullResponse(t *testing.T) {
+func TestFetchAvailableModelsResponse_Unmarshal(t *testing.T) {
 	raw := `{
-		"quota_buckets": [
-			{
-				"model_id": "models/gemini-2.5-pro",
-				"remaining_fraction": 0.75,
-				"reset_time": "2026-02-20T00:00:00Z"
+		"models": {
+			"gemini-2.5-pro": {
+				"displayName": "Gemini 2.5 Pro",
+				"quotaInfo": {
+					"remainingFraction": 0.75,
+					"resetTime": "2026-02-20T05:00:00Z"
+				},
+				"recommended": true
 			},
-			{
-				"model_id": "models/gemini-2.0-flash",
-				"remaining_fraction": 0.5,
-				"reset_time": "2026-02-20T00:00:00Z"
+			"gemini-3-flash": {
+				"displayName": "Gemini 3 Flash",
+				"quotaInfo": {
+					"remainingFraction": 0.5,
+					"resetTime": "2026-02-20T04:00:00Z"
+				}
 			}
-		]
+		}
 	}`
 
-	var resp QuotaResponse
+	var resp FetchAvailableModelsResponse
 	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if len(resp.QuotaBuckets) != 2 {
-		t.Fatalf("len(quota_buckets) = %d, want 2", len(resp.QuotaBuckets))
+	if len(resp.Models) != 2 {
+		t.Fatalf("len(models) = %d, want 2", len(resp.Models))
 	}
 
-	b := resp.QuotaBuckets[0]
-	if b.ModelID != "models/gemini-2.5-pro" {
-		t.Errorf("model_id = %q, want %q", b.ModelID, "models/gemini-2.5-pro")
+	pro := resp.Models["gemini-2.5-pro"]
+	if pro.DisplayName != "Gemini 2.5 Pro" {
+		t.Errorf("displayName = %q, want %q", pro.DisplayName, "Gemini 2.5 Pro")
 	}
-	if b.RemainingFraction == nil || *b.RemainingFraction != 0.75 {
-		t.Errorf("remaining_fraction = %v, want 0.75", b.RemainingFraction)
+	if pro.QuotaInfo == nil {
+		t.Fatal("expected quotaInfo")
 	}
-	if b.ResetTime != "2026-02-20T00:00:00Z" {
-		t.Errorf("reset_time = %q, want %q", b.ResetTime, "2026-02-20T00:00:00Z")
+	if pro.QuotaInfo.RemainingFraction == nil || *pro.QuotaInfo.RemainingFraction != 0.75 {
+		t.Errorf("remainingFraction = %v, want 0.75", pro.QuotaInfo.RemainingFraction)
+	}
+	if !pro.Recommended {
+		t.Error("expected recommended = true")
 	}
 }
 
-func TestQuotaResponse_UnmarshalEmpty(t *testing.T) {
+func TestFetchAvailableModelsResponse_UnmarshalEmpty(t *testing.T) {
 	raw := `{}`
 
-	var resp QuotaResponse
+	var resp FetchAvailableModelsResponse
 	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if resp.QuotaBuckets != nil {
-		t.Errorf("expected nil quota_buckets, got %v", resp.QuotaBuckets)
+	if resp.Models != nil {
+		t.Errorf("expected nil models, got %v", resp.Models)
 	}
 }
 
-func TestQuotaBucket_Utilization(t *testing.T) {
+func TestQuotaInfo_Utilization(t *testing.T) {
 	tests := []struct {
-		name              string
-		remainingFraction *float64
-		want              int
+		name string
+		qi   *QuotaInfo
+		want int
 	}{
-		{"75% remaining", ptrFloat64(0.75), 25},
-		{"0% remaining", ptrFloat64(0.0), 100},
-		{"100% remaining", ptrFloat64(1.0), 0},
-		{"50% remaining", ptrFloat64(0.5), 50},
-		{"nil defaults to 0% used", nil, 0},
-		{"remaining > 1.0 clamped to 0", ptrFloat64(1.5), 0},
-		{"negative remaining clamped to 100", ptrFloat64(-0.5), 100},
+		{"75% remaining", &QuotaInfo{RemainingFraction: ptrFloat64(0.75)}, 25},
+		{"0% remaining", &QuotaInfo{RemainingFraction: ptrFloat64(0.0)}, 100},
+		{"100% remaining", &QuotaInfo{RemainingFraction: ptrFloat64(1.0)}, 0},
+		{"50% remaining", &QuotaInfo{RemainingFraction: ptrFloat64(0.5)}, 50},
+		{"nil fraction defaults to 0% used", &QuotaInfo{}, 0},
+		{"nil quotaInfo", nil, 0},
+		{"remaining > 1.0 clamped to 0", &QuotaInfo{RemainingFraction: ptrFloat64(1.5)}, 0},
+		{"negative remaining clamped to 100", &QuotaInfo{RemainingFraction: ptrFloat64(-0.5)}, 100},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := QuotaBucket{RemainingFraction: tt.remainingFraction}
-			got := b.Utilization()
+			got := tt.qi.Utilization()
 			if got != tt.want {
 				t.Errorf("Utilization() = %d, want %d", got, tt.want)
 			}
@@ -84,34 +92,39 @@ func TestQuotaBucket_Utilization(t *testing.T) {
 	}
 }
 
-func TestQuotaBucket_ResetTimeUTC(t *testing.T) {
+func TestQuotaInfo_ResetTimeUTC(t *testing.T) {
 	tests := []struct {
-		name      string
-		resetTime string
-		wantNil   bool
-		wantTime  time.Time
+		name     string
+		qi       *QuotaInfo
+		wantNil  bool
+		wantTime time.Time
 	}{
 		{
-			name:      "valid time",
-			resetTime: "2026-02-20T00:00:00Z",
-			wantNil:   false,
-			wantTime:  time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC),
+			name:     "valid time",
+			qi:       &QuotaInfo{ResetTime: "2026-02-20T05:00:00Z"},
+			wantNil:  false,
+			wantTime: time.Date(2026, 2, 20, 5, 0, 0, 0, time.UTC),
 		},
 		{
 			name:    "empty",
+			qi:      &QuotaInfo{},
 			wantNil: true,
 		},
 		{
-			name:      "invalid",
-			resetTime: "garbage",
-			wantNil:   true,
+			name:    "nil quotaInfo",
+			qi:      nil,
+			wantNil: true,
+		},
+		{
+			name:    "invalid",
+			qi:      &QuotaInfo{ResetTime: "garbage"},
+			wantNil: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := QuotaBucket{ResetTime: tt.resetTime}
-			got := b.ResetTimeUTC()
+			got := tt.qi.ResetTimeUTC()
 			if tt.wantNil {
 				if got != nil {
 					t.Errorf("ResetTimeUTC() = %v, want nil", got)
@@ -128,16 +141,66 @@ func TestQuotaBucket_ResetTimeUTC(t *testing.T) {
 	}
 }
 
-func TestCodeAssistResponse_Unmarshal(t *testing.T) {
-	raw := `{"user_tier": "premium"}`
-
-	var resp CodeAssistResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
+func TestCodeAssistResponse_EffectiveTier(t *testing.T) {
+	tests := []struct {
+		name string
+		resp *CodeAssistResponse
+		want string
+	}{
+		{
+			name: "tier name from currentTier",
+			resp: &CodeAssistResponse{CurrentTier: &TierInfo{ID: "pro-tier", Name: "Google AI Pro"}},
+			want: "Google AI Pro",
+		},
+		{
+			name: "tier id fallback",
+			resp: &CodeAssistResponse{CurrentTier: &TierInfo{ID: "free-tier"}},
+			want: "free-tier",
+		},
+		{
+			name: "user_tier fallback",
+			resp: &CodeAssistResponse{UserTier: "premium"},
+			want: "premium",
+		},
+		{
+			name: "nil response",
+			resp: nil,
+			want: "",
+		},
+		{
+			name: "empty response",
+			resp: &CodeAssistResponse{},
+			want: "",
+		},
 	}
 
-	if resp.UserTier != "premium" {
-		t.Errorf("user_tier = %q, want %q", resp.UserTier, "premium")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.resp.EffectiveTier()
+			if got != tt.want {
+				t.Errorf("EffectiveTier() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCodeAssistRequest_Marshal(t *testing.T) {
+	req := CodeAssistRequest{
+		Metadata: &CodeAssistRequestMetadata{
+			IDEType:    "ANTIGRAVITY",
+			Platform:   "PLATFORM_UNSPECIFIED",
+			PluginType: "GEMINI",
+		},
+	}
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+
+	want := `{"metadata":{"ideType":"ANTIGRAVITY","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}}`
+	if string(data) != want {
+		t.Errorf("marshal = %s, want %s", string(data), want)
 	}
 }
 
@@ -202,28 +265,6 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 	}
 }
 
-func TestOAuthCredentials_Roundtrip(t *testing.T) {
-	original := OAuthCredentials{
-		AccessToken:  "my-token",
-		RefreshToken: "my-refresh",
-		ExpiresAt:    "2026-02-20T00:00:00Z",
-	}
-
-	data, err := json.Marshal(original)
-	if err != nil {
-		t.Fatalf("marshal failed: %v", err)
-	}
-
-	var decoded OAuthCredentials
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if decoded != original {
-		t.Errorf("roundtrip mismatch: got %+v, want %+v", decoded, original)
-	}
-}
-
 func TestAntigravityCredentials_AccessTokenFormat(t *testing.T) {
 	raw := `{
 		"access_token": "at-val",
@@ -243,36 +284,6 @@ func TestAntigravityCredentials_AccessTokenFormat(t *testing.T) {
 	if creds.AccessToken != "at-val" {
 		t.Errorf("access_token = %q, want %q", creds.AccessToken, "at-val")
 	}
-	if creds.RefreshToken != "ref-val" {
-		t.Errorf("refresh_token = %q, want %q", creds.RefreshToken, "ref-val")
-	}
-	if creds.ExpiresAt != "2026-02-20T00:00:00Z" {
-		t.Errorf("expires_at = %q, want %q", creds.ExpiresAt, "2026-02-20T00:00:00Z")
-	}
-}
-
-func TestAntigravityCredentials_TokenFormat(t *testing.T) {
-	raw := `{
-		"token": "tok-val",
-		"refresh_token": "ref-val",
-		"expiry_date": 1740000000000
-	}`
-
-	var agCreds AntigravityCredentials
-	if err := json.Unmarshal([]byte(raw), &agCreds); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	creds := agCreds.ToOAuthCredentials()
-	if creds == nil {
-		t.Fatal("expected non-nil credentials")
-	}
-	if creds.AccessToken != "tok-val" {
-		t.Errorf("access_token = %q, want %q", creds.AccessToken, "tok-val")
-	}
-	if creds.ExpiresAt == "" {
-		t.Error("expected expires_at to be set from expiry_date")
-	}
 }
 
 func TestAntigravityCredentials_Empty(t *testing.T) {
@@ -289,32 +300,39 @@ func TestAntigravityCredentials_Empty(t *testing.T) {
 	}
 }
 
+func TestVscdbAuthStatus_Unmarshal(t *testing.T) {
+	raw := `{
+		"name": "Test User",
+		"apiKey": "ya29.test-token",
+		"email": "test@example.com"
+	}`
+
+	var status VscdbAuthStatus
+	if err := json.Unmarshal([]byte(raw), &status); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if status.Name != "Test User" {
+		t.Errorf("name = %q, want %q", status.Name, "Test User")
+	}
+	if status.APIKey != "ya29.test-token" {
+		t.Errorf("apiKey = %q, want %q", status.APIKey, "ya29.test-token")
+	}
+	if status.Email != "test@example.com" {
+		t.Errorf("email = %q, want %q", status.Email, "test@example.com")
+	}
+}
+
 func TestParseExpiryDate(t *testing.T) {
 	tests := []struct {
 		name string
 		v    any
 		want string
 	}{
-		{
-			name: "float64 ms timestamp",
-			v:    float64(1740000000000),
-			want: "2025-02-19T21:20:00Z",
-		},
-		{
-			name: "string",
-			v:    "2026-02-20T00:00:00Z",
-			want: "2026-02-20T00:00:00Z",
-		},
-		{
-			name: "nil",
-			v:    nil,
-			want: "",
-		},
-		{
-			name: "zero float64",
-			v:    float64(0),
-			want: "",
-		},
+		{"float64 ms timestamp", float64(1740000000000), "2025-02-19T21:20:00Z"},
+		{"string", "2026-02-20T00:00:00Z", "2026-02-20T00:00:00Z"},
+		{"nil", nil, ""},
+		{"zero float64", float64(0), ""},
 	}
 
 	for _, tt := range tests {
@@ -324,25 +342,5 @@ func TestParseExpiryDate(t *testing.T) {
 				t.Errorf("parseExpiryDate(%v) = %q, want %q", tt.v, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestQuotaRequest_Marshal(t *testing.T) {
-	req := QuotaRequest{
-		Metadata: QuotaRequestMetadata{
-			IDEType:    "ANTIGRAVITY",
-			Platform:   "PLATFORM_UNSPECIFIED",
-			PluginType: "GEMINI",
-		},
-	}
-
-	data, err := json.Marshal(req)
-	if err != nil {
-		t.Fatalf("marshal failed: %v", err)
-	}
-
-	want := `{"metadata":{"ideType":"ANTIGRAVITY","platform":"PLATFORM_UNSPECIFIED","pluginType":"GEMINI"}}`
-	if string(data) != want {
-		t.Errorf("marshal = %s, want %s", string(data), want)
 	}
 }
