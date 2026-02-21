@@ -386,15 +386,12 @@ func TestRenderSingleProvider_CachedIndicator(t *testing.T) {
 	}
 
 	result := RenderSingleProvider(snap, true)
-	if !strings.Contains(result, "cached") {
-		t.Errorf("expected 'cached' indicator for stale data, got: %q", result)
-	}
-	if !strings.Contains(result, "ago") {
-		t.Errorf("expected 'ago' in cached indicator, got: %q", result)
+	if !strings.Contains(result, "2h ago") {
+		t.Errorf("expected '2h ago' age indicator for stale data, got: %q", result)
 	}
 }
 
-func TestRenderSingleProvider_NoCachedIndicatorWhenFresh(t *testing.T) {
+func TestRenderSingleProvider_NoAgeIndicatorWhenFresh(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider:  "claude",
 		FetchedAt: time.Now(),
@@ -402,8 +399,8 @@ func TestRenderSingleProvider_NoCachedIndicatorWhenFresh(t *testing.T) {
 	}
 
 	result := RenderSingleProvider(snap, false)
-	if strings.Contains(result, "cached") {
-		t.Errorf("should not show cached indicator for fresh data, got: %q", result)
+	if strings.Contains(result, "ago") {
+		t.Errorf("should not show age indicator for fresh data, got: %q", result)
 	}
 }
 
@@ -493,7 +490,7 @@ func TestRenderProviderPanel_WithOverage(t *testing.T) {
 	}
 }
 
-func TestRenderProviderPanel_CachedIndicator(t *testing.T) {
+func TestRenderProviderPanel_AgeIndicator(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider:  "claude",
 		FetchedAt: time.Now().Add(-3 * time.Hour),
@@ -501,15 +498,12 @@ func TestRenderProviderPanel_CachedIndicator(t *testing.T) {
 	}
 
 	result := RenderProviderPanel(snap, true)
-	if !strings.Contains(result, "cached") {
-		t.Errorf("expected 'cached' in panel title, got: %q", result)
-	}
-	if !strings.Contains(result, "ago") {
-		t.Errorf("expected 'ago' in cached indicator, got: %q", result)
+	if !strings.Contains(result, "3h ago") {
+		t.Errorf("expected '3h ago' in panel title, got: %q", result)
 	}
 }
 
-func TestRenderProviderPanel_NoCachedIndicatorWhenFresh(t *testing.T) {
+func TestRenderProviderPanel_NoAgeIndicatorWhenFresh(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider:  "claude",
 		FetchedAt: time.Now(),
@@ -517,8 +511,8 @@ func TestRenderProviderPanel_NoCachedIndicatorWhenFresh(t *testing.T) {
 	}
 
 	result := RenderProviderPanel(snap, false)
-	if strings.Contains(result, "cached") {
-		t.Errorf("should not show cached indicator for fresh data, got: %q", result)
+	if strings.Contains(result, "ago") {
+		t.Errorf("should not show age indicator for fresh data, got: %q", result)
 	}
 }
 

@@ -406,10 +406,10 @@ func TestExecutePipeline_GoErrorFallsBackToNextStrategy(t *testing.T) {
 func TestExecutePipeline_CacheFallback(t *testing.T) {
 	setupFetchTestEnv(t)
 
-	// Pre-populate cache
+	// Pre-populate cache with recent data (within default 60min threshold)
 	cachedSnap := models.UsageSnapshot{
 		Provider:  "test-provider",
-		FetchedAt: time.Now().Add(-1 * time.Hour).UTC(),
+		FetchedAt: time.Now().Add(-10 * time.Minute).UTC(),
 		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
 		Source:    "previous-fetch",
 	}
@@ -442,6 +442,39 @@ func TestExecutePipeline_CacheFallback(t *testing.T) {
 	}
 	if outcome.Snapshot.Provider != "test-provider" {
 		t.Errorf("cached snapshot provider = %q, want %q", outcome.Snapshot.Provider, "test-provider")
+	}
+}
+
+func TestExecutePipeline_CacheFallbackRejectsStaleData(t *testing.T) {
+	setupFetchTestEnv(t)
+
+	// Pre-populate cache with old data (beyond default 60min threshold)
+	cachedSnap := models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-2 * time.Hour).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+		Source:    "previous-fetch",
+	}
+	if err := config.CacheSnapshot(cachedSnap); err != nil {
+		t.Fatalf("failed to pre-populate cache: %v", err)
+	}
+
+	strategy := &mockStrategy{
+		name:      "failing",
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			return ResultFail("API error"), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+
+	if outcome.Success {
+		t.Error("expected failure when cached data is beyond stale threshold")
+	}
+	if outcome.Cached {
+		t.Error("Cached should be false when data is too old")
 	}
 }
 

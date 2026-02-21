@@ -105,16 +105,19 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 		})
 	}
 
-	// All strategies failed — try cache fallback
+	// All strategies failed — try cache fallback if data isn't too old
 	if useCache {
 		if cached := config.LoadCachedSnapshot(providerID); cached != nil {
-			return FetchOutcome{
-				ProviderID: providerID,
-				Success:    true,
-				Snapshot:   cached,
-				Source:     "cache",
-				Attempts:   attempts,
-				Cached:     true,
+			ageMinutes := int(time.Since(cached.FetchedAt).Minutes())
+			if ageMinutes < cfg.Fetch.StaleThresholdMinutes {
+				return FetchOutcome{
+					ProviderID: providerID,
+					Success:    true,
+					Snapshot:   cached,
+					Source:     "cache",
+					Attempts:   attempts,
+					Cached:     true,
+				}
 			}
 		}
 	}

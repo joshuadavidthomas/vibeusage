@@ -162,13 +162,9 @@ func TestModelViewAllDone(t *testing.T) {
 
 	view := m.View()
 
-	// Should show the completed line
-	if !strings.Contains(view, "claude") {
-		t.Errorf("expected completed claude in view, got %q", view)
-	}
-	// Should NOT contain "Fetching" since all are done
-	if strings.Contains(view, "Fetching") {
-		t.Errorf("expected no Fetching in final view, got %q", view)
+	// Final view should be empty — spinner is transient progress UI
+	if view != "" {
+		t.Errorf("expected empty final view, got %q", view)
 	}
 }
 
@@ -176,7 +172,7 @@ func TestModelViewHidesFailures(t *testing.T) {
 	providers := []string{"claude", "cursor"}
 	m := newModel(providers)
 
-	// Complete cursor with failure
+	// Complete cursor with failure — should not appear
 	updated, _ := m.Update(completionMsg{
 		ProviderID: "cursor",
 		Success:    false,
@@ -184,21 +180,17 @@ func TestModelViewHidesFailures(t *testing.T) {
 	})
 	m = updated.(model)
 
-	// Complete claude with success
-	updated, _ = m.Update(completionMsg{
-		ProviderID: "claude",
-		Success:    true,
-	})
-	m = updated.(model)
-
 	view := m.View()
 
-	// Should show successful provider
-	if !strings.Contains(view, "claude") {
-		t.Errorf("expected successful claude in view, got %q", view)
-	}
-	// Should NOT show the failure symbol
+	// Mid-progress: should NOT show failure indicators
 	if strings.Contains(view, "✗") {
 		t.Errorf("should not show failure indicators in view, got %q", view)
+	}
+	if strings.Contains(view, "cursor") {
+		t.Errorf("should not show failed provider in view, got %q", view)
+	}
+	// Should still show spinner for remaining inflight
+	if !strings.Contains(view, "Fetching claude...") {
+		t.Errorf("expected inflight spinner for claude, got %q", view)
 	}
 }

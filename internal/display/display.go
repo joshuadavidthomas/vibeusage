@@ -80,7 +80,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 	// Title
 	title := strutil.TitleCase(snapshot.Provider)
 	if cached {
-		title += dimStyle.Render(" (cached, " + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
+		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
 	b.WriteString(titleStyle.Render(title))
 	b.WriteByte('\n')
@@ -216,7 +216,7 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool) string {
 	content := strings.TrimRight(b.String(), "\n")
 	title := strutil.TitleCase(snapshot.Provider)
 	if cached {
-		title += dimStyle.Render(" (cached, " + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
+		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
 	return panelBorder.Render(title + "\n" + content)
 }

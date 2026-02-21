@@ -76,6 +76,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	// When done, return empty — the spinner is transient progress UI
+	if m.quitting {
+		return ""
+	}
+
 	var b strings.Builder
 
 	// Show completed providers (only successes)
@@ -89,7 +94,7 @@ func (m model) View() string {
 		b.WriteString("\n")
 	}
 
-	// Show spinner with in-flight providers if not done
+	// Show spinner with in-flight providers
 	if len(m.inflight) > 0 {
 		b.WriteString(m.spinner.View())
 		b.WriteString(" ")
