@@ -8,6 +8,18 @@ import (
 	"testing"
 )
 
+// resetPathFlags resets configPathCmd flags to defaults and registers
+// cleanup to restore them after the test, preventing inter-test leakage.
+func resetPathFlags(t *testing.T) {
+	t.Helper()
+	configPathCmd.Flags().Set("cache", "false")
+	configPathCmd.Flags().Set("credentials", "false")
+	t.Cleanup(func() {
+		configPathCmd.Flags().Set("cache", "false")
+		configPathCmd.Flags().Set("credentials", "false")
+	})
+}
+
 // Root command tests
 
 func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
@@ -195,9 +207,7 @@ func TestConfigPath_DefaultOutput(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	// Reset flags
-	configPathCmd.Flags().Set("cache", "false")
-	configPathCmd.Flags().Set("credentials", "false")
+	resetPathFlags(t)
 
 	if err := configPathCmd.RunE(configPathCmd, nil); err != nil {
 		t.Fatalf("config path error: %v", err)
@@ -228,8 +238,7 @@ func TestConfigPath_QuietMode(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
-	configPathCmd.Flags().Set("cache", "false")
-	configPathCmd.Flags().Set("credentials", "false")
+	resetPathFlags(t)
 
 	if err := configPathCmd.RunE(configPathCmd, nil); err != nil {
 		t.Fatalf("config path error: %v", err)
@@ -255,8 +264,7 @@ func TestConfigPath_JSONOutput(t *testing.T) {
 	jsonOutput = true
 	defer func() { jsonOutput = oldJSON }()
 
-	configPathCmd.Flags().Set("cache", "false")
-	configPathCmd.Flags().Set("credentials", "false")
+	resetPathFlags(t)
 
 	if err := configPathCmd.RunE(configPathCmd, nil); err != nil {
 		t.Fatalf("config path --json error: %v", err)
@@ -291,9 +299,8 @@ func TestConfigPath_CacheFlag(t *testing.T) {
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
 
+	resetPathFlags(t)
 	configPathCmd.Flags().Set("cache", "true")
-	configPathCmd.Flags().Set("credentials", "false")
-	defer configPathCmd.Flags().Set("cache", "false")
 
 	if err := configPathCmd.RunE(configPathCmd, nil); err != nil {
 		t.Fatalf("config path --cache error: %v", err)
