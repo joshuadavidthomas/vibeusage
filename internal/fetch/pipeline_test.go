@@ -445,7 +445,7 @@ func TestExecutePipeline_CacheFallback(t *testing.T) {
 	}
 }
 
-func TestExecutePipeline_CacheFallbackRejectsStaleData(t *testing.T) {
+func TestExecutePipeline_CacheFallbackServesStaleWhenFetchAttempted(t *testing.T) {
 	setupFetchTestEnv(t)
 
 	// Pre-populate cache with old data (beyond default 60min threshold)
@@ -459,6 +459,7 @@ func TestExecutePipeline_CacheFallbackRejectsStaleData(t *testing.T) {
 		t.Fatalf("failed to pre-populate cache: %v", err)
 	}
 
+	// Strategy has credentials (available=true) but the fetch itself fails
 	strategy := &mockStrategy{
 		name:      "failing",
 		available: true,
@@ -470,11 +471,48 @@ func TestExecutePipeline_CacheFallbackRejectsStaleData(t *testing.T) {
 	ctx := context.Background()
 	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
 
+	// Should still serve stale cache — credentials exist, API is just down
+	if !outcome.Success {
+		t.Fatalf("expected success from cache fallback when fetch was attempted, got error: %s", outcome.Error)
+	}
+	if !outcome.Cached {
+		t.Error("expected Cached=true")
+	}
+}
+
+func TestExecutePipeline_CacheFallbackRejectsStaleWhenNotConfigured(t *testing.T) {
+	setupFetchTestEnv(t)
+
+	// Pre-populate cache with old data (beyond default 60min threshold)
+	cachedSnap := models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-2 * time.Hour).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+		Source:    "previous-fetch",
+	}
+	if err := config.CacheSnapshot(cachedSnap); err != nil {
+		t.Fatalf("failed to pre-populate cache: %v", err)
+	}
+
+	// No credentials — strategy is unavailable
+	strategy := &mockStrategy{
+		name:      "unavailable",
+		available: false,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			t.Fatal("should not call Fetch on unavailable strategy")
+			return FetchResult{}, nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+
+	// Should NOT serve stale cache when no credentials exist
 	if outcome.Success {
-		t.Error("expected failure when cached data is beyond stale threshold")
+		t.Error("expected failure when cached data is stale and no credentials configured")
 	}
 	if outcome.Cached {
-		t.Error("Cached should be false when data is too old")
+		t.Error("Cached should be false when data is too old and unconfigured")
 	}
 }
 

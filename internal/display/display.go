@@ -270,6 +270,13 @@ func groupPeriods(periods []models.UsagePeriod) (session, weekly, daily, monthly
 	return
 }
 
+// RenderProviderError renders a compact error line for a failed provider.
+func RenderProviderError(providerID string, errMsg string) string {
+	name := strutil.TitleCase(providerID)
+	return dimStyle.Render(name+": "+errMsg) +
+		dimStyle.Render("  (vibeusage auth "+providerID+")")
+}
+
 // StatusSymbol returns a colored status indicator symbol.
 // When noColor is true, the plain symbol is returned without ANSI styling.
 func StatusSymbol(level models.StatusLevel, noColor bool) string {

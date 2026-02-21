@@ -214,13 +214,14 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 	}
 	sort.Strings(ids)
 
-	var errors []struct{ id, err string }
+	type providerError struct{ id, err string }
+	var errors []providerError
 
 	for _, pid := range ids {
 		outcome := outcomes[pid]
 		if !outcome.Success || outcome.Snapshot == nil {
 			if outcome.Error != "" {
-				errors = append(errors, struct{ id, err string }{pid, outcome.Error})
+				errors = append(errors, providerError{pid, outcome.Error})
 			}
 			continue
 		}
@@ -233,6 +234,12 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 			}
 		} else {
 			outln(display.RenderProviderPanel(snap, outcome.Cached))
+		}
+	}
+
+	if !quiet && len(errors) > 0 {
+		for _, e := range errors {
+			outln(display.RenderProviderError(e.id, e.err))
 		}
 	}
 
