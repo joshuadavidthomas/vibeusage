@@ -321,6 +321,11 @@ func (s *OAuthStrategy) parseModelsResponse(modelsResp FetchAvailableModelsRespo
 		})
 	}
 
+	// Add a summary period (Model == "") for the compact panel view.
+	// Uses the highest utilization across all models — shows worst case.
+	summary := summarizePeriods(periods, periodType)
+	periods = append([]models.UsagePeriod{summary}, periods...)
+
 	var identity *models.ProviderIdentity
 	if tier != "" {
 		identity = &models.ProviderIdentity{Plan: tier}
@@ -334,6 +339,33 @@ func (s *OAuthStrategy) parseModelsResponse(modelsResp FetchAvailableModelsRespo
 		Identity:  identity,
 		Source:    "oauth",
 	}
+}
+
+// summarizePeriods creates a summary period from per-model periods.
+// It picks the highest utilization (worst case) and the earliest reset time.
+func summarizePeriods(periods []models.UsagePeriod, periodType models.PeriodType) models.UsagePeriod {
+	name := "Session (5h)"
+	if periodType == models.PeriodWeekly {
+		name = "Weekly"
+	}
+
+	summary := models.UsagePeriod{
+		Name:       name,
+		PeriodType: periodType,
+	}
+
+	for _, p := range periods {
+		if p.Utilization > summary.Utilization {
+			summary.Utilization = p.Utilization
+		}
+		if p.ResetsAt != nil {
+			if summary.ResetsAt == nil || p.ResetsAt.Before(*summary.ResetsAt) {
+				summary.ResetsAt = p.ResetsAt
+			}
+		}
+	}
+
+	return summary
 }
 
 // Status

@@ -66,31 +66,41 @@ func TestParseModelsResponse_FullResponse(t *testing.T) {
 		t.Errorf("source = %q, want %q", snapshot.Source, "oauth")
 	}
 
-	if len(snapshot.Periods) != 2 {
-		t.Fatalf("len(periods) = %d, want 2", len(snapshot.Periods))
+	// 1 summary + 2 model periods
+	if len(snapshot.Periods) != 3 {
+		t.Fatalf("len(periods) = %d, want 3", len(snapshot.Periods))
 	}
 
-	// Periods are sorted by model name
-	p0 := snapshot.Periods[0]
-	if p0.Model != "gemini-2.5-pro" {
-		t.Errorf("period[0] model = %q, want %q", p0.Model, "gemini-2.5-pro")
+	// First period is the summary (no model)
+	summary := snapshot.Periods[0]
+	if summary.Model != "" {
+		t.Errorf("summary model = %q, want empty", summary.Model)
 	}
-	if p0.Utilization != 25 {
-		t.Errorf("period[0] utilization = %d, want 25", p0.Utilization)
+	if summary.Utilization != 50 {
+		t.Errorf("summary utilization = %d, want 50 (highest of 25 and 50)", summary.Utilization)
 	}
-	if p0.PeriodType != models.PeriodSession {
-		t.Errorf("period[0] period_type = %q, want %q (paid tier)", p0.PeriodType, models.PeriodSession)
+	if summary.PeriodType != models.PeriodSession {
+		t.Errorf("summary period_type = %q, want %q", summary.PeriodType, models.PeriodSession)
 	}
-	if p0.Name != "Gemini 2.5 Pro" {
-		t.Errorf("period[0] name = %q, want %q", p0.Name, "Gemini 2.5 Pro")
+	if summary.Name != "Session (5h)" {
+		t.Errorf("summary name = %q, want %q", summary.Name, "Session (5h)")
 	}
-	if p0.ResetsAt == nil {
+
+	// Model periods are sorted by model name
+	p1 := snapshot.Periods[1]
+	if p1.Model != "gemini-2.5-pro" {
+		t.Errorf("period[1] model = %q, want %q", p1.Model, "gemini-2.5-pro")
+	}
+	if p1.Utilization != 25 {
+		t.Errorf("period[1] utilization = %d, want 25", p1.Utilization)
+	}
+	if p1.ResetsAt == nil {
 		t.Fatal("expected resets_at")
 	}
 
-	p1 := snapshot.Periods[1]
-	if p1.Utilization != 50 {
-		t.Errorf("period[1] utilization = %d, want 50", p1.Utilization)
+	p2 := snapshot.Periods[2]
+	if p2.Utilization != 50 {
+		t.Errorf("period[2] utilization = %d, want 50", p2.Utilization)
 	}
 
 	if snapshot.Identity == nil {
@@ -158,11 +168,15 @@ func TestParseModelsResponse_SkipsModelsWithoutResetTime(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
 	}
-	if len(snapshot.Periods) != 1 {
-		t.Fatalf("len(periods) = %d, want 1 (should skip models without reset time)", len(snapshot.Periods))
+	// 1 summary + 1 model period (skipped 2 without reset time)
+	if len(snapshot.Periods) != 2 {
+		t.Fatalf("len(periods) = %d, want 2 (summary + 1 model)", len(snapshot.Periods))
 	}
-	if snapshot.Periods[0].Model != "gemini-3-flash" {
-		t.Errorf("period model = %q, want %q", snapshot.Periods[0].Model, "gemini-3-flash")
+	if snapshot.Periods[0].Model != "" {
+		t.Errorf("period[0] should be summary (no model), got %q", snapshot.Periods[0].Model)
+	}
+	if snapshot.Periods[1].Model != "gemini-3-flash" {
+		t.Errorf("period[1] model = %q, want %q", snapshot.Periods[1].Model, "gemini-3-flash")
 	}
 }
 
@@ -204,11 +218,16 @@ func TestParseModelsResponse_EmptyModels(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot (fallback period)")
 	}
-	if len(snapshot.Periods) != 1 {
-		t.Fatalf("len(periods) = %d, want 1", len(snapshot.Periods))
+	// 1 fallback "Usage" period + 1 summary prepended
+	if len(snapshot.Periods) != 2 {
+		t.Fatalf("len(periods) = %d, want 2", len(snapshot.Periods))
 	}
-	if snapshot.Periods[0].Name != "Usage" {
-		t.Errorf("period name = %q, want %q", snapshot.Periods[0].Name, "Usage")
+	// Summary comes first
+	if snapshot.Periods[0].Name != "Weekly" {
+		t.Errorf("period[0] name = %q, want %q", snapshot.Periods[0].Name, "Weekly")
+	}
+	if snapshot.Periods[1].Name != "Usage" {
+		t.Errorf("period[1] name = %q, want %q", snapshot.Periods[1].Name, "Usage")
 	}
 }
 
@@ -233,17 +252,23 @@ func TestParseModelsResponse_SortedByModelName(t *testing.T) {
 	s := OAuthStrategy{}
 	snapshot := s.parseModelsResponse(modelsResp, nil)
 
-	if len(snapshot.Periods) != 3 {
-		t.Fatalf("len(periods) = %d, want 3", len(snapshot.Periods))
+	// 1 summary + 3 model periods
+	if len(snapshot.Periods) != 4 {
+		t.Fatalf("len(periods) = %d, want 4", len(snapshot.Periods))
 	}
-	if snapshot.Periods[0].Model != "claude-sonnet-4-6" {
-		t.Errorf("period[0] model = %q, want %q", snapshot.Periods[0].Model, "claude-sonnet-4-6")
+	// First is summary
+	if snapshot.Periods[0].Model != "" {
+		t.Errorf("period[0] should be summary, got model %q", snapshot.Periods[0].Model)
 	}
-	if snapshot.Periods[1].Model != "gemini-2.5-pro" {
-		t.Errorf("period[1] model = %q, want %q", snapshot.Periods[1].Model, "gemini-2.5-pro")
+	// Model periods sorted
+	if snapshot.Periods[1].Model != "claude-sonnet-4-6" {
+		t.Errorf("period[1] model = %q, want %q", snapshot.Periods[1].Model, "claude-sonnet-4-6")
 	}
-	if snapshot.Periods[2].Model != "gemini-3-flash" {
-		t.Errorf("period[2] model = %q, want %q", snapshot.Periods[2].Model, "gemini-3-flash")
+	if snapshot.Periods[2].Model != "gemini-2.5-pro" {
+		t.Errorf("period[2] model = %q, want %q", snapshot.Periods[2].Model, "gemini-2.5-pro")
+	}
+	if snapshot.Periods[3].Model != "gemini-3-flash" {
+		t.Errorf("period[3] model = %q, want %q", snapshot.Periods[3].Model, "gemini-3-flash")
 	}
 }
 
