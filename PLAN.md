@@ -195,9 +195,11 @@ Chinese AI provider offering GLM model access via subscription coding plans. Two
 - Period types: `PeriodSession` for token quota (5h window), `PeriodMonthly` for MCP
 - Subscription tier: Lite / Pro / Max
 
-### Auth strategies (2 tiers)
+### Auth: Bearer token (single strategy)
 
-#### 1. API key (primary)
+Both API keys and web session tokens use the same mechanism: `Authorization: Bearer <token>`.
+
+#### API key
 
 From [glm-plan-usage plugin](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs):
 
@@ -212,16 +214,36 @@ Two equivalent base URLs:
 - International: `https://api.z.ai`
 - China: `https://open.bigmodel.cn`
 
-#### 2. Web session cookie (secondary)
+#### Web session token (localStorage)
 
-The Z.ai dashboard at `https://z.ai` is a Next.js app. When logged in, the browser holds a session cookie that authenticates requests to the same API endpoints. This lets users skip API key creation — just grab the cookie from DevTools.
+Z.ai uses **no auth cookies**. The cookies on the site (`sensorsdata*`, `machine_identifier`, `cid`, `acw_tc`) are all analytics/tracking. Auth is a JWT stored in **localStorage**:
 
-**TODO**: Need to identify the session cookie name. The dashboard sets `acw_tc` (generic Alibaba Cloud WAF cookie) and `NEXT_LOCALE`, but the actual auth cookie only appears after login. User needs to check DevTools → Application → Cookies after logging in.
+- `z-ai-open-platform-token-production` — the token used for API calls
+- `z-ai-website-token` — possibly the same or a site-scoped variant
 
-Likely candidates:
-- A JWT or session token cookie (common in Next.js apps)
-- Could be the same `Authorization` header value stored as a cookie
-- May use `next-auth` session pattern (`__Secure-next-auth.session-token`)
+The dashboard reads this from localStorage and sends it as `Authorization: Bearer <jwt>` to the same API endpoints that API keys use. So both sources are interchangeable — one strategy handles both.
+
+**JWT structure** (HS512, no `exp` claim — appears to not expire):
+```json
+{
+  "user_type": "PERSONAL",
+  "user_id": 5214519,
+  "api_key": null,
+  "user_key": "01d80be3-...",
+  "customer_id": "26321765812398606",
+  "customer": {
+    "channel": "Z_AI",
+    "userType": "PERSONAL",
+    ...
+  }
+}
+```
+
+When `api_key` is null, it's a web session token (not a generated API key). Both work identically with the quota endpoint.
+
+For `vibeusage auth zai`, prompt the user with two options:
+1. Paste an API key (from dashboard → API key management)
+2. Paste the JWT from localStorage (DevTools → Application → Local Storage → `z-ai-open-platform-token-production`)
 
 ### API endpoints
 
@@ -250,7 +272,7 @@ Unauthenticated requests return: `{"code":1001,"msg":"Authentication parameter n
 
 #### New files
 
-- `internal/provider/zai/zai.go` — Provider, metadata, APIKeyStrategy, WebStrategy
+- `internal/provider/zai/zai.go` — Provider, metadata, single BearerTokenStrategy
 - `internal/provider/zai/response.go` — Response types for quota limits
 
 #### Wiring
@@ -258,7 +280,7 @@ Unauthenticated requests return: `{"code":1001,"msg":"Authentication parameter n
 | File | Change |
 |---|---|
 | `cmd/root.go` | Blank import + add `"zai"` to provider list |
-| `cmd/auth.go` | `case "zai": return authZai()` (prompt for API key or session cookie) |
+| `cmd/auth.go` | `case "zai": return authZai()` (prompt for API key or localStorage JWT) |
 | `cmd/key.go` | Add `"zai"` to key loop + `"zai": "api_key"` to `credentialKeyMap` |
 | `internal/config/credentials.go` | `ProviderEnvVars`: `"zai": "ZAI_API_KEY"` |
 
@@ -268,11 +290,10 @@ No known status page. Return `StatusUnknown`.
 
 ### Open questions
 
-- [ ] What is the session cookie name on z.ai after login? (user needs to check DevTools)
 - [ ] Does the quota endpoint return reset times, or just percentages?
 - [ ] Is `percentage` 0-100 or 0.0-1.0?
 - [ ] Is there a way to detect subscription tier from the API?
-- [ ] Does the session cookie work with the same `/api/monitor/usage/quota/limit` endpoint, or does the dashboard hit a different internal endpoint?
+- [ ] How long does the localStorage JWT actually last? (no `exp` claim, but server may enforce TTL)
 
 ## Minimax
 
@@ -402,23 +423,22 @@ Best-documented remaining provider. Device flow auth is proven (Copilot uses sam
 
 ### Phase 3: Z.ai
 
-Simple API key auth with well-understood endpoint. Web strategy depends on identifying the session cookie.
+Single bearer token strategy — API keys and localStorage JWTs use the same `Authorization: Bearer <token>` mechanism. No blockers.
 
-1. Create `internal/provider/zai/` with API key strategy
+1. Create `internal/provider/zai/` with bearer token strategy
 2. Parse quota/limit response (percentage-based)
-3. Wire into CLI
-4. Test with real API key
-5. **After cookie identified**: Add web strategy
+3. Wire into CLI + auth flow (prompt for API key or localStorage JWT)
+4. Test with real token
 
 ### Phase 4: Minimax
 
-Simple API key auth but unknown response format. Web strategy depends on identifying the session cookie.
+Bearer token auth, but unknown response format. Need to identify whether the dashboard also uses localStorage JWTs (like Z.ai) or cookies.
 
-1. Make a real request to `/coding_plan/remains` to determine response format
-2. Create `internal/provider/minimax/` with API key strategy
-3. Wire into CLI
-4. Test with real API key
-5. **After cookie identified**: Add web strategy
+1. Identify Minimax dashboard auth mechanism (user checks DevTools)
+2. Make a real request to `/coding_plan/remains` to determine response format
+3. Create `internal/provider/minimax/` with bearer token strategy
+4. Wire into CLI
+5. Test with real token
 
 ### Phase 5: Kiro
 
