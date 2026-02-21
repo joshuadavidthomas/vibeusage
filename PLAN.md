@@ -27,7 +27,9 @@ Implemented on branch `add-antigravity-provider`.
 - Protobuf field 36 in vscdb `userStatusProtoBinaryBase64` contains the real subscription: `{tierID: "g1-pro-tier", tierName: "Google AI Pro"}`
 - Models without `resetTime` (tab completion, internal) should be filtered out
 
-## Kimi / Moonshot
+## Kimi / Moonshot — ✅ DONE
+
+Implemented on branch `add-kimi-provider`.
 
 Chinese AI provider with K2.5 model. KimiCode is an open-source CLI agent. The kimi-cli source code gives us the full auth flow and usage API.
 
@@ -488,16 +490,16 @@ Response format is deeply nested and unstable. cockpit-tools uses 7+ fallback JS
 
 Branch `add-antigravity-provider`, 5 commits.
 
-### Phase 2: Kimi
+### Phase 2: Kimi — ✅ DONE
 
-Best-documented remaining provider. Device flow auth is proven (Copilot uses same pattern). Open-source CLI gives us the full OAuth spec, usage endpoint, and response parser.
+Branch `add-kimi-provider`, 1 commit.
 
-1. Create `internal/provider/kimi/` with device flow + API key strategies
-2. Implement device flow in `cmd/auth.go` (model after `authCopilot`)
-3. Add credential reuse from kimi-cli installation
-4. Parse usage response with window-to-period mapping
-5. Wire into CLI
-6. Test with real device flow
+- DeviceFlowStrategy + APIKeyStrategy
+- Credential reuse from kimi-cli (~/.kimi/credentials/kimi-code.json)
+- Device flow auth in cmd/auth.go (same pattern as Copilot)
+- Window-to-period mapping (300 MINUTE → PeriodSession, etc.)
+- Plan tier from user.membership.level
+- Tested with real device flow token
 
 ### Phase 3: Z.ai
 
