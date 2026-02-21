@@ -527,9 +527,9 @@ Branch `add-minimax-provider`, 1 commit.
 - Browser User-Agent header (Cloudflare bot protection)
 - Auth flow validates sk-cp- prefix, rejects standard sk-api- keys
 
-### Phase 5: Kiro
+### Phase 5: Kiro — SKIPPED
 
-Blocked on OAuth details. Implement only when we have real endpoint info.
+Blocked on OAuth details. Deprioritized — revisit if/when real endpoint info becomes available.
 
 ### Phase 6: Polish
 
