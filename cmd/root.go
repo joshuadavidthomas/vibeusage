@@ -34,6 +34,7 @@ var (
 	noColor    bool
 	verbose    bool
 	quiet      bool
+	refresh    bool
 )
 
 var rootCmd = &cobra.Command{
@@ -55,6 +56,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Minimal output")
+	rootCmd.PersistentFlags().BoolVarP(&refresh, "refresh", "r", false, "Disable cache fallback — fresh data or error")
 	rootCmd.Flags().Bool("version", false, "Show version and exit")
 
 	rootCmd.AddCommand(usageCmd)
@@ -101,25 +103,24 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	return fetchAndDisplayAll(cmd.Context(), false)
+	return fetchAndDisplayAll(cmd.Context())
 }
 
 func isTerminal() bool {
 	return isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd())
 }
 
-func fetchAndDisplayAll(ctx context.Context, refresh bool) error {
+func fetchAndDisplayAll(ctx context.Context) error {
 	start := time.Now()
 
 	providerMap := buildProviderMap()
 
-	useCache := !refresh
 	var outcomes map[string]fetch.FetchOutcome
 
 	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
 		spinnerIDs := availableProviderIDs(providerMap)
 		err := spinner.Run(spinnerIDs, func(onComplete func(spinner.CompletionInfo)) {
-			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, func(o fetch.FetchOutcome) {
+			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
 			})
 		})
@@ -127,7 +128,7 @@ func fetchAndDisplayAll(ctx context.Context, refresh bool) error {
 			return fmt.Errorf("spinner error: %w", err)
 		}
 	} else {
-		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, useCache, nil)
+		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, nil)
 	}
 
 	durationMs := time.Since(start).Milliseconds()
@@ -252,20 +253,17 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 }
 
 func makeProviderCmd(providerID string) *cobra.Command {
-	var refresh bool
 	titleName := strutil.TitleCase(providerID)
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   providerID,
 		Short: "Show usage for " + titleName,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchAndDisplayProvider(cmd.Context(), providerID, refresh)
+			return fetchAndDisplayProvider(cmd.Context(), providerID)
 		},
 	}
-	cmd.Flags().BoolVarP(&refresh, "refresh", "r", false, "Bypass cache and fetch fresh data")
-	return cmd
 }
 
-func fetchAndDisplayProvider(ctx context.Context, providerID string, refresh bool) error {
+func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	p, ok := provider.Get(providerID)
 	if !ok {
 		return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
