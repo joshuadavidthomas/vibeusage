@@ -341,7 +341,11 @@ Chinese AI provider with M2.5 model. Subscription plans with 5-hour refresh cycl
 
 ### Auth strategy: API key
 
-Note: Minimax has separate API keys for coding plans vs pay-as-you-go. Only the Coding Plan key (prefix `sk-cp-`) works for quota tracking. Key from: `https://platform.minimax.io/user-center/payment/coding-plan`
+Minimax has separate API keys for coding plans vs pay-as-you-go. Only the **Coding Plan key** (prefix `sk-cp-`) works for quota tracking. Standard API keys (`sk-api-...`) return `{"status_code":1004,"status_msg":"cookie is missing, log in again"}`.
+
+Key from: `https://platform.minimax.io/user-center/payment/coding-plan`
+
+During `vibeusage auth minimax`, validate that the key starts with `sk-cp-`.
 
 ### API endpoint
 
