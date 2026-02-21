@@ -514,13 +514,18 @@ Branch `add-zai-provider`, 1 commit.
 - Auth flow prompts for API key from `z.ai/manage-apikey/apikey-list`
 - Handles auth error code 1001 as fatal
 
-### Phase 4: Minimax
+### Phase 4: Minimax — ✅ DONE
 
-API key auth, per-model response format verified. No blockers.
+Branch `add-minimax-provider`, 1 commit.
 
-1. Create `internal/provider/minimax/` with API key strategy
-2. Wire into CLI
-3. Test with real API key
+- APIKeyStrategy for Coding Plan keys (sk-cp- prefix validation)
+- Endpoint: `GET platform.minimax.io/v1/api/openplatform/coding_plan/remains`
+- Per-model quota parsing with summary period for multi-model responses
+- Plan tier inference from total_count (500=Starter, 1500=Plus, 5000=Max)
+- Utilization computed as usage_count / total_count * 100
+- Reset time from end_time (Unix millis)
+- Browser User-Agent header (Cloudflare bot protection)
+- Auth flow validates sk-cp- prefix, rejects standard sk-api- keys
 
 ### Phase 5: Kiro
 

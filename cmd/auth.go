@@ -14,6 +14,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/copilot"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/kimi"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/minimax"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
@@ -41,6 +42,8 @@ var authCmd = &cobra.Command{
 			return authCopilot()
 		case "kimi":
 			return authKimi()
+		case "minimax":
+			return authMinimax()
 		case "zai":
 			return authZai()
 		default:
@@ -226,6 +229,55 @@ func authKimi() error {
 	}
 	if !success {
 		return fmt.Errorf("authentication failed")
+	}
+	return nil
+}
+
+func authMinimax() error {
+	hasCreds, source := config.CheckProviderCredentials("minimax")
+	if hasCreds && !quiet {
+		out("✓ Minimax is already authenticated (%s)\n", sourceToLabel(source))
+
+		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title: "Re-authenticate?",
+		})
+		if err != nil {
+			return err
+		}
+		if !reauth {
+			return nil
+		}
+	}
+
+	if !quiet {
+		outln("Minimax Authentication")
+		outln()
+		outln("Get your Coding Plan API key from Minimax:")
+		outln("  1. Open https://platform.minimax.io/user-center/payment/coding-plan")
+		outln("  2. Copy your Coding Plan API key (starts with sk-cp-)")
+		outln()
+		outln("Note: Standard API keys (sk-api-) won't work — you need a Coding Plan key.")
+		outln()
+	}
+
+	apiKey, err := prompt.Default.Input(prompt.InputConfig{
+		Title:       "Coding Plan API key",
+		Placeholder: "sk-cp-...",
+		Validate: func(s string) error {
+			return minimax.ValidateCodingPlanKey(s)
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	credData, _ := json.Marshal(map[string]string{"api_key": apiKey})
+	if err := config.WriteCredential(config.CredentialPath("minimax", "apikey"), credData); err != nil {
+		return fmt.Errorf("error saving credential: %w", err)
+	}
+
+	if !quiet {
+		outln("✓ Minimax Coding Plan API key saved")
 	}
 	return nil
 }
