@@ -158,22 +158,36 @@ func listModels(providerFilter string) error {
 }
 
 // buildModelRolesMap returns a map from canonical model ID to sorted role names.
+// Uses prefix matching so "claude-opus-4-5" in a role also tags "claude-opus-4-5-20251101".
 func buildModelRolesMap() map[string][]string {
 	cfg := config.Get()
 	result := make(map[string][]string)
 
 	for roleName, role := range cfg.Roles {
 		for _, modelID := range role.Models {
-			info := modelmap.Lookup(modelID)
-			if info == nil {
-				continue
+			matches := modelmap.MatchPrefix(modelID)
+			if len(matches) == 0 {
+				// Fall back to exact lookup (might match an alias).
+				if info := modelmap.Lookup(modelID); info != nil {
+					matches = []modelmap.ModelInfo{*info}
+				}
 			}
-			result[info.ID] = append(result[info.ID], roleName)
+			for _, info := range matches {
+				result[info.ID] = append(result[info.ID], roleName)
+			}
 		}
 	}
 
-	for id := range result {
-		sort.Strings(result[id])
+	// Deduplicate and sort role names per model.
+	for id, roles := range result {
+		sort.Strings(roles)
+		deduped := roles[:0]
+		for i, r := range roles {
+			if i == 0 || r != roles[i-1] {
+				deduped = append(deduped, r)
+			}
+		}
+		result[id] = deduped
 	}
 
 	return result
@@ -468,24 +482,34 @@ func routeByRole(cmd *cobra.Command, roleName string) error {
 	}
 
 	// Resolve each model ID to its providers and build model entries.
+	// Uses prefix matching so "claude-opus-4-5" also picks up dated variants,
+	// but prefers the shortest (non-dated) ID per provider to avoid duplicates.
 	var modelEntries []routing.RoleModelEntry
 	allProviderIDs := make(map[string]bool)
 
 	for _, modelID := range role.Models {
-		info := modelmap.Lookup(modelID)
-		if info == nil {
-			// Skip unknown models silently — they may be from a future models.dev update.
+		matches := modelmap.MatchPrefix(modelID)
+		if len(matches) == 0 {
+			// Fall back to exact lookup (might match an alias).
+			if info := modelmap.Lookup(modelID); info != nil {
+				matches = []modelmap.ModelInfo{*info}
+			}
+		}
+		if len(matches) == 0 {
 			continue
 		}
 
-		configured := configuredProviders(info.Providers)
+		// Prefer the shortest ID (the "latest" pointer, not the dated variant).
+		// MatchPrefix returns sorted by length, so first match is shortest.
+		best := matches[0]
+		configured := configuredProviders(best.Providers)
 		if len(configured) == 0 {
 			continue
 		}
 
 		modelEntries = append(modelEntries, routing.RoleModelEntry{
-			ModelID:     info.ID,
-			ModelName:   info.Name,
+			ModelID:     best.ID,
+			ModelName:   best.Name,
 			ProviderIDs: configured,
 		})
 		for _, pid := range configured {
