@@ -12,6 +12,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/antigravity"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/copilot"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/kimi"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/minimax"
@@ -34,6 +35,8 @@ var authCmd = &cobra.Command{
 		}
 
 		switch providerID {
+		case "antigravity":
+			return authAntigravity()
 		case "claude":
 			return authClaude()
 		case "cursor":
@@ -112,6 +115,32 @@ func authStatusCommand() error {
 		}
 	}
 
+	return nil
+}
+
+func authAntigravity() error {
+	hasCreds, source := config.CheckProviderCredentials("antigravity")
+	if hasCreds && !quiet {
+		out("✓ Antigravity is already authenticated (%s)\n", sourceToLabel(source))
+
+		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title: "Re-authenticate?",
+		})
+		if err != nil {
+			return err
+		}
+		if !reauth {
+			return nil
+		}
+	}
+
+	success, err := antigravity.RunAuthFlow(outWriter, quiet)
+	if err != nil {
+		return err
+	}
+	if !success {
+		return fmt.Errorf("authentication failed")
+	}
 	return nil
 }
 

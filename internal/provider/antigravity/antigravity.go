@@ -3,6 +3,7 @@ package antigravity
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,9 +118,12 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		creds = refreshed
 	}
 
-	modelsResp, codeAssistResp := s.fetchQuotaData(ctx, creds.AccessToken)
+	modelsResp, codeAssistResp, fetchErr := s.fetchQuotaData(ctx, creds.AccessToken)
 	if modelsResp == nil {
-		return fetch.ResultFail("Failed to fetch quota data"), nil
+		if fetchErr.authFailed {
+			return fetch.ResultFail("Token expired or invalid. Sign in again in the Antigravity IDE, or run `vibeusage auth antigravity`."), nil
+		}
+		return fetch.ResultFail(fmt.Sprintf("Failed to fetch quota data: %s", fetchErr.message)), nil
 	}
 
 	snapshot := s.parseModelsResponse(*modelsResp, codeAssistResp)
@@ -213,23 +217,39 @@ func loadFromVSCDB() *vscdbResult {
 	return result
 }
 
-func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*FetchAvailableModelsResponse, *CodeAssistResponse) {
+type fetchError struct {
+	message    string
+	authFailed bool
+}
+
+func (e fetchError) String() string { return e.message }
+
+func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*FetchAvailableModelsResponse, *CodeAssistResponse, fetchError) {
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	bearer := httpclient.WithBearer(accessToken)
 	ua := httpclient.WithHeader("User-Agent", antigravityUserAgent)
 	var modelsResp *FetchAvailableModelsResponse
 	var codeAssistResp *CodeAssistResponse
+	var modelsErr fetchError
 
 	// Fetch available models (includes per-model quota info)
 	var mr FetchAvailableModelsResponse
 	mResp, err := client.PostJSONCtx(ctx, fetchModelsURL,
 		json.RawMessage("{}"), &mr, bearer, ua,
 	)
-	if err == nil && mResp.StatusCode == 200 && mResp.JSONErr == nil {
+	if err != nil {
+		modelsErr = fetchError{message: fmt.Sprintf("request failed: %v", err)}
+	} else if mResp.StatusCode == 401 || mResp.StatusCode == 403 {
+		modelsErr = fetchError{message: fmt.Sprintf("HTTP %d", mResp.StatusCode), authFailed: true}
+	} else if mResp.StatusCode != 200 {
+		modelsErr = fetchError{message: fmt.Sprintf("HTTP %d: %s", mResp.StatusCode, googleauth.ExtractAPIError(mResp.Body))}
+	} else if mResp.JSONErr != nil {
+		modelsErr = fetchError{message: fmt.Sprintf("invalid response: %v", mResp.JSONErr)}
+	} else {
 		modelsResp = &mr
 	}
 
-	// User tier — requires IDE metadata
+	// User tier — requires IDE metadata (non-fatal if it fails)
 	reqBody := CodeAssistRequest{
 		Metadata: &CodeAssistRequestMetadata{
 			IDEType:    "ANTIGRAVITY",
@@ -245,7 +265,7 @@ func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) 
 		codeAssistResp = &ca
 	}
 
-	return modelsResp, codeAssistResp
+	return modelsResp, codeAssistResp, modelsErr
 }
 
 // periodTypeForTier returns the appropriate period type based on the user's plan.
