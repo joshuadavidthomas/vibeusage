@@ -1,7 +1,5 @@
 package spinner
 
-
-
 // CompletionInfo describes a completed provider fetch.
 type CompletionInfo struct {
 	ProviderID string
