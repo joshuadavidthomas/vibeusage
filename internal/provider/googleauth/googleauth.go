@@ -89,6 +89,34 @@ func RefreshToken(ctx context.Context, creds *OAuthCredentials, cfg RefreshConfi
 	return updated
 }
 
+// ExtractAPIError returns a human-readable error description from a Google API
+// error response body. Google APIs return errors as:
+//
+//	{"error":{"code":401,"message":"...","status":"UNAUTHENTICATED"}}
+//
+// Returns the message field if present, otherwise returns a truncated snippet
+// of the raw body for debugging.
+func ExtractAPIError(body []byte) string {
+	var envelope struct {
+		Error struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &envelope) == nil && envelope.Error.Message != "" {
+		return envelope.Error.Message
+	}
+	// Fall back to a raw snippet for non-standard error shapes.
+	s := string(body)
+	if len(s) > 200 {
+		s = s[:200] + "..."
+	}
+	if s == "" {
+		return "empty response"
+	}
+	return s
+}
+
 // ParseExpiryDate converts a mixed-type expiry_date (float64 ms or string)
 // to an RFC3339 string.
 func ParseExpiryDate(v any) string {

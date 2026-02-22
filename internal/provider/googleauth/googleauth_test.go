@@ -105,6 +105,49 @@ func TestOAuthCredentials_Roundtrip(t *testing.T) {
 	}
 }
 
+func TestExtractAPIError(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "standard google error",
+			body: `{"error":{"code":401,"message":"Request had invalid authentication credentials.","status":"UNAUTHENTICATED"}}`,
+			want: "Request had invalid authentication credentials.",
+		},
+		{
+			name: "empty body",
+			body: "",
+			want: "empty response",
+		},
+		{
+			name: "non-json body",
+			body: "Service Unavailable",
+			want: "Service Unavailable",
+		},
+		{
+			name: "json without error field",
+			body: `{"status":"fail"}`,
+			want: `{"status":"fail"}`,
+		},
+		{
+			name: "long body is truncated",
+			body: string(make([]byte, 300)),
+			want: string(make([]byte, 200)) + "...",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ExtractAPIError([]byte(tt.body))
+			if got != tt.want {
+				t.Errorf("ExtractAPIError() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseExpiryDate(t *testing.T) {
 	tests := []struct {
 		name string

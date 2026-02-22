@@ -103,9 +103,12 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		creds = refreshed
 	}
 
-	quotaResp, codeAssistResp := s.fetchQuotaData(ctx, creds.AccessToken)
+	quotaResp, codeAssistResp, fetchErr := s.fetchQuotaData(ctx, creds.AccessToken)
 	if quotaResp == nil {
-		return fetch.ResultFail("Failed to fetch quota data"), nil
+		if fetchErr.authFailed {
+			return fetch.ResultFail("Token expired or invalid. Run `vibeusage auth gemini` to re-authenticate."), nil
+		}
+		return fetch.ResultFail(fmt.Sprintf("Failed to fetch quota data: %s", fetchErr.message)), nil
 	}
 
 	snapshot := s.parseTypedQuotaResponse(*quotaResp, codeAssistResp)
@@ -133,22 +136,38 @@ func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
 	return nil
 }
 
-func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*QuotaResponse, *CodeAssistResponse) {
+type fetchError struct {
+	message    string
+	authFailed bool
+}
+
+func (e fetchError) String() string { return e.message }
+
+func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*QuotaResponse, *CodeAssistResponse, fetchError) {
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 	bearer := httpclient.WithBearer(accessToken)
 	var quotaResp *QuotaResponse
 	var codeAssistResp *CodeAssistResponse
+	var quotaErr fetchError
 
 	// Quota
 	var qr QuotaResponse
 	qResp, err := client.PostJSONCtx(ctx, quotaURL,
 		json.RawMessage("{}"), &qr, bearer,
 	)
-	if err == nil && qResp.StatusCode == 200 && qResp.JSONErr == nil {
+	if err != nil {
+		quotaErr = fetchError{message: fmt.Sprintf("request failed: %v", err)}
+	} else if qResp.StatusCode == 401 || qResp.StatusCode == 403 {
+		quotaErr = fetchError{message: fmt.Sprintf("HTTP %d", qResp.StatusCode), authFailed: true}
+	} else if qResp.StatusCode != 200 {
+		quotaErr = fetchError{message: fmt.Sprintf("HTTP %d: %s", qResp.StatusCode, googleauth.ExtractAPIError(qResp.Body))}
+	} else if qResp.JSONErr != nil {
+		quotaErr = fetchError{message: fmt.Sprintf("invalid response: %v", qResp.JSONErr)}
+	} else {
 		quotaResp = &qr
 	}
 
-	// User tier
+	// User tier (non-fatal if it fails)
 	var ca CodeAssistResponse
 	tResp, err := client.PostJSONCtx(ctx, codeAssistURL,
 		json.RawMessage("{}"), &ca, bearer,
@@ -157,7 +176,7 @@ func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) 
 		codeAssistResp = &ca
 	}
 
-	return quotaResp, codeAssistResp
+	return quotaResp, codeAssistResp, quotaErr
 }
 
 func (s *OAuthStrategy) parseTypedQuotaResponse(quotaResp QuotaResponse, codeAssistResp *CodeAssistResponse) *models.UsageSnapshot {
