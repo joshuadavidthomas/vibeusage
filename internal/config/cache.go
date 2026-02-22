@@ -92,6 +92,11 @@ func ClearSnapshotCache(providerID string) {
 	}
 }
 
+func ClearModelsCache() {
+	_ = os.Remove(ModelsFile())
+	_ = os.Remove(MultipliersFile())
+}
+
 func ClearAllCache(providerID string) {
 	if providerID != "" {
 		ClearProviderCache(providerID)
@@ -99,4 +104,5 @@ func ClearAllCache(providerID string) {
 	}
 	ClearSnapshotCache("")
 	ClearOrgIDCache("")
+	ClearModelsCache()
 }

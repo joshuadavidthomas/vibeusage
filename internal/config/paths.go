@@ -21,10 +21,12 @@ func CacheDir() string {
 	return filepath.Join(userCacheDir(), appName)
 }
 
-func CredentialsDir() string { return filepath.Join(ConfigDir(), "credentials") }
-func SnapshotsDir() string   { return filepath.Join(CacheDir(), "snapshots") }
-func OrgIDsDir() string      { return filepath.Join(CacheDir(), "org-ids") }
-func ConfigFile() string     { return filepath.Join(ConfigDir(), "config.toml") }
+func CredentialsDir() string  { return filepath.Join(ConfigDir(), "credentials") }
+func SnapshotsDir() string    { return filepath.Join(CacheDir(), "snapshots") }
+func OrgIDsDir() string       { return filepath.Join(CacheDir(), "org-ids") }
+func ModelsFile() string      { return filepath.Join(CacheDir(), "models.json") }
+func MultipliersFile() string { return filepath.Join(CacheDir(), "multipliers.json") }
+func ConfigFile() string      { return filepath.Join(ConfigDir(), "config.toml") }
 
 func userConfigDir() string {
 	if d, err := os.UserConfigDir(); err == nil {

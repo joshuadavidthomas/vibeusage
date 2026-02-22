@@ -106,7 +106,7 @@ var cacheShowCmd = &cobra.Command{
 		outln(display.NewTableWithOptions(
 			[]string{"Provider", "Snapshot", "Org ID", "Age"},
 			rows,
-			display.TableOptions{Title: "Cache Status", NoColor: noColor},
+			display.TableOptions{Title: "Cache Status", NoColor: noColor, Width: display.TerminalWidth()},
 		))
 
 		out("\nCache directory: %s\n", config.CacheDir())

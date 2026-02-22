@@ -63,6 +63,25 @@ func listModels(providerFilter string) error {
 		allModels = modelmap.ListModels()
 	}
 
+	// Filter to models that have at least one configured provider,
+	// and only show configured providers in the list.
+	var filtered []modelmap.ModelInfo
+	for _, m := range allModels {
+		configured := configuredProviders(m.Providers)
+		if len(configured) > 0 {
+			m.Providers = configured
+			filtered = append(filtered, m)
+		}
+	}
+	allModels = filtered
+
+	if len(allModels) == 0 {
+		if providerFilter != "" {
+			return fmt.Errorf("no models found for configured provider %q", providerFilter)
+		}
+		return fmt.Errorf("no models available — no providers are configured.\nSet up a provider with: vibeusage auth <provider>")
+	}
+
 	if jsonOutput {
 		type jsonModel struct {
 			ID        string   `json:"id"`
@@ -72,7 +91,7 @@ func listModels(providerFilter string) error {
 		var data []jsonModel
 		for _, m := range allModels {
 			data = append(data, jsonModel{
-				ID:        m.ID,
+				ID:        strings.ToLower(m.ID),
 				Name:      m.Name,
 				Providers: m.Providers,
 			})
@@ -83,14 +102,14 @@ func listModels(providerFilter string) error {
 
 	if quiet {
 		for _, m := range allModels {
-			out("%s %s\n", m.ID, strings.Join(m.Providers, ","))
+			out("%s %s\n", strings.ToLower(m.ID), strings.Join(m.Providers, ","))
 		}
 		return nil
 	}
 
 	var rows [][]string
 	for _, m := range allModels {
-		rows = append(rows, []string{m.ID, m.Name, strings.Join(m.Providers, ", ")})
+		rows = append(rows, []string{strings.ToLower(m.ID), strings.Join(m.Providers, ", ")})
 	}
 
 	title := "Known Models"
@@ -99,12 +118,31 @@ func listModels(providerFilter string) error {
 	}
 
 	outln(display.NewTableWithOptions(
-		[]string{"ID", "Name", "Providers"},
+		[]string{"Model", "Providers"},
 		rows,
-		display.TableOptions{Title: title, NoColor: noColor},
+		display.TableOptions{Title: title, NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
 	return nil
+}
+
+// configuredProviders filters a list of provider IDs to only those that are
+// registered and have at least one available fetch strategy.
+func configuredProviders(providerIDs []string) []string {
+	var result []string
+	for _, pid := range providerIDs {
+		p, ok := provider.Get(pid)
+		if !ok {
+			continue
+		}
+		for _, s := range p.FetchStrategies() {
+			if s.IsAvailable() {
+				result = append(result, pid)
+				break
+			}
+		}
+	}
+	return result
 }
 
 func routeModel(cmd *cobra.Command, query string) error {
@@ -182,7 +220,15 @@ func routeModel(cmd *cobra.Command, query string) error {
 		}
 	}
 
-	candidates, unavailable := routing.Rank(configuredIDs, providerData)
+	// Build multiplier map for providers that have cost multipliers.
+	multipliers := make(map[string]*float64)
+	for _, pid := range configuredIDs {
+		if pid == "copilot" {
+			multipliers[pid] = modelmap.LookupMultiplier(info.Name)
+		}
+	}
+
+	candidates, unavailable := routing.Rank(configuredIDs, providerData, multipliers)
 
 	rec := routing.Recommendation{
 		ModelID:     info.ID,
@@ -220,14 +266,38 @@ func displayRecommendation(rec routing.Recommendation) error {
 
 	out("Route: %s\n\n", rec.ModelName)
 
+	// Check if any candidate has a multiplier to decide whether to show the column.
+	hasMultiplier := false
+	for _, c := range rec.Candidates {
+		if c.Multiplier != nil {
+			hasMultiplier = true
+			break
+		}
+	}
+
 	// Ranked table.
 	var rows [][]string
+	var rowStyles []display.RowStyle
+
 	for i, c := range rec.Candidates {
 		name := strutil.TitleCase(c.ProviderID)
 
-		headroom := fmt.Sprintf("%d%%", c.Headroom)
 		bar := display.RenderBar(c.Utilization, 15, models.PaceToColor(nil, c.Utilization))
 		util := fmt.Sprintf("%d%%", c.Utilization)
+
+		headroom := fmt.Sprintf("%d%%", c.EffectiveHeadroom)
+
+		cost := "—"
+		if c.Multiplier != nil {
+			m := *c.Multiplier
+			if m == 0 {
+				cost = "free"
+			} else if m == float64(int(m)) {
+				cost = fmt.Sprintf("%dx", int(m))
+			} else {
+				cost = fmt.Sprintf("%.2gx", m)
+			}
+		}
 
 		reset := ""
 		if d := timeUntilReset(c.ResetsAt); d != nil {
@@ -239,31 +309,43 @@ func displayRecommendation(rec routing.Recommendation) error {
 			plan = "—"
 		}
 
-		tag := ""
-		if i == 0 {
-			tag = "← best"
-		}
-		if c.Cached {
-			if tag != "" {
-				tag += " (cached)"
-			} else {
-				tag = "(cached)"
-			}
+		if hasMultiplier {
+			rows = append(rows, []string{name, bar + " " + util, headroom, cost, string(c.PeriodType), reset, plan})
+		} else {
+			rows = append(rows, []string{name, bar + " " + util, headroom, string(c.PeriodType), reset, plan})
 		}
 
-		rows = append(rows, []string{name, bar + " " + util, headroom, string(c.PeriodType), reset, plan, tag})
+		if i == 0 {
+			rowStyles = append(rowStyles, display.RowBold)
+		} else {
+			rowStyles = append(rowStyles, display.RowNormal)
+		}
+	}
+
+	// Unavailable providers as dim rows at the bottom.
+	sort.Strings(rec.Unavailable)
+	for _, pid := range rec.Unavailable {
+		name := strutil.TitleCase(pid)
+		if hasMultiplier {
+			rows = append(rows, []string{name, "—", "—", "—", "—", "—", "—"})
+		} else {
+			rows = append(rows, []string{name, "—", "—", "—", "—", "—"})
+		}
+		rowStyles = append(rowStyles, display.RowDim)
+	}
+
+	var headers []string
+	if hasMultiplier {
+		headers = []string{"Provider", "Usage", "Headroom", "Cost", "Period", "Resets In", "Plan"}
+	} else {
+		headers = []string{"Provider", "Usage", "Headroom", "Period", "Resets In", "Plan"}
 	}
 
 	outln(display.NewTableWithOptions(
-		[]string{"Provider", "Usage", "Headroom", "Period", "Resets In", "Plan", ""},
+		headers,
 		rows,
-		display.TableOptions{NoColor: noColor},
+		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: rowStyles},
 	))
-
-	if len(rec.Unavailable) > 0 {
-		sort.Strings(rec.Unavailable)
-		out("\nUnavailable: %s\n", strings.Join(rec.Unavailable, ", "))
-	}
 
 	return nil
 }

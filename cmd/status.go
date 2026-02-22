@@ -84,7 +84,7 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 	outln(display.NewTableWithOptions(
 		[]string{"Provider", "Status", "Description", "Updated"},
 		rows,
-		display.TableOptions{Title: "Provider Status", NoColor: noColor},
+		display.TableOptions{Title: "Provider Status", NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
 	if durationMs > 0 {
