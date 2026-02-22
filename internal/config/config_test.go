@@ -538,6 +538,137 @@ timeout = 20.0
 	}
 }
 
+// Roles
+
+func TestDefaultConfig_RolesInitialized(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Roles == nil {
+		t.Error("Roles map should be initialized (non-nil)")
+	}
+	if len(cfg.Roles) != 0 {
+		t.Errorf("Roles map should be empty, got %d entries", len(cfg.Roles))
+	}
+}
+
+func TestGetRole_Found(t *testing.T) {
+	cfg := Config{
+		Roles: map[string]RoleConfig{
+			"thinking": {Models: []string{"claude-opus-4-6", "o4"}},
+		},
+	}
+	role, ok := cfg.GetRole("thinking")
+	if !ok {
+		t.Fatal("GetRole should find 'thinking'")
+	}
+	if len(role.Models) != 2 {
+		t.Errorf("role models len = %d, want 2", len(role.Models))
+	}
+	if role.Models[0] != "claude-opus-4-6" {
+		t.Errorf("role models[0] = %q, want %q", role.Models[0], "claude-opus-4-6")
+	}
+}
+
+func TestGetRole_NotFound(t *testing.T) {
+	cfg := Config{Roles: map[string]RoleConfig{}}
+	_, ok := cfg.GetRole("nonexistent")
+	if ok {
+		t.Error("GetRole should return false for missing role")
+	}
+}
+
+func TestRoleNames_Sorted(t *testing.T) {
+	cfg := Config{
+		Roles: map[string]RoleConfig{
+			"fast":     {Models: []string{"haiku"}},
+			"thinking": {Models: []string{"opus"}},
+			"coding":   {Models: []string{"sonnet"}},
+		},
+	}
+	names := cfg.RoleNames()
+	if len(names) != 3 {
+		t.Fatalf("RoleNames len = %d, want 3", len(names))
+	}
+	if names[0] != "coding" || names[1] != "fast" || names[2] != "thinking" {
+		t.Errorf("RoleNames = %v, want [coding fast thinking]", names)
+	}
+}
+
+func TestRoles_SaveLoadRoundtrip(t *testing.T) {
+	dir := setupTempDir(t)
+	path := filepath.Join(dir, "roles.toml")
+
+	original := DefaultConfig()
+	original.Roles["thinking"] = RoleConfig{Models: []string{"claude-opus-4-6", "o4"}}
+	original.Roles["fast"] = RoleConfig{Models: []string{"haiku", "flash"}}
+
+	if err := Save(original, path); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	loaded := Load(path)
+
+	if len(loaded.Roles) != 2 {
+		t.Fatalf("Roles len = %d, want 2", len(loaded.Roles))
+	}
+
+	thinking, ok := loaded.GetRole("thinking")
+	if !ok {
+		t.Fatal("GetRole('thinking') not found after roundtrip")
+	}
+	if len(thinking.Models) != 2 || thinking.Models[0] != "claude-opus-4-6" || thinking.Models[1] != "o4" {
+		t.Errorf("thinking.Models = %v, want [claude-opus-4-6 o4]", thinking.Models)
+	}
+
+	fast, ok := loaded.GetRole("fast")
+	if !ok {
+		t.Fatal("GetRole('fast') not found after roundtrip")
+	}
+	if len(fast.Models) != 2 || fast.Models[0] != "haiku" || fast.Models[1] != "flash" {
+		t.Errorf("fast.Models = %v, want [haiku flash]", fast.Models)
+	}
+}
+
+func TestRoles_CloneIsolation(t *testing.T) {
+	setupTempDir(t)
+
+	cfg := DefaultConfig()
+	cfg.Roles["test"] = RoleConfig{Models: []string{"model-a", "model-b"}}
+
+	configMu.Lock()
+	globalConfig = &cfg
+	configMu.Unlock()
+
+	c1 := Get()
+	c1.Roles["test"] = RoleConfig{Models: []string{"MUTATED"}}
+	c1.Roles["injected"] = RoleConfig{Models: []string{"bad"}}
+
+	c2 := Get()
+	if _, ok := c2.Roles["injected"]; ok {
+		t.Error("Get() should return a copy: Roles map mutation leaked")
+	}
+	role, ok := c2.GetRole("test")
+	if !ok {
+		t.Fatal("role 'test' should exist")
+	}
+	if role.Models[0] == "MUTATED" {
+		t.Error("Get() should return a copy: Roles slice mutation leaked")
+	}
+}
+
+func TestLoad_InitializesNilRolesMap(t *testing.T) {
+	dir := setupTempDir(t)
+	path := filepath.Join(dir, "noroles.toml")
+	writeTestFile(t, path, []byte(`
+[fetch]
+timeout = 15.0
+`))
+
+	cfg := Load(path)
+	if cfg.Roles == nil {
+		t.Error("Roles map should be initialized when not present in TOML")
+	}
+}
+
 // Paths
 
 func TestConfigDir_EnvOverride(t *testing.T) {

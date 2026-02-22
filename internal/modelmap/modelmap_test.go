@@ -11,10 +11,12 @@ func testData() map[string]modelsDevProvider {
 			ID:   "anthropic",
 			Name: "Anthropic",
 			Models: map[string]modelsDevModel{
-				"claude-sonnet-4-5": {ID: "claude-sonnet-4-5", Name: "Claude Sonnet 4.5", Family: "claude-sonnet"},
-				"claude-sonnet-4-6": {ID: "claude-sonnet-4-6", Name: "Claude Sonnet 4.6", Family: "claude-sonnet"},
-				"claude-opus-4-0":   {ID: "claude-opus-4-0", Name: "Claude Opus 4", Family: "claude-opus"},
-				"claude-haiku-4-5":  {ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5", Family: "claude-haiku"},
+				"claude-sonnet-4-5":          {ID: "claude-sonnet-4-5", Name: "Claude Sonnet 4.5", Family: "claude-sonnet"},
+				"claude-sonnet-4-5-20250929": {ID: "claude-sonnet-4-5-20250929", Name: "Claude Sonnet 4.5 (20250929)", Family: "claude-sonnet"},
+				"claude-sonnet-4-6":          {ID: "claude-sonnet-4-6", Name: "Claude Sonnet 4.6", Family: "claude-sonnet"},
+				"claude-opus-4-0":            {ID: "claude-opus-4-0", Name: "Claude Opus 4", Family: "claude-opus"},
+				"claude-haiku-4-5":           {ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5", Family: "claude-haiku"},
+				"claude-haiku-4-5-20251001":  {ID: "claude-haiku-4-5-20251001", Name: "Claude Haiku 4.5 (20251001)", Family: "claude-haiku"},
 			},
 		},
 		"openai": {
@@ -205,6 +207,52 @@ func TestSearch_NoResults(t *testing.T) {
 	results := Search("zzzzz-nonexistent")
 	if len(results) != 0 {
 		t.Errorf("expected no results, got %d", len(results))
+	}
+}
+
+func TestMatchPrefix_ExactAndDated(t *testing.T) {
+	setupTest(t)
+
+	results := MatchPrefix("claude-haiku-4-5")
+	if len(results) < 2 {
+		t.Fatalf("expected at least 2 results (base + dated), got %d", len(results))
+	}
+	// Shortest ID first.
+	if results[0].ID != "claude-haiku-4-5" {
+		t.Errorf("first result = %q, want %q (shortest)", results[0].ID, "claude-haiku-4-5")
+	}
+	if results[1].ID != "claude-haiku-4-5-20251001" {
+		t.Errorf("second result = %q, want %q", results[1].ID, "claude-haiku-4-5-20251001")
+	}
+}
+
+func TestMatchPrefix_NoOverlapWithDifferentModel(t *testing.T) {
+	setupTest(t)
+
+	// "claude-sonnet-4-5" should NOT match "claude-sonnet-4-6".
+	results := MatchPrefix("claude-sonnet-4-5")
+	for _, r := range results {
+		if r.ID == "claude-sonnet-4-6" {
+			t.Error("claude-sonnet-4-5 prefix should not match claude-sonnet-4-6")
+		}
+	}
+}
+
+func TestMatchPrefix_NoResults(t *testing.T) {
+	setupTest(t)
+
+	results := MatchPrefix("zzz-nonexistent")
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+func TestMatchPrefix_EmptyQuery(t *testing.T) {
+	setupTest(t)
+
+	results := MatchPrefix("")
+	if results != nil {
+		t.Errorf("expected nil for empty query, got %d results", len(results))
 	}
 }
 

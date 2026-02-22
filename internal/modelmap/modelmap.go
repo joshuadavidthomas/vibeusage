@@ -116,6 +116,37 @@ func Search(query string) []ModelInfo {
 	return results
 }
 
+// MatchPrefix returns all models whose canonical ID starts with the query.
+// Results are sorted by ID length (shortest first), then alphabetically.
+// This is useful for expanding "claude-opus-4-5" to include dated variants
+// like "claude-opus-4-5-20251101".
+func MatchPrefix(query string) []ModelInfo {
+	ensureLoaded()
+	q := normalize(query)
+	if q == "" {
+		return nil
+	}
+
+	var results []ModelInfo
+	seen := make(map[string]bool)
+
+	for _, info := range registryModels {
+		if strings.HasPrefix(normalize(info.ID), q) && !seen[info.ID] {
+			results = append(results, info)
+			seen[info.ID] = true
+		}
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		if len(results[i].ID) != len(results[j].ID) {
+			return len(results[i].ID) < len(results[j].ID)
+		}
+		return results[i].ID < results[j].ID
+	})
+
+	return results
+}
+
 // ProvidersForModel returns the provider IDs that offer the given model.
 // Returns nil if the model is not found.
 func ProvidersForModel(query string) []string {
