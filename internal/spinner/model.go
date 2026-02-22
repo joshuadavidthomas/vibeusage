@@ -12,25 +12,34 @@ import (
 type completionMsg CompletionInfo
 
 type model struct {
-	spinner   spinner.Model
-	inflight  []string
-	completed []CompletionInfo
-	quitting  bool
+	spinner      spinner.Model
+	allProviders []string
+	inflight     []string
+	completions  map[string]CompletionInfo
+	quitting     bool
 }
 
-var checkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+var (
+	checkStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	errStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+)
 
 func newModel(providerIDs []string) model {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	allProviders := make([]string, len(providerIDs))
+	copy(allProviders, providerIDs)
+
 	inflight := make([]string, len(providerIDs))
 	copy(inflight, providerIDs)
 
 	return model{
-		spinner:  s,
-		inflight: inflight,
+		spinner:      s,
+		allProviders: allProviders,
+		inflight:     inflight,
+		completions:  make(map[string]CompletionInfo),
 	}
 }
 
@@ -48,7 +57,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		m.completed = append(m.completed, info)
+		m.completions[info.ProviderID] = info
 		m.inflight = removeString(m.inflight, info.ProviderID)
 
 		if len(m.inflight) == 0 {
@@ -80,22 +89,24 @@ func (m model) View() string {
 
 	var b strings.Builder
 
-	// Show completed providers (only successes)
-	for _, c := range m.completed {
-		if !c.Success {
-			continue
+	for i, id := range m.allProviders {
+		if i > 0 {
+			b.WriteString("\n")
 		}
-		b.WriteString(checkStyle.Render("✓"))
-		b.WriteString(" ")
-		b.WriteString(FormatCompletionText(c))
-		b.WriteString("\n")
-	}
 
-	// Show spinner with in-flight providers
-	if len(m.inflight) > 0 {
-		b.WriteString(m.spinner.View())
-		b.WriteString(" ")
-		b.WriteString(FormatTitle(m.inflight))
+		if c, done := m.completions[id]; done {
+			if c.Success {
+				b.WriteString(checkStyle.Render("✓"))
+			} else {
+				b.WriteString(errStyle.Render("✗"))
+			}
+			b.WriteString(" ")
+			b.WriteString(FormatCompletionText(c))
+		} else {
+			b.WriteString(m.spinner.View())
+			b.WriteString(" ")
+			b.WriteString(id)
+		}
 	}
 
 	return b.String()
