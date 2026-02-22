@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -33,12 +34,17 @@ type ProviderConfig struct {
 	Enabled          bool   `toml:"enabled" json:"enabled"`
 }
 
+type RoleConfig struct {
+	Models []string `toml:"models" json:"models"`
+}
+
 type Config struct {
 	EnabledProviders []string                  `toml:"enabled_providers" json:"enabled_providers"`
 	Display          DisplayConfig             `toml:"display" json:"display"`
 	Fetch            FetchConfig               `toml:"fetch" json:"fetch"`
 	Credentials      CredentialsConfig         `toml:"credentials" json:"credentials"`
 	Providers        map[string]ProviderConfig `toml:"providers" json:"providers"`
+	Roles            map[string]RoleConfig     `toml:"roles" json:"roles"`
 }
 
 func DefaultConfig() Config {
@@ -59,6 +65,7 @@ func DefaultConfig() Config {
 			ReuseProviderCredentials: true,
 		},
 		Providers: make(map[string]ProviderConfig),
+		Roles:     make(map[string]RoleConfig),
 	}
 }
 
@@ -71,6 +78,12 @@ func (c Config) clone() Config {
 	out.Providers = make(map[string]ProviderConfig, len(c.Providers))
 	for k, v := range c.Providers {
 		out.Providers[k] = v
+	}
+	out.Roles = make(map[string]RoleConfig, len(c.Roles))
+	for k, v := range c.Roles {
+		models := make([]string, len(v.Models))
+		copy(models, v.Models)
+		out.Roles[k] = RoleConfig{Models: models}
 	}
 	return out
 }
@@ -88,6 +101,20 @@ func (c Config) IsProviderEnabled(providerID string) bool {
 		}
 	}
 	return false
+}
+
+func (c Config) GetRole(name string) (RoleConfig, bool) {
+	r, ok := c.Roles[name]
+	return r, ok
+}
+
+func (c Config) RoleNames() []string {
+	names := make([]string, 0, len(c.Roles))
+	for name := range c.Roles {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 var (
@@ -136,9 +163,12 @@ func Load(path string) Config {
 		return applyEnvOverrides(DefaultConfig())
 	}
 
-	// Ensure Providers map is initialized
+	// Ensure maps are initialized
 	if cfg.Providers == nil {
 		cfg.Providers = make(map[string]ProviderConfig)
+	}
+	if cfg.Roles == nil {
+		cfg.Roles = make(map[string]RoleConfig)
 	}
 
 	return applyEnvOverrides(cfg)

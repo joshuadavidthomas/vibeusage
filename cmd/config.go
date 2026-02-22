@@ -42,7 +42,8 @@ var configShowCmd = &cobra.Command{
 					"use_keyring":                cfg.Credentials.UseKeyring,
 					"reuse_provider_credentials": cfg.Credentials.ReuseProviderCredentials,
 				},
-				"path": cfgPath,
+				"roles": cfg.Roles,
+				"path":  cfgPath,
 			})
 			return nil
 		}

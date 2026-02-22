@@ -130,8 +130,44 @@ func interactiveWizard() error {
 		}
 	}
 
+	// Seed default roles if none exist.
+	seedDefaultRoles()
+
 	outln()
 	outln("Run the commands above to authenticate each provider.")
 	outln("After setup, run 'vibeusage' to see your usage.")
 	return nil
+}
+
+// defaultRoles defines the starter roles seeded during init.
+var defaultRoles = map[string]config.RoleConfig{
+	"thinking": {Models: []string{"claude-opus-4-6", "o4", "gpt-5-2"}},
+	"coding":   {Models: []string{"claude-sonnet-4-6", "kimi-k2", "gpt-5"}},
+	"fast":     {Models: []string{"claude-haiku-4-5", "gemini-3-flash", "gpt-4o-mini"}},
+}
+
+func seedDefaultRoles() {
+	cfg := config.Get()
+	if len(cfg.Roles) > 0 {
+		return
+	}
+
+	for name, role := range defaultRoles {
+		cfg.Roles[name] = role
+	}
+
+	if err := config.Save(cfg, ""); err != nil {
+		// Non-fatal — roles are a convenience, not a requirement.
+		return
+	}
+	config.Reload()
+
+	outln()
+	outln("  Default roles added to config:")
+	outln("    thinking — deep reasoning models (Opus, o4, GPT-5.2)")
+	outln("    coding   — agentic coding models (Sonnet, Kimi K2, GPT-5)")
+	outln("    fast     — quick lightweight models (Haiku, Flash, GPT-4o-mini)")
+	outln()
+	outln("  Customize roles with: vibeusage config edit")
+	outln("  Route by role with:   vibeusage route --role thinking")
 }

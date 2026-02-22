@@ -366,6 +366,153 @@ func TestComputeEffectiveHeadroom(t *testing.T) {
 	}
 }
 
+// RankByRole tests
+
+func TestRankByRole_RanksAcrossModelsAndProviders(t *testing.T) {
+	entries := []RoleModelEntry{
+		{ModelID: "claude-opus-4-6", ModelName: "Claude Opus 4.6", ProviderIDs: []string{"claude"}},
+		{ModelID: "o4", ModelName: "o4", ProviderIDs: []string{"codex"}},
+	}
+	snapshots := map[string]ProviderData{
+		"claude": {Snapshot: makeSnapshot("claude", 80, models.PeriodSession, "Max")},
+		"codex":  {Snapshot: makeSnapshot("codex", 30, models.PeriodMonthly, "Plus")},
+	}
+
+	candidates, unavailable := RankByRole(entries, snapshots, nil)
+
+	if len(unavailable) != 0 {
+		t.Errorf("expected 0 unavailable, got %d", len(unavailable))
+	}
+	if len(candidates) != 2 {
+		t.Fatalf("expected 2 candidates, got %d", len(candidates))
+	}
+
+	// codex (70 headroom) > claude (20 headroom)
+	if candidates[0].ProviderID != "codex" {
+		t.Errorf("first = %q, want codex", candidates[0].ProviderID)
+	}
+	if candidates[0].ModelID != "o4" {
+		t.Errorf("first model = %q, want o4", candidates[0].ModelID)
+	}
+	if candidates[0].ModelName != "o4" {
+		t.Errorf("first model name = %q, want o4", candidates[0].ModelName)
+	}
+	if candidates[1].ProviderID != "claude" {
+		t.Errorf("second = %q, want claude", candidates[1].ProviderID)
+	}
+	if candidates[1].ModelID != "claude-opus-4-6" {
+		t.Errorf("second model = %q, want claude-opus-4-6", candidates[1].ModelID)
+	}
+}
+
+func TestRankByRole_DeduplicatesProviders(t *testing.T) {
+	// Two models both available on the same provider — should only appear once.
+	entries := []RoleModelEntry{
+		{ModelID: "claude-opus-4-6", ModelName: "Claude Opus 4.6", ProviderIDs: []string{"claude"}},
+		{ModelID: "claude-sonnet-4-6", ModelName: "Claude Sonnet 4.6", ProviderIDs: []string{"claude"}},
+	}
+	snapshots := map[string]ProviderData{
+		"claude": {Snapshot: makeSnapshot("claude", 40, models.PeriodSession, "")},
+	}
+
+	candidates, _ := RankByRole(entries, snapshots, nil)
+
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate (deduplicated), got %d", len(candidates))
+	}
+	// First model in the list wins for the provider.
+	if candidates[0].ModelID != "claude-opus-4-6" {
+		t.Errorf("model = %q, want claude-opus-4-6 (first listed)", candidates[0].ModelID)
+	}
+}
+
+func TestRankByRole_MissingProviderIsUnavailable(t *testing.T) {
+	entries := []RoleModelEntry{
+		{ModelID: "claude-opus-4-6", ModelName: "Claude Opus 4.6", ProviderIDs: []string{"claude"}},
+		{ModelID: "o4", ModelName: "o4", ProviderIDs: []string{"codex"}},
+	}
+	snapshots := map[string]ProviderData{
+		"claude": {Snapshot: makeSnapshot("claude", 30, models.PeriodSession, "")},
+		// codex missing
+	}
+
+	candidates, unavailable := RankByRole(entries, snapshots, nil)
+
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate, got %d", len(candidates))
+	}
+	if len(unavailable) != 1 {
+		t.Fatalf("expected 1 unavailable, got %d", len(unavailable))
+	}
+	if unavailable[0].ModelID != "o4" {
+		t.Errorf("unavailable model = %q, want o4", unavailable[0].ModelID)
+	}
+	if unavailable[0].ProviderID != "codex" {
+		t.Errorf("unavailable provider = %q, want codex", unavailable[0].ProviderID)
+	}
+}
+
+func TestRankByRole_WithMultipliers(t *testing.T) {
+	entries := []RoleModelEntry{
+		{ModelID: "claude-opus-4-6", ModelName: "Claude Opus 4.6", ProviderIDs: []string{"claude"}},
+		{ModelID: "claude-opus-4-6", ModelName: "Claude Opus 4.6", ProviderIDs: []string{"copilot"}},
+	}
+	snapshots := map[string]ProviderData{
+		"claude":  {Snapshot: makeSnapshot("claude", 50, models.PeriodSession, "")},
+		"copilot": {Snapshot: makeSnapshot("copilot", 10, models.PeriodMonthly, "")},
+	}
+
+	multiplierFn := func(modelName string, providerID string) *float64 {
+		if providerID == "copilot" {
+			v := 3.0
+			return &v
+		}
+		return nil
+	}
+
+	candidates, _ := RankByRole(entries, snapshots, multiplierFn)
+
+	if len(candidates) != 2 {
+		t.Fatalf("expected 2 candidates, got %d", len(candidates))
+	}
+
+	// Claude: 50 headroom, no multiplier → effective 50
+	// Copilot: 90 headroom, 3x → effective 30
+	if candidates[0].ProviderID != "claude" {
+		t.Errorf("first = %q, want claude (better effective headroom)", candidates[0].ProviderID)
+	}
+	if candidates[1].EffectiveHeadroom != 30 {
+		t.Errorf("copilot effective headroom = %d, want 30", candidates[1].EffectiveHeadroom)
+	}
+}
+
+func TestRankByRole_AllMissing(t *testing.T) {
+	entries := []RoleModelEntry{
+		{ModelID: "o4", ModelName: "o4", ProviderIDs: []string{"codex"}},
+	}
+	snapshots := map[string]ProviderData{}
+
+	candidates, unavailable := RankByRole(entries, snapshots, nil)
+
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 candidates, got %d", len(candidates))
+	}
+	if len(unavailable) != 1 {
+		t.Errorf("expected 1 unavailable, got %d", len(unavailable))
+	}
+}
+
+func TestRankByRole_EmptyEntries(t *testing.T) {
+	candidates, unavailable := RankByRole(nil, nil, nil)
+
+	if len(candidates) != 0 {
+		t.Errorf("expected 0 candidates, got %d", len(candidates))
+	}
+	if len(unavailable) != 0 {
+		t.Errorf("expected 0 unavailable, got %d", len(unavailable))
+	}
+}
+
 func TestRank_FullyUsedProvider(t *testing.T) {
 	providerIDs := []string{"claude", "copilot"}
 	snapshots := map[string]ProviderData{
