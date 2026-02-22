@@ -102,11 +102,15 @@ func listModels(providerFilter string) error {
 		return fmt.Errorf("no models available — no providers are configured.\nSet up a provider with: vibeusage auth <provider>")
 	}
 
+	// Build a reverse map: model ID → role names.
+	modelRoles := buildModelRolesMap()
+
 	if jsonOutput {
 		type jsonModel struct {
 			ID        string   `json:"id"`
 			Name      string   `json:"name"`
 			Providers []string `json:"providers"`
+			Roles     []string `json:"roles,omitempty"`
 		}
 		var data []jsonModel
 		for _, m := range allModels {
@@ -114,6 +118,7 @@ func listModels(providerFilter string) error {
 				ID:        strings.ToLower(m.ID),
 				Name:      m.Name,
 				Providers: m.Providers,
+				Roles:     modelRoles[m.ID],
 			})
 		}
 		display.OutputJSON(outWriter, data)
@@ -122,14 +127,20 @@ func listModels(providerFilter string) error {
 
 	if quiet {
 		for _, m := range allModels {
-			out("%s %s\n", strings.ToLower(m.ID), strings.Join(m.Providers, ","))
+			roles := modelRoles[m.ID]
+			if len(roles) > 0 {
+				out("%s %s %s\n", strings.ToLower(m.ID), strings.Join(m.Providers, ","), strings.Join(roles, ","))
+			} else {
+				out("%s %s\n", strings.ToLower(m.ID), strings.Join(m.Providers, ","))
+			}
 		}
 		return nil
 	}
 
 	var rows [][]string
 	for _, m := range allModels {
-		rows = append(rows, []string{strings.ToLower(m.ID), strings.Join(m.Providers, ", ")})
+		roles := strings.Join(modelRoles[m.ID], ", ")
+		rows = append(rows, []string{strings.ToLower(m.ID), strings.Join(m.Providers, ", "), roles})
 	}
 
 	title := "Known Models"
@@ -138,12 +149,34 @@ func listModels(providerFilter string) error {
 	}
 
 	outln(display.NewTableWithOptions(
-		[]string{"Model", "Providers"},
+		[]string{"Model", "Providers", "Roles"},
 		rows,
 		display.TableOptions{Title: title, NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
 	return nil
+}
+
+// buildModelRolesMap returns a map from canonical model ID to sorted role names.
+func buildModelRolesMap() map[string][]string {
+	cfg := config.Get()
+	result := make(map[string][]string)
+
+	for roleName, role := range cfg.Roles {
+		for _, modelID := range role.Models {
+			info := modelmap.Lookup(modelID)
+			if info == nil {
+				continue
+			}
+			result[info.ID] = append(result[info.ID], roleName)
+		}
+	}
+
+	for id := range result {
+		sort.Strings(result[id])
+	}
+
+	return result
 }
 
 // configuredProviders filters a list of provider IDs to only those that are
