@@ -77,7 +77,7 @@ func displayAllCredentialStatus() error {
 	outln(display.NewTableWithOptions(
 		[]string{"Provider", "Status", "Source"},
 		rows,
-		display.TableOptions{Title: "Credential Status", NoColor: noColor},
+		display.TableOptions{Title: "Credential Status", NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
 	outln()

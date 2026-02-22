@@ -28,6 +28,8 @@ type OAuthUsageResponse struct {
 	SevenDayOpus   *UsagePeriodResponse `json:"seven_day_opus,omitempty"`
 	SevenDayHaiku  *UsagePeriodResponse `json:"seven_day_haiku,omitempty"`
 	ExtraUsage     *ExtraUsageResponse  `json:"extra_usage,omitempty"`
+	Plan           string               `json:"plan,omitempty"`
+	BillingType    string               `json:"billing_type,omitempty"`
 }
 
 // OAuthTokenResponse represents the response from /oauth/token.

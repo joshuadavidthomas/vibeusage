@@ -161,6 +161,22 @@ func (s UsageSnapshot) PrimaryPeriod() *UsagePeriod {
 	return &s.Periods[best]
 }
 
+// BottleneckPeriod returns the period with the least remaining headroom
+// (highest utilization). For routing, this is the constraining limit — if
+// session is at 2% but weekly is at 62%, effective headroom is 38%.
+func (s UsageSnapshot) BottleneckPeriod() *UsagePeriod {
+	if len(s.Periods) == 0 {
+		return nil
+	}
+	best := 0
+	for i, p := range s.Periods {
+		if p.Utilization > s.Periods[best].Utilization {
+			best = i
+		}
+	}
+	return &s.Periods[best]
+}
+
 func (s UsageSnapshot) ModelPeriods() []UsagePeriod {
 	var result []UsagePeriod
 	for _, p := range s.Periods {

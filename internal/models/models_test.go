@@ -403,6 +403,87 @@ func TestPrimaryPeriod(t *testing.T) {
 	}
 }
 
+func TestBottleneckPeriod(t *testing.T) {
+	tests := []struct {
+		name     string
+		snap     UsageSnapshot
+		wantNil  bool
+		wantPT   PeriodType
+		wantUtil int
+	}{
+		{
+			name:    "empty periods returns nil",
+			snap:    UsageSnapshot{},
+			wantNil: true,
+		},
+		{
+			name: "single period returned",
+			snap: UsageSnapshot{
+				Periods: []UsagePeriod{
+					{Name: "monthly", PeriodType: PeriodMonthly, Utilization: 30},
+				},
+			},
+			wantPT:   PeriodMonthly,
+			wantUtil: 30,
+		},
+		{
+			name: "picks highest utilization (weekly > session)",
+			snap: UsageSnapshot{
+				Periods: []UsagePeriod{
+					{Name: "session", PeriodType: PeriodSession, Utilization: 2},
+					{Name: "weekly", PeriodType: PeriodWeekly, Utilization: 62},
+				},
+			},
+			wantPT:   PeriodWeekly,
+			wantUtil: 62,
+		},
+		{
+			name: "session is bottleneck when most used",
+			snap: UsageSnapshot{
+				Periods: []UsagePeriod{
+					{Name: "session", PeriodType: PeriodSession, Utilization: 90},
+					{Name: "weekly", PeriodType: PeriodWeekly, Utilization: 20},
+				},
+			},
+			wantPT:   PeriodSession,
+			wantUtil: 90,
+		},
+		{
+			name: "picks most constrained among many periods",
+			snap: UsageSnapshot{
+				Periods: []UsagePeriod{
+					{Name: "session", PeriodType: PeriodSession, Utilization: 10},
+					{Name: "daily", PeriodType: PeriodDaily, Utilization: 50},
+					{Name: "weekly", PeriodType: PeriodWeekly, Utilization: 80},
+					{Name: "monthly", PeriodType: PeriodMonthly, Utilization: 30},
+				},
+			},
+			wantPT:   PeriodWeekly,
+			wantUtil: 80,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.snap.BottleneckPeriod()
+			if tt.wantNil {
+				if got != nil {
+					t.Errorf("BottleneckPeriod() = %+v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("BottleneckPeriod() = nil, want non-nil")
+			}
+			if got.PeriodType != tt.wantPT {
+				t.Errorf("BottleneckPeriod().PeriodType = %q, want %q", got.PeriodType, tt.wantPT)
+			}
+			if got.Utilization != tt.wantUtil {
+				t.Errorf("BottleneckPeriod().Utilization = %d, want %d", got.Utilization, tt.wantUtil)
+			}
+		})
+	}
+}
+
 func TestModelPeriods(t *testing.T) {
 	tests := []struct {
 		name string

@@ -101,7 +101,7 @@ func authStatusCommand() error {
 	outln(display.NewTableWithOptions(
 		[]string{"Provider", "Status", "Source"},
 		rows,
-		display.TableOptions{Title: "Authentication Status", NoColor: noColor},
+		display.TableOptions{Title: "Authentication Status", NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
 	if len(unconfigured) > 0 {

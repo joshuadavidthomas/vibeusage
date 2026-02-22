@@ -154,6 +154,17 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredential
 	return updated
 }
 
+// inferClaudePlan guesses the plan tier from usage response features.
+func inferClaudePlan(resp OAuthUsageResponse) string {
+	if resp.ExtraUsage != nil && resp.ExtraUsage.IsEnabled {
+		return "Pro"
+	}
+	if resp.SevenDayOpus != nil {
+		return "Pro"
+	}
+	return ""
+}
+
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
@@ -225,12 +236,27 @@ func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models
 		}
 	}
 
+	// Build identity from plan field or infer from usage features.
+	plan := resp.Plan
+	if plan == "" && resp.BillingType != "" {
+		plan = resp.BillingType
+	}
+	if plan == "" {
+		plan = inferClaudePlan(resp)
+	}
+
+	var identity *models.ProviderIdentity
+	if plan != "" {
+		identity = &models.ProviderIdentity{Plan: plan}
+	}
+
 	now := time.Now().UTC()
 	return &models.UsageSnapshot{
 		Provider:  "claude",
 		FetchedAt: now,
 		Periods:   periods,
 		Overage:   overage,
+		Identity:  identity,
 		Source:    "oauth",
 	}
 }
