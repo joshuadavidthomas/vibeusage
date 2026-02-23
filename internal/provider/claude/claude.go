@@ -30,7 +30,6 @@ func (c Claude) FetchStrategies() []fetch.Strategy {
 	return []fetch.Strategy{
 		&OAuthStrategy{},
 		&WebStrategy{},
-		&CLIStrategy{},
 	}
 }
 
