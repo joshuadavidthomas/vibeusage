@@ -28,10 +28,10 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 `config.Get()` is called as a hidden dependency in 13+ sites across `internal/fetch/`, `internal/provider/`, and `cmd/`.
 
-- [ ] `ExecutePipeline`: accept timeout and stale threshold as parameters (or a `PipelineConfig` struct) instead of calling `config.Get()` internally
-- [ ] `FetchAllProviders` / `FetchEnabledProviders`: accept max concurrency as a parameter
-- [ ] Provider strategies: inject HTTP timeout rather than each provider reading `config.Get().Fetch.Timeout` internally
-- [ ] `config.CacheSnapshot` / `config.LoadCachedSnapshot` calls inside `pipeline.go`: pass cache dir or a cache interface
+- [x] `ExecutePipeline`: accept timeout and stale threshold as parameters (or a `PipelineConfig` struct) instead of calling `config.Get()` internally
+- [x] `FetchAllProviders` / `FetchEnabledProviders`: accept max concurrency as a parameter
+- [x] Provider strategies: inject HTTP timeout rather than each provider reading `config.Get().Fetch.Timeout` internally
+- [x] `config.CacheSnapshot` / `config.LoadCachedSnapshot` calls inside `pipeline.go`: pass cache dir or a cache interface
 
 ## Medium Impact
 

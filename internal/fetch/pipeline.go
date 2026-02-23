@@ -3,13 +3,12 @@ package fetch
 import (
 	"context"
 	"time"
-
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 )
 
 // ExecutePipeline tries each strategy in order until one succeeds.
-func ExecutePipeline(ctx context.Context, providerID string, strategies []Strategy, useCache bool) FetchOutcome {
-	cfg := config.Get()
+// All configuration (timeout, stale threshold, cache) is provided via cfg
+// rather than read from a global singleton.
+func ExecutePipeline(ctx context.Context, providerID string, strategies []Strategy, useCache bool, cfg PipelineConfig) FetchOutcome {
 	var attempts []FetchAttempt
 
 	// Try each strategy
@@ -24,7 +23,6 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 		}
 
 		start := time.Now()
-		timeout := time.Duration(cfg.Fetch.Timeout * float64(time.Second))
 
 		resultCh := make(chan fetchAttemptResult, 1)
 		go func() {
@@ -43,7 +41,7 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 				Attempts:   attempts,
 				Error:      "Context cancelled",
 			}
-		case <-time.After(timeout):
+		case <-time.After(cfg.Timeout):
 			durationMs := int(time.Since(start).Milliseconds())
 			attempts = append(attempts, FetchAttempt{
 				Strategy:   strategy.Name(),
@@ -71,7 +69,9 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 
 		if result.Success && result.Snapshot != nil {
 			// Cache the result
-			_ = config.CacheSnapshot(*result.Snapshot)
+			if cfg.Cache != nil {
+				_ = cfg.Cache.Save(*result.Snapshot)
+			}
 
 			return FetchOutcome{
 				ProviderID: providerID,
@@ -120,8 +120,8 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 	// If nothing was even attempted (no credentials), only serve
 	// cache within the stale threshold — old data with no way to
 	// refresh is misleading.
-	if useCache {
-		if cached := config.LoadCachedSnapshot(providerID); cached != nil {
+	if useCache && cfg.Cache != nil {
+		if cached := cfg.Cache.Load(providerID); cached != nil {
 			if anyAttempted {
 				return FetchOutcome{
 					ProviderID: providerID,
@@ -133,7 +133,7 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 				}
 			}
 			ageMinutes := int(time.Since(cached.FetchedAt).Minutes())
-			if ageMinutes < cfg.Fetch.StaleThresholdMinutes {
+			if ageMinutes < cfg.StaleThresholdMinutes {
 				return FetchOutcome{
 					ProviderID: providerID,
 					Success:    true,

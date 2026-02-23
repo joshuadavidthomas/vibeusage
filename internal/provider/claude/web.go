@@ -13,7 +13,9 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-type WebStrategy struct{}
+type WebStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *WebStrategy) Name() string { return "web" }
 
@@ -33,7 +35,7 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail("Failed to get organization ID"), nil
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	sessionCookie := httpclient.WithCookie("sessionKey", sessionKey)
 
 	// Fetch usage
@@ -90,7 +92,7 @@ func (s *WebStrategy) getOrgID(ctx context.Context, sessionKey string) string {
 		return cached
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var orgs []WebOrganization
 	resp, err := client.GetJSONCtx(ctx, webBaseURL, &orgs,
 		httpclient.WithCookie("sessionKey", sessionKey),

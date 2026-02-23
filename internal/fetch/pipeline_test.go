@@ -3,11 +3,10 @@ package fetch
 import (
 	"context"
 	"fmt"
-	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -22,34 +21,39 @@ func (m *mockStrategy) Name() string                                   { return 
 func (m *mockStrategy) IsAvailable() bool                              { return m.available }
 func (m *mockStrategy) Fetch(ctx context.Context) (FetchResult, error) { return m.fetchFn(ctx) }
 
-// setupFetchTestEnv redirects config and cache to a temp directory,
-// reloads config (which picks up defaults), and ensures cleanup.
-func setupFetchTestEnv(t *testing.T) {
-	t.Helper()
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
-	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(dir, "cache"))
-	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "")
-	t.Setenv("VIBEUSAGE_NO_COLOR", "")
-	config.Reload()
+// memCache is a thread-safe in-memory Cache for testing, replacing filesystem deps.
+type memCache struct {
+	mu   sync.Mutex
+	data map[string]models.UsageSnapshot
 }
 
-// setupFetchTestEnvWithConfig sets up a temp environment and writes a
-// custom config file before reloading.
-func setupFetchTestEnvWithConfig(t *testing.T, modify func(*config.Config)) {
-	t.Helper()
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
-	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(dir, "cache"))
-	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "")
-	t.Setenv("VIBEUSAGE_NO_COLOR", "")
+func newMemCache() *memCache {
+	return &memCache{data: make(map[string]models.UsageSnapshot)}
+}
 
-	cfg := config.DefaultConfig()
-	modify(&cfg)
-	if err := config.Save(cfg, config.ConfigFile()); err != nil {
-		t.Fatalf("failed to save test config: %v", err)
+func (c *memCache) Save(snap models.UsageSnapshot) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data[snap.Provider] = snap
+	return nil
+}
+
+func (c *memCache) Load(providerID string) *models.UsageSnapshot {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s, ok := c.data[providerID]
+	if !ok {
+		return nil
 	}
-	config.Reload()
+	return &s
+}
+
+func defaultTestPipelineCfg() PipelineConfig {
+	return PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 newMemCache(),
+	}
 }
 
 // testSnapshot returns a minimal valid snapshot for testing.
@@ -80,7 +84,8 @@ func TestExecutePipeline_ContextCancellation(t *testing.T) {
 		cancel()
 	}()
 
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 	if outcome.Success {
 		t.Error("expected failure for cancelled context")
 	}
@@ -110,7 +115,8 @@ func TestExecutePipeline_ContextPassedToStrategy(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 	if !outcome.Success {
 		t.Fatalf("expected success, got error: %s", outcome.Error)
 	}
@@ -145,7 +151,8 @@ func TestExecutePipeline_SuccessfulFetch(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 	if !outcome.Success {
 		t.Fatalf("expected success, got error: %s", outcome.Error)
 	}
@@ -183,7 +190,8 @@ func TestExecutePipeline_FallbackToSecondStrategy(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 	if !outcome.Success {
 		t.Fatalf("expected success from fallback, got error: %s", outcome.Error)
 	}
@@ -216,7 +224,8 @@ func TestExecutePipeline_FatalStopsChain(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 	if outcome.Success {
 		t.Error("expected failure from fatal error")
 	}
@@ -239,7 +248,8 @@ func TestExecutePipeline_UnavailableStrategy(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 	if outcome.Success {
 		t.Error("expected failure when only strategy is unavailable")
 	}
@@ -253,7 +263,8 @@ func TestExecutePipeline_UnavailableStrategy(t *testing.T) {
 
 func TestExecutePipeline_EmptyStrategies(t *testing.T) {
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", nil, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", nil, false, cfg)
 	if outcome.Success {
 		t.Error("expected failure with no strategies")
 	}
@@ -265,9 +276,11 @@ func TestExecutePipeline_EmptyStrategies(t *testing.T) {
 // Timeout tests
 
 func TestExecutePipeline_Timeout(t *testing.T) {
-	setupFetchTestEnvWithConfig(t, func(cfg *config.Config) {
-		cfg.Fetch.Timeout = 0.05 // 50ms
-	})
+	cfg := PipelineConfig{
+		Timeout:               50 * time.Millisecond,
+		StaleThresholdMinutes: 60,
+		Cache:                 newMemCache(),
+	}
 
 	strategy := &mockStrategy{
 		name:      "slow",
@@ -279,7 +292,7 @@ func TestExecutePipeline_Timeout(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 
 	if outcome.Success {
 		t.Error("expected failure due to timeout")
@@ -299,9 +312,11 @@ func TestExecutePipeline_Timeout(t *testing.T) {
 }
 
 func TestExecutePipeline_TimeoutFallsBackToNextStrategy(t *testing.T) {
-	setupFetchTestEnvWithConfig(t, func(cfg *config.Config) {
-		cfg.Fetch.Timeout = 0.05 // 50ms
-	})
+	cfg := PipelineConfig{
+		Timeout:               50 * time.Millisecond,
+		StaleThresholdMinutes: 60,
+		Cache:                 newMemCache(),
+	}
 
 	snap := testSnapshot("test", "fast", 42)
 	strategies := []Strategy{
@@ -323,7 +338,7 @@ func TestExecutePipeline_TimeoutFallsBackToNextStrategy(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 
 	if !outcome.Success {
 		t.Fatalf("expected success from fast strategy, got error: %s", outcome.Error)
@@ -342,8 +357,6 @@ func TestExecutePipeline_TimeoutFallsBackToNextStrategy(t *testing.T) {
 // Go error from Fetch()
 
 func TestExecutePipeline_FetchReturnsGoError(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	strategy := &mockStrategy{
 		name:      "erroring",
 		available: true,
@@ -353,7 +366,8 @@ func TestExecutePipeline_FetchReturnsGoError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 
 	if outcome.Success {
 		t.Error("expected failure when strategy returns Go error")
@@ -370,8 +384,6 @@ func TestExecutePipeline_FetchReturnsGoError(t *testing.T) {
 }
 
 func TestExecutePipeline_GoErrorFallsBackToNextStrategy(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	snap := testSnapshot("test", "backup", 25)
 	strategies := []Strategy{
 		&mockStrategy{
@@ -391,7 +403,8 @@ func TestExecutePipeline_GoErrorFallsBackToNextStrategy(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 
 	if !outcome.Success {
 		t.Fatalf("expected success from backup, got error: %s", outcome.Error)
@@ -404,17 +417,19 @@ func TestExecutePipeline_GoErrorFallsBackToNextStrategy(t *testing.T) {
 // Cache fallback tests
 
 func TestExecutePipeline_CacheFallback(t *testing.T) {
-	setupFetchTestEnv(t)
-
+	cache := newMemCache()
 	// Pre-populate cache with recent data (within default 60min threshold)
-	cachedSnap := models.UsageSnapshot{
+	cache.data["test-provider"] = models.UsageSnapshot{
 		Provider:  "test-provider",
 		FetchedAt: time.Now().Add(-10 * time.Minute).UTC(),
 		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
 		Source:    "previous-fetch",
 	}
-	if err := config.CacheSnapshot(cachedSnap); err != nil {
-		t.Fatalf("failed to pre-populate cache: %v", err)
+
+	cfg := PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 cache,
 	}
 
 	strategy := &mockStrategy{
@@ -426,7 +441,7 @@ func TestExecutePipeline_CacheFallback(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
 
 	if !outcome.Success {
 		t.Fatalf("expected success from cache fallback, got error: %s", outcome.Error)
@@ -446,17 +461,19 @@ func TestExecutePipeline_CacheFallback(t *testing.T) {
 }
 
 func TestExecutePipeline_CacheFallbackServesStaleWhenFetchAttempted(t *testing.T) {
-	setupFetchTestEnv(t)
-
+	cache := newMemCache()
 	// Pre-populate cache with old data (beyond default 60min threshold)
-	cachedSnap := models.UsageSnapshot{
+	cache.data["test-provider"] = models.UsageSnapshot{
 		Provider:  "test-provider",
 		FetchedAt: time.Now().Add(-2 * time.Hour).UTC(),
 		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
 		Source:    "previous-fetch",
 	}
-	if err := config.CacheSnapshot(cachedSnap); err != nil {
-		t.Fatalf("failed to pre-populate cache: %v", err)
+
+	cfg := PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 cache,
 	}
 
 	// Strategy has credentials (available=true) but the fetch itself fails
@@ -469,7 +486,7 @@ func TestExecutePipeline_CacheFallbackServesStaleWhenFetchAttempted(t *testing.T
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
 
 	// Should still serve stale cache — credentials exist, API is just down
 	if !outcome.Success {
@@ -481,17 +498,19 @@ func TestExecutePipeline_CacheFallbackServesStaleWhenFetchAttempted(t *testing.T
 }
 
 func TestExecutePipeline_CacheFallbackRejectsStaleWhenNotConfigured(t *testing.T) {
-	setupFetchTestEnv(t)
-
+	cache := newMemCache()
 	// Pre-populate cache with old data (beyond default 60min threshold)
-	cachedSnap := models.UsageSnapshot{
+	cache.data["test-provider"] = models.UsageSnapshot{
 		Provider:  "test-provider",
 		FetchedAt: time.Now().Add(-2 * time.Hour).UTC(),
 		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
 		Source:    "previous-fetch",
 	}
-	if err := config.CacheSnapshot(cachedSnap); err != nil {
-		t.Fatalf("failed to pre-populate cache: %v", err)
+
+	cfg := PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 cache,
 	}
 
 	// No credentials — strategy is unavailable
@@ -505,7 +524,7 @@ func TestExecutePipeline_CacheFallbackRejectsStaleWhenNotConfigured(t *testing.T
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
 
 	// Should NOT serve stale cache when no credentials exist
 	if outcome.Success {
@@ -517,8 +536,11 @@ func TestExecutePipeline_CacheFallbackRejectsStaleWhenNotConfigured(t *testing.T
 }
 
 func TestExecutePipeline_CacheFallbackNoData(t *testing.T) {
-	setupFetchTestEnv(t)
-	// No cache pre-populated
+	cfg := PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 newMemCache(), // empty cache
+	}
 
 	strategy := &mockStrategy{
 		name:      "failing",
@@ -529,7 +551,7 @@ func TestExecutePipeline_CacheFallbackNoData(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true)
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
 
 	if outcome.Success {
 		t.Error("expected failure when no cache data exists")
@@ -543,16 +565,18 @@ func TestExecutePipeline_CacheFallbackNoData(t *testing.T) {
 }
 
 func TestExecutePipeline_CacheDisabled(t *testing.T) {
-	setupFetchTestEnv(t)
-
+	cache := newMemCache()
 	// Pre-populate cache (should NOT be used because useCache=false)
-	cachedSnap := models.UsageSnapshot{
+	cache.data["test-provider"] = models.UsageSnapshot{
 		Provider:  "test-provider",
 		FetchedAt: time.Now().UTC(),
 		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 10}},
 	}
-	if err := config.CacheSnapshot(cachedSnap); err != nil {
-		t.Fatalf("failed to pre-populate cache: %v", err)
+
+	cfg := PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 cache,
 	}
 
 	strategy := &mockStrategy{
@@ -564,7 +588,7 @@ func TestExecutePipeline_CacheDisabled(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 
 	if outcome.Success {
 		t.Error("expected failure when cache is disabled")
@@ -577,8 +601,6 @@ func TestExecutePipeline_CacheDisabled(t *testing.T) {
 // Multi-strategy chain
 
 func TestExecutePipeline_ThreeStrategyChain(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	snap := testSnapshot("test", "third", 75)
 	strategies := []Strategy{
 		&mockStrategy{
@@ -605,7 +627,8 @@ func TestExecutePipeline_ThreeStrategyChain(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 
 	if !outcome.Success {
 		t.Fatalf("expected success from third strategy, got error: %s", outcome.Error)
@@ -628,8 +651,6 @@ func TestExecutePipeline_ThreeStrategyChain(t *testing.T) {
 // Attempt tracking
 
 func TestExecutePipeline_AttemptsRecordErrors(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	strategies := []Strategy{
 		&mockStrategy{
 			name:      "unavail",
@@ -653,7 +674,8 @@ func TestExecutePipeline_AttemptsRecordErrors(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 
 	if outcome.Success {
 		t.Error("expected failure")
@@ -693,8 +715,6 @@ func TestExecutePipeline_AttemptsRecordErrors(t *testing.T) {
 }
 
 func TestExecutePipeline_AttemptsDurationTracked(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	strategy := &mockStrategy{
 		name:      "sleeper",
 		available: true,
@@ -705,7 +725,8 @@ func TestExecutePipeline_AttemptsDurationTracked(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
 
 	if len(outcome.Attempts) != 1 {
 		t.Fatalf("expected 1 attempt, got %d", len(outcome.Attempts))
@@ -718,7 +739,12 @@ func TestExecutePipeline_AttemptsDurationTracked(t *testing.T) {
 // Success behavior
 
 func TestExecutePipeline_SuccessCachesResult(t *testing.T) {
-	setupFetchTestEnv(t)
+	cache := newMemCache()
+	cfg := PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 cache,
+	}
 
 	snap := testSnapshot("cache-test-provider", "mock", 60)
 	strategy := &mockStrategy{
@@ -730,14 +756,14 @@ func TestExecutePipeline_SuccessCachesResult(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "cache-test-provider", []Strategy{strategy}, false)
+	outcome := ExecutePipeline(ctx, "cache-test-provider", []Strategy{strategy}, false, cfg)
 
 	if !outcome.Success {
 		t.Fatalf("expected success, got error: %s", outcome.Error)
 	}
 
-	// Verify the snapshot was cached
-	cached := config.LoadCachedSnapshot("cache-test-provider")
+	// Verify the snapshot was cached via the injected cache
+	cached := cache.Load("cache-test-provider")
 	if cached == nil {
 		t.Fatal("expected snapshot to be cached after successful fetch")
 	}
@@ -747,8 +773,6 @@ func TestExecutePipeline_SuccessCachesResult(t *testing.T) {
 }
 
 func TestExecutePipeline_SuccessStopsChain(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	secondCalled := false
 	strategies := []Strategy{
 		&mockStrategy{
@@ -769,7 +793,8 @@ func TestExecutePipeline_SuccessStopsChain(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 
 	if !outcome.Success {
 		t.Fatalf("expected success, got error: %s", outcome.Error)
@@ -785,8 +810,6 @@ func TestExecutePipeline_SuccessStopsChain(t *testing.T) {
 // ProviderID propagation
 
 func TestExecutePipeline_ProviderIDInOutcome(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	tests := []struct {
 		name       string
 		providerID string
@@ -818,7 +841,8 @@ func TestExecutePipeline_ProviderIDInOutcome(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			outcome := ExecutePipeline(ctx, tt.providerID, []Strategy{strategy}, false)
+			cfg := defaultTestPipelineCfg()
+			outcome := ExecutePipeline(ctx, tt.providerID, []Strategy{strategy}, false, cfg)
 
 			if outcome.ProviderID != tt.providerID {
 				t.Errorf("ProviderID = %q, want %q", outcome.ProviderID, tt.providerID)
@@ -830,8 +854,6 @@ func TestExecutePipeline_ProviderIDInOutcome(t *testing.T) {
 // Mixed unavailable and available strategies
 
 func TestExecutePipeline_SkipsUnavailableTriesAvailable(t *testing.T) {
-	setupFetchTestEnv(t)
-
 	snap := testSnapshot("test", "available", 55)
 	strategies := []Strategy{
 		&mockStrategy{
@@ -860,7 +882,8 @@ func TestExecutePipeline_SkipsUnavailableTriesAvailable(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcome := ExecutePipeline(ctx, "test-provider", strategies, false)
+	cfg := defaultTestPipelineCfg()
+	outcome := ExecutePipeline(ctx, "test-provider", strategies, false, cfg)
 
 	if !outcome.Success {
 		t.Fatalf("expected success, got error: %s", outcome.Error)
@@ -871,5 +894,62 @@ func TestExecutePipeline_SkipsUnavailableTriesAvailable(t *testing.T) {
 	// Two unavailable attempts should be recorded
 	if len(outcome.Attempts) != 2 {
 		t.Errorf("expected 2 attempts (for unavailable strategies), got %d", len(outcome.Attempts))
+	}
+}
+
+func TestExecutePipeline_CacheFallbackServesFreshWhenNotConfigured(t *testing.T) {
+	cache := newMemCache()
+	// Recent snapshot (10 minutes ago)
+	cache.data["test-provider"] = models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-10 * time.Minute).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:               5 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 cache,
+	}
+
+	// Unconfigured provider — strategy not available
+	strategy := &mockStrategy{
+		name:      "unavailable",
+		available: false,
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	// Should serve fresh cache even when unconfigured
+	if !outcome.Success {
+		t.Fatalf("expected success from fresh cache, got error: %s", outcome.Error)
+	}
+	if !outcome.Cached {
+		t.Error("expected Cached=true")
+	}
+}
+
+func TestExecutePipeline_NilCacheNoFallback(t *testing.T) {
+	cfg := PipelineConfig{
+		Timeout:               5 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 nil,
+	}
+
+	strategy := &mockStrategy{
+		name:      "failing",
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			return ResultFail("API error"), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	// Should not panic with nil cache, just skip caching
+	if outcome.Success {
+		t.Error("expected failure — nil cache means no fallback")
 	}
 }

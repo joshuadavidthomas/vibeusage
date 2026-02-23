@@ -30,9 +30,10 @@ func (k Kimi) Meta() provider.Metadata {
 }
 
 func (k Kimi) FetchStrategies() []fetch.Strategy {
+	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
-		&DeviceFlowStrategy{},
-		&APIKeyStrategy{},
+		&DeviceFlowStrategy{HTTPTimeout: timeout},
+		&APIKeyStrategy{HTTPTimeout: timeout},
 	}
 }
 
@@ -86,7 +87,9 @@ func commonHeaders() []httpclient.RequestOption {
 }
 
 // DeviceFlowStrategy fetches Kimi usage using OAuth device flow credentials.
-type DeviceFlowStrategy struct{}
+type DeviceFlowStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *DeviceFlowStrategy) Name() string { return "device_flow" }
 
@@ -127,7 +130,7 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 		creds = refreshed
 	}
 
-	return fetchUsage(ctx, creds.AccessToken, "device_flow")
+	return fetchUsage(ctx, creds.AccessToken, "device_flow", s.HTTPTimeout)
 }
 
 func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
@@ -152,7 +155,7 @@ func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCrede
 		return nil
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	opts := commonHeaders()
 
 	var tokenResp TokenResponse
@@ -193,7 +196,9 @@ func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCrede
 }
 
 // APIKeyStrategy fetches Kimi usage using an API key.
-type APIKeyStrategy struct{}
+type APIKeyStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *APIKeyStrategy) Name() string { return "api_key" }
 
@@ -207,7 +212,7 @@ func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail("No API key found. Set KIMI_CODE_API_KEY or use 'vibeusage key kimi set'"), nil
 	}
 
-	return fetchUsage(ctx, apiKey, "api_key")
+	return fetchUsage(ctx, apiKey, "api_key", s.HTTPTimeout)
 }
 
 func (s *APIKeyStrategy) loadAPIKey() string {
@@ -229,8 +234,8 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 }
 
 // fetchUsage makes the API call and parses the response. Shared between strategies.
-func fetchUsage(ctx context.Context, token, source string) (fetch.FetchResult, error) {
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+func fetchUsage(ctx context.Context, token, source string, httpTimeout float64) (fetch.FetchResult, error) {
+	client := httpclient.NewFromConfig(httpTimeout)
 	opts := append(commonHeaders(), httpclient.WithBearer(token))
 
 	var usageResp UsageResponse

@@ -30,7 +30,8 @@ func (c Cursor) Meta() provider.Metadata {
 }
 
 func (c Cursor) FetchStrategies() []fetch.Strategy {
-	return []fetch.Strategy{&WebStrategy{}}
+	timeout := config.Get().Fetch.Timeout
+	return []fetch.Strategy{&WebStrategy{HTTPTimeout: timeout}}
 }
 
 func (c Cursor) FetchStatus() models.ProviderStatus {
@@ -62,7 +63,9 @@ func init() {
 	provider.Register(Cursor{})
 }
 
-type WebStrategy struct{}
+type WebStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *WebStrategy) Name() string { return "web" }
 
@@ -78,7 +81,7 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail("No session token found"), nil
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	sessionCookie := httpclient.WithCookie("__Secure-next-auth.session-token", sessionToken)
 	userAgent := httpclient.WithHeader("User-Agent", "Mozilla/5.0")
 

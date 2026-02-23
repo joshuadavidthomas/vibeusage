@@ -30,7 +30,8 @@ func (c Codex) Meta() provider.Metadata {
 }
 
 func (c Codex) FetchStrategies() []fetch.Strategy {
-	return []fetch.Strategy{&OAuthStrategy{}}
+	timeout := config.Get().Fetch.Timeout
+	return []fetch.Strategy{&OAuthStrategy{HTTPTimeout: timeout}}
 }
 
 func (c Codex) FetchStatus() models.ProviderStatus {
@@ -49,7 +50,9 @@ const (
 	defaultUsageURL = "https://chatgpt.com/backend-api/wham/usage"
 )
 
-type OAuthStrategy struct{}
+type OAuthStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *OAuthStrategy) Name() string { return "oauth" }
 
@@ -82,7 +85,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 	usageURL := s.getUsageURL()
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var usageResp UsageResponse
 	resp, err := client.GetJSONCtx(ctx, usageURL, &usageResp, httpclient.WithBearer(creds.AccessToken))
 	if err != nil {
@@ -140,7 +143,7 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *C
 		return nil
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var tokenResp TokenResponse
 	resp, err := client.PostFormCtx(ctx, codexTokenURL,
 		map[string]string{

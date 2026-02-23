@@ -33,8 +33,9 @@ func (a Antigravity) Meta() provider.Metadata {
 }
 
 func (a Antigravity) FetchStrategies() []fetch.Strategy {
+	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
-		&OAuthStrategy{},
+		&OAuthStrategy{HTTPTimeout: timeout},
 	}
 }
 
@@ -65,7 +66,8 @@ const (
 
 // OAuthStrategy fetches Antigravity quota using Google OAuth credentials.
 type OAuthStrategy struct {
-	vscdb *vscdbResult // cached vscdb data (credentials + subscription)
+	HTTPTimeout float64
+	vscdb       *vscdbResult // cached vscdb data (credentials + subscription)
 }
 
 func (s *OAuthStrategy) Name() string { return "oauth" }
@@ -116,6 +118,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 			ClientID:     antigravityClientID,
 			ClientSecret: antigravityClientSecret,
 			ProviderID:   "antigravity",
+			HTTPTimeout:  s.HTTPTimeout,
 		})
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
@@ -230,7 +233,7 @@ type fetchError struct {
 func (e fetchError) String() string { return e.message }
 
 func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*FetchAvailableModelsResponse, *CodeAssistResponse, fetchError) {
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	bearer := httpclient.WithBearer(accessToken)
 	ua := httpclient.WithHeader("User-Agent", antigravityUserAgent)
 	var modelsResp *FetchAvailableModelsResponse
