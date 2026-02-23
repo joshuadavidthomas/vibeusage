@@ -40,6 +40,11 @@ func (k Kimi) FetchStatus() models.ProviderStatus {
 	return models.ProviderStatus{Level: models.StatusUnknown}
 }
 
+// Auth returns the Kimi device flow.
+func (k Kimi) Auth() provider.AuthFlow {
+	return provider.DeviceAuthFlow{RunFlow: RunDeviceFlow}
+}
+
 func init() {
 	provider.Register(Kimi{})
 }

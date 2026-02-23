@@ -11,6 +11,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -33,6 +34,19 @@ func (z Zai) FetchStrategies() []fetch.Strategy {
 
 func (z Zai) FetchStatus() models.ProviderStatus {
 	return models.ProviderStatus{Level: models.StatusUnknown}
+}
+
+// Auth returns the manual API key flow for Z.ai.
+func (z Zai) Auth() provider.AuthFlow {
+	return provider.ManualKeyAuthFlow{
+		Instructions: "Get your API key from Z.ai:\n" +
+			"  1. Open https://z.ai/manage-apikey/apikey-list\n" +
+			"  2. Create a new API key (or copy an existing one)",
+		Placeholder: "paste API key here",
+		Validate:    prompt.ValidateNotEmpty,
+		CredPath:    config.CredentialPath("zai", "apikey"),
+		JSONKey:     "api_key",
+	}
 }
 
 func init() {

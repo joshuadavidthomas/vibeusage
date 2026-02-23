@@ -71,7 +71,9 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(routeCmd)
 
-	for _, id := range []string{"antigravity", "claude", "codex", "copilot", "cursor", "gemini", "kimi", "minimax", "zai"} {
+	ids := provider.ListIDs()
+	sort.Strings(ids)
+	for _, id := range ids {
 		rootCmd.AddCommand(makeProviderCmd(id))
 	}
 }

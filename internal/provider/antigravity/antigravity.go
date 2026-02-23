@@ -44,6 +44,11 @@ func (a Antigravity) FetchStatus() models.ProviderStatus {
 	})
 }
 
+// Auth returns the OAuth browser flow for Antigravity.
+func (a Antigravity) Auth() provider.AuthFlow {
+	return provider.DeviceAuthFlow{RunFlow: RunAuthFlow}
+}
+
 func init() {
 	provider.Register(Antigravity{})
 }

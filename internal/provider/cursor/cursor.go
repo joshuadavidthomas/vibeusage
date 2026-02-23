@@ -12,6 +12,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -40,6 +41,22 @@ const (
 	usageSummaryURL = "https://www.cursor.com/api/usage-summary"
 	authMeURL       = "https://www.cursor.com/api/auth/me"
 )
+
+// Auth returns the manual session token flow for Cursor.
+func (c Cursor) Auth() provider.AuthFlow {
+	return provider.ManualKeyAuthFlow{
+		Instructions: "Get your session token from cursor.com:\n" +
+			"  1. Open https://cursor.com in your browser\n" +
+			"  2. Open DevTools (F12 or Cmd+Option+I)\n" +
+			"  3. Go to Application → Cookies → https://cursor.com\n" +
+			"  4. Find one of: WorkosCursorSessionToken, __Secure-next-auth.session-token\n" +
+			"  5. Copy its value",
+		Placeholder: "paste token here",
+		Validate:    prompt.ValidateNotEmpty,
+		CredPath:    config.CredentialPath("cursor", "session"),
+		JSONKey:     "session_token",
+	}
+}
 
 func init() {
 	provider.Register(Cursor{})
