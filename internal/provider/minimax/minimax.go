@@ -27,8 +27,9 @@ func (m Minimax) Meta() provider.Metadata {
 }
 
 func (m Minimax) FetchStrategies() []fetch.Strategy {
+	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
-		&APIKeyStrategy{},
+		&APIKeyStrategy{HTTPTimeout: timeout},
 	}
 }
 
@@ -60,7 +61,9 @@ const (
 )
 
 // APIKeyStrategy fetches Minimax usage using a coding plan API key (sk-cp-...).
-type APIKeyStrategy struct{}
+type APIKeyStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *APIKeyStrategy) Name() string { return "api_key" }
 
@@ -74,7 +77,7 @@ func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail("No API key found. Set MINIMAX_API_KEY or use 'vibeusage key minimax set'"), nil
 	}
 
-	return fetchQuota(ctx, token)
+	return fetchQuota(ctx, token, s.HTTPTimeout)
 }
 
 func (s *APIKeyStrategy) loadToken() string {
@@ -96,8 +99,8 @@ func (s *APIKeyStrategy) loadToken() string {
 }
 
 // fetchQuota makes the API call and parses the response.
-func fetchQuota(ctx context.Context, token string) (fetch.FetchResult, error) {
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+func fetchQuota(ctx context.Context, token string, httpTimeout float64) (fetch.FetchResult, error) {
+	client := httpclient.NewFromConfig(httpTimeout)
 	opts := []httpclient.RequestOption{
 		httpclient.WithBearer(token),
 		httpclient.WithHeader("Content-Type", "application/json"),

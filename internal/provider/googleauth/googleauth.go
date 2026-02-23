@@ -45,6 +45,7 @@ type RefreshConfig struct {
 	ClientID     string
 	ClientSecret string
 	ProviderID   string // e.g. "gemini" or "antigravity"
+	HTTPTimeout  float64
 }
 
 // RefreshToken refreshes an expired Google OAuth token and saves the updated
@@ -54,7 +55,7 @@ func RefreshToken(ctx context.Context, creds *OAuthCredentials, cfg RefreshConfi
 		return nil
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(cfg.HTTPTimeout)
 	var tokenResp TokenResponse
 	resp, err := client.PostFormCtx(ctx, TokenURL,
 		map[string]string{

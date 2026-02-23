@@ -2,9 +2,32 @@ package fetch
 
 import (
 	"context"
+	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
+
+// Cache abstracts snapshot persistence so ExecutePipeline doesn't depend
+// on the filesystem or config package directly.
+type Cache interface {
+	Save(snapshot models.UsageSnapshot) error
+	Load(providerID string) *models.UsageSnapshot
+}
+
+// PipelineConfig holds the parameters that ExecutePipeline needs,
+// replacing the previous hidden dependency on config.Get().
+type PipelineConfig struct {
+	Timeout               time.Duration
+	StaleThresholdMinutes int
+	Cache                 Cache
+}
+
+// OrchestratorConfig holds parameters for FetchAllProviders and
+// FetchEnabledProviders, replacing config.Get() calls.
+type OrchestratorConfig struct {
+	MaxConcurrent int
+	Pipeline      PipelineConfig
+}
 
 // FetchResult represents the outcome of a single strategy attempt.
 type FetchResult struct {

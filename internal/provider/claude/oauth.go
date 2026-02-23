@@ -15,7 +15,9 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-type OAuthStrategy struct{}
+type OAuthStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *OAuthStrategy) Name() string { return "oauth" }
 
@@ -46,7 +48,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		creds = refreshed
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var usageResp OAuthUsageResponse
 	resp, err := client.GetJSONCtx(ctx, oauthUsageURL, &usageResp,
 		httpclient.WithBearer(creds.AccessToken),
@@ -113,7 +115,7 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredential
 		return nil
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var tokenResp OAuthTokenResponse
 	resp, err := client.PostFormCtx(ctx, oauthTokenURL,
 		map[string]string{

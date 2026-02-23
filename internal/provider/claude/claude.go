@@ -29,9 +29,10 @@ func (c Claude) Meta() provider.Metadata {
 }
 
 func (c Claude) FetchStrategies() []fetch.Strategy {
+	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
-		&OAuthStrategy{},
-		&WebStrategy{},
+		&OAuthStrategy{HTTPTimeout: timeout},
+		&WebStrategy{HTTPTimeout: timeout},
 	}
 }
 

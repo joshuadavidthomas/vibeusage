@@ -27,8 +27,9 @@ func (z Zai) Meta() provider.Metadata {
 }
 
 func (z Zai) FetchStrategies() []fetch.Strategy {
+	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
-		&BearerTokenStrategy{},
+		&BearerTokenStrategy{HTTPTimeout: timeout},
 	}
 }
 
@@ -58,7 +59,9 @@ const (
 )
 
 // BearerTokenStrategy fetches Z.ai usage using an API key or JWT bearer token.
-type BearerTokenStrategy struct{}
+type BearerTokenStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *BearerTokenStrategy) Name() string { return "bearer_token" }
 
@@ -72,7 +75,7 @@ func (s *BearerTokenStrategy) Fetch(ctx context.Context) (fetch.FetchResult, err
 		return fetch.ResultFail("No API key found. Set ZAI_API_KEY or use 'vibeusage key zai set'"), nil
 	}
 
-	return fetchQuota(ctx, token)
+	return fetchQuota(ctx, token, s.HTTPTimeout)
 }
 
 func (s *BearerTokenStrategy) loadToken() string {
@@ -94,8 +97,8 @@ func (s *BearerTokenStrategy) loadToken() string {
 }
 
 // fetchQuota makes the API call and parses the response.
-func fetchQuota(ctx context.Context, token string) (fetch.FetchResult, error) {
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+func fetchQuota(ctx context.Context, token string, httpTimeout float64) (fetch.FetchResult, error) {
+	client := httpclient.NewFromConfig(httpTimeout)
 	opts := []httpclient.RequestOption{
 		httpclient.WithBearer(token),
 		httpclient.WithHeader("Accept-Language", "en-US,en"),

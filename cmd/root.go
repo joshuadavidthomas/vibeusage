@@ -120,13 +120,15 @@ func fetchAndDisplayAll(ctx context.Context) error {
 	start := time.Now()
 
 	providerMap := buildProviderMap()
+	cfg := config.Get()
+	orchCfg := orchestratorConfigFromConfig(cfg)
 
 	var outcomes map[string]fetch.FetchOutcome
 
 	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
 		spinnerIDs := availableProviderIDs(providerMap)
 		err := spinner.Run(spinnerIDs, func(onComplete func(spinner.CompletionInfo)) {
-			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, func(o fetch.FetchOutcome) {
+			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, orchCfg, cfg.IsProviderEnabled, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
 			})
 		})
@@ -134,7 +136,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 			return fmt.Errorf("spinner error: %w", err)
 		}
 	} else {
-		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, nil)
+		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, orchCfg, cfg.IsProviderEnabled, nil)
 	}
 
 	durationMs := time.Since(start).Milliseconds()
@@ -278,19 +280,20 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	start := time.Now()
 
 	strategies := p.FetchStrategies()
+	pipeCfg := pipelineConfigFromConfig(config.Get())
 
 	var outcome fetch.FetchOutcome
 
 	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
 		err := spinner.Run([]string{providerID}, func(onComplete func(spinner.CompletionInfo)) {
-			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh, pipeCfg)
 			onComplete(outcomeToCompletion(outcome))
 		})
 		if err != nil {
 			return fmt.Errorf("spinner error: %w", err)
 		}
 	} else {
-		outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh)
+		outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh, pipeCfg)
 	}
 
 	durationMs := time.Since(start).Milliseconds()
@@ -331,6 +334,21 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 
 	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached))
 	return nil
+}
+
+func pipelineConfigFromConfig(cfg config.Config) fetch.PipelineConfig {
+	return fetch.PipelineConfig{
+		Timeout:               time.Duration(cfg.Fetch.Timeout * float64(time.Second)),
+		StaleThresholdMinutes: cfg.Fetch.StaleThresholdMinutes,
+		Cache:                 config.FileCache{},
+	}
+}
+
+func orchestratorConfigFromConfig(cfg config.Config) fetch.OrchestratorConfig {
+	return fetch.OrchestratorConfig{
+		MaxConcurrent: cfg.Fetch.MaxConcurrent,
+		Pipeline:      pipelineConfigFromConfig(cfg),
+	}
 }
 
 func showFirstRunMessage() {

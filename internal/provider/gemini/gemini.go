@@ -32,9 +32,10 @@ func (g Gemini) Meta() provider.Metadata {
 }
 
 func (g Gemini) FetchStrategies() []fetch.Strategy {
+	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
-		&OAuthStrategy{},
-		&APIKeyStrategy{},
+		&OAuthStrategy{HTTPTimeout: timeout},
+		&APIKeyStrategy{HTTPTimeout: timeout},
 	}
 }
 
@@ -60,7 +61,9 @@ const (
 )
 
 // OAuth Strategy
-type OAuthStrategy struct{}
+type OAuthStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *OAuthStrategy) Name() string { return "oauth" }
 
@@ -96,6 +99,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 			ClientID:     geminiClientID,
 			ClientSecret: geminiClientSecret,
 			ProviderID:   "gemini",
+			HTTPTimeout:  s.HTTPTimeout,
 		})
 		if refreshed == nil {
 			return fetch.ResultFail("Failed to refresh token"), nil
@@ -144,7 +148,7 @@ type fetchError struct {
 func (e fetchError) String() string { return e.message }
 
 func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) (*QuotaResponse, *CodeAssistResponse, fetchError) {
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	bearer := httpclient.WithBearer(accessToken)
 	var quotaResp *QuotaResponse
 	var codeAssistResp *CodeAssistResponse
@@ -224,7 +228,9 @@ func (s *OAuthStrategy) parseTypedQuotaResponse(quotaResp QuotaResponse, codeAss
 }
 
 // API Key Strategy
-type APIKeyStrategy struct{}
+type APIKeyStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *APIKeyStrategy) Name() string { return "api_key" }
 
@@ -248,7 +254,7 @@ func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	// Validate key by fetching models
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var modelsResp ModelsResponse
 	resp, err := client.GetJSONCtx(ctx, modelsURL+"?key="+apiKey, &modelsResp)
 	if err != nil {

@@ -7,12 +7,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
+func defaultTestOrchestratorCfg() OrchestratorConfig {
+	return OrchestratorConfig{
+		MaxConcurrent: 5,
+		Pipeline:      defaultTestPipelineCfg(),
+	}
+}
+
 func TestFetchAllProviders_MultipleProviders(t *testing.T) {
-	setupFetchTestEnv(t)
+	cfg := defaultTestOrchestratorCfg()
 
 	providerMap := map[string][]Strategy{
 		"provider-a": {
@@ -45,7 +51,7 @@ func TestFetchAllProviders_MultipleProviders(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcomes := FetchAllProviders(ctx, providerMap, false, nil)
+	outcomes := FetchAllProviders(ctx, providerMap, false, cfg, nil)
 
 	if len(outcomes) != 3 {
 		t.Fatalf("expected 3 outcomes, got %d", len(outcomes))
@@ -66,10 +72,10 @@ func TestFetchAllProviders_MultipleProviders(t *testing.T) {
 }
 
 func TestFetchAllProviders_EmptyMap(t *testing.T) {
-	setupFetchTestEnv(t)
+	cfg := defaultTestOrchestratorCfg()
 
 	ctx := context.Background()
-	outcomes := FetchAllProviders(ctx, map[string][]Strategy{}, false, nil)
+	outcomes := FetchAllProviders(ctx, map[string][]Strategy{}, false, cfg, nil)
 
 	if len(outcomes) != 0 {
 		t.Errorf("expected 0 outcomes, got %d", len(outcomes))
@@ -77,10 +83,10 @@ func TestFetchAllProviders_EmptyMap(t *testing.T) {
 }
 
 func TestFetchAllProviders_NilMap(t *testing.T) {
-	setupFetchTestEnv(t)
+	cfg := defaultTestOrchestratorCfg()
 
 	ctx := context.Background()
-	outcomes := FetchAllProviders(ctx, nil, false, nil)
+	outcomes := FetchAllProviders(ctx, nil, false, cfg, nil)
 
 	if len(outcomes) != 0 {
 		t.Errorf("expected 0 outcomes, got %d", len(outcomes))
@@ -88,7 +94,7 @@ func TestFetchAllProviders_NilMap(t *testing.T) {
 }
 
 func TestFetchAllProviders_MixedResults(t *testing.T) {
-	setupFetchTestEnv(t)
+	cfg := defaultTestOrchestratorCfg()
 
 	providerMap := map[string][]Strategy{
 		"succeeder": {
@@ -112,7 +118,7 @@ func TestFetchAllProviders_MixedResults(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcomes := FetchAllProviders(ctx, providerMap, false, nil)
+	outcomes := FetchAllProviders(ctx, providerMap, false, cfg, nil)
 
 	if len(outcomes) != 2 {
 		t.Fatalf("expected 2 outcomes, got %d", len(outcomes))
@@ -130,7 +136,7 @@ func TestFetchAllProviders_MixedResults(t *testing.T) {
 }
 
 func TestFetchAllProviders_OnCompleteCallback(t *testing.T) {
-	setupFetchTestEnv(t)
+	cfg := defaultTestOrchestratorCfg()
 
 	providerMap := map[string][]Strategy{
 		"alpha": {
@@ -157,7 +163,7 @@ func TestFetchAllProviders_OnCompleteCallback(t *testing.T) {
 	var completedProviders []string
 
 	ctx := context.Background()
-	FetchAllProviders(ctx, providerMap, false, func(outcome FetchOutcome) {
+	FetchAllProviders(ctx, providerMap, false, cfg, func(outcome FetchOutcome) {
 		mu.Lock()
 		defer mu.Unlock()
 		completedProviders = append(completedProviders, outcome.ProviderID)
@@ -183,7 +189,7 @@ func TestFetchAllProviders_OnCompleteCallback(t *testing.T) {
 }
 
 func TestFetchAllProviders_ContextCancellation(t *testing.T) {
-	setupFetchTestEnv(t)
+	cfg := defaultTestOrchestratorCfg()
 
 	providerMap := map[string][]Strategy{
 		"blocking": {
@@ -204,7 +210,7 @@ func TestFetchAllProviders_ContextCancellation(t *testing.T) {
 		cancel()
 	}()
 
-	outcomes := FetchAllProviders(ctx, providerMap, false, nil)
+	outcomes := FetchAllProviders(ctx, providerMap, false, cfg, nil)
 
 	o, ok := outcomes["blocking"]
 	if !ok {
@@ -216,9 +222,10 @@ func TestFetchAllProviders_ContextCancellation(t *testing.T) {
 }
 
 func TestFetchAllProviders_ConcurrencyLimit(t *testing.T) {
-	setupFetchTestEnvWithConfig(t, func(cfg *config.Config) {
-		cfg.Fetch.MaxConcurrent = 2
-	})
+	cfg := OrchestratorConfig{
+		MaxConcurrent: 2,
+		Pipeline:      defaultTestPipelineCfg(),
+	}
 
 	var concurrentCount atomic.Int32
 	var maxConcurrent atomic.Int32
@@ -254,7 +261,7 @@ func TestFetchAllProviders_ConcurrencyLimit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcomes := FetchAllProviders(ctx, providerMap, false, nil)
+	outcomes := FetchAllProviders(ctx, providerMap, false, cfg, nil)
 
 	if len(outcomes) != 5 {
 		t.Fatalf("expected 5 outcomes, got %d", len(outcomes))
@@ -274,10 +281,8 @@ func TestFetchAllProviders_ConcurrencyLimit(t *testing.T) {
 // FetchEnabledProviders tests
 
 func TestFetchEnabledProviders_FiltersDisabled(t *testing.T) {
-	setupFetchTestEnv(t)
-	// Set enabled providers via env var
-	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "alpha,gamma")
-	config.Reload()
+	cfg := defaultTestOrchestratorCfg()
+	isEnabled := func(id string) bool { return id == "alpha" || id == "gamma" }
 
 	providerMap := map[string][]Strategy{
 		"alpha": {
@@ -311,7 +316,7 @@ func TestFetchEnabledProviders_FiltersDisabled(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcomes := FetchEnabledProviders(ctx, providerMap, false, nil)
+	outcomes := FetchEnabledProviders(ctx, providerMap, false, cfg, isEnabled, nil)
 
 	if len(outcomes) != 2 {
 		t.Fatalf("expected 2 outcomes (only enabled), got %d", len(outcomes))
@@ -328,8 +333,8 @@ func TestFetchEnabledProviders_FiltersDisabled(t *testing.T) {
 }
 
 func TestFetchEnabledProviders_AllEnabledByDefault(t *testing.T) {
-	setupFetchTestEnv(t)
-	// No VIBEUSAGE_ENABLED_PROVIDERS set → all enabled
+	cfg := defaultTestOrchestratorCfg()
+	allEnabled := func(string) bool { return true }
 
 	providerMap := map[string][]Strategy{
 		"alpha": {
@@ -353,7 +358,7 @@ func TestFetchEnabledProviders_AllEnabledByDefault(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcomes := FetchEnabledProviders(ctx, providerMap, false, nil)
+	outcomes := FetchEnabledProviders(ctx, providerMap, false, cfg, allEnabled, nil)
 
 	if len(outcomes) != 2 {
 		t.Fatalf("expected 2 outcomes (all enabled by default), got %d", len(outcomes))
@@ -361,9 +366,8 @@ func TestFetchEnabledProviders_AllEnabledByDefault(t *testing.T) {
 }
 
 func TestFetchEnabledProviders_WithProviderConfigDisabled(t *testing.T) {
-	setupFetchTestEnvWithConfig(t, func(cfg *config.Config) {
-		cfg.Providers["beta"] = config.ProviderConfig{Enabled: false}
-	})
+	cfg := defaultTestOrchestratorCfg()
+	isEnabled := func(id string) bool { return id != "beta" }
 
 	providerMap := map[string][]Strategy{
 		"alpha": {
@@ -388,7 +392,7 @@ func TestFetchEnabledProviders_WithProviderConfigDisabled(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcomes := FetchEnabledProviders(ctx, providerMap, false, nil)
+	outcomes := FetchEnabledProviders(ctx, providerMap, false, cfg, isEnabled, nil)
 
 	if _, ok := outcomes["beta"]; ok {
 		t.Error("should not have outcome for disabled 'beta'")

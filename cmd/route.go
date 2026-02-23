@@ -83,7 +83,8 @@ func newRoutingService(ctx context.Context) *routing.Service {
 			return p.FetchStrategies()
 		},
 		FetchAll: func(ctx context.Context, strategies map[string][]fetch.Strategy, useCache bool) map[string]fetch.FetchOutcome {
-			return fetch.FetchAllProviders(ctx, strategies, useCache, nil)
+			orchCfg := orchestratorConfigFromConfig(config.Get())
+			return fetch.FetchAllProviders(ctx, strategies, useCache, orchCfg, nil)
 		},
 		LookupMultiplier: func(modelName string, providerID string) *float64 {
 			if providerID == "copilot" {
@@ -118,14 +119,15 @@ func newRoutingServiceWithSpinner(ctx context.Context) *routing.Service {
 		}
 
 		var outcomes map[string]fetch.FetchOutcome
+		orchCfg := orchestratorConfigFromConfig(config.Get())
 		if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
 			_ = spinner.Run(providerIDs, func(onComplete func(spinner.CompletionInfo)) {
-				outcomes = fetch.FetchAllProviders(fetchCtx, strategies, useCache, func(o fetch.FetchOutcome) {
+				outcomes = fetch.FetchAllProviders(fetchCtx, strategies, useCache, orchCfg, func(o fetch.FetchOutcome) {
 					onComplete(outcomeToCompletion(o))
 				})
 			})
 		} else {
-			outcomes = fetch.FetchAllProviders(fetchCtx, strategies, useCache, nil)
+			outcomes = fetch.FetchAllProviders(fetchCtx, strategies, useCache, orchCfg, nil)
 		}
 		return outcomes
 	}

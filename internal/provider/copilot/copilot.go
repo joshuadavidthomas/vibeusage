@@ -29,7 +29,8 @@ func (c Copilot) Meta() provider.Metadata {
 }
 
 func (c Copilot) FetchStrategies() []fetch.Strategy {
-	return []fetch.Strategy{&DeviceFlowStrategy{}}
+	timeout := config.Get().Fetch.Timeout
+	return []fetch.Strategy{&DeviceFlowStrategy{HTTPTimeout: timeout}}
 }
 
 func (c Copilot) FetchStatus() models.ProviderStatus {
@@ -52,7 +53,9 @@ const (
 	clientID      = "Iv1.b507a08c87ecfe98" // VS Code Copilot OAuth app client ID
 )
 
-type DeviceFlowStrategy struct{}
+type DeviceFlowStrategy struct {
+	HTTPTimeout float64
+}
 
 func (s *DeviceFlowStrategy) Name() string { return "device_flow" }
 
@@ -72,7 +75,7 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var userResp UserResponse
 	resp, err := client.GetJSONCtx(ctx, usageURL, &userResp,
 		httpclient.WithBearer(creds.AccessToken),
