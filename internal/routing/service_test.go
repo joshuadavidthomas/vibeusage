@@ -125,7 +125,7 @@ func TestRouteModel_Success(t *testing.T) {
 
 func TestRouteByRole_UnknownRole(t *testing.T) {
 	svc := &Service{
-		GetRole: func(name string) (*RoleConfig, bool) { return nil, false },
+		GetRole:   func(name string) (*RoleConfig, bool) { return nil, false },
 		RoleNames: func() []string { return nil },
 	}
 
