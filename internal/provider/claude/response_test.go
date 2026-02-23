@@ -13,7 +13,7 @@ func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
 		"seven_day_sonnet": {"utilization": 60.0, "resets_at": "2025-02-26T00:00:00Z"},
 		"seven_day_opus": {"utilization": 10.0, "resets_at": "2025-02-26T00:00:00Z"},
 		"seven_day_haiku": {"utilization": 90.0, "resets_at": "2025-02-26T00:00:00Z"},
-		"extra_usage": {"is_enabled": true, "used_credits": 5.50, "monthly_limit": 100.0}
+		"extra_usage": {"is_enabled": true, "used_credits": 550, "monthly_limit": 10000}
 	}`
 
 	var resp OAuthUsageResponse
@@ -75,11 +75,11 @@ func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
 	if !resp.ExtraUsage.IsEnabled {
 		t.Error("expected extra_usage.is_enabled to be true")
 	}
-	if resp.ExtraUsage.UsedCredits != 5.50 {
-		t.Errorf("extra_usage.used_credits = %v, want 5.50", resp.ExtraUsage.UsedCredits)
+	if resp.ExtraUsage.UsedCredits != 550 {
+		t.Errorf("extra_usage.used_credits = %v, want 550", resp.ExtraUsage.UsedCredits)
 	}
-	if resp.ExtraUsage.MonthlyLimit != 100.0 {
-		t.Errorf("extra_usage.monthly_limit = %v, want 100.0", resp.ExtraUsage.MonthlyLimit)
+	if resp.ExtraUsage.MonthlyLimit != 10000 {
+		t.Errorf("extra_usage.monthly_limit = %v, want 10000", resp.ExtraUsage.MonthlyLimit)
 	}
 }
 

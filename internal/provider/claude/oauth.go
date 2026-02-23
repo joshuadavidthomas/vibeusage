@@ -229,8 +229,8 @@ func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models
 	var overage *models.OverageUsage
 	if resp.ExtraUsage != nil && resp.ExtraUsage.IsEnabled {
 		overage = &models.OverageUsage{
-			Used:      resp.ExtraUsage.UsedCredits,
-			Limit:     resp.ExtraUsage.MonthlyLimit,
+			Used:      resp.ExtraUsage.UsedCredits / 100.0,
+			Limit:     resp.ExtraUsage.MonthlyLimit / 100.0,
 			Currency:  "USD",
 			IsEnabled: true,
 		}

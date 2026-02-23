@@ -81,7 +81,7 @@ func TestParseWebUsageResponse_WithOverage(t *testing.T) {
 	}
 	overage := &models.OverageUsage{
 		Used:      25.50,
-		Limit:     100.0,
+		Limit:     100.00,
 		Currency:  "USD",
 		IsEnabled: true,
 	}
