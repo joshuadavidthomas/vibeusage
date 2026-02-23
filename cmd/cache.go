@@ -59,8 +59,7 @@ var cacheShowCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, cacheData)
-			return nil
+			return display.OutputJSON(outWriter, cacheData)
 		}
 
 		if quiet {
@@ -134,12 +133,11 @@ var cacheClearCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, display.ActionResultJSON{
+			return display.OutputJSON(outWriter, display.ActionResultJSON{
 				Success:  true,
 				Message:  msg,
 				Provider: providerID,
 			})
-			return nil
 		}
 
 		out("✓ %s\n", msg)

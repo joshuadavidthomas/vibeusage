@@ -24,8 +24,7 @@ var statusCmd = &cobra.Command{
 		durationMs := time.Since(start).Milliseconds()
 
 		if jsonOutput {
-			display.OutputStatusJSON(outWriter, statuses)
-			return nil
+			return display.OutputStatusJSON(outWriter, statuses)
 		}
 
 		displayStatusTable(statuses, durationMs)

@@ -67,8 +67,8 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 > *"Don't just check errors, handle them gracefully."*
 
-- [ ] Change `OutputJSON(w io.Writer, data any)` to return `error`
-- [ ] Update all call sites to handle the returned error
+- [x] Change `OutputJSON(w io.Writer, data any)` to return `error`
+- [x] Update all call sites to handle the returned error
 
 ## Low Impact
 

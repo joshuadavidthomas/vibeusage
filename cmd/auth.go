@@ -52,8 +52,7 @@ func authStatusCommand() error {
 				Source:        sourceToLabel(source),
 			}
 		}
-		display.OutputJSON(outWriter, data)
-		return nil
+		return display.OutputJSON(outWriter, data)
 	}
 
 	if quiet {

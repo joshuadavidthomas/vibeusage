@@ -3,6 +3,7 @@ package display
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,9 @@ import (
 
 func TestOutputJSON_WritesToWriter(t *testing.T) {
 	var buf bytes.Buffer
-	OutputJSON(&buf, map[string]string{"key": "value"})
+	if err := OutputJSON(&buf, map[string]string{"key": "value"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	output := buf.String()
 	if !strings.Contains(output, `"key"`) {
@@ -26,11 +29,35 @@ func TestOutputJSON_WritesToWriter(t *testing.T) {
 
 func TestOutputJSON_PrettyPrints(t *testing.T) {
 	var buf bytes.Buffer
-	OutputJSON(&buf, map[string]string{"a": "1"})
+	if err := OutputJSON(&buf, map[string]string{"a": "1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	output := buf.String()
 	if !strings.Contains(output, "  ") {
 		t.Errorf("expected indented output, got: %s", output)
+	}
+}
+
+func TestOutputJSON_ReturnsErrorOnMarshalFailure(t *testing.T) {
+	var buf bytes.Buffer
+	// Channels cannot be marshaled to JSON.
+	err := OutputJSON(&buf, map[string]any{"bad": make(chan int)})
+	if err == nil {
+		t.Fatal("expected error for unmarshalable type, got nil")
+	}
+}
+
+type failWriter struct{}
+
+func (failWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write failed")
+}
+
+func TestOutputJSON_ReturnsErrorOnWriteFailure(t *testing.T) {
+	err := OutputJSON(failWriter{}, map[string]string{"a": "1"})
+	if err == nil {
+		t.Fatal("expected error for failed writer, got nil")
 	}
 }
 
@@ -43,7 +70,9 @@ func TestOutputStatusJSON_WritesToWriter(t *testing.T) {
 		},
 	}
 
-	OutputStatusJSON(&buf, statuses)
+	if err := OutputStatusJSON(&buf, statuses); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	output := buf.String()
 	if !strings.Contains(output, "claude") {
@@ -69,7 +98,9 @@ func TestOutputMultiProviderJSON_WritesToWriter(t *testing.T) {
 		},
 	}
 
-	OutputMultiProviderJSON(&buf, outcomes)
+	if err := OutputMultiProviderJSON(&buf, outcomes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	output := buf.String()
 	if !strings.Contains(output, "claude") {
@@ -91,7 +122,9 @@ func TestOutputMultiProviderJSON_IncludesErrors(t *testing.T) {
 		},
 	}
 
-	OutputMultiProviderJSON(&buf, outcomes)
+	if err := OutputMultiProviderJSON(&buf, outcomes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	output := buf.String()
 	if !strings.Contains(output, "errors") {
@@ -392,7 +425,9 @@ func TestOutputMultiProviderJSON_Structure(t *testing.T) {
 		},
 	}
 
-	OutputMultiProviderJSON(&buf, outcomes)
+	if err := OutputMultiProviderJSON(&buf, outcomes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	var result MultiProviderJSON
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
@@ -416,7 +451,9 @@ func TestOutputMultiProviderJSON_Structure(t *testing.T) {
 
 func TestOutputMultiProviderJSON_EmptyOutcomes(t *testing.T) {
 	var buf bytes.Buffer
-	OutputMultiProviderJSON(&buf, map[string]fetch.FetchOutcome{})
+	if err := OutputMultiProviderJSON(&buf, map[string]fetch.FetchOutcome{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	var result MultiProviderJSON
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
@@ -438,7 +475,9 @@ func TestOutputMultiProviderJSON_ErrorWithEmptyMessage(t *testing.T) {
 		},
 	}
 
-	OutputMultiProviderJSON(&buf, outcomes)
+	if err := OutputMultiProviderJSON(&buf, outcomes); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	var result MultiProviderJSON
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
@@ -468,7 +507,9 @@ func TestOutputStatusJSON_Structure(t *testing.T) {
 		},
 	}
 
-	OutputStatusJSON(&buf, statuses)
+	if err := OutputStatusJSON(&buf, statuses); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	var result map[string]StatusEntryJSON
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {

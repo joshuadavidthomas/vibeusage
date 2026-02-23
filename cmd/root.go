@@ -142,8 +142,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 	durationMs := time.Since(start).Milliseconds()
 
 	if jsonOutput {
-		display.OutputMultiProviderJSON(outWriter, outcomes)
-		return nil
+		return display.OutputMultiProviderJSON(outWriter, outcomes)
 	}
 
 	displayMultipleSnapshots(outcomes, durationMs)
@@ -286,8 +285,7 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	durationMs := time.Since(start).Milliseconds()
 
 	if jsonOutput {
-		display.OutputJSON(outWriter, display.SnapshotToJSON(outcome))
-		return nil
+		return display.OutputJSON(outWriter, display.SnapshotToJSON(outcome))
 	}
 
 	if !outcome.Success || outcome.Snapshot == nil {

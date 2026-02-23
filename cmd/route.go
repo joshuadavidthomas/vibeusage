@@ -189,8 +189,7 @@ func listModels(providerFilter string) error {
 				Roles:     modelRoles[m.ID],
 			})
 		}
-		display.OutputJSON(outWriter, data)
-		return nil
+		return display.OutputJSON(outWriter, data)
 	}
 
 	if quiet {
@@ -234,8 +233,7 @@ func routeModel(cmd *cobra.Command, query string) error {
 	}
 
 	if jsonOutput {
-		display.OutputJSON(outWriter, rec)
-		return nil
+		return display.OutputJSON(outWriter, rec)
 	}
 
 	if quiet {
@@ -276,8 +274,7 @@ func listRoles() error {
 
 	if len(names) == 0 {
 		if jsonOutput {
-			display.OutputJSON(outWriter, []struct{}{})
-			return nil
+			return display.OutputJSON(outWriter, []struct{}{})
 		}
 		return fmt.Errorf("no roles configured.\nAdd roles to your config:\n  vibeusage config edit\n\nExample:\n  [roles.thinking]\n  models = [\"claude-opus-4-6\", \"o4\", \"gpt-5-2\"]")
 	}
@@ -292,8 +289,7 @@ func listRoles() error {
 			role, _ := cfg.GetRole(name)
 			data = append(data, jsonRole{Name: name, Models: role.Models})
 		}
-		display.OutputJSON(outWriter, data)
-		return nil
+		return display.OutputJSON(outWriter, data)
 	}
 
 	if quiet {
@@ -328,8 +324,7 @@ func routeByRole(cmd *cobra.Command, roleName string) error {
 	}
 
 	if jsonOutput {
-		display.OutputJSON(outWriter, rec)
-		return nil
+		return display.OutputJSON(outWriter, rec)
 	}
 
 	if quiet {
