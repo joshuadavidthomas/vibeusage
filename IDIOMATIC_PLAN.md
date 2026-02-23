@@ -9,18 +9,18 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 > *"The main package should be completely devoid of business logic."*
 
 **`cmd/route.go` (~660 lines)**
-- [ ] Move `routeModel()`, `routeByRole()`, `buildModelRolesMap()` orchestration to an `internal/routing/` service (or new `internal/route/` package)
-- [ ] Move `configuredProviders()` to `internal/provider/`
-- [ ] Extract duplicated cost formatting (`0x → "free"`, int check, `%.2gx`) from `displayRecommendation` and `displayRoleRecommendation` into a shared helper
-- [ ] Extract the shared table-rendering pattern (hasMultiplier column toggle, unavailable dim rows) into a common function
+- [x] Move `routeModel()`, `routeByRole()`, `buildModelRolesMap()` orchestration to an `internal/routing/` service (or new `internal/route/` package)
+- [x] Move `configuredProviders()` to `internal/provider/`
+- [x] Extract duplicated cost formatting (`0x → "free"`, int check, `%.2gx`) from `displayRecommendation` and `displayRoleRecommendation` into a shared helper
+- [x] Extract the shared table-rendering pattern (hasMultiplier column toggle, unavailable dim rows) into a common function
 
 **`cmd/auth.go` (~360 lines)**
-- [ ] Define an `Authenticator` interface (or add `Auth()` to `Provider`) so each provider owns its auth flow
-- [ ] Eliminate the `switch providerID` dispatch — the command layer should just call `provider.Auth(id)`
-- [ ] The manual-key providers (claude, cursor, zai, minimax) should implement the same pattern that antigravity/copilot/kimi already use (delegating to `RunAuthFlow`/`RunDeviceFlow`)
+- [x] Define an `Authenticator` interface (or add `Auth()` to `Provider`) so each provider owns its auth flow
+- [x] Eliminate the `switch providerID` dispatch — the command layer should just call `provider.Auth(id)`
+- [x] The manual-key providers (claude, cursor, zai, minimax) should implement the same pattern that antigravity/copilot/kimi already use (delegating to `RunAuthFlow`/`RunDeviceFlow`)
 
 **`cmd/root.go`**
-- [ ] Replace hardcoded provider list on line 73 (`[]string{"antigravity", "claude", ...}`) with `provider.ListIDs()`
+- [x] Replace hardcoded provider list on line 73 (`[]string{"antigravity", "claude", ...}`) with `provider.ListIDs()`
 
 ### 2. Inject Config Instead of Global Singleton
 
