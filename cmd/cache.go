@@ -134,10 +134,10 @@ var cacheClearCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, map[string]any{
-				"success":  true,
-				"message":  msg,
-				"provider": providerID,
+			display.OutputJSON(outWriter, display.ActionResultJSON{
+				Success:  true,
+				Message:  msg,
+				Provider: providerID,
 			})
 			return nil
 		}

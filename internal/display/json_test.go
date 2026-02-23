@@ -111,17 +111,17 @@ func TestSnapshotToJSON_FailedOutcome(t *testing.T) {
 		Error:      "token expired",
 	}
 
-	data := SnapshotToJSON(outcome)
+	result := SnapshotToJSON(outcome)
 
-	errMap, ok := data["error"].(map[string]any)
+	errResult, ok := result.(SnapshotErrorJSON)
 	if !ok {
-		t.Fatal("expected 'error' key with map value")
+		t.Fatalf("expected SnapshotErrorJSON, got %T", result)
 	}
-	if errMap["message"] != "token expired" {
-		t.Errorf("error.message = %v, want %q", errMap["message"], "token expired")
+	if errResult.Error.Message != "token expired" {
+		t.Errorf("error.message = %q, want %q", errResult.Error.Message, "token expired")
 	}
-	if errMap["provider"] != "claude" {
-		t.Errorf("error.provider = %v, want %q", errMap["provider"], "claude")
+	if errResult.Error.Provider != "claude" {
+		t.Errorf("error.provider = %q, want %q", errResult.Error.Provider, "claude")
 	}
 }
 
@@ -132,9 +132,9 @@ func TestSnapshotToJSON_NilSnapshot(t *testing.T) {
 		Snapshot:   nil,
 	}
 
-	data := SnapshotToJSON(outcome)
-	if _, ok := data["error"]; !ok {
-		t.Error("expected error map when snapshot is nil")
+	result := SnapshotToJSON(outcome)
+	if _, ok := result.(SnapshotErrorJSON); !ok {
+		t.Fatalf("expected SnapshotErrorJSON when snapshot is nil, got %T", result)
 	}
 }
 
@@ -152,16 +152,20 @@ func TestSnapshotToJSON_SuccessBaseFields(t *testing.T) {
 		},
 	}
 
-	data := SnapshotToJSON(outcome)
+	result := SnapshotToJSON(outcome)
+	snap, ok := result.(SnapshotJSON)
+	if !ok {
+		t.Fatalf("expected SnapshotJSON, got %T", result)
+	}
 
-	if data["provider"] != "claude" {
-		t.Errorf("provider = %v, want %q", data["provider"], "claude")
+	if snap.Provider != "claude" {
+		t.Errorf("provider = %q, want %q", snap.Provider, "claude")
 	}
-	if data["source"] != "oauth" {
-		t.Errorf("source = %v, want %q", data["source"], "oauth")
+	if snap.Source != "oauth" {
+		t.Errorf("source = %q, want %q", snap.Source, "oauth")
 	}
-	if data["cached"] != false {
-		t.Errorf("cached = %v, want false", data["cached"])
+	if snap.Cached {
+		t.Error("cached should be false")
 	}
 }
 
@@ -179,20 +183,23 @@ func TestSnapshotToJSON_WithIdentity(t *testing.T) {
 		},
 	}
 
-	data := SnapshotToJSON(outcome)
-
-	identity, ok := data["identity"].(map[string]any)
+	result := SnapshotToJSON(outcome)
+	snap, ok := result.(SnapshotJSON)
 	if !ok {
-		t.Fatal("expected 'identity' key")
+		t.Fatalf("expected SnapshotJSON, got %T", result)
 	}
-	if identity["email"] != "user@example.com" {
-		t.Errorf("identity.email = %v, want %q", identity["email"], "user@example.com")
+
+	if snap.Identity == nil {
+		t.Fatal("expected identity to be set")
 	}
-	if identity["organization"] != "Acme Corp" {
-		t.Errorf("identity.organization = %v, want %q", identity["organization"], "Acme Corp")
+	if snap.Identity.Email != "user@example.com" {
+		t.Errorf("identity.email = %q, want %q", snap.Identity.Email, "user@example.com")
 	}
-	if identity["plan"] != "pro" {
-		t.Errorf("identity.plan = %v, want %q", identity["plan"], "pro")
+	if snap.Identity.Organization != "Acme Corp" {
+		t.Errorf("identity.organization = %q, want %q", snap.Identity.Organization, "Acme Corp")
+	}
+	if snap.Identity.Plan != "pro" {
+		t.Errorf("identity.plan = %q, want %q", snap.Identity.Plan, "pro")
 	}
 }
 
@@ -206,9 +213,14 @@ func TestSnapshotToJSON_NoIdentity(t *testing.T) {
 		},
 	}
 
-	data := SnapshotToJSON(outcome)
-	if _, ok := data["identity"]; ok {
-		t.Error("identity should be absent when nil")
+	result := SnapshotToJSON(outcome)
+	snap, ok := result.(SnapshotJSON)
+	if !ok {
+		t.Fatalf("expected SnapshotJSON, got %T", result)
+	}
+
+	if snap.Identity != nil {
+		t.Error("identity should be nil when not provided")
 	}
 }
 
@@ -236,41 +248,39 @@ func TestSnapshotToJSON_Periods(t *testing.T) {
 		},
 	}
 
-	data := SnapshotToJSON(outcome)
-
-	periods, ok := data["periods"].([]map[string]any)
+	result := SnapshotToJSON(outcome)
+	snap, ok := result.(SnapshotJSON)
 	if !ok {
-		t.Fatal("expected 'periods' as []map[string]any")
-	}
-	if len(periods) != 2 {
-		t.Fatalf("expected 2 periods, got %d", len(periods))
+		t.Fatalf("expected SnapshotJSON, got %T", result)
 	}
 
-	// Period 0: Monthly with reset
-	p0 := periods[0]
-	if p0["name"] != "Monthly" {
-		t.Errorf("period[0].name = %v, want %q", p0["name"], "Monthly")
-	}
-	if p0["utilization"] != 75 {
-		t.Errorf("period[0].utilization = %v, want 75", p0["utilization"])
-	}
-	if p0["remaining"] != 25 {
-		t.Errorf("period[0].remaining = %v, want 25", p0["remaining"])
-	}
-	if p0["period_type"] != "monthly" {
-		t.Errorf("period[0].period_type = %v, want %q", p0["period_type"], "monthly")
-	}
-	if _, ok := p0["resets_at"]; !ok {
-		t.Error("period[0] should have 'resets_at'")
+	if len(snap.Periods) != 2 {
+		t.Fatalf("expected 2 periods, got %d", len(snap.Periods))
 	}
 
-	// Period 1: model-specific, no reset
-	p1 := periods[1]
-	if p1["model"] != "claude-3-sonnet" {
-		t.Errorf("period[1].model = %v, want %q", p1["model"], "claude-3-sonnet")
+	p0 := snap.Periods[0]
+	if p0.Name != "Monthly" {
+		t.Errorf("period[0].name = %q, want %q", p0.Name, "Monthly")
 	}
-	if _, ok := p1["resets_at"]; ok {
-		t.Error("period[1] should not have 'resets_at' when nil")
+	if p0.Utilization != 75 {
+		t.Errorf("period[0].utilization = %d, want 75", p0.Utilization)
+	}
+	if p0.Remaining != 25 {
+		t.Errorf("period[0].remaining = %d, want 25", p0.Remaining)
+	}
+	if p0.PeriodType != "monthly" {
+		t.Errorf("period[0].period_type = %q, want %q", p0.PeriodType, "monthly")
+	}
+	if p0.ResetsAt == "" {
+		t.Error("period[0] should have resets_at")
+	}
+
+	p1 := snap.Periods[1]
+	if p1.Model != "claude-3-sonnet" {
+		t.Errorf("period[1].model = %q, want %q", p1.Model, "claude-3-sonnet")
+	}
+	if p1.ResetsAt != "" {
+		t.Error("period[1] should not have resets_at when nil")
 	}
 }
 
@@ -289,23 +299,26 @@ func TestSnapshotToJSON_WithOverage(t *testing.T) {
 		},
 	}
 
-	data := SnapshotToJSON(outcome)
-
-	overage, ok := data["overage"].(map[string]any)
+	result := SnapshotToJSON(outcome)
+	snap, ok := result.(SnapshotJSON)
 	if !ok {
-		t.Fatal("expected 'overage' key")
+		t.Fatalf("expected SnapshotJSON, got %T", result)
 	}
-	if overage["used"] != 15.50 {
-		t.Errorf("overage.used = %v, want 15.50", overage["used"])
+
+	if snap.Overage == nil {
+		t.Fatal("expected overage to be set")
 	}
-	if overage["limit"] != 100.00 {
-		t.Errorf("overage.limit = %v, want 100.00", overage["limit"])
+	if snap.Overage.Used != 15.50 {
+		t.Errorf("overage.used = %v, want 15.50", snap.Overage.Used)
 	}
-	if overage["remaining"] != 84.50 {
-		t.Errorf("overage.remaining = %v, want 84.50", overage["remaining"])
+	if snap.Overage.Limit != 100.00 {
+		t.Errorf("overage.limit = %v, want 100.00", snap.Overage.Limit)
 	}
-	if overage["currency"] != "USD" {
-		t.Errorf("overage.currency = %v, want %q", overage["currency"], "USD")
+	if snap.Overage.Remaining != 84.50 {
+		t.Errorf("overage.remaining = %v, want 84.50", snap.Overage.Remaining)
+	}
+	if snap.Overage.Currency != "USD" {
+		t.Errorf("overage.currency = %q, want %q", snap.Overage.Currency, "USD")
 	}
 }
 
@@ -323,9 +336,14 @@ func TestSnapshotToJSON_OverageDisabled(t *testing.T) {
 		},
 	}
 
-	data := SnapshotToJSON(outcome)
-	if _, ok := data["overage"]; ok {
-		t.Error("overage should be absent when disabled")
+	result := SnapshotToJSON(outcome)
+	snap, ok := result.(SnapshotJSON)
+	if !ok {
+		t.Fatalf("expected SnapshotJSON, got %T", result)
+	}
+
+	if snap.Overage != nil {
+		t.Error("overage should be nil when disabled")
 	}
 }
 
@@ -339,9 +357,14 @@ func TestSnapshotToJSON_OverageNil(t *testing.T) {
 		},
 	}
 
-	data := SnapshotToJSON(outcome)
-	if _, ok := data["overage"]; ok {
-		t.Error("overage should be absent when nil")
+	result := SnapshotToJSON(outcome)
+	snap, ok := result.(SnapshotJSON)
+	if !ok {
+		t.Fatalf("expected SnapshotJSON, got %T", result)
+	}
+
+	if snap.Overage != nil {
+		t.Error("overage should be nil when nil")
 	}
 }
 
@@ -371,35 +394,23 @@ func TestOutputMultiProviderJSON_Structure(t *testing.T) {
 
 	OutputMultiProviderJSON(&buf, outcomes)
 
-	var parsed map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	var result MultiProviderJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
 
-	// Top-level keys
-	if _, ok := parsed["providers"]; !ok {
-		t.Error("missing 'providers' key")
-	}
-	if _, ok := parsed["errors"]; !ok {
-		t.Error("missing 'errors' key")
-	}
-	if _, ok := parsed["fetched_at"]; !ok {
-		t.Error("missing 'fetched_at' key")
+	if result.FetchedAt == "" {
+		t.Error("missing fetched_at")
 	}
 
-	// Providers section
-	providers, _ := parsed["providers"].(map[string]any)
-	if _, ok := providers["claude"]; !ok {
+	if _, ok := result.Providers["claude"]; !ok {
 		t.Error("missing 'claude' in providers")
 	}
 
-	// Errors section
-	errors, _ := parsed["errors"].(map[string]any)
-	if _, ok := errors["cursor"]; !ok {
+	if errMsg, ok := result.Errors["cursor"]; !ok {
 		t.Error("missing 'cursor' in errors")
-	}
-	if errors["cursor"] != "auth failed" {
-		t.Errorf("errors.cursor = %v, want %q", errors["cursor"], "auth failed")
+	} else if errMsg != "auth failed" {
+		t.Errorf("errors.cursor = %q, want %q", errMsg, "auth failed")
 	}
 }
 
@@ -407,14 +418,13 @@ func TestOutputMultiProviderJSON_EmptyOutcomes(t *testing.T) {
 	var buf bytes.Buffer
 	OutputMultiProviderJSON(&buf, map[string]fetch.FetchOutcome{})
 
-	var parsed map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	var result MultiProviderJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
 
-	providers, _ := parsed["providers"].(map[string]any)
-	if len(providers) != 0 {
-		t.Errorf("expected empty providers, got %d", len(providers))
+	if len(result.Providers) != 0 {
+		t.Errorf("expected empty providers, got %d", len(result.Providers))
 	}
 }
 
@@ -430,14 +440,13 @@ func TestOutputMultiProviderJSON_ErrorWithEmptyMessage(t *testing.T) {
 
 	OutputMultiProviderJSON(&buf, outcomes)
 
-	var parsed map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	var result MultiProviderJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
 
-	errors, _ := parsed["errors"].(map[string]any)
-	if errors["broken"] != "Unknown error" {
-		t.Errorf("expected 'Unknown error' for empty message, got: %v", errors["broken"])
+	if result.Errors["broken"] != "Unknown error" {
+		t.Errorf("expected 'Unknown error' for empty message, got: %v", result.Errors["broken"])
 	}
 }
 
@@ -461,27 +470,30 @@ func TestOutputStatusJSON_Structure(t *testing.T) {
 
 	OutputStatusJSON(&buf, statuses)
 
-	var parsed map[string]any
-	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	var result map[string]StatusEntryJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
 
-	claude, ok := parsed["claude"].(map[string]any)
+	claude, ok := result["claude"]
 	if !ok {
 		t.Fatal("missing 'claude' key")
 	}
-	if claude["level"] != "operational" {
-		t.Errorf("claude.level = %v, want %q", claude["level"], "operational")
+	if claude.Level != "operational" {
+		t.Errorf("claude.level = %q, want %q", claude.Level, "operational")
 	}
-	if _, ok := claude["updated_at"]; !ok {
-		t.Error("claude should have 'updated_at'")
+	if claude.Description != "All systems go" {
+		t.Errorf("claude.description = %q, want %q", claude.Description, "All systems go")
+	}
+	if claude.UpdatedAt == "" {
+		t.Error("claude should have updated_at")
 	}
 
-	copilot, ok := parsed["copilot"].(map[string]any)
+	copilot, ok := result["copilot"]
 	if !ok {
 		t.Fatal("missing 'copilot' key")
 	}
-	if _, ok := copilot["updated_at"]; ok {
-		t.Error("copilot should not have 'updated_at' when nil")
+	if copilot.UpdatedAt != "" {
+		t.Errorf("copilot should not have updated_at, got %q", copilot.UpdatedAt)
 	}
 }

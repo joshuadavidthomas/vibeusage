@@ -44,13 +44,12 @@ func authStatusCommand() error {
 	sort.Strings(allProviders)
 
 	if jsonOutput {
-		data := make(map[string]any)
+		data := make(map[string]display.AuthStatusEntryJSON)
 		for _, pid := range allProviders {
 			hasCreds, source := config.CheckProviderCredentials(pid)
-			sourceLabel := sourceToLabel(source)
-			data[pid] = map[string]any{
-				"authenticated": hasCreds,
-				"source":        sourceLabel,
+			data[pid] = display.AuthStatusEntryJSON{
+				Authenticated: hasCreds,
+				Source:        sourceToLabel(source),
 			}
 		}
 		display.OutputJSON(outWriter, data)
