@@ -87,7 +87,7 @@ func listModels(providerFilter string) error {
 	// and only show configured providers in the list.
 	var filtered []modelmap.ModelInfo
 	for _, m := range allModels {
-		configured := configuredProviders(m.Providers)
+		configured := provider.ConfiguredIDs(m.Providers)
 		if len(configured) > 0 {
 			m.Providers = configured
 			filtered = append(filtered, m)
@@ -193,24 +193,7 @@ func buildModelRolesMap() map[string][]string {
 	return result
 }
 
-// configuredProviders filters a list of provider IDs to only those that are
-// registered and have at least one available fetch strategy.
-func configuredProviders(providerIDs []string) []string {
-	var result []string
-	for _, pid := range providerIDs {
-		p, ok := provider.Get(pid)
-		if !ok {
-			continue
-		}
-		for _, s := range p.FetchStrategies() {
-			if s.IsAvailable() {
-				result = append(result, pid)
-				break
-			}
-		}
-	}
-	return result
-}
+
 
 func routeModel(cmd *cobra.Command, query string) error {
 	info := modelmap.Lookup(query)
@@ -231,19 +214,7 @@ func routeModel(cmd *cobra.Command, query string) error {
 	}
 
 	// Filter to only configured providers.
-	var configuredIDs []string
-	for _, pid := range info.Providers {
-		p, ok := provider.Get(pid)
-		if !ok {
-			continue
-		}
-		for _, s := range p.FetchStrategies() {
-			if s.IsAvailable() {
-				configuredIDs = append(configuredIDs, pid)
-				break
-			}
-		}
-	}
+	configuredIDs := provider.ConfiguredIDs(info.Providers)
 
 	if len(configuredIDs) == 0 {
 		return fmt.Errorf(
@@ -429,7 +400,7 @@ func routeByRole(cmd *cobra.Command, roleName string) error {
 		// Prefer the shortest ID (the "latest" pointer, not the dated variant).
 		// MatchPrefix returns sorted by length, so first match is shortest.
 		best := matches[0]
-		configured := configuredProviders(best.Providers)
+		configured := provider.ConfiguredIDs(best.Providers)
 		if len(configured) == 0 {
 			continue
 		}

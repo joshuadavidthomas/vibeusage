@@ -46,3 +46,22 @@ func ListIDs() []string {
 	}
 	return ids
 }
+
+// ConfiguredIDs filters a list of provider IDs to only those that are
+// registered and have at least one available fetch strategy.
+func ConfiguredIDs(providerIDs []string) []string {
+	var result []string
+	for _, pid := range providerIDs {
+		p, ok := Get(pid)
+		if !ok {
+			continue
+		}
+		for _, s := range p.FetchStrategies() {
+			if s.IsAvailable() {
+				result = append(result, pid)
+				break
+			}
+		}
+	}
+	return result
+}
