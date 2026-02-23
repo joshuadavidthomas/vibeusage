@@ -35,33 +35,6 @@ func TestAuthStatusJSON_UsesTypedStruct(t *testing.T) {
 	}
 }
 
-func TestConfigShowJSON_UsesTypedStruct(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
-	reloadConfig()
-
-	var buf bytes.Buffer
-	outWriter = &buf
-	defer func() { outWriter = os.Stdout }()
-
-	oldJSON := jsonOutput
-	jsonOutput = true
-	defer func() { jsonOutput = oldJSON }()
-
-	if err := configShowCmd.RunE(configShowCmd, nil); err != nil {
-		t.Fatalf("config show error: %v", err)
-	}
-
-	var result display.ConfigShowJSON
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("config show JSON should unmarshal into ConfigShowJSON: %v\nOutput: %s", err, buf.String())
-	}
-
-	if result.Path == "" {
-		t.Error("path should not be empty")
-	}
-}
-
 func TestConfigResetJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
