@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -12,12 +13,14 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
+const statusMaxConcurrent = 5
+
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show health status for all providers",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
-		statuses := fetchAllStatuses()
+		statuses := fetchAllStatuses(cmd.Context(), provider.All(), statusMaxConcurrent)
 		durationMs := time.Since(start).Milliseconds()
 
 		if jsonOutput {
@@ -30,16 +33,24 @@ var statusCmd = &cobra.Command{
 	},
 }
 
-func fetchAllStatuses() map[string]models.ProviderStatus {
+func fetchAllStatuses(ctx context.Context, providers map[string]provider.Provider, maxConcurrent int) map[string]models.ProviderStatus {
+	if maxConcurrent <= 0 {
+		maxConcurrent = 5
+	}
+
 	statuses := make(map[string]models.ProviderStatus)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxConcurrent)
 
-	for id, p := range provider.All() {
+	for id, p := range providers {
 		wg.Add(1)
 		go func(pid string, prov provider.Provider) {
 			defer wg.Done()
-			status := prov.FetchStatus()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			status := prov.FetchStatus(ctx)
 			mu.Lock()
 			statuses[pid] = status
 			mu.Unlock()

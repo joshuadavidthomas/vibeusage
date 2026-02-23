@@ -33,7 +33,7 @@ func (m Minimax) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (m Minimax) FetchStatus() models.ProviderStatus {
+func (m Minimax) FetchStatus(_ context.Context) models.ProviderStatus {
 	return models.ProviderStatus{Level: models.StatusUnknown}
 }
 

@@ -37,7 +37,7 @@ func (k Kimi) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (k Kimi) FetchStatus() models.ProviderStatus {
+func (k Kimi) FetchStatus(_ context.Context) models.ProviderStatus {
 	return models.ProviderStatus{Level: models.StatusUnknown}
 }
 

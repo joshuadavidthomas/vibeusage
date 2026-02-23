@@ -1,6 +1,8 @@
 package claude
 
 import (
+	"context"
+
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -36,8 +38,8 @@ func (c Claude) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (c Claude) FetchStatus() models.ProviderStatus {
-	return provider.FetchStatuspageStatus("https://status.anthropic.com/api/v2/status.json")
+func (c Claude) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchStatuspageStatus(ctx, "https://status.anthropic.com/api/v2/status.json")
 }
 
 // Auth returns the manual session key flow for Claude.

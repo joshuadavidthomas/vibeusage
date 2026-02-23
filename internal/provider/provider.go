@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"context"
+
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
@@ -17,7 +19,7 @@ type Metadata struct {
 type Provider interface {
 	Meta() Metadata
 	FetchStrategies() []fetch.Strategy
-	FetchStatus() models.ProviderStatus
+	FetchStatus(ctx context.Context) models.ProviderStatus
 }
 
 var registry = map[string]Provider{}

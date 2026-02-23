@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 )
 
 // FetchStatuspageStatus fetches status from a Statuspage.io endpoint.
-func FetchStatuspageStatus(url string) models.ProviderStatus {
+func FetchStatuspageStatus(ctx context.Context, url string) models.ProviderStatus {
 	client := httpclient.NewWithTimeout(10 * time.Second)
 	var data struct {
 		Status struct {
@@ -17,7 +18,7 @@ func FetchStatuspageStatus(url string) models.ProviderStatus {
 			Description string `json:"description"`
 		} `json:"status"`
 	}
-	resp, err := client.GetJSON(url, &data)
+	resp, err := client.GetJSONCtx(ctx, url, &data)
 	if err != nil || resp.JSONErr != nil {
 		return models.ProviderStatus{Level: models.StatusUnknown}
 	}
@@ -46,15 +47,21 @@ func indicatorToLevel(indicator string) models.StatusLevel {
 	}
 }
 
+const googleIncidentURL = "https://www.google.com/appsstatus/dashboard/incidents.json"
+
 // FetchGoogleAppsStatus checks the Google Apps Status Dashboard for active
 // incidents matching any of the given keywords. Used by providers that run
 // on Google infrastructure (Gemini, Antigravity).
-func FetchGoogleAppsStatus(keywords []string) models.ProviderStatus {
-	const incidentURL = "https://www.google.com/appsstatus/dashboard/incidents.json"
+func FetchGoogleAppsStatus(ctx context.Context, keywords []string) models.ProviderStatus {
+	return FetchGoogleAppsStatusFromURL(ctx, googleIncidentURL, keywords)
+}
 
+// FetchGoogleAppsStatusFromURL is the testable core of FetchGoogleAppsStatus,
+// accepting the incident URL as a parameter.
+func FetchGoogleAppsStatusFromURL(ctx context.Context, incidentURL string, keywords []string) models.ProviderStatus {
 	client := httpclient.NewWithTimeout(10 * time.Second)
 	var incidents []googleIncident
-	resp, err := client.GetJSON(incidentURL, &incidents)
+	resp, err := client.GetJSONCtx(ctx, incidentURL, &incidents)
 	if err != nil || resp.JSONErr != nil {
 		return models.ProviderStatus{Level: models.StatusUnknown}
 	}

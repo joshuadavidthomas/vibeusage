@@ -34,8 +34,8 @@ func (c Codex) FetchStrategies() []fetch.Strategy {
 	return []fetch.Strategy{&OAuthStrategy{HTTPTimeout: timeout}}
 }
 
-func (c Codex) FetchStatus() models.ProviderStatus {
-	return provider.FetchStatuspageStatus("https://status.openai.com/api/v2/status.json")
+func (c Codex) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchStatuspageStatus(ctx, "https://status.openai.com/api/v2/status.json")
 }
 
 func init() {

@@ -34,8 +34,8 @@ func (c Cursor) FetchStrategies() []fetch.Strategy {
 	return []fetch.Strategy{&WebStrategy{HTTPTimeout: timeout}}
 }
 
-func (c Cursor) FetchStatus() models.ProviderStatus {
-	return provider.FetchStatuspageStatus("https://status.cursor.com/api/v2/status.json")
+func (c Cursor) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchStatuspageStatus(ctx, "https://status.cursor.com/api/v2/status.json")
 }
 
 const (
