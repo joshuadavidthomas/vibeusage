@@ -113,10 +113,10 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 
 	// Capture logger output (verbose info goes to logger, not stdout)
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	logging.Configure(logging.Logger, logging.Flags{Verbose: true})
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	logging.Configure(logger, logging.Flags{Verbose: true})
+	defer func() { logger = oldLogger }()
 
 	var buf bytes.Buffer
 	outWriter = &buf

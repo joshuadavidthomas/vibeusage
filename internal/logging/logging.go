@@ -2,19 +2,10 @@ package logging
 
 import (
 	"io"
-	"os"
 
 	"github.com/charmbracelet/log"
 	"github.com/muesli/termenv"
 )
-
-// Logger is the application-wide logger instance.
-// It writes to stderr so it doesn't interfere with piped stdout.
-var Logger *log.Logger
-
-func init() {
-	Logger = NewLogger(os.Stderr)
-}
 
 // Flags holds the CLI flags that affect logging behavior.
 type Flags struct {

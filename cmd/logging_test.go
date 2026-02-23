@@ -14,10 +14,10 @@ import (
 
 func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	logging.Configure(logging.Logger, logging.Flags{Verbose: true})
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	logging.Configure(logger, logging.Flags{Verbose: true})
+	defer func() { logger = oldLogger }()
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -55,10 +55,10 @@ func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
 
 func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	logging.Configure(logging.Logger, logging.Flags{Verbose: true})
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	logging.Configure(logger, logging.Flags{Verbose: true})
+	defer func() { logger = oldLogger }()
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -101,10 +101,10 @@ func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
 
 func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	logging.Configure(logging.Logger, logging.Flags{})
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	logging.Configure(logger, logging.Flags{})
+	defer func() { logger = oldLogger }()
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -139,10 +139,10 @@ func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) 
 
 func TestVerboseOutput_StatusTable_LogsDuration(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	logging.Configure(logging.Logger, logging.Flags{Verbose: true})
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	logging.Configure(logger, logging.Flags{Verbose: true})
+	defer func() { logger = oldLogger }()
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -174,10 +174,10 @@ func TestVerboseOutput_StatusTable_LogsDuration(t *testing.T) {
 
 func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	logging.Configure(logging.Logger, logging.Flags{Quiet: true})
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	logging.Configure(logger, logging.Flags{Quiet: true})
+	defer func() { logger = oldLogger }()
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -233,9 +233,9 @@ func TestLoggerConfiguration_CalledInRunDefaultUsage(t *testing.T) {
 
 func TestConfigureLogger_SetsUpFromFlags(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	defer func() { logger = oldLogger }()
 
 	oldVerbose := verbose
 	oldQuiet := quiet
@@ -254,24 +254,24 @@ func TestConfigureLogger_SetsUpFromFlags(t *testing.T) {
 	noColor = false
 	jsonOutput = false
 	configureLogger()
-	if logging.Logger.GetLevel() != log.DebugLevel {
-		t.Errorf("expected DebugLevel for verbose, got %v", logging.Logger.GetLevel())
+	if logger.GetLevel() != log.DebugLevel {
+		t.Errorf("expected DebugLevel for verbose, got %v", logger.GetLevel())
 	}
 
 	// Test quiet
 	verbose = false
 	quiet = true
 	configureLogger()
-	if logging.Logger.GetLevel() != log.ErrorLevel {
-		t.Errorf("expected ErrorLevel for quiet, got %v", logging.Logger.GetLevel())
+	if logger.GetLevel() != log.ErrorLevel {
+		t.Errorf("expected ErrorLevel for quiet, got %v", logger.GetLevel())
 	}
 
 	// Test default
 	verbose = false
 	quiet = false
 	configureLogger()
-	if logging.Logger.GetLevel() != log.WarnLevel {
-		t.Errorf("expected WarnLevel for default, got %v", logging.Logger.GetLevel())
+	if logger.GetLevel() != log.WarnLevel {
+		t.Errorf("expected WarnLevel for default, got %v", logger.GetLevel())
 	}
 }
 
@@ -279,10 +279,10 @@ func TestVerboseOutput_NotOnStdout(t *testing.T) {
 	// Verbose logging should go to the logger (stderr), NOT to outWriter (stdout).
 	// This ensures piped output is clean.
 	var logBuf bytes.Buffer
-	oldLogger := logging.Logger
-	logging.Logger = logging.NewLogger(&logBuf)
-	logging.Configure(logging.Logger, logging.Flags{Verbose: true})
-	defer func() { logging.Logger = oldLogger }()
+	oldLogger := logger
+	logger = logging.NewLogger(&logBuf)
+	logging.Configure(logger, logging.Flags{Verbose: true})
+	defer func() { logger = oldLogger }()
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf

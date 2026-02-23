@@ -90,7 +90,7 @@ func ExecuteContext(ctx context.Context) error {
 
 // configureLogger sets up the structured logger based on CLI flags.
 func configureLogger() {
-	logging.Configure(logging.Logger, logging.Flags{
+	logging.Configure(logger, logging.Flags{
 		Verbose: verbose,
 		Quiet:   quiet,
 		NoColor: noColor,
@@ -240,10 +240,10 @@ func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs
 	}
 
 	if durationMs > 0 {
-		logging.Logger.Debug("fetch complete", "total_duration_ms", durationMs)
+		logger.Debug("fetch complete", "total_duration_ms", durationMs)
 	}
 	for _, e := range errors {
-		logging.Logger.Debug("provider error", "provider", e.id, "error", e.err)
+		logger.Debug("provider error", "provider", e.id, "error", e.err)
 	}
 }
 
@@ -317,7 +317,7 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	if outcome.Source != "" {
 		logFields = append(logFields, "source", outcome.Source)
 	}
-	logging.Logger.Debug("fetch complete", logFields...)
+	logger.Debug("fetch complete", logFields...)
 
 	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached))
 	return nil
