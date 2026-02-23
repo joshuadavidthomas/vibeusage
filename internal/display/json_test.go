@@ -482,6 +482,9 @@ func TestOutputStatusJSON_Structure(t *testing.T) {
 	if claude.Level != "operational" {
 		t.Errorf("claude.level = %q, want %q", claude.Level, "operational")
 	}
+	if claude.Description != "All systems go" {
+		t.Errorf("claude.description = %q, want %q", claude.Description, "All systems go")
+	}
 	if claude.UpdatedAt == "" {
 		t.Error("claude should have updated_at")
 	}

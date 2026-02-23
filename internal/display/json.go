@@ -73,14 +73,14 @@ func SnapshotToJSON(outcome fetch.FetchOutcome) any {
 // OutputMultiProviderJSON outputs all outcomes as JSON.
 func OutputMultiProviderJSON(w io.Writer, outcomes map[string]fetch.FetchOutcome) {
 	data := MultiProviderJSON{
-		Providers: make(map[string]any),
+		Providers: make(map[string]SnapshotJSON),
 		Errors:    make(map[string]string),
 		FetchedAt: time.Now().Format(time.RFC3339),
 	}
 
 	for pid, outcome := range outcomes {
 		if outcome.Success && outcome.Snapshot != nil {
-			data.Providers[pid] = SnapshotToJSON(outcome)
+			data.Providers[pid] = SnapshotToJSON(outcome).(SnapshotJSON)
 		} else {
 			errMsg := outcome.Error
 			if errMsg == "" {

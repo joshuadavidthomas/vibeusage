@@ -1,8 +1,5 @@
 package display
 
-// Typed JSON response structs for all JSON output.
-// Replaces map[string]any throughout the codebase.
-
 // SnapshotErrorJSON represents a failed fetch outcome.
 type SnapshotErrorJSON struct {
 	Error ErrorDetailJSON `json:"error"`
@@ -51,9 +48,9 @@ type OverageJSON struct {
 
 // MultiProviderJSON is the top-level response for multi-provider fetches.
 type MultiProviderJSON struct {
-	Providers map[string]any    `json:"providers"`
-	Errors    map[string]string `json:"errors"`
-	FetchedAt string            `json:"fetched_at"`
+	Providers map[string]SnapshotJSON `json:"providers"`
+	Errors    map[string]string       `json:"errors"`
+	FetchedAt string                  `json:"fetched_at"`
 }
 
 // StatusEntryJSON represents a single provider's status.
