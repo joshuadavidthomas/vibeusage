@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 )
 
 // resetPathFlags resets configPathCmd flags to defaults and registers
@@ -321,7 +323,7 @@ func TestEnabledProviderIDs_SortedAlphabetically(t *testing.T) {
 	reloadConfig()
 
 	providerMap := buildProviderMap()
-	ids := enabledProviderIDs(providerMap)
+	ids := enabledProviderIDs(providerMap, config.Get())
 
 	for i := 1; i < len(ids); i++ {
 		if ids[i-1] > ids[i] {

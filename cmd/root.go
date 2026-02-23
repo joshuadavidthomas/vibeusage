@@ -126,7 +126,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 	var outcomes map[string]fetch.FetchOutcome
 
 	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
-		spinnerIDs := availableProviderIDs(providerMap)
+		spinnerIDs := availableProviderIDs(providerMap, cfg)
 		err := spinner.Run(spinnerIDs, func(onComplete func(spinner.CompletionInfo)) {
 			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, orchCfg, cfg.IsProviderEnabled, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
@@ -150,8 +150,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 	return nil
 }
 
-func enabledProviderIDs(providerMap map[string][]fetch.Strategy) []string {
-	cfg := config.Get()
+func enabledProviderIDs(providerMap map[string][]fetch.Strategy, cfg config.Config) []string {
 	var ids []string
 	for pid := range providerMap {
 		if cfg.IsProviderEnabled(pid) {
@@ -165,8 +164,7 @@ func enabledProviderIDs(providerMap map[string][]fetch.Strategy) []string {
 // availableProviderIDs returns enabled provider IDs that have at least one
 // available strategy. Used to filter what the spinner tracks — providers
 // with no credentials are silently excluded.
-func availableProviderIDs(providerMap map[string][]fetch.Strategy) []string {
-	cfg := config.Get()
+func availableProviderIDs(providerMap map[string][]fetch.Strategy, cfg config.Config) []string {
 	var ids []string
 	for pid, strategies := range providerMap {
 		if !cfg.IsProviderEnabled(pid) {
