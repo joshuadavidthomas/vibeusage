@@ -59,9 +59,9 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 > *"Idiomatic Go uses the context package to propagate cancellation signals."*
 
-- [ ] Add `context.Context` parameter to `Provider.FetchStatus()`
-- [ ] Update all provider implementations
-- [ ] Add concurrency bound (semaphore channel) to `fetchAllStatuses()` in `cmd/status.go` — currently unbounded unlike the well-done `FetchAllProviders`
+- [x] Add `context.Context` parameter to `Provider.FetchStatus()`
+- [x] Update all provider implementations
+- [x] Add concurrency bound (semaphore channel) to `fetchAllStatuses()` in `cmd/status.go` — currently unbounded unlike the well-done `FetchAllProviders`
 
 ### 6. `OutputJSON` Should Return `error`
 

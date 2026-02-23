@@ -39,8 +39,8 @@ func (a Antigravity) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (a Antigravity) FetchStatus() models.ProviderStatus {
-	return provider.FetchGoogleAppsStatus([]string{
+func (a Antigravity) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchGoogleAppsStatus(ctx, []string{
 		"antigravity", "gemini", "cloud code", "generative ai", "ai studio",
 	})
 }

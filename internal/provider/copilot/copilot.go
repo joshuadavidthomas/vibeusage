@@ -33,8 +33,8 @@ func (c Copilot) FetchStrategies() []fetch.Strategy {
 	return []fetch.Strategy{&DeviceFlowStrategy{HTTPTimeout: timeout}}
 }
 
-func (c Copilot) FetchStatus() models.ProviderStatus {
-	return provider.FetchStatuspageStatus("https://www.githubstatus.com/api/v2/status.json")
+func (c Copilot) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchStatuspageStatus(ctx, "https://www.githubstatus.com/api/v2/status.json")
 }
 
 // Auth returns the GitHub device flow for Copilot.

@@ -22,7 +22,7 @@ func (s *stubProvider) FetchStrategies() []fetch.Strategy {
 	return s.strategies
 }
 
-func (s *stubProvider) FetchStatus() models.ProviderStatus {
+func (s *stubProvider) FetchStatus(_ context.Context) models.ProviderStatus {
 	return models.ProviderStatus{}
 }
 

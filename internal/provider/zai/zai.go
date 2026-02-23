@@ -33,7 +33,7 @@ func (z Zai) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (z Zai) FetchStatus() models.ProviderStatus {
+func (z Zai) FetchStatus(_ context.Context) models.ProviderStatus {
 	return models.ProviderStatus{Level: models.StatusUnknown}
 }
 

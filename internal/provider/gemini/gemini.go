@@ -39,8 +39,8 @@ func (g Gemini) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (g Gemini) FetchStatus() models.ProviderStatus {
-	return provider.FetchGoogleAppsStatus([]string{
+func (g Gemini) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchGoogleAppsStatus(ctx, []string{
 		"gemini", "ai studio", "aistudio", "generative ai", "vertex ai", "cloud code",
 	})
 }
