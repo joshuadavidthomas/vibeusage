@@ -26,24 +26,24 @@ var configShowCmd = &cobra.Command{
 		cfgPath := config.ConfigFile()
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, map[string]any{
-				"fetch": map[string]any{
-					"timeout":                 cfg.Fetch.Timeout,
-					"stale_threshold_minutes": cfg.Fetch.StaleThresholdMinutes,
-					"max_concurrent":          cfg.Fetch.MaxConcurrent,
+			display.OutputJSON(outWriter, display.ConfigShowJSON{
+				Fetch: display.ConfigFetchJSON{
+					Timeout:               cfg.Fetch.Timeout,
+					StaleThresholdMinutes: cfg.Fetch.StaleThresholdMinutes,
+					MaxConcurrent:         cfg.Fetch.MaxConcurrent,
 				},
-				"enabled_providers": cfg.EnabledProviders,
-				"display": map[string]any{
-					"show_remaining": cfg.Display.ShowRemaining,
-					"pace_colors":    cfg.Display.PaceColors,
-					"reset_format":   cfg.Display.ResetFormat,
+				EnabledProviders: cfg.EnabledProviders,
+				Display: display.ConfigDisplayJSON{
+					ShowRemaining: cfg.Display.ShowRemaining,
+					PaceColors:    cfg.Display.PaceColors,
+					ResetFormat:   cfg.Display.ResetFormat,
 				},
-				"credentials": map[string]any{
-					"use_keyring":                cfg.Credentials.UseKeyring,
-					"reuse_provider_credentials": cfg.Credentials.ReuseProviderCredentials,
+				Credentials: display.ConfigCredentialsJSON{
+					UseKeyring:               cfg.Credentials.UseKeyring,
+					ReuseProviderCredentials: cfg.Credentials.ReuseProviderCredentials,
 				},
-				"roles": cfg.Roles,
-				"path":  cfgPath,
+				Roles: cfg.Roles,
+				Path:  cfgPath,
 			})
 			return nil
 		}
@@ -132,10 +132,10 @@ var configResetCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, map[string]any{
-				"success": true,
-				"reset":   true,
-				"message": "Configuration reset to defaults",
+			display.OutputJSON(outWriter, display.ActionResultJSON{
+				Success: true,
+				Reset:   true,
+				Message: "Configuration reset to defaults",
 			})
 			return nil
 		}

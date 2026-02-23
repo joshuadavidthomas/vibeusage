@@ -39,13 +39,13 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 > *"`any` says nothing" — it destroys compile-time verification.*
 
-- [ ] `internal/display/json.go`: Replace `SnapshotToJSON() map[string]any` with a `SnapshotJSON` struct using `json` tags
-- [ ] `cmd/auth.go`: Replace `map[string]any` auth status output with a typed struct
-- [ ] `cmd/config.go`: Replace `map[string]any` config output with a typed struct
-- [ ] `cmd/key.go`: Replace `map[string]any` key status output with a typed struct
-- [ ] `cmd/init.go`: Replace `map[string]any` init output with a typed struct
-- [ ] `cmd/cache.go`: Replace `map[string]any` cache output with a typed struct
-- [ ] `display.OutputMultiProviderJSON`: Replace internal `map[string]any` construction with typed structs
+- [x] `internal/display/json.go`: Replace `SnapshotToJSON() map[string]any` with a `SnapshotJSON` struct using `json` tags
+- [x] `cmd/auth.go`: Replace `map[string]any` auth status output with a typed struct
+- [x] `cmd/config.go`: Replace `map[string]any` config output with a typed struct
+- [x] `cmd/key.go`: Replace `map[string]any` key status output with a typed struct
+- [x] `cmd/init.go`: Replace `map[string]any` init output with a typed struct
+- [x] `cmd/cache.go`: Replace `map[string]any` cache output with a typed struct
+- [x] `display.OutputMultiProviderJSON`: Replace internal `map[string]any` construction with typed structs
 
 ### 4. Explicit Logger Initialization
 

@@ -27,10 +27,10 @@ var initCmd = &cobra.Command{
 		quick, _ := cmd.Flags().GetBool("quick")
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, map[string]any{
-				"first_run":            config.IsFirstRun(),
-				"configured_providers": config.CountConfiguredProviders(),
-				"available_providers":  provider.ListIDs(),
+			display.OutputJSON(outWriter, display.InitStatusJSON{
+				FirstRun:            config.IsFirstRun(),
+				ConfiguredProviders: config.CountConfiguredProviders(),
+				AvailableProviders:  provider.ListIDs(),
 			})
 			return nil
 		}

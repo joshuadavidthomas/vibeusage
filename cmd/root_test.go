@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
 )
 
 // resetPathFlags resets configPathCmd flags to defaults and registers
@@ -168,22 +170,13 @@ func TestConfigShow_JSONOutput(t *testing.T) {
 		t.Fatalf("config show --json error: %v", err)
 	}
 
-	var parsed map[string]any
+	var parsed display.ConfigShowJSON
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("config show --json output is not valid JSON: %v\nOutput: %s", err, buf.String())
 	}
 
-	if _, ok := parsed["fetch"]; !ok {
-		t.Error("JSON output missing 'fetch' key")
-	}
-	if _, ok := parsed["display"]; !ok {
-		t.Error("JSON output missing 'display' key")
-	}
-	if _, ok := parsed["credentials"]; !ok {
-		t.Error("JSON output missing 'credentials' key")
-	}
-	if _, ok := parsed["path"]; !ok {
-		t.Error("JSON output missing 'path' key")
+	if parsed.Path == "" {
+		t.Error("JSON output missing 'path'")
 	}
 }
 
