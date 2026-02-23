@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/log"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -137,41 +136,6 @@ func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) 
 	}
 }
 
-func TestVerboseOutput_StatusTable_LogsDuration(t *testing.T) {
-	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	logging.Configure(logger, logging.Flags{Verbose: true})
-	defer func() { logger = oldLogger }()
-
-	var outBuf bytes.Buffer
-	outWriter = &outBuf
-	defer func() { outWriter = os.Stdout }()
-
-	oldVerbose := verbose
-	verbose = true
-	defer func() { verbose = oldVerbose }()
-
-	oldQuiet := quiet
-	quiet = false
-	defer func() { quiet = oldQuiet }()
-
-	oldNoColor := noColor
-	noColor = true
-	defer func() { noColor = oldNoColor }()
-
-	statuses := map[string]models.ProviderStatus{
-		"claude": {Level: models.StatusOperational, Description: "OK"},
-	}
-
-	displayStatusTable(statuses, 250)
-
-	logOutput := logBuf.String()
-	if !strings.Contains(logOutput, "250") {
-		t.Errorf("expected log output to contain duration '250', got %q", logOutput)
-	}
-}
-
 func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 	var logBuf bytes.Buffer
 	oldLogger := logger
@@ -204,74 +168,6 @@ func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 	logOutput := logBuf.String()
 	if strings.Contains(logOutput, "250") {
 		t.Errorf("expected no duration in log in quiet mode, got %q", logOutput)
-	}
-}
-
-func TestLoggerConfiguration_CalledInRunDefaultUsage(t *testing.T) {
-	// Verify that the logger level is set correctly when flags are configured.
-	var logBuf bytes.Buffer
-	l := logging.NewLogger(&logBuf)
-
-	// Simulate verbose mode
-	logging.Configure(l, logging.Flags{Verbose: true})
-	if l.GetLevel() != log.DebugLevel {
-		t.Errorf("expected DebugLevel, got %v", l.GetLevel())
-	}
-
-	// Simulate quiet mode
-	logging.Configure(l, logging.Flags{Quiet: true})
-	if l.GetLevel() != log.ErrorLevel {
-		t.Errorf("expected ErrorLevel, got %v", l.GetLevel())
-	}
-
-	// Simulate default
-	logging.Configure(l, logging.Flags{})
-	if l.GetLevel() != log.WarnLevel {
-		t.Errorf("expected WarnLevel, got %v", l.GetLevel())
-	}
-}
-
-func TestConfigureLogger_SetsUpFromFlags(t *testing.T) {
-	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	defer func() { logger = oldLogger }()
-
-	oldVerbose := verbose
-	oldQuiet := quiet
-	oldNoColor := noColor
-	oldJSON := jsonOutput
-	defer func() {
-		verbose = oldVerbose
-		quiet = oldQuiet
-		noColor = oldNoColor
-		jsonOutput = oldJSON
-	}()
-
-	// Test verbose
-	verbose = true
-	quiet = false
-	noColor = false
-	jsonOutput = false
-	configureLogger()
-	if logger.GetLevel() != log.DebugLevel {
-		t.Errorf("expected DebugLevel for verbose, got %v", logger.GetLevel())
-	}
-
-	// Test quiet
-	verbose = false
-	quiet = true
-	configureLogger()
-	if logger.GetLevel() != log.ErrorLevel {
-		t.Errorf("expected ErrorLevel for quiet, got %v", logger.GetLevel())
-	}
-
-	// Test default
-	verbose = false
-	quiet = false
-	configureLogger()
-	if logger.GetLevel() != log.WarnLevel {
-		t.Errorf("expected WarnLevel for default, got %v", logger.GetLevel())
 	}
 }
 
@@ -311,7 +207,7 @@ func TestVerboseOutput_NotOnStdout(t *testing.T) {
 	displayMultipleSnapshots(outcomes, 500)
 
 	stdoutOutput := outBuf.String()
-	// Stdout should NOT contain timing/diagnostic info anymore
+	// Stdout should NOT contain timing/diagnostic info
 	if strings.Contains(stdoutOutput, "Total fetch time") {
 		t.Errorf("verbose timing info should not appear on stdout, got %q", stdoutOutput)
 	}

@@ -14,15 +14,6 @@ func TestLogger_InitializedExplicitly(t *testing.T) {
 	}
 }
 
-func TestLogger_DefaultLevelIsWarn(t *testing.T) {
-	// Create a fresh logger like the package var does
-	var buf bytes.Buffer
-	l := logging.NewLogger(&buf)
-	if l.GetLevel() != log.WarnLevel {
-		t.Errorf("expected default level WarnLevel, got %v", l.GetLevel())
-	}
-}
-
 func TestConfigureLogger_UsesPackageLogger(t *testing.T) {
 	var buf bytes.Buffer
 	old := logger
@@ -58,5 +49,26 @@ func TestConfigureLogger_QuietMode(t *testing.T) {
 
 	if logger.GetLevel() != log.ErrorLevel {
 		t.Errorf("expected configureLogger to set ErrorLevel for quiet, got %v", logger.GetLevel())
+	}
+}
+
+func TestConfigureLogger_DefaultMode(t *testing.T) {
+	var buf bytes.Buffer
+	old := logger
+	logger = logging.NewLogger(&buf)
+	defer func() { logger = old }()
+
+	oldVerbose := verbose
+	verbose = false
+	defer func() { verbose = oldVerbose }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	configureLogger()
+
+	if logger.GetLevel() != log.WarnLevel {
+		t.Errorf("expected configureLogger to set WarnLevel for default, got %v", logger.GetLevel())
 	}
 }
