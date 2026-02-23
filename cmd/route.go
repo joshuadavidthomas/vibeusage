@@ -73,7 +73,7 @@ func init() {
 
 // newRoutingService creates a routing.Service wired to the concrete
 // implementations: modelmap, provider, fetch, config.
-func newRoutingService(ctx context.Context) *routing.Service {
+func newRoutingService() *routing.Service {
 	return &routing.Service{
 		LookupModel:         adaptLookup,
 		SearchModels:        adaptSearch,
@@ -110,8 +110,8 @@ func newRoutingService(ctx context.Context) *routing.Service {
 
 // newRoutingServiceWithSpinner creates a routing.Service where FetchAll
 // is wrapped with a spinner for terminal output.
-func newRoutingServiceWithSpinner(ctx context.Context) *routing.Service {
-	svc := newRoutingService(ctx)
+func newRoutingServiceWithSpinner() *routing.Service {
+	svc := newRoutingService()
 	svc.FetchAll = func(fetchCtx context.Context, strategies map[string][]fetch.Strategy, useCache bool) map[string]fetch.FetchOutcome {
 		providerIDs := make([]string, 0, len(strategies))
 		for pid := range strategies {
@@ -226,7 +226,7 @@ func listModels(providerFilter string) error {
 }
 
 func routeModel(cmd *cobra.Command, query string) error {
-	svc := newRoutingServiceWithSpinner(cmd.Context())
+	svc := newRoutingServiceWithSpinner()
 
 	rec, err := svc.RouteModel(cmd.Context(), query)
 	if err != nil {
@@ -320,7 +320,7 @@ func listRoles() error {
 }
 
 func routeByRole(cmd *cobra.Command, roleName string) error {
-	svc := newRoutingServiceWithSpinner(cmd.Context())
+	svc := newRoutingServiceWithSpinner()
 
 	rec, err := svc.RouteByRole(cmd.Context(), roleName)
 	if err != nil {
