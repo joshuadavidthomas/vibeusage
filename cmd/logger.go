@@ -3,9 +3,18 @@ package cmd
 import (
 	"os"
 
+	"github.com/charmbracelet/log"
 	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 )
 
-// logger is the application-wide logger instance, explicitly initialized.
-// It writes to stderr so it doesn't interfere with piped stdout.
-var logger = logging.NewLogger(os.Stderr)
+// newConfiguredLogger creates a new logger configured based on CLI flags.
+func newConfiguredLogger() *log.Logger {
+	l := logging.NewLogger(os.Stderr)
+	logging.Configure(l, logging.Flags{
+		Verbose: verbose,
+		Quiet:   quiet,
+		NoColor: noColor,
+		JSON:    jsonOutput,
+	})
+	return l
+}

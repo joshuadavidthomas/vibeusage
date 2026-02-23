@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -11,12 +12,27 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
+func newVerboseContext(logBuf *bytes.Buffer) context.Context {
+	l := logging.NewLogger(logBuf)
+	logging.Configure(l, logging.Flags{Verbose: true})
+	return logging.WithLogger(context.Background(), l)
+}
+
+func newQuietContext(logBuf *bytes.Buffer) context.Context {
+	l := logging.NewLogger(logBuf)
+	logging.Configure(l, logging.Flags{Quiet: true})
+	return logging.WithLogger(context.Background(), l)
+}
+
+func newDefaultContext(logBuf *bytes.Buffer) context.Context {
+	l := logging.NewLogger(logBuf)
+	logging.Configure(l, logging.Flags{})
+	return logging.WithLogger(context.Background(), l)
+}
+
 func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	logging.Configure(logger, logging.Flags{Verbose: true})
-	defer func() { logger = oldLogger }()
+	ctx := newVerboseContext(&logBuf)
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -44,7 +60,7 @@ func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
 		},
 	}
 
-	displayMultipleSnapshots(outcomes, 342)
+	displayMultipleSnapshots(ctx, outcomes, 342)
 
 	logOutput := logBuf.String()
 	if !strings.Contains(logOutput, "342") {
@@ -54,10 +70,7 @@ func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
 
 func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	logging.Configure(logger, logging.Flags{Verbose: true})
-	defer func() { logger = oldLogger }()
+	ctx := newVerboseContext(&logBuf)
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -87,7 +100,7 @@ func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
 		},
 	}
 
-	displayMultipleSnapshots(outcomes, 100)
+	displayMultipleSnapshots(ctx, outcomes, 100)
 
 	logOutput := logBuf.String()
 	if !strings.Contains(logOutput, "cursor") {
@@ -100,10 +113,7 @@ func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
 
 func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	logging.Configure(logger, logging.Flags{})
-	defer func() { logger = oldLogger }()
+	ctx := newDefaultContext(&logBuf)
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -128,7 +138,7 @@ func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) 
 		},
 	}
 
-	displayMultipleSnapshots(outcomes, 500)
+	displayMultipleSnapshots(ctx, outcomes, 500)
 
 	logOutput := logBuf.String()
 	if strings.Contains(logOutput, "500") {
@@ -138,10 +148,7 @@ func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) 
 
 func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	logging.Configure(logger, logging.Flags{Quiet: true})
-	defer func() { logger = oldLogger }()
+	ctx := newQuietContext(&logBuf)
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -163,7 +170,7 @@ func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 		"claude": {Level: models.StatusOperational, Description: "OK"},
 	}
 
-	displayStatusTable(statuses, 250)
+	displayStatusTable(ctx, statuses, 250)
 
 	logOutput := logBuf.String()
 	if strings.Contains(logOutput, "250") {
@@ -175,10 +182,7 @@ func TestVerboseOutput_NotOnStdout(t *testing.T) {
 	// Verbose logging should go to the logger (stderr), NOT to outWriter (stdout).
 	// This ensures piped output is clean.
 	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	logging.Configure(logger, logging.Flags{Verbose: true})
-	defer func() { logger = oldLogger }()
+	ctx := newVerboseContext(&logBuf)
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -204,7 +208,7 @@ func TestVerboseOutput_NotOnStdout(t *testing.T) {
 		},
 	}
 
-	displayMultipleSnapshots(outcomes, 500)
+	displayMultipleSnapshots(ctx, outcomes, 500)
 
 	stdoutOutput := outBuf.String()
 	// Stdout should NOT contain timing/diagnostic info

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -27,7 +28,7 @@ var statusCmd = &cobra.Command{
 			return display.OutputStatusJSON(outWriter, statuses)
 		}
 
-		displayStatusTable(statuses, durationMs)
+		displayStatusTable(cmd.Context(), statuses, durationMs)
 		return nil
 	},
 }
@@ -60,7 +61,8 @@ func fetchAllStatuses(ctx context.Context, providers map[string]provider.Provide
 	return statuses
 }
 
-func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs int64) {
+func displayStatusTable(ctx context.Context, statuses map[string]models.ProviderStatus, durationMs int64) {
+	logger := logging.FromContext(ctx)
 	ids := make([]string, 0, len(statuses))
 	for id := range statuses {
 		ids = append(ids, id)
