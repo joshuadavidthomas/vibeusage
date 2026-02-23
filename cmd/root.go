@@ -150,17 +150,6 @@ func fetchAndDisplayAll(ctx context.Context) error {
 	return nil
 }
 
-func enabledProviderIDs(providerMap map[string][]fetch.Strategy, cfg config.Config) []string {
-	var ids []string
-	for pid := range providerMap {
-		if cfg.IsProviderEnabled(pid) {
-			ids = append(ids, pid)
-		}
-	}
-	sort.Strings(ids)
-	return ids
-}
-
 // availableProviderIDs returns enabled provider IDs that have at least one
 // available strategy. Used to filter what the spinner tracks — providers
 // with no credentials are silently excluded.

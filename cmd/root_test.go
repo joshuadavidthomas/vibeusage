@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 )
 
 // resetPathFlags resets configPathCmd flags to defaults and registers
@@ -311,24 +309,5 @@ func TestConfigPath_CacheFlag(t *testing.T) {
 	output := strings.TrimSpace(buf.String())
 	if output != tmpDir {
 		t.Errorf("expected cache dir %q, got %q", tmpDir, output)
-	}
-}
-
-// enabledProviderIDs tests
-
-func TestEnabledProviderIDs_SortedAlphabetically(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
-	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "")
-	reloadConfig()
-
-	providerMap := buildProviderMap()
-	ids := enabledProviderIDs(providerMap, config.Get())
-
-	for i := 1; i < len(ids); i++ {
-		if ids[i-1] > ids[i] {
-			t.Errorf("IDs not sorted: %v", ids)
-			break
-		}
 	}
 }
