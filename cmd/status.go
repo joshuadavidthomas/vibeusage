@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
-	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -88,6 +87,6 @@ func displayStatusTable(statuses map[string]models.ProviderStatus, durationMs in
 	))
 
 	if durationMs > 0 {
-		logging.Logger.Debug("status fetch complete", "duration_ms", durationMs)
+		logger.Debug("status fetch complete", "duration_ms", durationMs)
 	}
 }

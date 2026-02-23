@@ -51,8 +51,8 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 > *"Relying on init functions is highly discouraged."*
 
-- [ ] Remove `init()` from `internal/logging/logging.go`
-- [ ] Create the logger explicitly in `cmd/` (or pass it from `main`)
+- [x] Remove `init()` from `internal/logging/logging.go`
+- [x] Create the logger explicitly in `cmd/` (or pass it from `main`)
 - [ ] Consider making the logger injectable rather than a package-level global (longer term)
 
 ### 5. Add `context.Context` to `FetchStatus()`
