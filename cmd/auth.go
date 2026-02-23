@@ -12,10 +12,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/antigravity"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/copilot"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/kimi"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/minimax"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
@@ -30,28 +26,12 @@ var authCmd = &cobra.Command{
 		}
 
 		providerID := args[0]
-		if _, ok := provider.Get(providerID); !ok {
+		p, ok := provider.Get(providerID)
+		if !ok {
 			return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
 		}
 
-		switch providerID {
-		case "antigravity":
-			return authAntigravity()
-		case "claude":
-			return authClaude()
-		case "cursor":
-			return authCursor()
-		case "copilot":
-			return authCopilot()
-		case "kimi":
-			return authKimi()
-		case "minimax":
-			return authMinimax()
-		case "zai":
-			return authZai()
-		default:
-			return authGeneric(providerID)
-		}
+		return authProvider(providerID, p)
 	},
 }
 
@@ -118,10 +98,35 @@ func authStatusCommand() error {
 	return nil
 }
 
-func authAntigravity() error {
-	hasCreds, source := config.CheckProviderCredentials("antigravity")
+// authProvider dispatches to the appropriate auth flow based on what the
+// provider declares via the Authenticator interface.
+func authProvider(providerID string, p provider.Provider) error {
+	auth, ok := p.(provider.Authenticator)
+	if !ok {
+		return authGeneric(providerID)
+	}
+
+	flow := auth.Auth()
+	if flow == nil {
+		return authGeneric(providerID)
+	}
+
+	switch f := flow.(type) {
+	case provider.DeviceAuthFlow:
+		return authDeviceFlow(providerID, f)
+	case provider.ManualKeyAuthFlow:
+		return authManualKey(providerID, f)
+	default:
+		return authGeneric(providerID)
+	}
+}
+
+// authDeviceFlow runs an OAuth/device-code flow with re-auth check.
+func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
+	hasCreds, source := config.CheckProviderCredentials(providerID)
 	if hasCreds && !quiet {
-		out("✓ Antigravity is already authenticated (%s)\n", sourceToLabel(source))
+		out("✓ %s is already authenticated (%s)\n",
+			strutil.TitleCase(providerID), sourceToLabel(source))
 
 		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
 			Title: "Re-authenticate?",
@@ -134,7 +139,7 @@ func authAntigravity() error {
 		}
 	}
 
-	success, err := antigravity.RunAuthFlow(outWriter, quiet)
+	success, err := flow.Authenticate(outWriter, quiet)
 	if err != nil {
 		return err
 	}
@@ -144,128 +149,12 @@ func authAntigravity() error {
 	return nil
 }
 
-func authClaude() error {
-	if !quiet {
-		outln("Claude Authentication")
-		outln()
-		outln("Get your session key from claude.ai:")
-		outln("  1. Open https://claude.ai in your browser")
-		outln("  2. Open DevTools (F12 or Cmd+Option+I)")
-		outln("  3. Go to Application → Cookies → https://claude.ai")
-		outln("  4. Find the sessionKey cookie")
-		outln("  5. Copy its value (starts with sk-ant-sid01-)")
-		outln()
-	}
-
-	sessionKey, err := prompt.Default.Input(prompt.InputConfig{
-		Title:       "Session key",
-		Placeholder: "sk-ant-sid01-...",
-		Validate:    prompt.ValidateClaudeSessionKey,
-	})
-	if err != nil {
-		return err
-	}
-
-	credData, _ := json.Marshal(map[string]string{"session_key": sessionKey})
-	if err := config.WriteCredential(config.CredentialPath("claude", "session"), credData); err != nil {
-		return fmt.Errorf("error saving credential: %w", err)
-	}
-
-	if !quiet {
-		outln("✓ Claude session key saved")
-	}
-	return nil
-}
-
-func authCursor() error {
-	if !quiet {
-		outln("Cursor Authentication")
-		outln()
-		outln("Get your session token from cursor.com:")
-		outln("  1. Open https://cursor.com in your browser")
-		outln("  2. Open DevTools (F12 or Cmd+Option+I)")
-		outln("  3. Go to Application → Cookies → https://cursor.com")
-		outln("  4. Find one of: WorkosCursorSessionToken, __Secure-next-auth.session-token")
-		outln("  5. Copy its value")
-		outln()
-	}
-
-	sessionToken, err := prompt.Default.Input(prompt.InputConfig{
-		Title:       "Session token",
-		Placeholder: "paste token here",
-		Validate:    prompt.ValidateNotEmpty,
-	})
-	if err != nil {
-		return err
-	}
-
-	credData, _ := json.Marshal(map[string]string{"session_token": sessionToken})
-	if err := config.WriteCredential(config.CredentialPath("cursor", "session"), credData); err != nil {
-		return fmt.Errorf("error saving credential: %w", err)
-	}
-
-	if !quiet {
-		outln("✓ Cursor session token saved")
-	}
-	return nil
-}
-
-func authCopilot() error {
-	hasCreds, source := config.CheckProviderCredentials("copilot")
+// authManualKey runs an interactive manual-key input flow.
+func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
+	hasCreds, source := config.CheckProviderCredentials(providerID)
 	if hasCreds && !quiet {
-		out("✓ Copilot is already authenticated (%s)\n", sourceToLabel(source))
-
-		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: "Re-authenticate?",
-		})
-		if err != nil {
-			return err
-		}
-		if !reauth {
-			return nil
-		}
-	}
-
-	success, err := copilot.RunDeviceFlow(outWriter, quiet)
-	if err != nil {
-		return err
-	}
-	if !success {
-		return fmt.Errorf("authentication failed")
-	}
-	return nil
-}
-
-func authKimi() error {
-	hasCreds, source := config.CheckProviderCredentials("kimi")
-	if hasCreds && !quiet {
-		out("✓ Kimi is already authenticated (%s)\n", sourceToLabel(source))
-
-		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: "Re-authenticate?",
-		})
-		if err != nil {
-			return err
-		}
-		if !reauth {
-			return nil
-		}
-	}
-
-	success, err := kimi.RunDeviceFlow(outWriter, quiet)
-	if err != nil {
-		return err
-	}
-	if !success {
-		return fmt.Errorf("authentication failed")
-	}
-	return nil
-}
-
-func authMinimax() error {
-	hasCreds, source := config.CheckProviderCredentials("minimax")
-	if hasCreds && !quiet {
-		out("✓ Minimax is already authenticated (%s)\n", sourceToLabel(source))
+		out("✓ %s is already authenticated (%s)\n",
+			strutil.TitleCase(providerID), sourceToLabel(source))
 
 		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
 			Title: "Re-authenticate?",
@@ -279,79 +168,27 @@ func authMinimax() error {
 	}
 
 	if !quiet {
-		outln("Minimax Authentication")
-		outln()
-		outln("Get your Coding Plan API key from Minimax:")
-		outln("  1. Open https://platform.minimax.io/user-center/payment/coding-plan")
-		outln("  2. Copy your Coding Plan API key (starts with sk-cp-)")
-		outln()
-		outln("Note: Standard API keys (sk-api-) won't work — you need a Coding Plan key.")
+		out("%s Authentication\n\n", strutil.TitleCase(providerID))
+		outln(flow.Instructions)
 		outln()
 	}
 
-	apiKey, err := prompt.Default.Input(prompt.InputConfig{
-		Title:       "Coding Plan API key",
-		Placeholder: "sk-cp-...",
-		Validate: func(s string) error {
-			return minimax.ValidateCodingPlanKey(s)
-		},
+	value, err := prompt.Default.Input(prompt.InputConfig{
+		Title:       strutil.TitleCase(flow.JSONKey),
+		Placeholder: flow.Placeholder,
+		Validate:    flow.Validate,
 	})
 	if err != nil {
 		return err
 	}
 
-	credData, _ := json.Marshal(map[string]string{"api_key": apiKey})
-	if err := config.WriteCredential(config.CredentialPath("minimax", "apikey"), credData); err != nil {
+	credData, _ := json.Marshal(map[string]string{flow.JSONKey: value})
+	if err := config.WriteCredential(flow.CredPath, credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
 	}
 
 	if !quiet {
-		outln("✓ Minimax Coding Plan API key saved")
-	}
-	return nil
-}
-
-func authZai() error {
-	hasCreds, source := config.CheckProviderCredentials("zai")
-	if hasCreds && !quiet {
-		out("✓ Z.ai is already authenticated (%s)\n", sourceToLabel(source))
-
-		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: "Re-authenticate?",
-		})
-		if err != nil {
-			return err
-		}
-		if !reauth {
-			return nil
-		}
-	}
-
-	if !quiet {
-		outln("Z.ai Authentication")
-		outln()
-		outln("Get your API key from Z.ai:")
-		outln("  1. Open https://z.ai/manage-apikey/apikey-list")
-		outln("  2. Create a new API key (or copy an existing one)")
-		outln()
-	}
-
-	apiKey, err := prompt.Default.Input(prompt.InputConfig{
-		Title:       "API key",
-		Placeholder: "paste API key here",
-		Validate:    prompt.ValidateNotEmpty,
-	})
-	if err != nil {
-		return err
-	}
-
-	credData, _ := json.Marshal(map[string]string{"api_key": apiKey})
-	if err := config.WriteCredential(config.CredentialPath("zai", "apikey"), credData); err != nil {
-		return fmt.Errorf("error saving credential: %w", err)
-	}
-
-	if !quiet {
-		outln("✓ Z.ai API key saved")
+		out("✓ %s credential saved\n", strutil.TitleCase(providerID))
 	}
 	return nil
 }

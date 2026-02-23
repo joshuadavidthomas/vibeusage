@@ -36,6 +36,11 @@ func (c Copilot) FetchStatus() models.ProviderStatus {
 	return provider.FetchStatuspageStatus("https://www.githubstatus.com/api/v2/status.json")
 }
 
+// Auth returns the GitHub device flow for Copilot.
+func (c Copilot) Auth() provider.AuthFlow {
+	return provider.DeviceAuthFlow{RunFlow: RunDeviceFlow}
+}
+
 func init() {
 	provider.Register(Copilot{})
 }

@@ -8,7 +8,18 @@ import (
 	"testing"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
+
+// writeTestConfig writes a config.toml that disables provider credential reuse
+// to prevent tests from detecting real CLI credentials on the host machine.
+func writeTestConfig(t *testing.T, configDir string) {
+	t.Helper()
+	configContent := []byte("[credentials]\nreuse_provider_credentials = false\n")
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), configContent, 0o644); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+}
 
 func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	mock := &prompt.Mock{
@@ -29,23 +40,31 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 			}
 			return "sk-ant-sid01-test123", nil
 		},
+		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
+			return true, nil // re-auth if already configured
+		},
 	}
 
 	old := prompt.Default
 	prompt.SetDefault(mock)
 	defer prompt.SetDefault(old)
 
-	// Use temp dir for credentials
+	// Use temp dir for credentials; disable provider CLI reuse to avoid
+	// detecting real Claude CLI credentials on the host.
 	tmpDir := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	writeTestConfig(t, tmpDir)
+	reloadConfig()
 
 	var buf bytes.Buffer
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	err := authClaude()
+	p, _ := provider.Get("claude")
+	err := authProvider("claude", p)
 	if err != nil {
-		t.Fatalf("authClaude() error: %v", err)
+		t.Fatalf("authProvider(claude) error: %v", err)
 	}
 
 	if len(mock.InputCalls) != 1 {
@@ -79,14 +98,16 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	reloadConfig()
 
 	var buf bytes.Buffer
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	err := authCursor()
+	p, _ := provider.Get("cursor")
+	err := authProvider("cursor", p)
 	if err != nil {
-		t.Fatalf("authCursor() error: %v", err)
+		t.Fatalf("authProvider(cursor) error: %v", err)
 	}
 
 	if len(mock.InputCalls) != 1 {
@@ -206,9 +227,10 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	// Force config reload to pick up new env
 	reloadConfig()
 
-	err := authCopilot()
+	p, _ := provider.Get("copilot")
+	err := authProvider("copilot", p)
 	if err != nil {
-		t.Fatalf("authCopilot() error: %v", err)
+		t.Fatalf("authProvider(copilot) error: %v", err)
 	}
 
 	if len(mock.ConfirmCalls) != 1 {

@@ -36,6 +36,21 @@ func (m Minimax) FetchStatus() models.ProviderStatus {
 	return models.ProviderStatus{Level: models.StatusUnknown}
 }
 
+// Auth returns the manual API key flow for Minimax.
+func (m Minimax) Auth() provider.AuthFlow {
+	return provider.ManualKeyAuthFlow{
+		Instructions: "Get your Coding Plan API key from Minimax:\n" +
+			"  1. Open https://platform.minimax.io/user-center/payment/coding-plan\n" +
+			"  2. Copy your Coding Plan API key (starts with sk-cp-)\n" +
+			"\n" +
+			"Note: Standard API keys (sk-api-) won't work — you need a Coding Plan key.",
+		Placeholder: "sk-cp-...",
+		Validate:    ValidateCodingPlanKey,
+		CredPath:    config.CredentialPath("minimax", "apikey"),
+		JSONKey:     "api_key",
+	}
+}
+
 func init() {
 	provider.Register(Minimax{})
 }
