@@ -11,16 +11,15 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-func writeJSON(t *testing.T, w http.ResponseWriter, v any) {
-	t.Helper()
+func writeJSON(w http.ResponseWriter, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		t.Fatalf("failed to encode JSON response: %v", err)
+		panic("writeJSON: " + err.Error())
 	}
 }
 
 func TestFetchStatuspageStatus_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, map[string]any{
+		writeJSON(w, map[string]any{
 			"status": map[string]any{
 				"indicator":   "none",
 				"description": "All Systems Operational",
@@ -57,7 +56,7 @@ func TestFetchStatuspageStatus_Indicators(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.indicator, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				writeJSON(t, w, map[string]any{
+				writeJSON(w, map[string]any{
 					"status": map[string]any{
 						"indicator":   tt.indicator,
 						"description": "test",
@@ -104,13 +103,13 @@ func TestFetchStatuspageStatus_ServerError(t *testing.T) {
 
 func TestFetchGoogleAppsStatus_NoActiveIncidents(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, []googleIncident{
+		writeJSON(w, []googleIncident{
 			{Title: "Gemini outage", Severity: "high", EndTime: "2025-01-01T00:00:00Z"},
 		})
 	}))
 	defer srv.Close()
 
-	status := FetchGoogleAppsStatusFromURL(context.Background(), srv.URL, []string{"gemini"})
+	status := fetchGoogleAppsStatusFromURL(context.Background(), srv.URL, []string{"gemini"})
 	if status.Level != models.StatusOperational {
 		t.Errorf("expected StatusOperational for resolved incident, got %v", status.Level)
 	}
@@ -118,13 +117,13 @@ func TestFetchGoogleAppsStatus_NoActiveIncidents(t *testing.T) {
 
 func TestFetchGoogleAppsStatus_ActiveIncidentMatch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, []googleIncident{
+		writeJSON(w, []googleIncident{
 			{Title: "Gemini API latency", Severity: "high", EndTime: ""},
 		})
 	}))
 	defer srv.Close()
 
-	status := FetchGoogleAppsStatusFromURL(context.Background(), srv.URL, []string{"gemini"})
+	status := fetchGoogleAppsStatusFromURL(context.Background(), srv.URL, []string{"gemini"})
 	if status.Level != models.StatusPartialOutage {
 		t.Errorf("expected StatusPartialOutage for high severity, got %v", status.Level)
 	}
@@ -135,13 +134,13 @@ func TestFetchGoogleAppsStatus_ActiveIncidentMatch(t *testing.T) {
 
 func TestFetchGoogleAppsStatus_NoKeywordMatch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(t, w, []googleIncident{
+		writeJSON(w, []googleIncident{
 			{Title: "Gmail outage", Severity: "critical", EndTime: ""},
 		})
 	}))
 	defer srv.Close()
 
-	status := FetchGoogleAppsStatusFromURL(context.Background(), srv.URL, []string{"gemini"})
+	status := fetchGoogleAppsStatusFromURL(context.Background(), srv.URL, []string{"gemini"})
 	if status.Level != models.StatusOperational {
 		t.Errorf("expected StatusOperational when no keyword match, got %v", status.Level)
 	}
@@ -157,7 +156,7 @@ func TestFetchGoogleAppsStatus_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	status := FetchGoogleAppsStatusFromURL(ctx, srv.URL, []string{"gemini"})
+	status := fetchGoogleAppsStatusFromURL(ctx, srv.URL, []string{"gemini"})
 	if status.Level != models.StatusUnknown {
 		t.Errorf("expected StatusUnknown on cancelled context, got %v", status.Level)
 	}

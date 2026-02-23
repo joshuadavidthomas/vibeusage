@@ -53,12 +53,12 @@ const googleIncidentURL = "https://www.google.com/appsstatus/dashboard/incidents
 // incidents matching any of the given keywords. Used by providers that run
 // on Google infrastructure (Gemini, Antigravity).
 func FetchGoogleAppsStatus(ctx context.Context, keywords []string) models.ProviderStatus {
-	return FetchGoogleAppsStatusFromURL(ctx, googleIncidentURL, keywords)
+	return fetchGoogleAppsStatusFromURL(ctx, googleIncidentURL, keywords)
 }
 
-// FetchGoogleAppsStatusFromURL is the testable core of FetchGoogleAppsStatus,
+// fetchGoogleAppsStatusFromURL is the testable core of FetchGoogleAppsStatus,
 // accepting the incident URL as a parameter.
-func FetchGoogleAppsStatusFromURL(ctx context.Context, incidentURL string, keywords []string) models.ProviderStatus {
+func fetchGoogleAppsStatusFromURL(ctx context.Context, incidentURL string, keywords []string) models.ProviderStatus {
 	client := httpclient.NewWithTimeout(10 * time.Second)
 	var incidents []googleIncident
 	resp, err := client.GetJSONCtx(ctx, incidentURL, &incidents)
