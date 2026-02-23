@@ -333,75 +333,12 @@ func displayRecommendation(rec routing.Recommendation) error {
 
 	out("Route: %s\n\n", rec.ModelName)
 
-	// Check if any candidate has a multiplier to decide whether to show the column.
-	hasMultiplier := false
-	for _, c := range rec.Candidates {
-		if c.Multiplier != nil {
-			hasMultiplier = true
-			break
-		}
-	}
-
-	// Ranked table.
-	var rows [][]string
-	var rowStyles []display.RowStyle
-
-	for i, c := range rec.Candidates {
-		name := strutil.TitleCase(c.ProviderID)
-
-		bar := display.RenderBar(c.Utilization, 15, models.PaceToColor(nil, c.Utilization))
-		util := fmt.Sprintf("%d%%", c.Utilization)
-
-		headroom := fmt.Sprintf("%d%%", c.EffectiveHeadroom)
-
-		cost := routing.FormatMultiplier(c.Multiplier)
-
-		reset := ""
-		if d := timeUntilReset(c.ResetsAt); d != nil {
-			reset = models.FormatResetCountdown(d)
-		}
-
-		plan := c.Plan
-		if plan == "" {
-			plan = "—"
-		}
-
-		if hasMultiplier {
-			rows = append(rows, []string{name, bar + " " + util, headroom, cost, string(c.PeriodType), reset, plan})
-		} else {
-			rows = append(rows, []string{name, bar + " " + util, headroom, string(c.PeriodType), reset, plan})
-		}
-
-		if i == 0 {
-			rowStyles = append(rowStyles, display.RowBold)
-		} else {
-			rowStyles = append(rowStyles, display.RowNormal)
-		}
-	}
-
-	// Unavailable providers as dim rows at the bottom.
-	sort.Strings(rec.Unavailable)
-	for _, pid := range rec.Unavailable {
-		name := strutil.TitleCase(pid)
-		if hasMultiplier {
-			rows = append(rows, []string{name, "—", "—", "—", "—", "—", "—"})
-		} else {
-			rows = append(rows, []string{name, "—", "—", "—", "—", "—"})
-		}
-		rowStyles = append(rowStyles, display.RowDim)
-	}
-
-	var headers []string
-	if hasMultiplier {
-		headers = []string{"Provider", "Usage", "Headroom", "Cost", "Period", "Resets In", "Plan"}
-	} else {
-		headers = []string{"Provider", "Usage", "Headroom", "Period", "Resets In", "Plan"}
-	}
+	ft := routing.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset)
 
 	outln(display.NewTableWithOptions(
-		headers,
-		rows,
-		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: rowStyles},
+		ft.Headers,
+		ft.Rows,
+		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: toDisplayStyles(ft.Styles)},
 	))
 
 	return nil
@@ -598,85 +535,44 @@ func displayRoleRecommendation(rec routing.RoleRecommendation) error {
 
 	out("Route: %s (role)\n\n", rec.Role)
 
-	// Check if any candidate has a multiplier.
-	hasMultiplier := false
-	for _, c := range rec.Candidates {
-		if c.Multiplier != nil {
-			hasMultiplier = true
-			break
-		}
-	}
-
-	var rows [][]string
-	var rowStyles []display.RowStyle
-
-	for i, c := range rec.Candidates {
-		model := c.ModelID
-		name := strutil.TitleCase(c.ProviderID)
-
-		bar := display.RenderBar(c.Utilization, 15, models.PaceToColor(nil, c.Utilization))
-		util := fmt.Sprintf("%d%%", c.Utilization)
-
-		headroom := fmt.Sprintf("%d%%", c.EffectiveHeadroom)
-
-		cost := routing.FormatMultiplier(c.Multiplier)
-
-		reset := ""
-		if d := timeUntilReset(c.ResetsAt); d != nil {
-			reset = models.FormatResetCountdown(d)
-		}
-
-		plan := c.Plan
-		if plan == "" {
-			plan = "—"
-		}
-
-		if hasMultiplier {
-			rows = append(rows, []string{model, name, bar + " " + util, headroom, cost, string(c.PeriodType), reset, plan})
-		} else {
-			rows = append(rows, []string{model, name, bar + " " + util, headroom, string(c.PeriodType), reset, plan})
-		}
-
-		if i == 0 {
-			rowStyles = append(rowStyles, display.RowBold)
-		} else {
-			rowStyles = append(rowStyles, display.RowNormal)
-		}
-	}
-
-	// Unavailable as dim rows.
-	for _, u := range rec.Unavailable {
-		if hasMultiplier {
-			rows = append(rows, []string{u.ModelID, strutil.TitleCase(u.ProviderID), "—", "—", "—", "—", "—", "—"})
-		} else {
-			rows = append(rows, []string{u.ModelID, strutil.TitleCase(u.ProviderID), "—", "—", "—", "—", "—"})
-		}
-		rowStyles = append(rowStyles, display.RowDim)
-	}
-
-	var headers []string
-	if hasMultiplier {
-		headers = []string{"Model", "Provider", "Usage", "Headroom", "Cost", "Period", "Resets In", "Plan"}
-	} else {
-		headers = []string{"Model", "Provider", "Usage", "Headroom", "Period", "Resets In", "Plan"}
-	}
+	ft := routing.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset)
 
 	outln(display.NewTableWithOptions(
-		headers,
-		rows,
-		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: rowStyles},
+		ft.Headers,
+		ft.Rows,
+		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: toDisplayStyles(ft.Styles)},
 	))
 
 	return nil
 }
 
-func timeUntilReset(t *time.Time) *time.Duration {
-	if t == nil {
-		return nil
-	}
-	d := time.Until(*t)
-	if d < 0 {
-		d = 0
-	}
-	return &d
+// routeRenderBar renders a utilization bar with color for the route table.
+func routeRenderBar(utilization int) string {
+	return display.RenderBar(utilization, 15, models.PaceToColor(nil, utilization))
 }
+
+// routeFormatReset formats a duration until reset for the route table.
+func routeFormatReset(d *time.Duration) string {
+	if d == nil {
+		return ""
+	}
+	return models.FormatResetCountdown(d)
+}
+
+// toDisplayStyles converts routing.RowStyle to display.RowStyle.
+func toDisplayStyles(styles []routing.RowStyle) []display.RowStyle {
+	result := make([]display.RowStyle, len(styles))
+	for i, s := range styles {
+		switch s {
+		case routing.RowBold:
+			result[i] = display.RowBold
+		case routing.RowDim:
+			result[i] = display.RowDim
+		default:
+			result[i] = display.RowNormal
+		}
+	}
+	return result
+}
+
+
