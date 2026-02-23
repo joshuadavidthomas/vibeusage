@@ -24,6 +24,10 @@ func TestConfigureLogger_UsesPackageLogger(t *testing.T) {
 	verbose = true
 	defer func() { verbose = oldVerbose }()
 
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
 	configureLogger()
 
 	if logger.GetLevel() != log.DebugLevel {
