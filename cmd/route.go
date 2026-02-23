@@ -354,17 +354,7 @@ func displayRecommendation(rec routing.Recommendation) error {
 
 		headroom := fmt.Sprintf("%d%%", c.EffectiveHeadroom)
 
-		cost := "—"
-		if c.Multiplier != nil {
-			m := *c.Multiplier
-			if m == 0 {
-				cost = "free"
-			} else if m == float64(int(m)) {
-				cost = fmt.Sprintf("%dx", int(m))
-			} else {
-				cost = fmt.Sprintf("%.2gx", m)
-			}
-		}
+		cost := routing.FormatMultiplier(c.Multiplier)
 
 		reset := ""
 		if d := timeUntilReset(c.ResetsAt); d != nil {
@@ -629,17 +619,7 @@ func displayRoleRecommendation(rec routing.RoleRecommendation) error {
 
 		headroom := fmt.Sprintf("%d%%", c.EffectiveHeadroom)
 
-		cost := "—"
-		if c.Multiplier != nil {
-			m := *c.Multiplier
-			if m == 0 {
-				cost = "free"
-			} else if m == float64(int(m)) {
-				cost = fmt.Sprintf("%dx", int(m))
-			} else {
-				cost = fmt.Sprintf("%.2gx", m)
-			}
-		}
+		cost := routing.FormatMultiplier(c.Multiplier)
 
 		reset := ""
 		if d := timeUntilReset(c.ResetsAt); d != nil {
