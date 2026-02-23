@@ -26,7 +26,7 @@ var configShowCmd = &cobra.Command{
 		cfgPath := config.ConfigFile()
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, display.ConfigShowJSON{
+			return display.OutputJSON(outWriter, display.ConfigShowJSON{
 				Fetch: display.ConfigFetchJSON{
 					Timeout:               cfg.Fetch.Timeout,
 					StaleThresholdMinutes: cfg.Fetch.StaleThresholdMinutes,
@@ -45,7 +45,6 @@ var configShowCmd = &cobra.Command{
 				Roles: cfg.Roles,
 				Path:  cfgPath,
 			})
-			return nil
 		}
 
 		if quiet {
@@ -67,20 +66,17 @@ var configPathCmd = &cobra.Command{
 		showCreds, _ := cmd.Flags().GetBool("credentials")
 
 		if jsonOutput {
-			paths := map[string]string{
+			if showCache {
+				return display.OutputJSON(outWriter, map[string]string{"cache_dir": config.CacheDir()})
+			} else if showCreds {
+				return display.OutputJSON(outWriter, map[string]string{"credentials_dir": config.CredentialsDir()})
+			}
+			return display.OutputJSON(outWriter, map[string]string{
 				"config_dir":      config.ConfigDir(),
 				"config_file":     config.ConfigFile(),
 				"cache_dir":       config.CacheDir(),
 				"credentials_dir": config.CredentialsDir(),
-			}
-			if showCache {
-				display.OutputJSON(outWriter, map[string]string{"cache_dir": config.CacheDir()})
-			} else if showCreds {
-				display.OutputJSON(outWriter, map[string]string{"credentials_dir": config.CredentialsDir()})
-			} else {
-				display.OutputJSON(outWriter, paths)
-			}
-			return nil
+			})
 		}
 
 		if quiet {
@@ -132,12 +128,11 @@ var configResetCmd = &cobra.Command{
 		}
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, display.ActionResultJSON{
+			return display.OutputJSON(outWriter, display.ActionResultJSON{
 				Success: true,
 				Reset:   true,
 				Message: "Configuration reset to defaults",
 			})
-			return nil
 		}
 
 		outln("✓ Configuration reset to defaults")

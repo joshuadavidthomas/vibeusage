@@ -27,12 +27,11 @@ var initCmd = &cobra.Command{
 		quick, _ := cmd.Flags().GetBool("quick")
 
 		if jsonOutput {
-			display.OutputJSON(outWriter, display.InitStatusJSON{
+			return display.OutputJSON(outWriter, display.InitStatusJSON{
 				FirstRun:            config.IsFirstRun(),
 				ConfiguredProviders: config.CountConfiguredProviders(),
 				AvailableProviders:  provider.ListIDs(),
 			})
-			return nil
 		}
 
 		if quick {

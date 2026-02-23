@@ -10,10 +10,10 @@ import (
 )
 
 // OutputJSON writes pretty-printed JSON to the given writer.
-func OutputJSON(w io.Writer, data any) {
+func OutputJSON(w io.Writer, data any) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	_ = enc.Encode(data)
+	return enc.Encode(data)
 }
 
 // SnapshotToJSON converts a snapshot to a typed JSON-serializable struct.
@@ -71,7 +71,7 @@ func SnapshotToJSON(outcome fetch.FetchOutcome) any {
 }
 
 // OutputMultiProviderJSON outputs all outcomes as JSON.
-func OutputMultiProviderJSON(w io.Writer, outcomes map[string]fetch.FetchOutcome) {
+func OutputMultiProviderJSON(w io.Writer, outcomes map[string]fetch.FetchOutcome) error {
 	data := MultiProviderJSON{
 		Providers: make(map[string]SnapshotJSON),
 		Errors:    make(map[string]string),
@@ -90,11 +90,11 @@ func OutputMultiProviderJSON(w io.Writer, outcomes map[string]fetch.FetchOutcome
 		}
 	}
 
-	OutputJSON(w, data)
+	return OutputJSON(w, data)
 }
 
 // OutputStatusJSON outputs provider statuses as JSON.
-func OutputStatusJSON(w io.Writer, statuses map[string]models.ProviderStatus) {
+func OutputStatusJSON(w io.Writer, statuses map[string]models.ProviderStatus) error {
 	data := make(map[string]StatusEntryJSON)
 	for pid, status := range statuses {
 		entry := StatusEntryJSON{
@@ -106,5 +106,5 @@ func OutputStatusJSON(w io.Writer, statuses map[string]models.ProviderStatus) {
 		}
 		data[pid] = entry
 	}
-	OutputJSON(w, data)
+	return OutputJSON(w, data)
 }
