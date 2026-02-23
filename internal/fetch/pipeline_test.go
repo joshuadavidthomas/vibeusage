@@ -3,6 +3,7 @@ package fetch
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,41 @@ type mockStrategy struct {
 func (m *mockStrategy) Name() string                                   { return m.name }
 func (m *mockStrategy) IsAvailable() bool                              { return m.available }
 func (m *mockStrategy) Fetch(ctx context.Context) (FetchResult, error) { return m.fetchFn(ctx) }
+
+// memCache is a thread-safe in-memory Cache for testing, replacing filesystem deps.
+type memCache struct {
+	mu   sync.Mutex
+	data map[string]models.UsageSnapshot
+}
+
+func newMemCache() *memCache {
+	return &memCache{data: make(map[string]models.UsageSnapshot)}
+}
+
+func (c *memCache) Save(snap models.UsageSnapshot) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data[snap.Provider] = snap
+	return nil
+}
+
+func (c *memCache) Load(providerID string) *models.UsageSnapshot {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s, ok := c.data[providerID]
+	if !ok {
+		return nil
+	}
+	return &s
+}
+
+func defaultTestPipelineCfg() PipelineConfig {
+	return PipelineConfig{
+		Timeout:               30 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 newMemCache(),
+	}
+}
 
 // testSnapshot returns a minimal valid snapshot for testing.
 func testSnapshot(provider, source string, utilization int) models.UsageSnapshot {
@@ -858,5 +894,62 @@ func TestExecutePipeline_SkipsUnavailableTriesAvailable(t *testing.T) {
 	// Two unavailable attempts should be recorded
 	if len(outcome.Attempts) != 2 {
 		t.Errorf("expected 2 attempts (for unavailable strategies), got %d", len(outcome.Attempts))
+	}
+}
+
+func TestExecutePipeline_CacheFallbackServesFreshWhenNotConfigured(t *testing.T) {
+	cache := newMemCache()
+	// Recent snapshot (10 minutes ago)
+	cache.data["test-provider"] = models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-10 * time.Minute).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:               5 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 cache,
+	}
+
+	// Unconfigured provider — strategy not available
+	strategy := &mockStrategy{
+		name:      "unavailable",
+		available: false,
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	// Should serve fresh cache even when unconfigured
+	if !outcome.Success {
+		t.Fatalf("expected success from fresh cache, got error: %s", outcome.Error)
+	}
+	if !outcome.Cached {
+		t.Error("expected Cached=true")
+	}
+}
+
+func TestExecutePipeline_NilCacheNoFallback(t *testing.T) {
+	cfg := PipelineConfig{
+		Timeout:               5 * time.Second,
+		StaleThresholdMinutes: 60,
+		Cache:                 nil,
+	}
+
+	strategy := &mockStrategy{
+		name:      "failing",
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			return ResultFail("API error"), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	// Should not panic with nil cache, just skip caching
+	if outcome.Success {
+		t.Error("expected failure — nil cache means no fallback")
 	}
 }
