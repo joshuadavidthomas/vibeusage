@@ -108,8 +108,8 @@ func (r *WebOverageResponse) ToOverageUsage() *models.OverageUsage {
 		return nil
 	}
 	return &models.OverageUsage{
-		Used:      r.CurrentSpend,
-		Limit:     r.HardLimit,
+		Used:      r.CurrentSpend / 100.0,
+		Limit:     r.HardLimit / 100.0,
 		Currency:  "USD",
 		IsEnabled: true,
 	}

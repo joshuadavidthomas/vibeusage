@@ -109,8 +109,8 @@ func TestWebUsageResponse_UnmarshalZeroLimit(t *testing.T) {
 func TestWebOverageResponse_UnmarshalWithHardLimit(t *testing.T) {
 	raw := `{
 		"has_hard_limit": true,
-		"current_spend": 25.50,
-		"hard_limit": 100.0
+		"current_spend": 2550,
+		"hard_limit": 10000
 	}`
 
 	var resp WebOverageResponse
@@ -121,11 +121,11 @@ func TestWebOverageResponse_UnmarshalWithHardLimit(t *testing.T) {
 	if !resp.HasHardLimit {
 		t.Error("expected has_hard_limit to be true")
 	}
-	if resp.CurrentSpend != 25.50 {
-		t.Errorf("current_spend = %v, want 25.50", resp.CurrentSpend)
+	if resp.CurrentSpend != 2550 {
+		t.Errorf("current_spend = %v, want 2550", resp.CurrentSpend)
 	}
-	if resp.HardLimit != 100.0 {
-		t.Errorf("hard_limit = %v, want 100.0", resp.HardLimit)
+	if resp.HardLimit != 10000 {
+		t.Errorf("hard_limit = %v, want 10000", resp.HardLimit)
 	}
 }
 
@@ -400,8 +400,8 @@ func TestWebOverageResponse_ToOverageUsage(t *testing.T) {
 			name: "with hard limit",
 			resp: WebOverageResponse{
 				HasHardLimit: true,
-				CurrentSpend: 25.50,
-				HardLimit:    100.0,
+				CurrentSpend: 2550,
+				HardLimit:    10000,
 			},
 			wantNil:  false,
 			wantUsed: 25.50,

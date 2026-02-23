@@ -35,8 +35,8 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 		},
 		ExtraUsage: &ExtraUsageResponse{
 			IsEnabled:    true,
-			UsedCredits:  5.50,
-			MonthlyLimit: 100.0,
+			UsedCredits:  550,
+			MonthlyLimit: 10000,
 		},
 	}
 
