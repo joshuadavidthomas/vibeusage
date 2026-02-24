@@ -1,4 +1,4 @@
-package kimi
+package kimicode
 
 import (
 	"context"
@@ -95,8 +95,8 @@ func TestParseUsageResponse_FullResponse(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
 	}
-	if snapshot.Provider != "kimi" {
-		t.Errorf("Provider = %q, want %q", snapshot.Provider, "kimi")
+	if snapshot.Provider != "kimicode" {
+		t.Errorf("Provider = %q, want %q", snapshot.Provider, "kimicode")
 	}
 	if snapshot.Source != "device_flow" {
 		t.Errorf("Source = %q, want %q", snapshot.Source, "device_flow")
@@ -184,13 +184,13 @@ func TestParseUsageResponse_NoIdentity(t *testing.T) {
 	}
 }
 
-func TestKimi_Meta(t *testing.T) {
-	k := Kimi{}
+func TestKimiCode_Meta(t *testing.T) {
+	k := KimiCode{}
 	meta := k.Meta()
-	if meta.ID != "kimi" {
-		t.Errorf("ID = %q, want %q", meta.ID, "kimi")
+	if meta.ID != "kimicode" {
+		t.Errorf("ID = %q, want %q", meta.ID, "kimicode")
 	}
-	if meta.Name != "Kimi" {
-		t.Errorf("Name = %q, want %q", meta.Name, "Kimi")
+	if meta.Name != "Kimi Code" {
+		t.Errorf("Name = %q, want %q", meta.Name, "Kimi Code")
 	}
 }

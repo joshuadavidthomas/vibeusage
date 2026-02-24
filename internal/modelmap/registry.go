@@ -4,13 +4,13 @@ import "strings"
 
 // providerSources maps vibeusage provider IDs to models.dev provider IDs.
 var providerSources = map[string]string{
-	"claude":  "anthropic",
-	"copilot": "github-copilot",
-	"codex":   "openai",
-	"gemini":  "google",
-	"kimi":    "moonshotai",
-	"minimax": "minimax",
-	"zai":     "zai",
+	"claude":   "anthropic",
+	"copilot":  "github-copilot",
+	"codex":    "openai",
+	"gemini":   "google",
+	"kimicode": "moonshotai",
+	"minimax":  "minimax",
+	"zai":      "zai",
 }
 
 // inferredProviders maps vibeusage providers that aren't in models.dev to the

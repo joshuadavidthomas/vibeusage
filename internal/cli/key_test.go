@@ -261,10 +261,14 @@ func TestKeyStatusJSON_UsesTypedStruct(t *testing.T) {
 }
 
 func TestKeyCommand_HasP0ProviderSubcommands(t *testing.T) {
-	for _, providerID := range []string{"openrouter", "warp", "kimik2", "amp"} {
+	for _, providerID := range []string{"openrouter", "warp", "kimik2", "kimicode", "amp"} {
 		if cmd := findSubcommand(keyCmd, providerID); cmd == nil {
 			t.Errorf("key command missing provider subcommand %q", providerID)
 		}
+	}
+
+	if cmd := findSubcommand(keyCmd, "kimi"); cmd != nil {
+		t.Error("key command should not expose legacy provider subcommand \"kimi\"")
 	}
 }
 
