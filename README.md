@@ -2,12 +2,12 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, Gemini, Antigravity, Kimi, Kimi K2, OpenRouter, Warp, Amp, Z.ai, and Minimax with consistent formatting, progress indicators, and offline support.
+A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, Gemini, Antigravity, Kimi Code, Kimi K2, OpenRouter, Warp, Amp, Z.ai, and Minimax with consistent formatting, progress indicators, and offline support.
 
 ## Features
 
 - **Unified Interface**: Single command to check usage across all configured providers
-- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini, Antigravity, Kimi, Kimi K2, OpenRouter, Warp, Amp, Z.ai, Minimax
+- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini, Antigravity, Kimi Code, Kimi K2, OpenRouter, Warp, Amp, Z.ai, Minimax
 - **Concurrent Fetching**: Check all providers in parallel
 - **Offline Support**: Displays cached data when network is unavailable
 - **JSON Output**: Scriptable with `--json` flag
@@ -62,7 +62,7 @@ vibeusage copilot
 vibeusage cursor
 vibeusage gemini
 vibeusage antigravity
-vibeusage kimi
+vibeusage kimicode
 vibeusage kimik2
 vibeusage openrouter
 vibeusage warp
@@ -205,17 +205,17 @@ Antigravity credentials are automatically detected from the IDE's state database
 vibeusage antigravity
 ```
 
-### Kimi (Moonshot AI)
+### Kimi Code (Moonshot AI)
 
 **Required**: OAuth token via device flow or API key
 
 ```bash
 # Option 1: Device flow OAuth (recommended)
-vibeusage auth kimi
+vibeusage auth kimicode
 
 # Option 2: Use API key
 export KIMI_CODE_API_KEY=your_api_key_here
-vibeusage kimi
+vibeusage kimicode
 ```
 
 For device flow, you'll be prompted to authorize in your browser. If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, vibeusage will automatically use its credentials from `~/.kimi/credentials/kimi-code.json`.
@@ -295,7 +295,7 @@ vibeusage auth openrouter
 vibeusage auth warp
 vibeusage auth kimik2
 vibeusage auth amp
-vibeusage auth kimi
+vibeusage auth kimicode
 vibeusage auth minimax
 vibeusage auth zai
 

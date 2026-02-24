@@ -1,4 +1,4 @@
-package kimi
+package kimicode
 
 import (
 	"strconv"

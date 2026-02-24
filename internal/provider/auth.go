@@ -11,7 +11,7 @@ type AuthFlow interface {
 }
 
 // DeviceAuthFlow wraps an OAuth/device-code flow provided by the
-// provider package (e.g. copilot.RunDeviceFlow, kimi.RunDeviceFlow).
+// provider package (e.g. copilot.RunDeviceFlow, kimicode.RunDeviceFlow).
 type DeviceAuthFlow struct {
 	RunFlow func(w io.Writer, quiet bool) (bool, error)
 }

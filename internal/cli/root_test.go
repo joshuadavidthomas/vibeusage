@@ -44,7 +44,7 @@ func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
 }
 
 func TestRootCmd_HasProviderSubcommands(t *testing.T) {
-	providers := []string{"claude", "codex", "copilot", "cursor", "gemini", "openrouter", "warp", "kimik2", "amp"}
+	providers := []string{"claude", "codex", "copilot", "cursor", "gemini", "openrouter", "warp", "kimik2", "kimicode", "amp"}
 	for _, name := range providers {
 		found := false
 		for _, cmd := range rootCmd.Commands() {
@@ -55,6 +55,12 @@ func TestRootCmd_HasProviderSubcommands(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("rootCmd missing provider subcommand %q", name)
+		}
+	}
+
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Name() == "kimi" {
+			t.Error("rootCmd should not expose legacy provider subcommand \"kimi\"")
 		}
 	}
 }

@@ -4,7 +4,7 @@
 
 vibeusage currently ships 9 providers:
 
-`claude`, `gemini`, `codex`, `copilot`, `cursor`, `antigravity`, `kimi`, `minimax`, `zai`
+`claude`, `gemini`, `codex`, `copilot`, `cursor`, `antigravity`, `kimicode`, `minimax`, `zai`
 
 Reference apps:
 

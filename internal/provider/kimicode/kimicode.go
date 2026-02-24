@@ -1,4 +1,4 @@
-package kimi
+package kimicode
 
 import (
 	"context"
@@ -18,25 +18,25 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
-type Kimi struct{}
+type KimiCode struct{}
 
-func (k Kimi) Meta() provider.Metadata {
+func (k KimiCode) Meta() provider.Metadata {
 	return provider.Metadata{
-		ID:          "kimi",
-		Name:        "Kimi",
+		ID:          "kimicode",
+		Name:        "Kimi Code",
 		Description: "Moonshot AI coding assistant",
 		Homepage:    "https://www.kimi.com",
 	}
 }
 
-func (k Kimi) CredentialSources() provider.CredentialInfo {
+func (k KimiCode) CredentialSources() provider.CredentialInfo {
 	return provider.CredentialInfo{
 		CLIPaths: []string{"~/.kimi/credentials/kimi-code.json"},
 		EnvVars:  []string{"KIMI_CODE_API_KEY"},
 	}
 }
 
-func (k Kimi) FetchStrategies() []fetch.Strategy {
+func (k KimiCode) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
 		&DeviceFlowStrategy{HTTPTimeout: timeout},
@@ -44,17 +44,17 @@ func (k Kimi) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (k Kimi) FetchStatus(_ context.Context) models.ProviderStatus {
+func (k KimiCode) FetchStatus(_ context.Context) models.ProviderStatus {
 	return models.ProviderStatus{Level: models.StatusUnknown}
 }
 
-// Auth returns the Kimi device flow.
-func (k Kimi) Auth() provider.AuthFlow {
+// Auth returns the Kimi Code device flow.
+func (k KimiCode) Auth() provider.AuthFlow {
 	return provider.DeviceAuthFlow{RunFlow: RunDeviceFlow}
 }
 
 func init() {
-	provider.Register(Kimi{})
+	provider.Register(KimiCode{})
 }
 
 const (
@@ -110,7 +110,7 @@ func (s *DeviceFlowStrategy) IsAvailable() bool {
 }
 
 func (s *DeviceFlowStrategy) credentialPaths() []string {
-	paths := []string{config.CredentialPath("kimi", "oauth")}
+	paths := []string{config.CredentialPath("kimicode", "oauth")}
 	// kimi-cli stores credentials at ~/.kimi/credentials/kimi-code.json
 	home, err := os.UserHomeDir()
 	if err == nil {
@@ -122,7 +122,7 @@ func (s *DeviceFlowStrategy) credentialPaths() []string {
 func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	creds := s.loadCredentials()
 	if creds == nil {
-		return fetch.ResultFail("No OAuth credentials found. Run `vibeusage auth kimi` to authenticate."), nil
+		return fetch.ResultFail("No OAuth credentials found. Run `vibeusage auth kimicode` to authenticate."), nil
 	}
 
 	if creds.AccessToken == "" {
@@ -132,7 +132,7 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 	if creds.NeedsRefresh() {
 		refreshed := s.refreshToken(ctx, creds)
 		if refreshed == nil {
-			return fetch.ResultFail("Failed to refresh token. Run `vibeusage auth kimi` to re-authenticate."), nil
+			return fetch.ResultFail("Failed to refresh token. Run `vibeusage auth kimicode` to re-authenticate."), nil
 		}
 		creds = refreshed
 	}
@@ -197,7 +197,7 @@ func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCrede
 	}
 
 	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(config.CredentialPath("kimi", "oauth"), content)
+	_ = config.WriteCredential(config.CredentialPath("kimicode", "oauth"), content)
 
 	return updated
 }
@@ -216,7 +216,7 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	apiKey := s.loadAPIKey()
 	if apiKey == "" {
-		return fetch.ResultFail("No API key found. Set KIMI_CODE_API_KEY or use 'vibeusage key kimi set'"), nil
+		return fetch.ResultFail("No API key found. Set KIMI_CODE_API_KEY or use 'vibeusage key kimicode set'"), nil
 	}
 
 	return fetchUsage(ctx, apiKey, "api_key", s.HTTPTimeout)
@@ -226,7 +226,7 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 	if key := os.Getenv("KIMI_CODE_API_KEY"); key != "" {
 		return key
 	}
-	path := config.CredentialPath("kimi", "apikey")
+	path := config.CredentialPath("kimicode", "apikey")
 	data, err := config.ReadCredential(path)
 	if err != nil || data == nil {
 		return ""
@@ -252,7 +252,7 @@ func fetchUsage(ctx context.Context, token, source string, httpTimeout float64) 
 	}
 
 	if resp.StatusCode == 401 {
-		return fetch.ResultFatal("Token expired or invalid. Run `vibeusage auth kimi` to re-authenticate."), nil
+		return fetch.ResultFatal("Token expired or invalid. Run `vibeusage auth kimicode` to re-authenticate."), nil
 	}
 	if resp.StatusCode != 200 {
 		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
@@ -325,7 +325,7 @@ func parseUsageResponse(resp UsageResponse, source string) *models.UsageSnapshot
 
 	now := time.Now().UTC()
 	return &models.UsageSnapshot{
-		Provider:  "kimi",
+		Provider:  "kimicode",
 		FetchedAt: now,
 		Periods:   periods,
 		Identity:  identity,
@@ -414,7 +414,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 				creds.ExpiresAt = float64(time.Now().UTC().Unix() + int64(tokenResp.ExpiresIn))
 			}
 			content, _ := json.Marshal(creds)
-			_ = config.WriteCredential(config.CredentialPath("kimi", "oauth"), content)
+			_ = config.WriteCredential(config.CredentialPath("kimicode", "oauth"), content)
 			if !quiet {
 				_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
 			}

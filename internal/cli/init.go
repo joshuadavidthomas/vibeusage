@@ -19,6 +19,7 @@ var providerDescriptions = map[string]string{
 	"cursor":     "Cursor AI code editor (cursor.com)",
 	"gemini":     "Google's Gemini AI (gemini.google.com)",
 	"kimik2":     "Kimi K2 API usage (kimi-k2.ai)",
+	"kimicode":   "Kimi Code coding assistant (kimi.com)",
 	"openrouter": "OpenRouter unified model gateway (openrouter.ai)",
 	"warp":       "Warp terminal AI (warp.dev)",
 }
