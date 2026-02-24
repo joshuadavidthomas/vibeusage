@@ -125,3 +125,15 @@ type InitStatusJSON struct {
 	ConfiguredProviders int      `json:"configured_providers"`
 	AvailableProviders  []string `json:"available_providers"`
 }
+
+// UpdateStatusJSON represents update check/apply output.
+type UpdateStatusJSON struct {
+	CurrentVersion  string `json:"current_version"`
+	LatestVersion   string `json:"latest_version"`
+	TargetVersion   string `json:"target_version"`
+	UpdateAvailable bool   `json:"update_available"`
+	IsDowngrade     bool   `json:"is_downgrade"`
+	Asset           string `json:"asset,omitempty"`
+	Applied         bool   `json:"applied,omitempty"`
+	Pending         bool   `json:"pending,omitempty"`
+}
