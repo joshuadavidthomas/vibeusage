@@ -91,8 +91,8 @@ func TestParseQuotaResponse_PeriodFields(t *testing.T) {
 	}
 
 	p := snapshot.Periods[0]
-	if p.Name != "Token Quota" {
-		t.Errorf("Name = %q, want %q", p.Name, "Token Quota")
+	if p.Name != "Session (5h)" {
+		t.Errorf("Name = %q, want %q", p.Name, "Session (5h)")
 	}
 	if p.Utilization != 75 {
 		t.Errorf("Utilization = %d, want 75", p.Utilization)

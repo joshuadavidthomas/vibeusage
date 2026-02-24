@@ -1,6 +1,7 @@
 package zai
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -75,14 +76,39 @@ func (q QuotaLimit) ResetTime() *time.Time {
 }
 
 // DisplayName returns a human-readable name for the limit type.
+//
+// TOKENS_LIMIT hourly windows use "Session (Nh)" to match the convention used
+// by Claude and Antigravity. Other token periods fall back to a labelled quota.
+// TIME_LIMIT windows describe the tool quota period (e.g. "Monthly Tools").
 func (q QuotaLimit) DisplayName() string {
 	switch q.Type {
 	case typeTokens:
-		return "Token Quota"
+		if q.Unit == unitHours {
+			return fmt.Sprintf("Session (%dh)", q.Number)
+		}
+		return q.periodLabel("Quota")
 	case typeTime:
-		return "MCP Usage"
+		return q.periodLabel("Tools")
 	default:
 		return q.Type
+	}
+}
+
+// periodLabel builds a period-prefixed label such as "Monthly Tools" or "Daily Quota".
+func (q QuotaLimit) periodLabel(suffix string) string {
+	switch q.Unit {
+	case unitDays:
+		if q.Number == 1 {
+			return fmt.Sprintf("Daily %s", suffix)
+		}
+		return fmt.Sprintf("%d Day %s", q.Number, suffix)
+	case unitMonths:
+		if q.Number == 1 {
+			return fmt.Sprintf("Monthly %s", suffix)
+		}
+		return fmt.Sprintf("%d Month %s", q.Number, suffix)
+	default:
+		return suffix
 	}
 }
 
