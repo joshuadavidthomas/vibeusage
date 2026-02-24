@@ -12,7 +12,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -59,7 +58,7 @@ func (c Cursor) Auth() provider.AuthFlow {
 			"  4. Find one of: WorkosCursorSessionToken, __Secure-next-auth.session-token\n" +
 			"  5. Copy its value",
 		Placeholder: "paste token here",
-		Validate:    prompt.ValidateNotEmpty,
+		Validate:    provider.ValidateNotEmpty,
 		CredPath:    config.CredentialPath("cursor", "session"),
 		JSONKey:     "session_token",
 	}

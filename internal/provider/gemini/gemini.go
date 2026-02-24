@@ -3,7 +3,6 @@ package gemini
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -65,18 +64,10 @@ func (g Gemini) Auth() provider.AuthFlow {
 			"Alternatively, install the Gemini CLI and run `gemini login` to use\n" +
 			"OAuth credentials, which will be picked up automatically.",
 		Placeholder: "AI Studio API key",
-		Validate:    validateNotEmpty,
+		Validate:    provider.ValidateNotEmpty,
 		CredPath:    config.CredentialPath("gemini", "api_key"),
 		JSONKey:     "api_key",
 	}
-}
-
-// validateNotEmpty is a minimal validator for providers that accept any non-empty credential.
-func validateNotEmpty(s string) error {
-	if strings.TrimSpace(s) == "" {
-		return errors.New("value cannot be empty")
-	}
-	return nil
 }
 
 func init() {

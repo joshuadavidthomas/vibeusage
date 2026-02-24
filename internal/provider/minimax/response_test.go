@@ -435,25 +435,3 @@ func TestParseResponse_FetchedAtIsRecent(t *testing.T) {
 		t.Errorf("fetchedAt = %v, expected between %v and %v", snapshot.FetchedAt, before, after)
 	}
 }
-
-func TestValidateCodingPlanKey(t *testing.T) {
-	tests := []struct {
-		name    string
-		key     string
-		wantErr bool
-	}{
-		{"valid key", "sk-cp-abc123", false},
-		{"empty", "", true},
-		{"standard api key", "sk-api-abc123", true},
-		{"whitespace trimmed valid", "  sk-cp-abc123  ", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateCodingPlanKey(tt.key)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateCodingPlanKey(%q) error = %v, wantErr %v", tt.key, err, tt.wantErr)
-			}
-		})
-	}
-}

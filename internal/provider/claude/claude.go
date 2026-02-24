@@ -3,7 +3,6 @@ package claude
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -68,21 +67,10 @@ func (c Claude) Auth() provider.AuthFlow {
 			"  4. Find the sessionKey cookie\n" +
 			"  5. Copy its value (starts with sk-ant-sid01-)",
 		Placeholder: "sk-ant-sid01-...",
-		Validate:    validateSessionKey,
+		Validate:    provider.ValidatePrefix("sk-ant-sid01-"),
 		CredPath:    config.CredentialPath("claude", "session"),
 		JSONKey:     "session_key",
 	}
-}
-
-// validateSessionKey checks that the input looks like a Claude session key.
-func validateSessionKey(s string) error {
-	if strings.TrimSpace(s) == "" {
-		return errors.New("value cannot be empty")
-	}
-	if !strings.HasPrefix(s, "sk-ant-sid01-") {
-		return errors.New("session key should start with sk-ant-sid01-")
-	}
-	return nil
 }
 
 func init() {

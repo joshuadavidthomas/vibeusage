@@ -11,7 +11,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -50,7 +49,7 @@ func (z Zai) Auth() provider.AuthFlow {
 			"  1. Open https://z.ai/manage-apikey/apikey-list\n" +
 			"  2. Create a new API key (or copy an existing one)",
 		Placeholder: "paste API key here",
-		Validate:    prompt.ValidateNotEmpty,
+		Validate:    provider.ValidateNotEmpty,
 		CredPath:    config.CredentialPath("zai", "apikey"),
 		JSONKey:     "api_key",
 	}
