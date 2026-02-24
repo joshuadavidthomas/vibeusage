@@ -260,6 +260,14 @@ func TestKeyStatusJSON_UsesTypedStruct(t *testing.T) {
 	}
 }
 
+func TestKeyCommand_HasP0ProviderSubcommands(t *testing.T) {
+	for _, providerID := range []string{"openrouter", "warp", "kimik2", "amp"} {
+		if cmd := findSubcommand(keyCmd, providerID); cmd == nil {
+			t.Errorf("key command missing provider subcommand %q", providerID)
+		}
+	}
+}
+
 // findSubcommand finds a subcommand by name.
 func findSubcommand(parent *cobra.Command, name string) *cobra.Command {
 	for _, c := range parent.Commands() {

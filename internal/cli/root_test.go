@@ -44,7 +44,7 @@ func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
 }
 
 func TestRootCmd_HasProviderSubcommands(t *testing.T) {
-	providers := []string{"claude", "codex", "copilot", "cursor", "gemini"}
+	providers := []string{"claude", "codex", "copilot", "cursor", "gemini", "openrouter", "warp", "kimik2", "amp"}
 	for _, name := range providers {
 		found := false
 		for _, cmd := range rootCmd.Commands() {

@@ -18,6 +18,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	// Register all providers
+	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/amp"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/antigravity"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/claude"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/codex"
@@ -25,7 +26,10 @@ import (
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/cursor"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/gemini"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kimi"
+	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kimik2"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/minimax"
+	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/openrouter"
+	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/warp"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/zai"
 )
 
@@ -42,7 +46,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:          "vibeusage",
 	Short:        "Track usage across agentic LLM providers",
-	Long:         "A unified CLI tool that aggregates usage statistics from Antigravity, Claude, Codex, Copilot, Cursor, Gemini, Kimi, Minimax, and Z.ai.",
+	Long:         "A unified CLI tool that aggregates usage statistics from Amp, Antigravity, Claude, Codex, Copilot, Cursor, Gemini, Kimi, Kimi K2, Minimax, OpenRouter, Warp, and Z.ai.",
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if verbose && quiet {

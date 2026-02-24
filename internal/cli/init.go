@@ -12,11 +12,15 @@ import (
 )
 
 var providerDescriptions = map[string]string{
-	"claude":  "Anthropic's Claude AI assistant (claude.ai)",
-	"codex":   "OpenAI's Codex/ChatGPT (platform.openai.com)",
-	"copilot": "GitHub Copilot (github.com)",
-	"cursor":  "Cursor AI code editor (cursor.com)",
-	"gemini":  "Google's Gemini AI (gemini.google.com)",
+	"amp":        "Amp coding assistant (ampcode.com)",
+	"claude":     "Anthropic's Claude AI assistant (claude.ai)",
+	"codex":      "OpenAI's Codex/ChatGPT (platform.openai.com)",
+	"copilot":    "GitHub Copilot (github.com)",
+	"cursor":     "Cursor AI code editor (cursor.com)",
+	"gemini":     "Google's Gemini AI (gemini.google.com)",
+	"kimik2":     "Kimi K2 API usage (kimi-k2.ai)",
+	"openrouter": "OpenRouter unified model gateway (openrouter.ai)",
+	"warp":       "Warp terminal AI (warp.dev)",
 }
 
 var initCmd = &cobra.Command{

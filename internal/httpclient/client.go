@@ -22,6 +22,7 @@ type Client struct {
 type Response struct {
 	StatusCode int
 	Body       []byte
+	Header     http.Header
 	JSONErr    error
 }
 
@@ -73,7 +74,7 @@ func (c *Client) DoCtx(ctx context.Context, method, rawURL string, body io.Reade
 		return nil, err
 	}
 
-	return &Response{StatusCode: resp.StatusCode, Body: respBody}, nil
+	return &Response{StatusCode: resp.StatusCode, Body: respBody, Header: resp.Header.Clone()}, nil
 }
 
 // Do sends an HTTP request with the given method and URL, applies options, reads
