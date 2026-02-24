@@ -117,17 +117,17 @@ Route: Claude Opus 4.6
 Or route via your own role/model group:
 
 ```bash
-$ vibeusage route --role thinking
-Route: thinking (role)
+$ vibeusage route --role coding
+Route: coding (role)
 
-╭─────────────────┬─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
-│ Model           │ Provider    │ Usage               │ Headroom │ Cost │ Period  │ Resets In │ Plan        │
-├─────────────────┼─────────────┼─────────────────────┼──────────┼──────┼─────────┼───────────┼─────────────┤
-│ claude-opus-4-6 │ Antigravity │ ░░░░░░░░░░░░░░░ 0%  │ 100%     │ —    │ weekly  │ 2h 24m    │ Antigravity │
-│ o4-mini         │ Codex       │ █░░░░░░░░░░░░░░ 12% │ 88%      │ —    │ weekly  │ 6d 18h    │ plus        │
-│ claude-opus-4-6 │ Copilot     │ █░░░░░░░░░░░░░░ 11% │ 29%      │ 3x   │ monthly │ 4d 1h     │ individual  │
-│ claude-opus-4-6 │ Claude      │ ██████████████░ 99% │ 1%       │ —    │ weekly  │ 16h 24m   │ Pro         │
-╰─────────────────┴─────────────┴─────────────────────┴──────────┴──────┴─────────┴───────────┴─────────────╯
+╭──────────────────┬─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
+│ Model            │ Provider    │ Usage               │ Headroom │ Cost │ Period  │ Resets In │ Plan        │
+├──────────────────┼─────────────┼─────────────────────┼──────────┼──────┼─────────┼───────────┼─────────────┤
+│ claude-opus-4-6  │ Antigravity │ ░░░░░░░░░░░░░░░ 0%  │ 100%     │ —    │ weekly  │ 2h 24m    │ Antigravity │
+│ gpt-5.3-codex    │ Codex       │ █░░░░░░░░░░░░░░ 12% │ 88%      │ —    │ weekly  │ 6d 18h    │ plus        │
+│ claude-opus-4-6  │ Copilot     │ █░░░░░░░░░░░░░░ 11% │ 29%      │ 3x   │ monthly │ 4d 1h     │ individual  │
+│ claude-opus-4-6  │ Claude      │ ██████████████░ 99% │ 1%       │ —    │ weekly  │ 16h 24m   │ Pro         │
+╰──────────────────┴─────────────┴─────────────────────┴──────────┴──────┴─────────┴───────────┴─────────────╯
 ```
 
 Not sure which model ID to use?
@@ -389,10 +389,10 @@ Define model groups for `vibeusage route --role <name>`:
 
 ```toml
 [roles.coding]
-models = ["claude-sonnet-4-5", "gpt-5", "gemini-2.5-pro"]
+models = ["claude-opus-4-6", "gpt-5.3-codex", "gemini-3.1-pro-preview"]
 
-[roles.research]
-models = ["claude-opus-4-6", "o4", "gpt-5"]
+[roles.fast]
+models = ["claude-haiku-4-5", "gemini-3-flash-preview"]
 ```
 
 Then route by role:
