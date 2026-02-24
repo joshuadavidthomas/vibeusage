@@ -281,15 +281,7 @@ func displayRecommendation(rec routing.Recommendation) error {
 	}
 
 	out("Route: %s\n\n", rec.ModelName)
-
-	ft := routing.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset)
-
-	outln(display.NewTableWithOptions(
-		ft.Headers,
-		ft.Rows,
-		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: toDisplayStyles(ft.Styles)},
-	))
-
+	renderRouteTable(routing.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset))
 	return nil
 }
 
@@ -376,15 +368,7 @@ func displayRoleRecommendation(rec routing.RoleRecommendation) error {
 	}
 
 	out("Route: %s (role)\n\n", rec.Role)
-
-	ft := routing.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset)
-
-	outln(display.NewTableWithOptions(
-		ft.Headers,
-		ft.Rows,
-		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: toDisplayStyles(ft.Styles)},
-	))
-
+	renderRouteTable(routing.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset))
 	return nil
 }
 
@@ -414,6 +398,16 @@ func adaptMatchPrefix(prefix string) []routing.ModelInfo {
 		out[i] = routing.ModelInfo{ID: r.ID, Name: r.Name, Providers: r.Providers}
 	}
 	return out
+}
+
+// renderRouteTable renders a FormattedTable to the output writer using the
+// shared route table options (noColor flag, terminal width, row styles).
+func renderRouteTable(ft routing.FormattedTable) {
+	outln(display.NewTableWithOptions(
+		ft.Headers,
+		ft.Rows,
+		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: toDisplayStyles(ft.Styles)},
+	))
 }
 
 // routeRenderBar renders a utilization bar with color for the route table.

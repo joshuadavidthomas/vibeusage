@@ -85,9 +85,9 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 ### 9. Reduce Display Logic Duplication in `cmd/route.go`
 
-- [ ] `displayRecommendation` and `displayRoleRecommendation` are ~80% identical
-- [ ] Extract `formatCost(*float64) string` helper
-- [ ] Unify the table construction into a single function parameterized by whether a "Model" column is present
+- [x] `displayRecommendation` and `displayRoleRecommendation` are ~80% identical — shared `renderRouteTable` helper extracted in `internal/cli/route.go`
+- [x] Extract `formatCost(*float64) string` helper — done as `routing.FormatMultiplier` in `internal/routing/format.go`
+- [x] Unify the table construction into a single function parameterized by whether a "Model" column is present — done via `buildHeaders`, `formatCandidateRow`, `unavailableRow` in `internal/routing/display.go`
 
 ## Things Already Done Well ✅
 
