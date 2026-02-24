@@ -229,6 +229,16 @@ func PaceToColor(paceRatio *float64, utilization int) string {
 		}
 		return "red"
 	}
+	// Near-exhaustion floor: ≥90% utilization is always at least yellow.
+	// Pace ratio captures burn rate, not how much budget remains. At 90%+
+	// you have ≤10% left regardless of pace, which warrants a caution signal.
+	// Pace can still escalate near-exhaustion to red, but not rescue it to green.
+	if utilization >= 90 {
+		if *paceRatio > 1.15 {
+			return "red"
+		}
+		return "yellow"
+	}
 	if *paceRatio <= 1.15 {
 		return "green"
 	}

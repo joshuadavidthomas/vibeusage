@@ -614,6 +614,15 @@ func TestPaceToColor(t *testing.T) {
 		{"pace 1.0 util 100 red", pf(1.0), 100, "red"},
 		{"pace 1.05 util 100 red", pf(1.05), 100, "red"},
 		{"pace 0.5 util 100 red", pf(0.5), 100, "red"},
+
+		// near-exhaustion (≥90%) floor — pace can escalate to red but not rescue to green
+		// e.g. 99% at 86% elapsed = paceRatio 1.149 (just under 1.15), must be yellow not green
+		{"pace 1.0 util 90 yellow", pf(1.0), 90, "yellow"},
+		{"pace 1.0 util 99 yellow", pf(1.0), 99, "yellow"},
+		{"pace 0.5 util 95 yellow", pf(0.5), 95, "yellow"},
+		{"pace 1.149 util 99 yellow", pf(1.149), 99, "yellow"},
+		{"pace 1.16 util 92 red", pf(1.16), 92, "red"},
+		{"pace 2.0 util 90 red", pf(2.0), 90, "red"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
