@@ -2,9 +2,11 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 )
 
@@ -92,5 +94,89 @@ func TestQuickSetup_NoPrompt(t *testing.T) {
 	// quickSetup should not call any prompts
 	if len(mock.InputCalls) != 0 || len(mock.ConfirmCalls) != 0 || len(mock.MultiSelectCalls) != 0 {
 		t.Error("quickSetup should not use any prompts")
+	}
+}
+
+// Flag behavior tests
+
+func TestInitWizard_QuietSkipsPrompt(t *testing.T) {
+	mock := &prompt.Mock{}
+	old := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(old)
+
+	oldQuiet := quiet
+	quiet = true
+	defer func() { quiet = oldQuiet }()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	err := interactiveWizard()
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	if len(mock.MultiSelectCalls) != 0 {
+		t.Error("quiet mode should skip MultiSelect prompt")
+	}
+
+	output := buf.String()
+	if !bytes.Contains([]byte(output), []byte("vibeusage auth")) {
+		t.Error("quiet mode should show fallback instructions")
+	}
+}
+
+func TestQuickSetup_QuietMode(t *testing.T) {
+	mock := &prompt.Mock{}
+	old := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(old)
+
+	oldQuiet := quiet
+	quiet = true
+	defer func() { quiet = oldQuiet }()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	err := quickSetup()
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+
+	if len(mock.InputCalls)+len(mock.ConfirmCalls)+len(mock.MultiSelectCalls) != 0 {
+		t.Error("quiet mode should not invoke any prompts")
+	}
+}
+
+// JSON output tests
+
+func TestInitJSON_UsesTypedStruct(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldJSON := jsonOutput
+	jsonOutput = true
+	defer func() { jsonOutput = oldJSON }()
+
+	if err := initCmd.RunE(initCmd, nil); err != nil {
+		t.Fatalf("init error: %v", err)
+	}
+
+	var result display.InitStatusJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("init JSON should unmarshal into InitStatusJSON: %v\nOutput: %s", err, buf.String())
+	}
+
+	if len(result.AvailableProviders) == 0 {
+		t.Error("available_providers should not be empty")
 	}
 }

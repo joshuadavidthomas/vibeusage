@@ -2,11 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -235,5 +237,33 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 
 	if len(mock.ConfirmCalls) != 1 {
 		t.Fatalf("expected 1 Confirm call, got %d", len(mock.ConfirmCalls))
+	}
+}
+
+// JSON output tests
+
+func TestAuthStatusJSON_UsesTypedStruct(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldJSON := jsonOutput
+	jsonOutput = true
+	defer func() { jsonOutput = oldJSON }()
+
+	_ = authStatusCommand()
+
+	var result map[string]display.AuthStatusEntryJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("auth status JSON should unmarshal into map[string]AuthStatusEntryJSON: %v\nOutput: %s", err, buf.String())
+	}
+
+	// Should have at least one provider entry
+	if len(result) == 0 {
+		t.Error("expected at least one provider in auth status")
 	}
 }

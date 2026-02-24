@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 )
 
@@ -232,6 +234,29 @@ func TestDisplayAllCredentialStatus_QuietMode(t *testing.T) {
 	output := buf.String()
 	if strings.Contains(output, "╭") {
 		t.Error("quiet mode should not use table borders")
+	}
+}
+
+// JSON output tests
+
+func TestKeyStatusJSON_UsesTypedStruct(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldJSON := jsonOutput
+	jsonOutput = true
+	defer func() { jsonOutput = oldJSON }()
+
+	_ = displayAllCredentialStatus()
+
+	var result map[string]display.KeyStatusEntryJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("key status JSON should unmarshal into map[string]KeyStatusEntryJSON: %v\nOutput: %s", err, buf.String())
 	}
 }
 

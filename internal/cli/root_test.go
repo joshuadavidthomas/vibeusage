@@ -2,12 +2,16 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
 )
 
 // resetPathFlags resets configPathCmd flags to defaults and registers
@@ -302,5 +306,264 @@ func TestConfigPath_CacheFlag(t *testing.T) {
 	output := strings.TrimSpace(buf.String())
 	if output != tmpDir {
 		t.Errorf("expected cache dir %q, got %q", tmpDir, output)
+	}
+}
+
+// Context tests (ExecuteContext)
+
+func TestExecuteContext_PropagatesContext(t *testing.T) {
+	// Verify that ExecuteContext sets the context on rootCmd,
+	// which commands can access via cmd.Context().
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// We can't easily run the full command without providers,
+	// but we can verify the API exists and doesn't panic.
+	// Pass a cancelled context so any fetch would abort quickly.
+	cancel()
+
+	// ExecuteContext should accept the context and not panic.
+	// It will likely error because there's no config, which is fine.
+	_ = ExecuteContext(ctx)
+}
+
+// Spinner/outcome conversion tests
+
+func TestOutcomeToCompletion_Success(t *testing.T) {
+	o := fetch.FetchOutcome{
+		ProviderID: "claude",
+		Success:    true,
+		Source:     "oauth",
+		Attempts: []fetch.FetchAttempt{
+			{Strategy: "oauth", Success: true, DurationMs: 342},
+		},
+	}
+
+	got := outcomeToCompletion(o)
+
+	want := spinner.CompletionInfo{
+		ProviderID: "claude",
+		Success:    true,
+	}
+
+	if got != want {
+		t.Errorf("outcomeToCompletion() = %+v, want %+v", got, want)
+	}
+}
+
+func TestOutcomeToCompletion_Failure(t *testing.T) {
+	o := fetch.FetchOutcome{
+		ProviderID: "cursor",
+		Success:    false,
+		Error:      "auth failed",
+		Attempts: []fetch.FetchAttempt{
+			{Strategy: "api_key", Success: false, DurationMs: 50, Error: "not available"},
+			{Strategy: "web", Success: false, DurationMs: 100, Error: "auth failed"},
+		},
+	}
+
+	got := outcomeToCompletion(o)
+
+	want := spinner.CompletionInfo{
+		ProviderID: "cursor",
+		Success:    false,
+		Error:      "auth failed",
+	}
+
+	if got != want {
+		t.Errorf("outcomeToCompletion() = %+v, want %+v", got, want)
+	}
+}
+
+func TestOutcomeToCompletion_Fallback(t *testing.T) {
+	o := fetch.FetchOutcome{
+		ProviderID: "gemini",
+		Success:    true,
+		Source:     "code_assist",
+		Attempts: []fetch.FetchAttempt{
+			{Strategy: "oauth", Success: false, DurationMs: 200, Error: "token expired"},
+			{Strategy: "code_assist", Success: true, DurationMs: 800},
+		},
+	}
+
+	got := outcomeToCompletion(o)
+
+	if !got.Success {
+		t.Error("expected success=true")
+	}
+	if got.ProviderID != "gemini" {
+		t.Errorf("expected providerID gemini, got %s", got.ProviderID)
+	}
+}
+
+// Logging/verbose output tests
+
+func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
+	var logBuf bytes.Buffer
+	ctx := newVerboseContext(&logBuf)
+
+	var outBuf bytes.Buffer
+	outWriter = &outBuf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	outcomes := map[string]fetch.FetchOutcome{
+		"claude": {
+			ProviderID: "claude",
+			Success:    true,
+			Source:     "oauth",
+			Snapshot: &models.UsageSnapshot{
+				Provider: "claude",
+				Periods: []models.UsagePeriod{
+					{Name: "daily", Utilization: 50},
+				},
+			},
+		},
+	}
+
+	displayMultipleSnapshots(ctx, outcomes, 342)
+
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "342") {
+		t.Errorf("expected log output to contain duration '342', got %q", logOutput)
+	}
+}
+
+func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
+	var logBuf bytes.Buffer
+	ctx := newVerboseContext(&logBuf)
+
+	var outBuf bytes.Buffer
+	outWriter = &outBuf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	outcomes := map[string]fetch.FetchOutcome{
+		"claude": {
+			ProviderID: "claude",
+			Success:    true,
+			Snapshot: &models.UsageSnapshot{
+				Provider: "claude",
+				Periods:  []models.UsagePeriod{{Name: "daily", Utilization: 50}},
+			},
+		},
+		"cursor": {
+			ProviderID: "cursor",
+			Success:    false,
+			Error:      "auth token expired",
+		},
+	}
+
+	displayMultipleSnapshots(ctx, outcomes, 100)
+
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "cursor") {
+		t.Errorf("expected log output to contain provider 'cursor', got %q", logOutput)
+	}
+	if !strings.Contains(logOutput, "auth token expired") {
+		t.Errorf("expected log output to contain error message, got %q", logOutput)
+	}
+}
+
+func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) {
+	var logBuf bytes.Buffer
+	ctx := newDefaultContext(&logBuf)
+
+	var outBuf bytes.Buffer
+	outWriter = &outBuf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	outcomes := map[string]fetch.FetchOutcome{
+		"claude": {
+			ProviderID: "claude",
+			Success:    true,
+			Snapshot: &models.UsageSnapshot{
+				Provider: "claude",
+				Periods:  []models.UsagePeriod{{Name: "daily", Utilization: 50}},
+			},
+		},
+	}
+
+	displayMultipleSnapshots(ctx, outcomes, 500)
+
+	logOutput := logBuf.String()
+	if strings.Contains(logOutput, "500") {
+		t.Errorf("expected no duration in log when not verbose, got %q", logOutput)
+	}
+}
+
+func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
+	var logBuf bytes.Buffer
+	ctx := newQuietContext(&logBuf)
+
+	var outBuf bytes.Buffer
+	outWriter = &outBuf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = true
+	defer func() { quiet = oldQuiet }()
+
+	oldNoColor := noColor
+	noColor = true
+	defer func() { noColor = oldNoColor }()
+
+	statuses := map[string]models.ProviderStatus{
+		"claude": {Level: models.StatusOperational, Description: "OK"},
+	}
+
+	displayStatusTable(ctx, statuses, 250)
+
+	logOutput := logBuf.String()
+	if strings.Contains(logOutput, "250") {
+		t.Errorf("expected no duration in log in quiet mode, got %q", logOutput)
+	}
+}
+
+func TestVerboseOutput_NotOnStdout(t *testing.T) {
+	// Verbose logging should go to the logger (stderr), NOT to outWriter (stdout).
+	// This ensures piped output is clean.
+	var logBuf bytes.Buffer
+	ctx := newVerboseContext(&logBuf)
+
+	var outBuf bytes.Buffer
+	outWriter = &outBuf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	outcomes := map[string]fetch.FetchOutcome{
+		"claude": {
+			ProviderID: "claude",
+			Success:    true,
+			Source:     "oauth",
+			Snapshot: &models.UsageSnapshot{
+				Provider: "claude",
+				Periods:  []models.UsagePeriod{{Name: "daily", Utilization: 50}},
+			},
+		},
+	}
+
+	displayMultipleSnapshots(ctx, outcomes, 500)
+
+	stdoutOutput := outBuf.String()
+	// Stdout should NOT contain timing/diagnostic info
+	if strings.Contains(stdoutOutput, "Total fetch time") {
+		t.Errorf("verbose timing info should not appear on stdout, got %q", stdoutOutput)
+	}
+	if strings.Contains(stdoutOutput, "500ms") {
+		t.Errorf("verbose duration should not appear on stdout, got %q", stdoutOutput)
 	}
 }

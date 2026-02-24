@@ -2,10 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 )
 
@@ -81,5 +83,43 @@ func TestConfigReset_UserDeclinesConfirm(t *testing.T) {
 	// File should still exist
 	if _, err := os.Stat(filepath.Join(tmpDir, "config.toml")); os.IsNotExist(err) {
 		t.Error("config file should not have been removed")
+	}
+}
+
+// JSON output tests
+
+func TestConfigResetJSON_UsesTypedStruct(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldJSON := jsonOutput
+	jsonOutput = true
+	defer func() { jsonOutput = oldJSON }()
+
+	_ = configResetCmd.Flags().Set("confirm", "true")
+	defer func() { _ = configResetCmd.Flags().Set("confirm", "false") }()
+
+	if err := configResetCmd.RunE(configResetCmd, nil); err != nil {
+		t.Fatalf("config reset error: %v", err)
+	}
+
+	var result display.ActionResultJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("config reset JSON should unmarshal into ActionResultJSON: %v\nOutput: %s", err, buf.String())
+	}
+
+	if !result.Success {
+		t.Error("success should be true")
+	}
+	if !result.Reset {
+		t.Error("reset should be true")
+	}
+	if result.Message == "" {
+		t.Error("message should not be empty")
 	}
 }
