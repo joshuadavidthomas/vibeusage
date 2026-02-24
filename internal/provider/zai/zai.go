@@ -35,7 +35,7 @@ func (z Zai) CredentialSources() provider.CredentialInfo {
 func (z Zai) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
-		&BearerTokenStrategy{HTTPTimeout: timeout},
+		&APIKeyStrategy{HTTPTimeout: timeout},
 	}
 }
 
@@ -64,18 +64,18 @@ const (
 	quotaURL = "https://api.z.ai/api/monitor/usage/quota/limit"
 )
 
-// BearerTokenStrategy fetches Z.ai usage using an API key or JWT bearer token.
-type BearerTokenStrategy struct {
+// APIKeyStrategy fetches Z.ai usage using an API key or JWT bearer token.
+type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *BearerTokenStrategy) Name() string { return "bearer_token" }
+func (s *APIKeyStrategy) Name() string { return "api_key" }
 
-func (s *BearerTokenStrategy) IsAvailable() bool {
+func (s *APIKeyStrategy) IsAvailable() bool {
 	return s.loadToken() != ""
 }
 
-func (s *BearerTokenStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
+func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	token := s.loadToken()
 	if token == "" {
 		return fetch.ResultFail("No API key found. Set ZAI_API_KEY or use 'vibeusage key zai set'"), nil
@@ -84,7 +84,7 @@ func (s *BearerTokenStrategy) Fetch(ctx context.Context) (fetch.FetchResult, err
 	return fetchQuota(ctx, token, s.HTTPTimeout)
 }
 
-func (s *BearerTokenStrategy) loadToken() string {
+func (s *APIKeyStrategy) loadToken() string {
 	if key := os.Getenv("ZAI_API_KEY"); key != "" {
 		return key
 	}
@@ -176,7 +176,7 @@ func parseQuotaResponse(resp QuotaResponse) *models.UsageSnapshot {
 		FetchedAt: time.Now().UTC(),
 		Periods:   periods,
 		Identity:  identity,
-		Source:    "bearer_token",
+		Source:    "api_key",
 	}
 }
 

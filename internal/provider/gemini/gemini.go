@@ -3,6 +3,7 @@ package gemini
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,6 +51,33 @@ func (g Gemini) FetchStatus(ctx context.Context) models.ProviderStatus {
 	return provider.FetchGoogleAppsStatus(ctx, []string{
 		"gemini", "ai studio", "aistudio", "generative ai", "vertex ai", "cloud code",
 	})
+}
+
+// Auth returns the manual API key flow for Gemini.
+// Gemini OAuth is managed by the Gemini CLI — users who want the richer OAuth
+// flow should install the CLI and run `gemini login`. Those with an AI Studio
+// API key can provide it here instead.
+func (g Gemini) Auth() provider.AuthFlow {
+	return provider.ManualKeyAuthFlow{
+		Instructions: "Get your Gemini API key from Google AI Studio:\n" +
+			"  1. Open https://aistudio.google.com/app/apikey\n" +
+			"  2. Create a new API key (or copy an existing one)\n" +
+			"\n" +
+			"Alternatively, install the Gemini CLI and run `gemini login` to use\n" +
+			"OAuth credentials, which will be picked up automatically.",
+		Placeholder: "AI Studio API key",
+		Validate:    validateNotEmpty,
+		CredPath:    config.CredentialPath("gemini", "api_key"),
+		JSONKey:     "api_key",
+	}
+}
+
+// validateNotEmpty is a minimal validator for providers that accept any non-empty credential.
+func validateNotEmpty(s string) error {
+	if strings.TrimSpace(s) == "" {
+		return errors.New("value cannot be empty")
+	}
+	return nil
 }
 
 func init() {

@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,6 +44,37 @@ func (c Codex) FetchStrategies() []fetch.Strategy {
 
 func (c Codex) FetchStatus(ctx context.Context) models.ProviderStatus {
 	return provider.FetchStatuspageStatus(ctx, "https://status.openai.com/api/v2/status.json")
+}
+
+// Auth returns the manual bearer token flow for Codex.
+// Codex uses OAuth tokens managed by the Codex CLI — users must authenticate
+// with the CLI first, or provide an access token obtained from the browser.
+func (c Codex) Auth() provider.AuthFlow {
+	return provider.ManualKeyAuthFlow{
+		Instructions: "Codex uses OAuth tokens from the Codex CLI (recommended):\n" +
+			"  Install the CLI and run `codex login`\n" +
+			"\n" +
+			"Or provide an access token manually:\n" +
+			"  1. Open https://chatgpt.com in your browser and sign in\n" +
+			"  2. Open DevTools (F12 or Cmd+Option+I) → Network tab\n" +
+			"  3. Reload the page and click any request to chatgpt.com/backend-api/\n" +
+			"  4. In Request Headers, find the Authorization header\n" +
+			"  5. Copy the value after \"Bearer \" (starts with ey...)\n" +
+			"\n" +
+			"Note: Manually obtained tokens won't auto-refresh — run auth again when they expire.",
+		Placeholder: "ey... (OAuth access token)",
+		Validate:    validateNotEmpty,
+		CredPath:    config.CredentialPath("codex", "oauth"),
+		JSONKey:     "access_token",
+	}
+}
+
+// validateNotEmpty is a minimal validator used by providers that accept any non-empty credential.
+func validateNotEmpty(s string) error {
+	if strings.TrimSpace(s) == "" {
+		return errors.New("value cannot be empty")
+	}
+	return nil
 }
 
 func init() {

@@ -27,27 +27,6 @@ func TestValidateNotEmpty(t *testing.T) {
 	}
 }
 
-func TestValidateClaudeSessionKey(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
-	}{
-		{"valid prefix passes", "sk-ant-sid01-abc123", false},
-		{"wrong prefix fails", "some-random-key", true},
-		{"empty fails", "", true},
-		{"prefix only passes", "sk-ant-sid01-", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateClaudeSessionKey(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateClaudeSessionKey(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestMockPrompter_Input(t *testing.T) {
 	m := &Mock{
 		InputFunc: func(cfg InputConfig) (string, error) {

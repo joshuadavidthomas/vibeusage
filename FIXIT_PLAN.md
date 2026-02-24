@@ -123,11 +123,11 @@ Every provider is organized differently for no apparent reason:
 
 Pick one pattern and apply it everywhere:
 
-- [ ] Every provider gets the same file layout: `<name>.go` (provider struct + strategies), `response.go` (response types), optionally `auth.go` if the auth flow is complex enough to warrant it (e.g. device flows with polling)
-- [ ] Every provider implements `Authenticator` — codex and gemini should get proper auth flows or at least explicit `ManualKeyAuthFlow` declarations instead of silent fallthrough
-- [ ] Every provider with a `ManualKeyAuthFlow` has validation — move `ValidateClaudeSessionKey` from `prompt` to `claude`, move `ValidateNotEmpty` usages to use a shared helper or define locally, move `ValidateCodingPlanKey` pattern to match wherever validation lands
-- [ ] Every provider has a `<name>_test.go` with at minimum strategy availability + basic fetch path tests, matching the pattern claude/codex/copilot already use
-- [ ] Strategy type names follow a consistent convention (propose: `OAuthStrategy`, `WebStrategy`, `APIKeyStrategy`, `DeviceFlowStrategy` — drop `BearerTokenStrategy` alias)
+- [x] Every provider gets the same file layout: `<name>.go` (provider struct + strategies), `response.go` (response types), optionally `auth.go` if the auth flow is complex enough to warrant it (e.g. device flows with polling)
+- [x] Every provider implements `Authenticator` — codex and gemini should get proper auth flows or at least explicit `ManualKeyAuthFlow` declarations instead of silent fallthrough
+- [x] Every provider with a `ManualKeyAuthFlow` has validation — move `ValidateClaudeSessionKey` from `prompt` to `claude`, move `ValidateNotEmpty` usages to use a shared helper or define locally, move `ValidateCodingPlanKey` pattern to match wherever validation lands
+- [x] Every provider has a `<name>_test.go` with at minimum strategy availability + basic fetch path tests, matching the pattern claude/codex/copilot already use
+- [x] Strategy type names follow a consistent convention (propose: `OAuthStrategy`, `WebStrategy`, `APIKeyStrategy`, `DeviceFlowStrategy` — drop `BearerTokenStrategy` alias)
 
 ## 5. Delete `internal/strutil/`
 
