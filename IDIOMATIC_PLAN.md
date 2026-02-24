@@ -80,8 +80,8 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 > *"Dependencies are passed explicitly, granting the caller complete control."*
 
-- [ ] Consider making the initial `models.dev` fetch explicit (called during startup with spinner feedback) rather than lazy-loading on first `Lookup()` with no user feedback
-- [ ] Replace hand-rolled YAML parser in `multipliers.go` with a proper YAML library
+- [x] Consider making the initial `models.dev` fetch explicit (called during startup with spinner feedback) rather than lazy-loading on first `Lookup()` with no user feedback
+- [x] Replace hand-rolled YAML parser in `multipliers.go` with a proper YAML library
 
 ### 9. Reduce Display Logic Duplication in `cmd/route.go`
 

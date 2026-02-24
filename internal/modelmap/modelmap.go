@@ -1,9 +1,14 @@
 package modelmap
 
 import (
+	"context"
+	"os"
 	"sort"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 )
 
 // ModelInfo describes a model and which providers offer it.
@@ -59,6 +64,30 @@ func SetLoaderForTesting(loader func() map[string]modelsDevProvider) func() {
 		dataLoader = old
 		ResetForTesting()
 	}
+}
+
+// Preload explicitly loads model registry data and Copilot multipliers, making
+// the network fetch (if needed) happen at a known point instead of silently on
+// the first Lookup call. Safe to call multiple times — subsequent calls are
+// no-ops. ctx is accepted for future cancellation support.
+func Preload(_ context.Context) {
+	ensureLoaded()
+	ensureMultipliersLoaded()
+}
+
+// CacheIsFresh reports whether both model-data cache files exist and are within
+// their TTL. When false, Preload may make network calls; when true it will
+// return near-instantly from disk.
+func CacheIsFresh() bool {
+	return cacheFileFresh(config.ModelsFile()) && cacheFileFresh(config.MultipliersFile())
+}
+
+func cacheFileFresh(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return time.Since(info.ModTime()) <= cacheTTL
 }
 
 // Lookup resolves a model query (canonical ID or alias) to a ModelInfo.

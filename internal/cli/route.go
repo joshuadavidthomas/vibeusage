@@ -32,6 +32,10 @@ Use "vibeusage route --list <provider>" to see models for a specific provider.
 Use "vibeusage route --list-roles" to see configured roles and their models.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Preload model registry data explicitly so any network fetch happens
+		// here (with optional spinner) rather than silently on first Lookup.
+		preloadModelData(cmd.Context())
+
 		listFlag, _ := cmd.Flags().GetBool("list")
 		listRolesFlag, _ := cmd.Flags().GetBool("list-roles")
 		roleFlag, _ := cmd.Flags().GetString("role")
@@ -67,6 +71,29 @@ func init() {
 	routeCmd.Flags().BoolP("list", "l", false, "List known models and their providers")
 	routeCmd.Flags().Bool("list-roles", false, "List configured roles and their models")
 	routeCmd.Flags().String("role", "", "Route by role instead of specific model")
+}
+
+// preloadModelData loads the modelmap registry and Copilot multipliers up
+// front, at a known point in the route command lifecycle. When a network fetch
+// is likely (cache stale or absent) and a spinner is appropriate, a brief
+// spinner is shown so the user knows what is happening. Once data is cached on
+// disk the call returns near-instantly with no visible output.
+func preloadModelData(ctx context.Context) {
+	if modelmap.CacheIsFresh() {
+		// Fast path: data is on disk and within TTL — load silently.
+		modelmap.Preload(ctx)
+		return
+	}
+
+	if !display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
+		modelmap.Preload(ctx)
+		return
+	}
+
+	_ = display.SpinnerRun([]string{"models.dev"}, func(onComplete func(display.CompletionInfo)) {
+		modelmap.Preload(ctx)
+		onComplete(display.CompletionInfo{ProviderID: "models.dev", Success: true})
+	})
 }
 
 // newRoutingService creates a routing.Service wired to the concrete
