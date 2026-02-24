@@ -107,20 +107,33 @@ func TestParseUsageResponse_FullResponse(t *testing.T) {
 	if snapshot.Identity.Plan != "Pro" {
 		t.Errorf("Plan = %q, want %q", snapshot.Identity.Plan, "Pro")
 	}
-	if len(snapshot.Periods) < 1 {
-		t.Fatalf("expected at least 1 period, got %d", len(snapshot.Periods))
+	// Both rows shown: weekly usage counter + per-window rate limit.
+	if len(snapshot.Periods) != 2 {
+		t.Fatalf("expected 2 periods (weekly + session limit), got %d", len(snapshot.Periods))
 	}
 
-	// First period from usage summary
-	p := snapshot.Periods[0]
-	if p.Utilization != 40 {
-		t.Errorf("Utilization = %d, want 40", p.Utilization)
+	// First: weekly usage summary.
+	weekly := snapshot.Periods[0]
+	if weekly.Name != "Weekly" {
+		t.Errorf("Periods[0].Name = %q, want %q", weekly.Name, "Weekly")
 	}
-	if p.PeriodType != models.PeriodSession {
-		t.Errorf("PeriodType = %q, want %q", p.PeriodType, models.PeriodSession)
+	if weekly.PeriodType != models.PeriodWeekly {
+		t.Errorf("Periods[0].PeriodType = %q, want %q", weekly.PeriodType, models.PeriodWeekly)
 	}
-	if p.ResetsAt == nil {
-		t.Fatal("expected ResetsAt to be set")
+	if weekly.Utilization != 40 {
+		t.Errorf("Periods[0].Utilization = %d, want 40", weekly.Utilization)
+	}
+
+	// Second: 5h rate limit window.
+	session := snapshot.Periods[1]
+	if session.Name != "Session (5h)" {
+		t.Errorf("Periods[1].Name = %q, want %q", session.Name, "Session (5h)")
+	}
+	if session.PeriodType != models.PeriodSession {
+		t.Errorf("Periods[1].PeriodType = %q, want %q", session.PeriodType, models.PeriodSession)
+	}
+	if session.ResetsAt == nil {
+		t.Fatal("expected Periods[1].ResetsAt to be set")
 	}
 }
 

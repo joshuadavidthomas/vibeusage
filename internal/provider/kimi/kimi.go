@@ -273,25 +273,14 @@ func fetchUsage(ctx context.Context, token, source string, httpTimeout float64) 
 func parseUsageResponse(resp UsageResponse, source string) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	// Overall usage summary
+	// Overall weekly usage counter — always shown when present. This is
+	// distinct from the per-window rate limits below: Kimi tracks a rolling
+	// weekly quota separately from short-window rate limits.
 	if resp.Usage != nil {
-		periodType := models.PeriodWeekly
-		if len(resp.Limits) > 0 {
-			periodType = resp.Limits[0].Window.PeriodType()
-		}
-		name := "Usage"
-		switch periodType {
-		case models.PeriodSession:
-			name = "Session (5h)"
-		case models.PeriodDaily:
-			name = "Daily"
-		case models.PeriodWeekly:
-			name = "Weekly"
-		}
 		periods = append(periods, models.UsagePeriod{
-			Name:        name,
+			Name:        "Weekly",
 			Utilization: resp.Usage.Utilization(),
-			PeriodType:  periodType,
+			PeriodType:  models.PeriodWeekly,
 			ResetsAt:    resp.Usage.ResetTimeUTC(),
 		})
 	}
@@ -302,7 +291,17 @@ func parseUsageResponse(resp UsageResponse, source string) *models.UsageSnapshot
 			continue
 		}
 		periodType := limit.Window.PeriodType()
-		name := limit.Window.DisplayName() + " limit"
+		name := limit.Window.DisplayName()
+		switch periodType {
+		case models.PeriodSession:
+			name = "Session (" + limit.Window.DisplayName() + ")"
+		case models.PeriodDaily:
+			name = "Daily"
+		case models.PeriodWeekly:
+			name = "Weekly"
+		case models.PeriodMonthly:
+			name = "Monthly"
+		}
 
 		periods = append(periods, models.UsagePeriod{
 			Name:        name,

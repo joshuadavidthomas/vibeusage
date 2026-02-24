@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -110,13 +112,16 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if creds.AccessToken == "" {
-		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
+		return fetch.ResultFatal("Invalid OAuth credentials: missing access_token"), nil
 	}
 
 	if creds.NeedsRefresh() {
 		refreshed := s.refreshToken(ctx, creds)
 		if refreshed == nil {
-			return fetch.ResultFail("Failed to refresh token"), nil
+			refreshed = s.tryRefreshViaCLI(ctx)
+		}
+		if refreshed == nil {
+			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with the Claude CLI."), nil
 		}
 		creds = refreshed
 	}
@@ -132,10 +137,10 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if resp.StatusCode == 401 {
-		return fetch.ResultFail("OAuth token expired or invalid"), nil
+		return fetch.ResultFatal("OAuth token expired or invalid. Re-authenticate with the Claude CLI."), nil
 	}
 	if resp.StatusCode == 403 {
-		return fetch.ResultFail("Not authorized to access usage"), nil
+		return fetch.ResultFatal("Not authorized to access usage."), nil
 	}
 	if resp.StatusCode != 200 {
 		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
@@ -227,6 +232,34 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredential
 	_ = config.WriteCredential(config.CredentialPath("claude", "oauth"), content)
 
 	return updated
+}
+
+// tryRefreshViaCLI attempts to refresh the OAuth token by running the
+// Claude CLI, which refreshes its stored credentials as a side effect of
+// startup. This handles the case where our own refresh call fails (e.g.
+// because the CLI uses a different client_id or PKCE parameters) but the
+// Claude CLI itself can still refresh successfully.
+func (s *OAuthStrategy) tryRefreshViaCLI(ctx context.Context) *OAuthCredentials {
+	claudePath, err := exec.LookPath("claude")
+	if err != nil {
+		return nil
+	}
+
+	tctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(tctx, claudePath, "--version")
+	cmd.Stdin = nil
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	_ = cmd.Run()
+
+	// Re-read credentials - return them only if they're now fresh.
+	creds := s.loadCredentials()
+	if creds == nil || creds.NeedsRefresh() {
+		return nil
+	}
+	return creds
 }
 
 // inferClaudePlan guesses the plan tier from usage response features.
