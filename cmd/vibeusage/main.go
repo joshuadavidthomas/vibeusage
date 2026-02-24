@@ -6,14 +6,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/joshuadavidthomas/vibeusage/cmd"
+	"github.com/joshuadavidthomas/vibeusage/internal/cli"
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
+	if err := cli.ExecuteContext(ctx); err != nil {
 		os.Exit(1)
 	}
 }
