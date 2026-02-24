@@ -53,6 +53,11 @@ var rootCmd = &cobra.Command{
 		l := newConfiguredLogger()
 		ctx := logging.WithLogger(cmd.Context(), l)
 		cmd.SetContext(ctx)
+
+		// Eagerly load config so malformed files surface a warning.
+		if _, err := config.Reload(); err != nil {
+			l.Warn("config file is malformed, using defaults", "err", err)
+		}
 	},
 	RunE: runDefaultUsage,
 }

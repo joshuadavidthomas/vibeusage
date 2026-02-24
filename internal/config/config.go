@@ -135,20 +135,20 @@ func Get() Config {
 	if globalConfig != nil {
 		return globalConfig.clone()
 	}
-	c := Load("")
+	c, _ := Load("")
 	globalConfig = &c
 	return c.clone()
 }
 
-func Reload() Config {
+func Reload() (Config, error) {
 	configMu.Lock()
 	defer configMu.Unlock()
-	c := Load("")
+	c, err := Load("")
 	globalConfig = &c
-	return c.clone()
+	return c.clone(), err
 }
 
-func Load(path string) Config {
+func Load(path string) (Config, error) {
 	if path == "" {
 		path = ConfigFile()
 	}
@@ -156,11 +156,11 @@ func Load(path string) Config {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return applyEnvOverrides(cfg)
+		return applyEnvOverrides(cfg), nil
 	}
 
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
-		return applyEnvOverrides(DefaultConfig())
+		return applyEnvOverrides(DefaultConfig()), fmt.Errorf("parsing config %s: %w", path, err)
 	}
 
 	// Ensure maps are initialized
@@ -171,7 +171,7 @@ func Load(path string) Config {
 		cfg.Roles = make(map[string]RoleConfig)
 	}
 
-	return applyEnvOverrides(cfg)
+	return applyEnvOverrides(cfg), nil
 }
 
 func Save(cfg Config, path string) error {
