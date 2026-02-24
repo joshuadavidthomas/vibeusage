@@ -19,11 +19,6 @@ var (
 	yellowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	redStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 
-	panelBorder = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1)
-
 	overageBorder = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("6")).
@@ -232,7 +227,7 @@ func renderPeriodTable(periods []models.UsagePeriod, cw PeriodColWidths) string 
 		resetPad := strings.Repeat(" ", max(0, cw.Reset-len(resetRaw)))
 
 		lines = append(lines,
-			boldStyle.Render(p.Name)+namePad+
+			p.Name+namePad+
 				"  "+RenderBar(p.Utilization, 20, color)+
 				" "+pctPad+colorStyle(color).Render(pctRaw)+
 				"    "+dimStyle.Render(resetRaw)+resetPad,
@@ -258,11 +253,37 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodCo
 		fmt.Fprintf(&b, "Extra: %s%.2f / %s%.2f %s", sym, o.Used, sym, o.Limit, o.Currency)
 	}
 
-	title := provider.DisplayName(snapshot.Provider)
+	title := titleStyle.Render(provider.DisplayName(snapshot.Provider))
 	if cached {
 		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
-	return panelBorder.Render(title + "\n" + b.String())
+	return renderTitledPanel(title, b.String())
+}
+
+func renderTitledPanel(title string, body string) string {
+	lines := strings.Split(body, "\n")
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+
+	bodyWidth := 0
+	for _, line := range lines {
+		bodyWidth = max(bodyWidth, lipgloss.Width(line))
+	}
+
+	innerWidth := max(bodyWidth+2, lipgloss.Width(title)+1)
+	top := separatorStyle.Render("╭─") + title + separatorStyle.Render(strings.Repeat("─", max(0, innerWidth-lipgloss.Width(title)-1))+"╮")
+	bottom := separatorStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
+
+	rows := make([]string, 0, len(lines)+2)
+	rows = append(rows, top)
+	for _, line := range lines {
+		pad := strings.Repeat(" ", max(0, bodyWidth-lipgloss.Width(line)))
+		rows = append(rows, separatorStyle.Render("│")+" "+line+pad+" "+separatorStyle.Render("│"))
+	}
+	rows = append(rows, bottom)
+
+	return strings.Join(rows, "\n")
 }
 
 // formatAge formats a duration as a compact human-readable age string.
