@@ -74,7 +74,7 @@ Findings from reviewing the codebase against canonical Go best practices (Effect
 
 ### 7. Warn on Malformed Config
 
-- [ ] `config.Load()`: When `toml.Decode` fails, log a warning (via the logger or return the error) instead of silently falling back to defaults
+- [x] `config.Load()`: When `toml.Decode` fails, log a warning (via the logger or return the error) instead of silently falling back to defaults
 
 ### 8. Make `modelmap` Init Explicit
 

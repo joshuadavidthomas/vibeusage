@@ -159,7 +159,8 @@ func seedDefaultRoles() {
 		// Non-fatal — roles are a convenience, not a requirement.
 		return
 	}
-	config.Reload()
+	// We just saved this config, so a parse error here would be unexpected.
+	_, _ = config.Reload()
 
 	outln()
 	outln("  Default roles added to config:")

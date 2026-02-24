@@ -207,7 +207,10 @@ func TestIsProviderEnabled(t *testing.T) {
 
 func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
 	dir := setupTempDir(t)
-	cfg := Load(filepath.Join(dir, "nonexistent.toml"))
+	cfg, err := Load(filepath.Join(dir, "nonexistent.toml"))
+	if err != nil {
+		t.Errorf("Load() error = %v, want nil for missing file", err)
+	}
 	def := DefaultConfig()
 
 	if cfg.Fetch.Timeout != def.Fetch.Timeout {
@@ -218,12 +221,18 @@ func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
 	}
 }
 
-func TestLoad_MalformedTOML_ReturnsDefaults(t *testing.T) {
+func TestLoad_MalformedTOML_ReturnsDefaultsAndError(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "bad.toml")
 	writeTestFile(t, path, []byte("this is not valid [[[toml"))
 
-	cfg := Load(path)
+	cfg, err := Load(path)
+	if err == nil {
+		t.Error("Load() should return an error for malformed TOML")
+	}
+	if !strings.Contains(err.Error(), "parsing config") {
+		t.Errorf("error should contain 'parsing config', got: %v", err)
+	}
 	def := DefaultConfig()
 
 	if cfg.Fetch.Timeout != def.Fetch.Timeout {
@@ -239,7 +248,10 @@ func TestLoad_PartialTOML_MergesWithDefaults(t *testing.T) {
 timeout = 10.0
 `))
 
-	cfg := Load(path)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Errorf("Load() error = %v, want nil for valid TOML", err)
+	}
 
 	if cfg.Fetch.Timeout != 10.0 {
 		t.Errorf("Fetch.Timeout = %v, want 10.0 (from file)", cfg.Fetch.Timeout)
@@ -262,7 +274,10 @@ func TestLoad_InitializesNilProvidersMap(t *testing.T) {
 timeout = 15.0
 `))
 
-	cfg := Load(path)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Errorf("Load() error = %v, want nil", err)
+	}
 	if cfg.Providers == nil {
 		t.Error("Providers map should be initialized when not present in TOML")
 	}
@@ -302,7 +317,10 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 		t.Fatalf("Save() error: %v", err)
 	}
 
-	loaded := Load(path)
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
 
 	if loaded.Fetch.Timeout != 99.0 {
 		t.Errorf("Fetch.Timeout = %v, want 99.0", loaded.Fetch.Timeout)
@@ -426,7 +444,10 @@ enabled_providers = ["claude", "copilot", "gemini"]
 
 	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "cursor")
 
-	cfg := Load(path)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
 	if len(cfg.EnabledProviders) != 1 || cfg.EnabledProviders[0] != "cursor" {
 		t.Errorf("Env override should take precedence. Got EnabledProviders = %v", cfg.EnabledProviders)
 	}
@@ -446,7 +467,7 @@ func TestGetAndReload_NoConcurrentRace(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			_ = Reload()
+			_, _ = Reload()
 		}()
 	}
 	wg.Wait()
@@ -494,9 +515,26 @@ func TestGet_ReturnsCopy(t *testing.T) {
 
 func TestReload_ReturnsCurrentConfig(t *testing.T) {
 	setupTempDir(t)
-	cfg := Reload()
+	cfg, err := Reload()
+	if err != nil {
+		t.Errorf("Reload() error = %v, want nil", err)
+	}
 	if cfg.Fetch.Timeout <= 0 {
 		t.Error("Reload() should return a valid config with positive timeout")
+	}
+}
+
+func TestReload_MalformedTOML_ReturnsError(t *testing.T) {
+	dir := setupTempDir(t)
+	path := filepath.Join(dir, "config", "config.toml")
+	writeTestFile(t, path, []byte("this is [[[not valid toml"))
+
+	_, err := Reload()
+	if err == nil {
+		t.Error("Reload() should return an error for malformed config file")
+	}
+	if !strings.Contains(err.Error(), "parsing config") {
+		t.Errorf("error should contain 'parsing config', got: %v", err)
 	}
 }
 
@@ -532,7 +570,10 @@ timeout = 10.0
 timeout = 20.0
 `))
 
-	cfg2 := Reload()
+	cfg2, err := Reload()
+	if err != nil {
+		t.Fatalf("Reload() error: %v", err)
+	}
 	if cfg2.Fetch.Timeout != 20.0 {
 		t.Errorf("Reload() Fetch.Timeout = %v, want 20.0", cfg2.Fetch.Timeout)
 	}
@@ -605,7 +646,10 @@ func TestRoles_SaveLoadRoundtrip(t *testing.T) {
 		t.Fatalf("Save() error: %v", err)
 	}
 
-	loaded := Load(path)
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
 
 	if len(loaded.Roles) != 2 {
 		t.Fatalf("Roles len = %d, want 2", len(loaded.Roles))
@@ -663,7 +707,10 @@ func TestLoad_InitializesNilRolesMap(t *testing.T) {
 timeout = 15.0
 `))
 
-	cfg := Load(path)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Errorf("Load() error = %v, want nil", err)
+	}
 	if cfg.Roles == nil {
 		t.Error("Roles map should be initialized when not present in TOML")
 	}
