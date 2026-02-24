@@ -55,13 +55,7 @@ You can also re-run the [install scripts](#quick-install-recommended) to upgrade
 
 ## Quick Start
 
-After installing, run the setup wizard once:
-
-```bash
-vibeusage init
-```
-
-Then check usage across your configured providers:
+If you already use AI coding tools (Claude Code, Codex CLI, Gemini CLI, Copilot, etc.), `vibeusage` auto-detects their credentials. Just run:
 
 ```bash
 $ vibeusage
@@ -81,6 +75,8 @@ $ vibeusage
 ```
 
 Bars are pace-colored: green (on track), yellow (slightly over pace), red (well over pace).
+
+For providers that need manual setup (API keys, browser tokens), see [Providers](#providers) below. You can also run `vibeusage init` for a guided setup wizard.
 
 ## Smart routing
 
@@ -142,177 +138,159 @@ vibeusage route <model>   # Best provider for a model
 
 ## Providers
 
-Each provider requires specific authentication. Follow the guides below:
+`vibeusage` checks for existing credentials first — CLI/app state files, then environment variables — so most providers work automatically if you already use their tools. Manual auth is there as a fallback.
 
 ### Amp
 
-**Required**: Amp API key or local Amp secrets
+[ampcode.com](https://ampcode.com) — Amp coding assistant. Reports daily usage and credit balance.
+
+If you have the Amp CLI installed, `vibeusage` reads credentials from `~/.local/share/amp/secrets.json` automatically. It also picks up `AMP_API_KEY` if you already have it set. Otherwise:
 
 ```bash
 vibeusage auth amp
 ```
 
-If Amp CLI is installed, vibeusage auto-detects `~/.local/share/amp/secrets.json`.
+### Claude Code Pro/Max
 
-### Claude Pro/Max
+[claude.ai](https://claude.ai) — Anthropic's Claude AI assistant. Reports session (5-hour) and weekly usage periods, plus overage spend if enabled. Shows your plan tier (Pro, Max, etc.).
 
-**Required**: Session key from Claude.ai
+If you have Claude Code installed, `vibeusage` reads its OAuth credentials from `~/.claude/.credentials.json` automatically — including token refresh. This is the recommended path.
+
+As a fallback, you can authenticate with a browser session key:
 
 ```bash
 vibeusage auth claude
 ```
 
-To get your session key:
-1. Open https://claude.ai in your browser
-2. Open DevTools (F12 or Cmd+Option+I)
-3. Go to Application → Cookies → https://claude.ai
-4. Find the `sessionKey` cookie
-5. Copy its value (starts with `sk-ant-sid01-`)
-6. Paste it when prompted
-
-**Alternative**: If you have the Claude CLI installed, vibeusage will automatically use its credentials from `~/.claude/.credentials.json`.
+This will prompt you to copy the `sessionKey` cookie from https://claude.ai (DevTools → Application → Cookies). Session keys don't auto-refresh, so you'll need to re-auth when they expire.
 
 ### Cursor
 
-**Required**: Session token from browser cookies
+[cursor.com](https://cursor.com) — AI-powered code editor. Reports monthly premium request usage and on-demand spend. Shows your membership type.
+
+Cursor requires a browser session token:
 
 ```bash
 vibeusage auth cursor
 ```
 
-The tool will attempt to extract your session token from your browser automatically. If that fails:
-
-1. Open https://cursor.com in your browser
-2. Extract your session cookie
-3. Run `vibeusage key cursor set` and paste the token
+The prompt walks you through extracting your session cookie from https://cursor.com (DevTools → Application → Cookies). You can also set it directly with `vibeusage key cursor set`.
 
 ### Google Antigravity
 
-**Required**: Antigravity IDE installed with active Google login
+[antigravity.google](https://antigravity.google) — Google's AI IDE (formerly Project IDX). Reports per-model usage and code assist quotas.
 
-Antigravity credentials are automatically detected from the IDE's state database. No manual setup is needed — just sign into the Antigravity IDE.
+`vibeusage` reads credentials from the local Antigravity IDE state automatically. Just sign into Antigravity and it should work — no manual setup needed.
+
+### Google Gemini CLI
+
+[gemini.google.com](https://gemini.google.com) — Google Gemini AI. Reports daily request and code assist quotas. Shows your user tier.
+
+If you have the Gemini CLI installed, `vibeusage` reads its OAuth credentials from `~/.gemini/oauth_creds.json` automatically — including token refresh. This gives you the full quota view from the Cloud Code API.
+
+You can also use an AI Studio API key:
 
 ```bash
-vibeusage antigravity
-```
-
-### Google Gemini
-
-**Required**: API key or OAuth tokens
-
-```bash
-# Option 1: Use API key
-export GEMINI_API_KEY=your_api_key_here
+# If you already have GEMINI_API_KEY set, it just works
 vibeusage gemini
 
-# Option 2: Use OAuth (recommended for full features)
+# Otherwise, set one up:
 vibeusage auth gemini
 ```
 
+The API key path reports rate-limit-based usage (requests per minute/day) rather than quota percentages.
+
 ### GitHub Copilot
 
-**Required**: GitHub OAuth token via device flow
+[github.com/features/copilot](https://github.com/features/copilot) — GitHub's AI pair programmer. Reports monthly usage across premium interactions, chat, and completions quotas.
+
+`vibeusage` reuses existing Copilot credentials from `~/.config/github-copilot/hosts.json` when available. If you don't have those, authenticate via device flow:
 
 ```bash
 vibeusage auth copilot
 ```
 
-You'll be prompted to:
-1. Visit a verification URL in your browser
-2. Enter a device code
-3. Authorize the vibeusage application
-
-**Alternative**: If you have the GitHub CLI installed, vibeusage can use your existing `gh auth login` credentials.
+This opens a browser-based GitHub authorization flow — you'll get a device code to enter at github.com/login/device.
 
 ### Kimi Code
 
-**Required**: OAuth token via device flow or API key
+[kimi.com](https://www.kimi.com) — Moonshot AI coding assistant. Reports weekly usage and per-window quotas.
+
+If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, `vibeusage` reads its credentials from `~/.kimi/credentials/kimi-code.json` automatically — including token refresh. It also picks up `KIMI_CODE_API_KEY` if set.
+
+Otherwise, authenticate via device flow:
 
 ```bash
-# Option 1: Device flow OAuth (recommended)
 vibeusage auth kimicode
-
-# Option 2: Use API key
-export KIMI_CODE_API_KEY=your_api_key_here
-vibeusage kimicode
 ```
-
-For device flow, you'll be prompted to authorize in your browser. If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, vibeusage will automatically use its credentials from `~/.kimi/credentials/kimi-code.json`.
 
 ### Kimi K2
 
-**Required**: Kimi K2 API key
+[kimi-k2.ai](https://kimi-k2.ai) — Kimi K2 API. Reports monthly token usage against your quota.
+
+Requires an API key. Set `KIMI_K2_API_KEY` in your environment (also accepts `KIMI_API_KEY` or `KIMI_KEY`), or store one with:
 
 ```bash
 vibeusage auth kimik2
 ```
 
-Set `KIMI_K2_API_KEY` (or `KIMI_API_KEY` / `KIMI_KEY`) as alternatives.
-
 ### Minimax
 
-**Required**: Coding Plan API key
+[minimax.io](https://www.minimax.io) — Minimax AI coding assistant. Reports per-model usage against your coding plan limits.
+
+Requires a **Coding Plan** API key (starts with `sk-cp-`). Standard API keys (`sk-api-`) won't work. Get yours from https://platform.minimax.io/user-center/payment/coding-plan.
+
+Set `MINIMAX_API_KEY` in your environment, or store one with:
 
 ```bash
 vibeusage auth minimax
 ```
 
-To get your Coding Plan API key:
-1. Open https://platform.minimax.io/user-center/payment/coding-plan
-2. Copy your Coding Plan API key (starts with `sk-cp-`)
-
-**Note**: Standard API keys (`sk-api-`) won't work — you need a Coding Plan key.
-
-**Alternative**: Set the `MINIMAX_API_KEY` environment variable.
-
 ### OpenAI Codex
 
-**Required**: OAuth tokens from Codex CLI
+[chatgpt.com](https://chatgpt.com) — OpenAI's ChatGPT and Codex. Reports session and weekly usage periods. Shows your subscription tier (Plus, Pro, etc.).
+
+If you have the Codex CLI installed, `vibeusage` reads its OAuth credentials from `~/.codex/auth.json` automatically — including token refresh. This is the recommended path:
 
 ```bash
-# First, authenticate with the Codex CLI
+# Authenticate with the Codex CLI first
 codex auth login
 
-# Then vibeusage will automatically detect your credentials
+# Then vibeusage picks it up automatically
 vibeusage codex
 ```
 
-**Alternative**: Set the `OPENAI_API_KEY` environment variable.
+As a fallback, `vibeusage auth codex` lets you paste a bearer token manually, though those don't auto-refresh.
 
 ### OpenRouter
 
-**Required**: OpenRouter API key
+[openrouter.ai](https://openrouter.ai) — Unified model gateway. Reports credit usage (dollars spent vs. total credits).
+
+Requires an API key. Set `OPENROUTER_API_KEY` in your environment, or store one with:
 
 ```bash
 vibeusage auth openrouter
 ```
 
-Set `OPENROUTER_API_KEY` as an alternative.
-
 ### Warp
 
-**Required**: Warp API token (`wk-...`)
+[warp.dev](https://warp.dev) — Warp terminal AI. Reports monthly request usage and AI action quotas.
+
+Requires an API key. Set `WARP_API_KEY` in your environment (also accepts `WARP_TOKEN`), or store one with:
 
 ```bash
 vibeusage auth warp
 ```
 
-Set `WARP_API_KEY` or `WARP_TOKEN` as alternatives.
-
 ### Z.ai
 
-**Required**: API key
+[z.ai](https://z.ai) — Zhipu AI coding assistant. Reports credit usage against your API quota.
+
+Requires an API key. Get one from https://z.ai/manage-apikey/apikey-list. Set `ZAI_API_KEY` in your environment, or store one with:
 
 ```bash
 vibeusage auth zai
 ```
-
-To get your API key:
-1. Open https://z.ai/manage-apikey/apikey-list
-2. Create a new API key (or copy an existing one)
-3. Paste it when prompted
-
-**Alternative**: Set the `ZAI_API_KEY` environment variable.
 
 ## Additional Commands
 
