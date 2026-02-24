@@ -216,6 +216,10 @@ func formatHM(h, m int) string { return strconv.Itoa(h) + "h " + strconv.Itoa(m)
 func formatM(m int) string     { return strconv.Itoa(m) + "m" }
 
 func PaceToColor(paceRatio *float64, utilization int) string {
+	// Exhausted quota is always red — you're blocked regardless of pace.
+	if utilization >= 100 {
+		return "red"
+	}
 	if paceRatio == nil {
 		if utilization < 50 {
 			return "green"
