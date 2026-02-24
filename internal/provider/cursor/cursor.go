@@ -29,6 +29,12 @@ func (c Cursor) Meta() provider.Metadata {
 	}
 }
 
+func (c Cursor) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		EnvVars: []string{"CURSOR_API_KEY"},
+	}
+}
+
 func (c Cursor) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{&WebStrategy{HTTPTimeout: timeout}}

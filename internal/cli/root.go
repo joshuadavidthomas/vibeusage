@@ -101,7 +101,7 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if config.IsFirstRun() && !jsonOutput && !quiet {
+	if provider.IsFirstRun() && !jsonOutput && !quiet {
 		showFirstRunMessage()
 		return nil
 	}

@@ -55,17 +55,17 @@ Adding a provider means updating both the provider package AND the credential ma
 
 Move credential knowledge into the provider interface. Each provider already knows its credential paths (strategy `IsAvailable()` checks them) and env vars.
 
-- [ ] Add `CredentialSources() CredentialInfo` to the `Provider` interface (or a new optional interface)
+- [x] Add `CredentialSources() CredentialInfo` to the `Provider` interface (or a new optional interface)
   ```go
   type CredentialInfo struct {
       CLIPaths []string // e.g. {"~/.claude/.credentials.json"}
       EnvVar   string   // e.g. "ANTHROPIC_API_KEY"
   }
   ```
-- [ ] Implement on each provider
-- [ ] Replace `ProviderCLIPaths` / `ProviderEnvVars` maps with calls to the registry
-- [ ] `IsFirstRun()`, `CountConfiguredProviders()`, `GetAllCredentialStatus()` iterate `provider.All()` instead of a hardcoded map
-- [ ] Delete the maps from `config/credentials.go`
+- [x] Implement on each provider
+- [x] Replace `ProviderCLIPaths` / `ProviderEnvVars` maps with calls to the registry
+- [x] `IsFirstRun()`, `CountConfiguredProviders()`, `GetAllCredentialStatus()` iterate `provider.All()` instead of a hardcoded map
+- [x] Delete the maps from `config/credentials.go`
 
 ## 3. Test file organization in `internal/cli/`
 

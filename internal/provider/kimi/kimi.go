@@ -29,6 +29,13 @@ func (k Kimi) Meta() provider.Metadata {
 	}
 }
 
+func (k Kimi) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		CLIPaths: []string{"~/.kimi/credentials/kimi-code.json"},
+		EnvVars:  []string{"KIMI_CODE_API_KEY"},
+	}
+}
+
 func (k Kimi) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{

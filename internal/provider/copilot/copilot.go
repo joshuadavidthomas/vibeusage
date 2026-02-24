@@ -28,6 +28,13 @@ func (c Copilot) Meta() provider.Metadata {
 	}
 }
 
+func (c Copilot) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		CLIPaths: []string{"~/.config/github-copilot/hosts.json"},
+		EnvVars:  []string{"GITHUB_TOKEN"},
+	}
+}
+
 func (c Copilot) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{&DeviceFlowStrategy{HTTPTimeout: timeout}}

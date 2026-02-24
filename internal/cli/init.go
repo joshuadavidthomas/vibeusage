@@ -28,8 +28,8 @@ var initCmd = &cobra.Command{
 
 		if jsonOutput {
 			return display.OutputJSON(outWriter, display.InitStatusJSON{
-				FirstRun:            config.IsFirstRun(),
-				ConfiguredProviders: config.CountConfiguredProviders(),
+				FirstRun:            provider.IsFirstRun(),
+				ConfiguredProviders: provider.CountConfigured(),
 				AvailableProviders:  provider.ListIDs(),
 			})
 		}
@@ -56,7 +56,7 @@ func quickSetup() error {
 	outln("Claude is the most popular AI assistant for agentic workflows.")
 	outln()
 
-	hasCreds, _ := config.CheckProviderCredentials("claude")
+	hasCreds, _ := provider.CheckCredentials("claude")
 	if hasCreds {
 		outln("✓ Claude is already configured!")
 		outln("\nRun 'vibeusage' to see your usage.")
@@ -88,7 +88,7 @@ func interactiveWizard() error {
 	// Build options for multi-select
 	options := make([]prompt.SelectOption, 0, len(allProviders))
 	for _, pid := range allProviders {
-		hasCreds, _ := config.CheckProviderCredentials(pid)
+		hasCreds, _ := provider.CheckCredentials(pid)
 		status := ""
 		if hasCreds {
 			status = "✓ "
@@ -121,7 +121,7 @@ func interactiveWizard() error {
 	out("\nSet up %d provider(s):\n\n", len(selected))
 
 	for _, pid := range selected {
-		hasCreds, _ := config.CheckProviderCredentials(pid)
+		hasCreds, _ := provider.CheckCredentials(pid)
 		if hasCreds {
 			out("  ✓ %s already configured\n", pid)
 		} else {

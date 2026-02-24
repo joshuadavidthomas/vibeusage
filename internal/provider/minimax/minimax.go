@@ -26,6 +26,12 @@ func (m Minimax) Meta() provider.Metadata {
 	}
 }
 
+func (m Minimax) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		EnvVars: []string{"MINIMAX_API_KEY"},
+	}
+}
+
 func (m Minimax) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{

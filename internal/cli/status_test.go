@@ -268,6 +268,10 @@ func (s *statusStubProvider) Meta() provider.Metadata {
 	return provider.Metadata{ID: s.id, Name: s.id}
 }
 
+func (s *statusStubProvider) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{}
+}
+
 func (s *statusStubProvider) FetchStrategies() []fetch.Strategy {
 	return nil
 }

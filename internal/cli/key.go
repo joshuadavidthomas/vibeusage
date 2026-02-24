@@ -11,6 +11,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
@@ -29,7 +30,7 @@ func init() {
 }
 
 func displayAllCredentialStatus() error {
-	allStatus := config.GetAllCredentialStatus()
+	allStatus := provider.GetAllCredentialStatus()
 
 	if jsonOutput {
 		data := make(map[string]display.KeyStatusEntryJSON)
@@ -114,7 +115,7 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 		Use:   providerID,
 		Short: fmt.Sprintf("Manage %s credentials", titleName),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			found, source, path := config.FindProviderCredential(providerID)
+			found, source, path := provider.FindCredential(providerID)
 
 			if jsonOutput {
 				return display.OutputJSON(outWriter, display.KeyDetailJSON{

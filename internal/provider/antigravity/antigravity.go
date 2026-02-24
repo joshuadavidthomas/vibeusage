@@ -32,6 +32,13 @@ func (a Antigravity) Meta() provider.Metadata {
 	}
 }
 
+func (a Antigravity) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		CLIPaths: []string{"~/.config/Antigravity/credentials.json"},
+		EnvVars:  []string{"ANTIGRAVITY_API_KEY"},
+	}
+}
+
 func (a Antigravity) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{

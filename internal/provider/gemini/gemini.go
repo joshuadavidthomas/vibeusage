@@ -31,6 +31,13 @@ func (g Gemini) Meta() provider.Metadata {
 	}
 }
 
+func (g Gemini) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		CLIPaths: []string{"~/.gemini/oauth_creds.json"},
+		EnvVars:  []string{"GEMINI_API_KEY"},
+	}
+}
+
 func (g Gemini) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{

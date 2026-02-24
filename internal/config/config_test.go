@@ -36,8 +36,12 @@ func setupTempDirWithCredentialIsolation(t *testing.T) string {
 	t.Helper()
 	dir := setupTempDir(t)
 
-	// Clear all provider env vars so env-based detection doesn't fire
-	for _, envVar := range ProviderEnvVars {
+	// Clear common provider env vars so env-based detection doesn't fire
+	for _, envVar := range []string{
+		"ANTIGRAVITY_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+		"GEMINI_API_KEY", "GITHUB_TOKEN", "CURSOR_API_KEY",
+		"KIMI_CODE_API_KEY", "MINIMAX_API_KEY", "ZAI_API_KEY",
+	} {
 		t.Setenv(envVar, "")
 	}
 
@@ -1253,7 +1257,7 @@ func TestFindProviderCredential_VibeusageStorage(t *testing.T) {
 		t.Fatalf("WriteCredential() error: %v", err)
 	}
 
-	found, source, path := FindProviderCredential("claude")
+	found, source, path := FindProviderCredential("claude", nil, nil)
 	if !found {
 		t.Error("should find credential in vibeusage storage")
 	}
@@ -1269,7 +1273,7 @@ func TestFindProviderCredential_EnvVar(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
 	t.Setenv("ANTHROPIC_API_KEY", "sk-test-key")
 
-	found, source, path := FindProviderCredential("claude")
+	found, source, path := FindProviderCredential("claude", nil, []string{"ANTHROPIC_API_KEY"})
 	if !found {
 		t.Error("should find credential from env var")
 	}
@@ -1281,11 +1285,13 @@ func TestFindProviderCredential_EnvVar(t *testing.T) {
 	}
 }
 
-func TestFindProviderCredential_UnknownProvider(t *testing.T) {
+func TestFindProviderCredential_NoEnvVars(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
-	found, source, path := FindProviderCredential("unknownprovider")
+
+	// With no env vars and no vibeusage storage, should not find anything
+	found, source, path := FindProviderCredential("unknownprovider", nil, nil)
 	if found {
-		t.Error("should not find credential for unknown provider")
+		t.Error("should not find credential with empty sources")
 	}
 	if source != "" {
 		t.Errorf("source = %q, want empty", source)
@@ -1302,7 +1308,7 @@ func TestFindProviderCredential_VibeusageTakesPrecedenceOverEnv(t *testing.T) {
 	credPath := CredentialPath("claude", "session")
 	_ = WriteCredential(credPath, []byte(`{"key":"val"}`))
 
-	_, source, _ := FindProviderCredential("claude")
+	_, source, _ := FindProviderCredential("claude", nil, []string{"ANTHROPIC_API_KEY"})
 	if source != "vibeusage" {
 		t.Errorf("vibeusage storage should take precedence, got source = %q", source)
 	}
@@ -1318,7 +1324,7 @@ func TestFindProviderCredential_CredentialTypes(t *testing.T) {
 			credPath := CredentialPath("claude", credType)
 			_ = WriteCredential(credPath, []byte(`{}`))
 
-			found, source, _ := FindProviderCredential("claude")
+			found, source, _ := FindProviderCredential("claude", nil, nil)
 			if !found {
 				t.Errorf("should find %s credential", credType)
 			}
@@ -1326,105 +1332,6 @@ func TestFindProviderCredential_CredentialTypes(t *testing.T) {
 				t.Errorf("source = %q, want %q", source, "vibeusage")
 			}
 		})
-	}
-}
-
-// CheckProviderCredentials
-
-func TestCheckProviderCredentials_Found(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
-
-	hasCreds, source := CheckProviderCredentials("claude")
-	if !hasCreds {
-		t.Error("should report credentials found")
-	}
-	if source != "vibeusage" {
-		t.Errorf("source = %q, want %q", source, "vibeusage")
-	}
-}
-
-func TestCheckProviderCredentials_NotFound(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-	hasCreds, source := CheckProviderCredentials("claude")
-	if hasCreds {
-		t.Error("should report no credentials")
-	}
-	if source != "" {
-		t.Errorf("source = %q, want empty", source)
-	}
-}
-
-// GetAllCredentialStatus
-
-func TestGetAllCredentialStatus_ReturnsAllProviders(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-	status := GetAllCredentialStatus()
-
-	// Should have an entry for every provider in ProviderCLIPaths
-	for providerID := range ProviderCLIPaths {
-		if _, ok := status[providerID]; !ok {
-			t.Errorf("missing status for provider %q", providerID)
-		}
-	}
-}
-
-func TestGetAllCredentialStatus_ReflectsCredentials(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-
-	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
-
-	status := GetAllCredentialStatus()
-
-	claudeStatus := status["claude"]
-	if !claudeStatus.HasCredentials {
-		t.Error("claude should have credentials")
-	}
-	if claudeStatus.Source != "vibeusage" {
-		t.Errorf("claude source = %q, want %q", claudeStatus.Source, "vibeusage")
-	}
-
-	copilotStatus := status["copilot"]
-	if copilotStatus.HasCredentials {
-		t.Error("copilot should not have credentials")
-	}
-}
-
-// IsFirstRun
-
-func TestIsFirstRun_NoCreds(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-	if !IsFirstRun() {
-		t.Error("IsFirstRun() should be true when no credentials exist")
-	}
-}
-
-func TestIsFirstRun_WithCreds(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
-
-	if IsFirstRun() {
-		t.Error("IsFirstRun() should be false when credentials exist")
-	}
-}
-
-// CountConfiguredProviders
-
-func TestCountConfiguredProviders_None(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-	if got := CountConfiguredProviders(); got != 0 {
-		t.Errorf("CountConfiguredProviders() = %d, want 0", got)
-	}
-}
-
-func TestCountConfiguredProviders_Some(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-
-	_ = WriteCredential(CredentialPath("claude", "oauth"), []byte(`{}`))
-	_ = WriteCredential(CredentialPath("copilot", "session"), []byte(`{}`))
-
-	if got := CountConfiguredProviders(); got != 2 {
-		t.Errorf("CountConfiguredProviders() = %d, want 2", got)
 	}
 }
 
