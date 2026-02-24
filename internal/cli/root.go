@@ -33,7 +33,8 @@ import (
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/zai"
 )
 
-const version = "0.1.0"
+// version is injected at build time via -ldflags.
+var version = "dev"
 
 var (
 	jsonOutput bool
@@ -79,6 +80,7 @@ func init() {
 	rootCmd.AddCommand(keyCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(routeCmd)
+	rootCmd.AddCommand(updateCmd)
 
 	ids := provider.ListIDs()
 	sort.Strings(ids)

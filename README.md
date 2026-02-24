@@ -17,9 +17,17 @@ A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, G
 
 ## Installation
 
-### Prerequisites
+### Install via GitHub Releases script (macOS/Linux)
 
-- Go 1.25.6 or later
+```bash
+curl -fsSL https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.sh | sh
+```
+
+### Install via GitHub Releases script (Windows PowerShell)
+
+```powershell
+iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.ps1 -useb | iex
+```
 
 ### Install with go install
 
@@ -32,8 +40,39 @@ go install github.com/joshuadavidthomas/vibeusage@latest
 ```bash
 git clone https://github.com/joshuadavidthomas/vibeusage.git
 cd vibeusage
-go build -o vibeusage .
+go build -o vibeusage ./cmd/vibeusage
 ```
+
+### Install a specific version with scripts
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.sh | VIBEUSAGE_VERSION=v0.1.0 sh
+```
+
+```powershell
+$env:VIBEUSAGE_VERSION = "v0.1.0"
+iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.ps1 -useb | iex
+```
+
+## Updating
+
+```bash
+# Check for updates
+vibeusage update --check
+
+# Update to latest release
+vibeusage update
+
+# Non-interactive update
+vibeusage update --yes
+
+# Install a specific version
+vibeusage update --version v0.1.0 --yes
+```
+
+You can also re-run the install scripts to upgrade in place.
+
+Install scripts place the binary in `~/.local/bin` by default (override with `VIBEUSAGE_INSTALL_DIR`). Ensure that directory is on your `PATH`.
 
 ## Quick Start
 
@@ -353,6 +392,25 @@ vibeusage status
 vibeusage status --json
 ```
 
+### Update Commands
+
+```bash
+# Check for updates only
+vibeusage update --check
+
+# Install the latest release
+vibeusage update
+
+# Install without interactive prompt
+vibeusage update --yes
+
+# Install a specific version
+vibeusage update --version v0.1.0 --yes
+
+# JSON output (requires --check or --yes)
+vibeusage update --check --json
+```
+
 ## Configuration
 
 ### Config File Location
@@ -480,6 +538,10 @@ go build -o vibeusage .
 ```bash
 golangci-lint run
 ```
+
+### Release
+
+See `docs/releasing.md` for the tag-and-publish workflow.
 
 ## License
 
