@@ -275,11 +275,11 @@ We prioritize providers by:
 
 ### Milestone A (P0)
 
-- [ ] OpenRouter
-- [ ] Warp
-- [ ] KimiK2
-- [ ] Amp
-- [ ] Docs and auth/key UX updates for all P0 providers
+- [x] OpenRouter
+- [x] Warp
+- [x] KimiK2
+- [x] Amp
+- [x] Docs and auth/key UX updates for all P0 providers
 
 ### Milestone B (P1)
 

@@ -2,12 +2,12 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, Gemini, Antigravity, Kimi, Z.ai, and Minimax with consistent formatting, progress indicators, and offline support.
+A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, Gemini, Antigravity, Kimi, Kimi K2, OpenRouter, Warp, Amp, Z.ai, and Minimax with consistent formatting, progress indicators, and offline support.
 
 ## Features
 
 - **Unified Interface**: Single command to check usage across all configured providers
-- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini, Antigravity, Kimi, Z.ai, Minimax
+- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini, Antigravity, Kimi, Kimi K2, OpenRouter, Warp, Amp, Z.ai, Minimax
 - **Concurrent Fetching**: Check all providers in parallel
 - **Offline Support**: Displays cached data when network is unavailable
 - **JSON Output**: Scriptable with `--json` flag
@@ -63,6 +63,10 @@ vibeusage cursor
 vibeusage gemini
 vibeusage antigravity
 vibeusage kimi
+vibeusage kimik2
+vibeusage openrouter
+vibeusage warp
+vibeusage amp
 vibeusage zai
 vibeusage minimax
 ```
@@ -150,6 +154,46 @@ vibeusage gemini
 # Option 2: Use OAuth (recommended for full features)
 vibeusage auth gemini
 ```
+
+### OpenRouter
+
+**Required**: OpenRouter API key
+
+```bash
+vibeusage auth openrouter
+```
+
+Set `OPENROUTER_API_KEY` as an alternative.
+
+### Warp
+
+**Required**: Warp API token (`wk-...`)
+
+```bash
+vibeusage auth warp
+```
+
+Set `WARP_API_KEY` or `WARP_TOKEN` as alternatives.
+
+### Kimi K2
+
+**Required**: Kimi K2 API key
+
+```bash
+vibeusage auth kimik2
+```
+
+Set `KIMI_K2_API_KEY` (or `KIMI_API_KEY` / `KIMI_KEY`) as alternatives.
+
+### Amp
+
+**Required**: Amp API key or local Amp secrets
+
+```bash
+vibeusage auth amp
+```
+
+If Amp CLI is installed, vibeusage auto-detects `~/.local/share/amp/secrets.json`.
 
 ### Antigravity (Google)
 
@@ -247,6 +291,10 @@ vibeusage auth codex
 vibeusage auth copilot
 vibeusage auth cursor
 vibeusage auth gemini
+vibeusage auth openrouter
+vibeusage auth warp
+vibeusage auth kimik2
+vibeusage auth amp
 vibeusage auth kimi
 vibeusage auth minimax
 vibeusage auth zai
@@ -344,6 +392,13 @@ reuse_provider_credentials = true      # Auto-detect CLI credentials
 | `OPENAI_API_KEY` | OpenAI API key |
 | `GEMINI_API_KEY` | Gemini API key |
 | `GITHUB_TOKEN` | GitHub token for Copilot |
+| `OPENROUTER_API_KEY` | OpenRouter API key |
+| `WARP_API_KEY` | Warp API key |
+| `WARP_TOKEN` | Warp token fallback |
+| `KIMI_K2_API_KEY` | Kimi K2 API key |
+| `KIMI_API_KEY` | Kimi/Kimi K2 API key fallback |
+| `KIMI_KEY` | Kimi K2 API key fallback |
+| `AMP_API_KEY` | Amp API key |
 | `KIMI_CODE_API_KEY` | Kimi API key |
 | `ZAI_API_KEY` | Z.ai API key |
 | `MINIMAX_API_KEY` | Minimax Coding Plan API key |
