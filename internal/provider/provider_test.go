@@ -12,10 +12,15 @@ import (
 type stubProvider struct {
 	id         string
 	strategies []fetch.Strategy
+	creds      CredentialInfo
 }
 
 func (s *stubProvider) Meta() Metadata {
 	return Metadata{ID: s.id, Name: s.id}
+}
+
+func (s *stubProvider) CredentialSources() CredentialInfo {
+	return s.creds
 }
 
 func (s *stubProvider) FetchStrategies() []fetch.Strategy {

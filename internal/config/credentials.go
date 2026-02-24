@@ -6,32 +6,6 @@ import (
 	"path/filepath"
 )
 
-// ProviderCLIPaths maps provider IDs to their CLI credential file paths.
-var ProviderCLIPaths = map[string][]string{
-	"antigravity": {"~/.config/Antigravity/credentials.json"},
-	"claude":      {"~/.claude/.credentials.json"},
-	"codex":       {"~/.codex/auth.json"},
-	"gemini":      {"~/.gemini/oauth_creds.json"},
-	"copilot":     {"~/.config/github-copilot/hosts.json"},
-	"cursor":      {"~/.cursor/mcp-state.json"},
-	"kimi":        {"~/.kimi/credentials/kimi-code.json"},
-	"minimax":     {},
-	"zai":         {},
-}
-
-// ProviderEnvVars maps provider IDs to their environment variable names.
-var ProviderEnvVars = map[string]string{
-	"antigravity": "ANTIGRAVITY_API_KEY",
-	"claude":      "ANTHROPIC_API_KEY",
-	"codex":       "OPENAI_API_KEY",
-	"gemini":      "GEMINI_API_KEY",
-	"copilot":     "GITHUB_TOKEN",
-	"cursor":      "CURSOR_API_KEY",
-	"kimi":        "KIMI_CODE_API_KEY",
-	"minimax":     "MINIMAX_API_KEY",
-	"zai":         "ZAI_API_KEY",
-}
-
 func CredentialPath(providerID, credType string) string {
 	return filepath.Join(CredentialsDir(), providerID, credType+".json")
 }
@@ -47,9 +21,12 @@ func expandPath(p string) string {
 	return p
 }
 
-// FindProviderCredential checks for credentials in vibeusage storage, provider CLIs, and env vars.
+// FindProviderCredential checks for credentials in vibeusage storage,
+// provider CLI paths, and environment variables.
+// cliPaths are external CLI credential file paths (may contain ~ for home).
+// envVars are environment variable names to check.
 // Returns (found, source, path).
-func FindProviderCredential(providerID string) (bool, string, string) {
+func FindProviderCredential(providerID string, cliPaths []string, envVars []string) (bool, string, string) {
 	cfg := Get()
 
 	// Check vibeusage storage first
@@ -62,18 +39,16 @@ func FindProviderCredential(providerID string) (bool, string, string) {
 
 	// Check provider CLI credentials
 	if cfg.Credentials.ReuseProviderCredentials {
-		if paths, ok := ProviderCLIPaths[providerID]; ok {
-			for _, raw := range paths {
-				p := expandPath(raw)
-				if fileExists(p) {
-					return true, "provider_cli", p
-				}
+		for _, raw := range cliPaths {
+			p := expandPath(raw)
+			if fileExists(p) {
+				return true, "provider_cli", p
 			}
 		}
 	}
 
 	// Check environment variables
-	if envVar, ok := ProviderEnvVars[providerID]; ok {
+	for _, envVar := range envVars {
 		if os.Getenv(envVar) != "" {
 			return true, "env", ""
 		}
@@ -111,48 +86,10 @@ func DeleteCredential(path string) bool {
 	return true
 }
 
-func CheckProviderCredentials(providerID string) (bool, string) {
-	found, source, _ := FindProviderCredential(providerID)
-	return found, source
-}
-
 // CredentialStatus reports whether a provider has credentials and their source.
 type CredentialStatus struct {
 	HasCredentials bool
 	Source         string
-}
-
-func GetAllCredentialStatus() map[string]CredentialStatus {
-	status := make(map[string]CredentialStatus)
-	for providerID := range ProviderCLIPaths {
-		hasCreds, source := CheckProviderCredentials(providerID)
-		status[providerID] = CredentialStatus{
-			HasCredentials: hasCreds,
-			Source:         source,
-		}
-	}
-	return status
-}
-
-func IsFirstRun() bool {
-	for providerID := range ProviderCLIPaths {
-		hasCreds, _ := CheckProviderCredentials(providerID)
-		if hasCreds {
-			return false
-		}
-	}
-	return true
-}
-
-func CountConfiguredProviders() int {
-	count := 0
-	for providerID := range ProviderCLIPaths {
-		hasCreds, _ := CheckProviderCredentials(providerID)
-		if hasCreds {
-			count++
-		}
-	}
-	return count
 }
 
 func fileExists(path string) bool {

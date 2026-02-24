@@ -26,6 +26,12 @@ func (z Zai) Meta() provider.Metadata {
 	}
 }
 
+func (z Zai) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		EnvVars: []string{"ZAI_API_KEY"},
+	}
+}
+
 func (z Zai) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{

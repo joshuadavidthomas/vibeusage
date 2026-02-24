@@ -46,7 +46,7 @@ func authStatusCommand() error {
 	if jsonOutput {
 		data := make(map[string]display.AuthStatusEntryJSON)
 		for _, pid := range allProviders {
-			hasCreds, source := config.CheckProviderCredentials(pid)
+			hasCreds, source := provider.CheckCredentials(pid)
 			data[pid] = display.AuthStatusEntryJSON{
 				Authenticated: hasCreds,
 				Source:        sourceToLabel(source),
@@ -57,7 +57,7 @@ func authStatusCommand() error {
 
 	if quiet {
 		for _, pid := range allProviders {
-			hasCreds, _ := config.CheckProviderCredentials(pid)
+			hasCreds, _ := provider.CheckCredentials(pid)
 			status := "not configured"
 			if hasCreds {
 				status = "authenticated"
@@ -70,7 +70,7 @@ func authStatusCommand() error {
 	var rows [][]string
 	var unconfigured []string
 	for _, pid := range allProviders {
-		hasCreds, source := config.CheckProviderCredentials(pid)
+		hasCreds, source := provider.CheckCredentials(pid)
 		if hasCreds {
 			rows = append(rows, []string{pid, "✓ Authenticated", sourceToLabel(source)})
 		} else {
@@ -121,7 +121,7 @@ func authProvider(providerID string, p provider.Provider) error {
 
 // authDeviceFlow runs an OAuth/device-code flow with re-auth check.
 func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
-	hasCreds, source := config.CheckProviderCredentials(providerID)
+	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
 		out("✓ %s is already authenticated (%s)\n",
 			strutil.TitleCase(providerID), sourceToLabel(source))
@@ -149,7 +149,7 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 
 // authManualKey runs an interactive manual-key input flow.
 func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
-	hasCreds, source := config.CheckProviderCredentials(providerID)
+	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
 		out("✓ %s is already authenticated (%s)\n",
 			strutil.TitleCase(providerID), sourceToLabel(source))
@@ -192,7 +192,7 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 }
 
 func authGeneric(providerID string) error {
-	hasCreds, source := config.CheckProviderCredentials(providerID)
+	hasCreds, source := provider.CheckCredentials(providerID)
 
 	if hasCreds {
 		if !quiet {

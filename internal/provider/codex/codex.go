@@ -29,6 +29,13 @@ func (c Codex) Meta() provider.Metadata {
 	}
 }
 
+func (c Codex) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		CLIPaths: []string{"~/.codex/auth.json"},
+		EnvVars:  []string{"OPENAI_API_KEY"},
+	}
+}
+
 func (c Codex) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{&OAuthStrategy{HTTPTimeout: timeout}}

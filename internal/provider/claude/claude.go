@@ -30,6 +30,13 @@ func (c Claude) Meta() provider.Metadata {
 	}
 }
 
+func (c Claude) CredentialSources() provider.CredentialInfo {
+	return provider.CredentialInfo{
+		CLIPaths: []string{"~/.claude/.credentials.json"},
+		EnvVars:  []string{"ANTHROPIC_API_KEY"},
+	}
+}
+
 func (c Claude) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
