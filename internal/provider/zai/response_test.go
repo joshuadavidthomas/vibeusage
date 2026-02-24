@@ -210,18 +210,54 @@ func TestQuotaLimit_ResetTime(t *testing.T) {
 
 func TestQuotaLimit_DisplayName(t *testing.T) {
 	tests := []struct {
-		limitType string
-		want      string
+		name string
+		q    QuotaLimit
+		want string
 	}{
-		{"TOKENS_LIMIT", "Token Quota"},
-		{"TIME_LIMIT", "MCP Usage"},
-		{"OTHER", "OTHER"},
+		// TOKENS_LIMIT: hourly windows use "Session (Nh)" to match Claude/Antigravity.
+		// Other periods fall back to a labelled quota.
+		{
+			name: "5 hour token window",
+			q:    QuotaLimit{Type: "TOKENS_LIMIT", Unit: unitHours, Number: 5},
+			want: "Session (5h)",
+		},
+		{
+			name: "1 hour token window",
+			q:    QuotaLimit{Type: "TOKENS_LIMIT", Unit: unitHours, Number: 1},
+			want: "Session (1h)",
+		},
+		{
+			name: "24 hour token window",
+			q:    QuotaLimit{Type: "TOKENS_LIMIT", Unit: unitHours, Number: 24},
+			want: "Session (24h)",
+		},
+		{
+			name: "monthly token window",
+			q:    QuotaLimit{Type: "TOKENS_LIMIT", Unit: unitMonths, Number: 1},
+			want: "Monthly Quota",
+		},
+		// TIME_LIMIT: monthly web-tool quota (web search, reader, zread)
+		{
+			name: "monthly tools",
+			q:    QuotaLimit{Type: "TIME_LIMIT", Unit: unitMonths, Number: 1},
+			want: "Monthly Tools",
+		},
+		{
+			name: "daily tools",
+			q:    QuotaLimit{Type: "TIME_LIMIT", Unit: unitDays, Number: 1},
+			want: "Daily Tools",
+		},
+		// unknown type falls back to the raw type string
+		{
+			name: "unknown type",
+			q:    QuotaLimit{Type: "OTHER"},
+			want: "OTHER",
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.limitType, func(t *testing.T) {
-			q := QuotaLimit{Type: tt.limitType}
-			got := q.DisplayName()
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.q.DisplayName()
 			if got != tt.want {
 				t.Errorf("DisplayName() = %q, want %q", got, tt.want)
 			}
@@ -300,8 +336,8 @@ func TestParseQuotaResponse_ProTier(t *testing.T) {
 	}
 
 	tokens := snapshot.Periods[0]
-	if tokens.Name != "Token Quota" {
-		t.Errorf("name = %q, want %q", tokens.Name, "Token Quota")
+	if tokens.Name != "Session (5h)" {
+		t.Errorf("name = %q, want %q", tokens.Name, "Session (5h)")
 	}
 	if tokens.Utilization != 42 {
 		t.Errorf("utilization = %d, want 42", tokens.Utilization)
@@ -317,15 +353,15 @@ func TestParseQuotaResponse_ProTier(t *testing.T) {
 		t.Errorf("resetsAt unix = %d, want 1771661559", tokens.ResetsAt.Unix())
 	}
 
-	mcp := snapshot.Periods[1]
-	if mcp.Name != "MCP Usage" {
-		t.Errorf("name = %q, want %q", mcp.Name, "MCP Usage")
+	tools := snapshot.Periods[1]
+	if tools.Name != "Monthly Tools" {
+		t.Errorf("name = %q, want %q", tools.Name, "Monthly Tools")
 	}
-	if mcp.Utilization != 20 {
-		t.Errorf("utilization = %d, want 20", mcp.Utilization)
+	if tools.Utilization != 20 {
+		t.Errorf("utilization = %d, want 20", tools.Utilization)
 	}
-	if mcp.PeriodType != models.PeriodMonthly {
-		t.Errorf("periodType = %q, want %q", mcp.PeriodType, models.PeriodMonthly)
+	if tools.PeriodType != models.PeriodMonthly {
+		t.Errorf("periodType = %q, want %q", tools.PeriodType, models.PeriodMonthly)
 	}
 }
 
