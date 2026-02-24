@@ -1,7 +1,11 @@
 package modelmap
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 )
 
 // testData returns a minimal models.dev-shaped fixture for testing.
@@ -401,5 +405,83 @@ func TestEmptyData(t *testing.T) {
 	info := Lookup("anything")
 	if info != nil {
 		t.Errorf("expected nil lookup with no data, got %+v", info)
+	}
+}
+
+func TestPreload_MakesDataAvailable(t *testing.T) {
+	cleanup := SetLoaderForTesting(testData)
+	t.Cleanup(cleanup)
+
+	Preload(context.Background())
+
+	if len(ListModels()) == 0 {
+		t.Error("expected models to be available after Preload")
+	}
+}
+
+func TestPreload_Idempotent(t *testing.T) {
+	cleanup := SetLoaderForTesting(testData)
+	t.Cleanup(cleanup)
+
+	Preload(context.Background())
+	Preload(context.Background()) // second call must not panic or reset data
+
+	if len(ListModels()) == 0 {
+		t.Error("expected models to remain available after double Preload")
+	}
+}
+
+func TestCacheIsFresh_NoFiles(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("VIBEUSAGE_CACHE_DIR", dir)
+
+	if CacheIsFresh() {
+		t.Error("CacheIsFresh() = true with no cache files, want false")
+	}
+}
+
+func TestCacheIsFresh_FreshFiles(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("VIBEUSAGE_CACHE_DIR", dir)
+
+	_ = os.WriteFile(filepath.Join(dir, "models.json"), []byte("{}"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "multipliers.json"), []byte("[]"), 0o644)
+
+	if !CacheIsFresh() {
+		t.Error("CacheIsFresh() = false with fresh cache files, want true")
+	}
+}
+
+func TestCacheIsFresh_StaleModelsFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("VIBEUSAGE_CACHE_DIR", dir)
+
+	modelsPath := filepath.Join(dir, "models.json")
+	multipliersPath := filepath.Join(dir, "multipliers.json")
+	_ = os.WriteFile(modelsPath, []byte("{}"), 0o644)
+	_ = os.WriteFile(multipliersPath, []byte("[]"), 0o644)
+
+	stale := time.Now().Add(-25 * time.Hour)
+	_ = os.Chtimes(modelsPath, stale, stale)
+
+	if CacheIsFresh() {
+		t.Error("CacheIsFresh() = true with stale models file, want false")
+	}
+}
+
+func TestCacheIsFresh_StaleMultipliersFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("VIBEUSAGE_CACHE_DIR", dir)
+
+	modelsPath := filepath.Join(dir, "models.json")
+	multipliersPath := filepath.Join(dir, "multipliers.json")
+	_ = os.WriteFile(modelsPath, []byte("{}"), 0o644)
+	_ = os.WriteFile(multipliersPath, []byte("[]"), 0o644)
+
+	stale := time.Now().Add(-25 * time.Hour)
+	_ = os.Chtimes(multipliersPath, stale, stale)
+
+	if CacheIsFresh() {
+		t.Error("CacheIsFresh() = true with stale multipliers file, want false")
 	}
 }

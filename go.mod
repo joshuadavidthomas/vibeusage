@@ -14,6 +14,7 @@ require (
 	github.com/muesli/termenv v0.16.0
 	github.com/spf13/cobra v1.10.2
 	google.golang.org/protobuf v1.36.11
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

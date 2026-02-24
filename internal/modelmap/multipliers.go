@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 )
@@ -136,40 +138,53 @@ func fetchMultipliersYAML() (string, error) {
 	return string(resp.Body), nil
 }
 
-// parseMultipliersYAML parses the simple YAML format from github/docs.
+// yamlMultiplierEntry is the raw YAML shape from github/docs. Paid and Free are
+// interface{} because the source mixes bare numbers (int/float) with the string
+// "Not applicable" in the same field.
+type yamlMultiplierEntry struct {
+	Name string      `yaml:"name"`
+	Paid interface{} `yaml:"multiplier_paid"`
+	Free interface{} `yaml:"multiplier_free"`
+}
+
+// parseMultipliersYAML parses the YAML format from github/docs.
 // Each entry is:
 //
 //   - name: MODEL_NAME
 //     multiplier_paid: NUMBER_OR_NOT_APPLICABLE
 //     multiplier_free: NUMBER_OR_NOT_APPLICABLE
 func parseMultipliersYAML(raw string) []ModelMultiplier {
-	var entries []ModelMultiplier
-	var current *ModelMultiplier
-
-	for _, line := range strings.Split(raw, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		if strings.HasPrefix(trimmed, "- name:") {
-			if current != nil {
-				entries = append(entries, *current)
-			}
-			current = &ModelMultiplier{
-				Name: strings.TrimSpace(strings.TrimPrefix(trimmed, "- name:")),
-			}
-		} else if current != nil && strings.HasPrefix(trimmed, "multiplier_paid:") {
-			current.Paid = parseMultiplierValue(strings.TrimSpace(strings.TrimPrefix(trimmed, "multiplier_paid:")))
-		} else if current != nil && strings.HasPrefix(trimmed, "multiplier_free:") {
-			current.Free = parseMultiplierValue(strings.TrimSpace(strings.TrimPrefix(trimmed, "multiplier_free:")))
-		}
-	}
-	if current != nil {
-		entries = append(entries, *current)
+	var rows []yamlMultiplierEntry
+	if err := yaml.Unmarshal([]byte(raw), &rows); err != nil {
+		return nil
 	}
 
+	entries := make([]ModelMultiplier, 0, len(rows))
+	for _, r := range rows {
+		entries = append(entries, ModelMultiplier{
+			Name: r.Name,
+			Paid: convertYAMLMultiplier(r.Paid),
+			Free: convertYAMLMultiplier(r.Free),
+		})
+	}
 	return entries
+}
+
+// convertYAMLMultiplier converts a yaml.v3 scalar value (int, float64, or
+// string) to a *float64. Returns nil for "Not applicable" or unrecognised
+// values.
+func convertYAMLMultiplier(v interface{}) *float64 {
+	switch val := v.(type) {
+	case int:
+		f := float64(val)
+		return &f
+	case float64:
+		return &val
+	case string:
+		return parseMultiplierValue(val)
+	default:
+		return nil
+	}
 }
 
 func parseMultiplierValue(s string) *float64 {
