@@ -2,24 +2,23 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, GitHub Copilot, Cursor, Gemini, Antigravity, Kimi Code, Kimi K2, OpenRouter, Warp, Amp, Z.ai, and Minimax with consistent formatting, progress indicators, and offline support.
+`vibeusage` gives you one place to see account usage, pace, and remaining headroom across your configured providers.
 
-## Features
+## Why vibeusage
 
-- **Unified Interface**: Single command to check usage across all configured providers
-- **Multiple Providers**: Claude, Codex, Copilot, Cursor, Gemini, Antigravity, Kimi Code, Kimi K2, OpenRouter, Warp, Amp, Z.ai, Minimax
-- **Concurrent Fetching**: Check all providers in parallel
-- **Offline Support**: Displays cached data when network is unavailable
-- **JSON Output**: Scriptable with `--json` flag
-- **Progress Indicators**: Real-time feedback during fetch operations
-- **Pace-Based Coloring**: Visual indicators show if you're on track to stay within quota
-- **Stale Data Warnings**: Know when your usage data is outdated
+As an OSS contributor, I’ve had free GitHub Copilot Pro access for a while, but I kept forgetting to use it and leaving free usage on the table. `vibeusage` keeps that visible across providers.
+
+Includes:
+
+- One command for all connected providers
+- Pace-aware output (not just percent used)
+- Smart model routing with `vibeusage route`
+- Works with existing local credentials where possible
+- JSON output for scripts and automation
 
 ## Installation
 
 ### Quick install (recommended)
-
-Install scripts place the binary in `~/.local/bin` by default (override with `VIBEUSAGE_INSTALL_DIR`). Ensure that directory is on your `PATH`.
 
 macOS/Linux/Windows Subsystem for Linux (WSL):
 
@@ -33,13 +32,17 @@ Windows (PowerShell):
 iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/install.ps1 -useb | iex
 ```
 
+Install scripts place the binary in `~/.local/bin` by default (override with `VIBEUSAGE_INSTALL_DIR`). Ensure that directory is on your `PATH`.
+
 ### Go install
+
+If you have [Go](https://go.dev/) available, you can also use:
 
 ```bash
 go install github.com/joshuadavidthomas/vibeusage@latest
 ```
 
-### From source
+Or install from source:
 
 ```bash
 git clone https://github.com/joshuadavidthomas/vibeusage.git
@@ -64,55 +67,107 @@ You can also re-run the [install scripts](#quick-install-recommended) to upgrade
 
 ## Quick Start
 
-### First Run
-
-First, run the setup wizard:
+After installing, run the setup wizard once:
 
 ```bash
 vibeusage init
+
 ```
 
-Then fetch usage:
+Then check usage across your configured providers:
 
 ```bash
-vibeusage
+$ vibeusage
+╭─Claude───────────────────────────────────────────────────────────────╮
+│ Session (5h)           ███████░░░░░░░░░░░░░ 38%    resets in 1h 40m  │
+│ Weekly                 ██████████████████░░ 98%    resets in 16h 40m │
+╰──────────────────────────────────────────────────────────────────────╯
+╭─Codex────────────────────────────────────────────────────────────────╮
+│ Session                ███░░░░░░░░░░░░░░░░░ 15%    resets in 15m     │
+│ Weekly                 ██░░░░░░░░░░░░░░░░░░ 12%    resets in 6d 19h  │
+╰──────────────────────────────────────────────────────────────────────╯
+╭─Copilot──────────────────────────────────────────────────────────────╮
+│ Monthly (Premium)      ██░░░░░░░░░░░░░░░░░░ 11%    resets in 4d 1h   │
+│ Monthly (Chat)         ░░░░░░░░░░░░░░░░░░░░  0%    resets in 4d 1h   │
+│ Monthly (Completions)  ░░░░░░░░░░░░░░░░░░░░  0%    resets in 4d 1h   │
+╰──────────────────────────────────────────────────────────────────────╯
 ```
 
-### Check Usage for All Providers
+Bars are pace-colored: green (on track), yellow (slightly over pace), red (well over pace).
+
+## Smart routing
+
+Inspired by OpenRouter-style routing, `vibeusage route` picks the best provider for a model based on real usage headroom from your own connected accounts.
+
+You can route a model to the provider with the best current headroom:
 
 ```bash
-vibeusage
+$ vibeusage route claude-opus-4-6
+Route: Claude Opus 4.6
+
+╭─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
+│ Provider    │ Usage               │ Headroom │ Cost │ Period  │ Resets In │ Plan        │
+├─────────────┼─────────────────────┼──────────┼──────┼─────────┼───────────┼─────────────┤
+│ Antigravity │ ░░░░░░░░░░░░░░░ 0%  │ 100%     │ —    │ weekly  │ 1h 19m    │ Antigravity │
+│ Copilot     │ █░░░░░░░░░░░░░░ 11% │ 29%      │ 3x   │ monthly │ 4d 1h     │ individual  │
+│ Claude      │ ██████████████░ 99% │ 1%       │ —    │ weekly  │ 16h 24m   │ Pro         │
+╰─────────────┴─────────────────────┴──────────┴──────┴─────────┴───────────┴─────────────╯
 ```
 
-### Check a Specific Provider
+Or route via your own role/model group:
 
 ```bash
-vibeusage claude
-vibeusage codex
-vibeusage copilot
-vibeusage cursor
-vibeusage gemini
-vibeusage antigravity
-vibeusage kimicode
-vibeusage kimik2
-vibeusage openrouter
-vibeusage warp
-vibeusage amp
-vibeusage zai
-vibeusage minimax
+$ vibeusage route --role thinking
+Route: thinking (role)
+
+╭─────────────────┬─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
+│ Model           │ Provider    │ Usage               │ Headroom │ Cost │ Period  │ Resets In │ Plan        │
+├─────────────────┼─────────────┼─────────────────────┼──────────┼──────┼─────────┼───────────┼─────────────┤
+│ claude-opus-4-6 │ Antigravity │ ░░░░░░░░░░░░░░░ 0%  │ 100%     │ —    │ weekly  │ 2h 24m    │ Antigravity │
+│ o4-mini         │ Codex       │ █░░░░░░░░░░░░░░ 12% │ 88%      │ —    │ weekly  │ 6d 18h    │ plus        │
+│ claude-opus-4-6 │ Copilot     │ █░░░░░░░░░░░░░░ 11% │ 29%      │ 3x   │ monthly │ 4d 1h     │ individual  │
+│ claude-opus-4-6 │ Claude      │ ██████████████░ 99% │ 1%       │ —    │ weekly  │ 16h 24m   │ Pro         │
+╰─────────────────┴─────────────┴─────────────────────┴──────────┴──────┴─────────┴───────────┴─────────────╯
 ```
 
-### Authenticate with a Provider
+Not sure which model ID to use?
 
 ```bash
-vibeusage auth claude
+vibeusage route --list
+vibeusage route --list-roles
 ```
 
-## Provider Setup
+If a model name is close but not exact, `vibeusage` suggests likely matches.
+
+Role-based model groups are configured in `config.toml` under `[roles.<name>]` (see [Routing Roles](#routing-roles)).
+
+## Core Commands
+
+```bash
+vibeusage                 # Usage for all configured providers
+vibeusage <provider>      # Usage for one provider
+vibeusage --json          # JSON output
+vibeusage --refresh       # Bypass cache fallback
+vibeusage auth --status   # Credential/auth status
+vibeusage key             # Credential sources and state
+vibeusage route <model>   # Best provider for a model
+```
+
+## Providers
 
 Each provider requires specific authentication. Follow the guides below:
 
-### Claude
+### Amp
+
+**Required**: Amp API key or local Amp secrets
+
+```bash
+vibeusage auth amp
+```
+
+If Amp CLI is installed, vibeusage auto-detects `~/.local/share/amp/secrets.json`.
+
+### Claude Pro/Max
 
 **Required**: Session key from Claude.ai
 
@@ -130,19 +185,42 @@ To get your session key:
 
 **Alternative**: If you have the Claude CLI installed, vibeusage will automatically use its credentials from `~/.claude/.credentials.json`.
 
-### Codex (OpenAI)
+### Cursor
 
-**Required**: OAuth tokens from Codex CLI
+**Required**: Session token from browser cookies
 
 ```bash
-# First, authenticate with the Codex CLI
-codex auth login
-
-# Then vibeusage will automatically detect your credentials
-vibeusage codex
+vibeusage auth cursor
 ```
 
-**Alternative**: Set the `OPENAI_API_KEY` environment variable.
+The tool will attempt to extract your session token from your browser automatically. If that fails:
+
+1. Open https://cursor.com in your browser
+2. Extract your session cookie
+3. Run `vibeusage key cursor set` and paste the token
+
+### Google Antigravity
+
+**Required**: Antigravity IDE installed with active Google login
+
+Antigravity credentials are automatically detected from the IDE's state database. No manual setup is needed — just sign into the Antigravity IDE.
+
+```bash
+vibeusage antigravity
+```
+
+### Google Gemini
+
+**Required**: API key or OAuth tokens
+
+```bash
+# Option 1: Use API key
+export GEMINI_API_KEY=your_api_key_here
+vibeusage gemini
+
+# Option 2: Use OAuth (recommended for full features)
+vibeusage auth gemini
+```
 
 ### GitHub Copilot
 
@@ -159,32 +237,60 @@ You'll be prompted to:
 
 **Alternative**: If you have the GitHub CLI installed, vibeusage can use your existing `gh auth login` credentials.
 
-### Cursor
+### Kimi Code
 
-**Required**: Session token from browser cookies
-
-```bash
-vibeusage auth cursor
-```
-
-The tool will attempt to extract your session token from your browser automatically. If that fails:
-
-1. Open https://cursor.com in your browser
-2. Extract your session cookie
-3. Run `vibeusage key cursor set` and paste the token
-
-### Gemini
-
-**Required**: API key or OAuth tokens
+**Required**: OAuth token via device flow or API key
 
 ```bash
-# Option 1: Use API key
-export GEMINI_API_KEY=your_api_key_here
-vibeusage gemini
+# Option 1: Device flow OAuth (recommended)
+vibeusage auth kimicode
 
-# Option 2: Use OAuth (recommended for full features)
-vibeusage auth gemini
+# Option 2: Use API key
+export KIMI_CODE_API_KEY=your_api_key_here
+vibeusage kimicode
 ```
+
+For device flow, you'll be prompted to authorize in your browser. If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, vibeusage will automatically use its credentials from `~/.kimi/credentials/kimi-code.json`.
+
+### Kimi K2
+
+**Required**: Kimi K2 API key
+
+```bash
+vibeusage auth kimik2
+```
+
+Set `KIMI_K2_API_KEY` (or `KIMI_API_KEY` / `KIMI_KEY`) as alternatives.
+
+### Minimax
+
+**Required**: Coding Plan API key
+
+```bash
+vibeusage auth minimax
+```
+
+To get your Coding Plan API key:
+1. Open https://platform.minimax.io/user-center/payment/coding-plan
+2. Copy your Coding Plan API key (starts with `sk-cp-`)
+
+**Note**: Standard API keys (`sk-api-`) won't work — you need a Coding Plan key.
+
+**Alternative**: Set the `MINIMAX_API_KEY` environment variable.
+
+### OpenAI Codex
+
+**Required**: OAuth tokens from Codex CLI
+
+```bash
+# First, authenticate with the Codex CLI
+codex auth login
+
+# Then vibeusage will automatically detect your credentials
+vibeusage codex
+```
+
+**Alternative**: Set the `OPENAI_API_KEY` environment variable.
 
 ### OpenRouter
 
@@ -206,52 +312,7 @@ vibeusage auth warp
 
 Set `WARP_API_KEY` or `WARP_TOKEN` as alternatives.
 
-### Kimi K2
-
-**Required**: Kimi K2 API key
-
-```bash
-vibeusage auth kimik2
-```
-
-Set `KIMI_K2_API_KEY` (or `KIMI_API_KEY` / `KIMI_KEY`) as alternatives.
-
-### Amp
-
-**Required**: Amp API key or local Amp secrets
-
-```bash
-vibeusage auth amp
-```
-
-If Amp CLI is installed, vibeusage auto-detects `~/.local/share/amp/secrets.json`.
-
-### Antigravity (Google)
-
-**Required**: Antigravity IDE installed with active Google login
-
-Antigravity credentials are automatically detected from the IDE's state database. No manual setup is needed — just sign into the Antigravity IDE.
-
-```bash
-vibeusage antigravity
-```
-
-### Kimi Code (Moonshot AI)
-
-**Required**: OAuth token via device flow or API key
-
-```bash
-# Option 1: Device flow OAuth (recommended)
-vibeusage auth kimicode
-
-# Option 2: Use API key
-export KIMI_CODE_API_KEY=your_api_key_here
-vibeusage kimicode
-```
-
-For device flow, you'll be prompted to authorize in your browser. If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, vibeusage will automatically use its credentials from `~/.kimi/credentials/kimi-code.json`.
-
-### Z.ai (Zhipu AI)
+### Z.ai
 
 **Required**: API key
 
@@ -266,138 +327,34 @@ To get your API key:
 
 **Alternative**: Set the `ZAI_API_KEY` environment variable.
 
-### Minimax
-
-**Required**: Coding Plan API key
+## Additional Commands
 
 ```bash
-vibeusage auth minimax
+# Inspect provider/credential state
+vibeusage status
+vibeusage auth --status
+vibeusage key
+
+# Config and cache
+vibeusage config show
+vibeusage config path
+vibeusage cache show
+vibeusage cache clear
+
+# Route discovery
+vibeusage route --list
+vibeusage route --list-roles
 ```
 
-To get your Coding Plan API key:
-1. Open https://platform.minimax.io/user-center/payment/coding-plan
-2. Copy your Coding Plan API key (starts with `sk-cp-`)
-
-**Note**: Standard API keys (`sk-api-`) won't work — you need a Coding Plan key.
-
-**Alternative**: Set the `MINIMAX_API_KEY` environment variable.
-
-## Commands
-
-### Global Options
+Global options:
 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--json` | `-j` | Output as JSON for scripting |
 | `--no-color` | | Disable colored output |
-| `--verbose` | `-v` | Show detailed output (fetch timing, account info) |
-| `--quiet` | `-q` | Minimal output (errors only) |
-| `--refresh` | | Force refresh, ignore cache |
-
-### Usage Commands
-
-```bash
-# Show usage for all configured providers
-vibeusage
-
-# Show usage for a specific provider
-vibeusage claude
-vibeusage codex
-
-# Force refresh (ignore cache)
-vibeusage --refresh
-
-# JSON output for scripting
-vibeusage --json
-vibeusage claude --json
-```
-
-### Authentication Commands
-
-```bash
-# Authenticate with a provider
-vibeusage auth claude
-vibeusage auth codex
-vibeusage auth copilot
-vibeusage auth cursor
-vibeusage auth gemini
-vibeusage auth openrouter
-vibeusage auth warp
-vibeusage auth kimik2
-vibeusage auth amp
-vibeusage auth kimicode
-vibeusage auth minimax
-vibeusage auth zai
-
-# Show authentication status for all providers
-vibeusage auth --status
-```
-
-### Configuration Commands
-
-```bash
-# Show current configuration
-vibeusage config show
-
-# Show config/cache/credentials directory paths
-vibeusage config path
-
-# Reset to default configuration
-vibeusage config reset
-```
-
-### Key Management Commands
-
-```bash
-# Show credential status for all providers
-vibeusage key
-
-# Set a credential manually
-vibeusage key claude set
-vibeusage key codex set
-
-# Delete credentials
-vibeusage key claude delete
-```
-
-### Cache Commands
-
-```bash
-# Show cache status
-vibeusage cache show
-
-# Clear all cached data
-vibeusage cache clear
-
-# Clear cache for specific provider
-vibeusage cache clear claude
-```
-
-### Status Commands
-
-```bash
-# Show provider health status
-vibeusage status
-
-# JSON output
-vibeusage status --json
-```
-
-### Update Commands
-
-```bash
-# Check for updates only
-vibeusage update --check
-
-# Install the latest release
-vibeusage update
-
-# Install without interactive prompt
-vibeusage update --yes
-
-# JSON output (requires --check or --yes)
-vibeusage update --check --json
-```
+| `--verbose` | `-v` | Show detailed output |
+| `--quiet` | `-q` | Minimal output |
+| `--refresh` | `-r` | Disable cache fallback (fresh data or error) |
 
 ## Configuration
 
@@ -426,6 +383,24 @@ use_keyring = false                    # Use system keyring
 reuse_provider_credentials = true      # Auto-detect CLI credentials
 ```
 
+### Routing Roles
+
+Define model groups for `vibeusage route --role <name>`:
+
+```toml
+[roles.coding]
+models = ["claude-sonnet-4-5", "gpt-5", "gemini-2.5-pro"]
+
+[roles.research]
+models = ["claude-opus-4-6", "o4", "gpt-5"]
+```
+
+Then route by role:
+
+```bash
+vibeusage route --role coding
+```
+
 ### Environment Variables
 
 | Variable | Description |
@@ -449,54 +424,6 @@ reuse_provider_credentials = true      # Auto-detect CLI credentials
 | `KIMI_CODE_API_KEY` | Kimi API key |
 | `ZAI_API_KEY` | Z.ai API key |
 | `MINIMAX_API_KEY` | Minimax Coding Plan API key |
-
-## Output Format
-
-### Default Display
-
-```
-Claude
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Session (5h)  ████████████░░░░░░░░ 58%    resets in 2h 15m
-
-Weekly
-  All Models  ████░░░░░░░░░░░░░░░░ 23%    resets in 4d 12h
-  Opus        ██░░░░░░░░░░░░░░░░░░ 12%    resets in 4d 12h
-  Sonnet      ██████░░░░░░░░░░░░░░ 31%    resets in 4d 12h
-
-╭─ Overage ──────────────────────────────────────────────╮
-│ Extra Usage: $5.50 / $100.00 USD                       │
-╰────────────────────────────────────────────────────────╯
-```
-
-### Progress Bar Colors
-
-- **Green** (≤ 1.15x pace): On track or under pace
-- **Yellow** (1.15-1.30x pace): Slightly over pace
-- **Red** (> 1.30x pace): Significantly over pace
-
-### JSON Output
-
-```bash
-vibeusage --json
-```
-
-Returns structured data for scripting:
-
-```json
-{
-  "providers": {
-    "claude": {
-      "provider": "claude",
-      "fetched_at": "2025-01-16T12:34:56Z",
-      "periods": [...],
-      "identity": {...},
-      "status": {...}
-    }
-  },
-  "errors": {}
-}
-```
 
 ## Development
 
