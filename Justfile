@@ -8,7 +8,7 @@ default:
 
 # Build the binary
 build *ARGS:
-    go build {{ ARGS }} -o vibeusage .
+    go build {{ ARGS }} -o vibeusage ./cmd/vibeusage
 
 # Run tests with coverage
 coverage *ARGS:
