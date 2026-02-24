@@ -11,7 +11,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
 )
 
 // resetPathFlags resets configPathCmd flags to defaults and registers
@@ -341,7 +340,7 @@ func TestOutcomeToCompletion_Success(t *testing.T) {
 
 	got := outcomeToCompletion(o)
 
-	want := spinner.CompletionInfo{
+	want := display.CompletionInfo{
 		ProviderID: "claude",
 		Success:    true,
 	}
@@ -364,7 +363,7 @@ func TestOutcomeToCompletion_Failure(t *testing.T) {
 
 	got := outcomeToCompletion(o)
 
-	want := spinner.CompletionInfo{
+	want := display.CompletionInfo{
 		ProviderID: "cursor",
 		Success:    false,
 		Error:      "auth failed",
