@@ -84,14 +84,14 @@ Meanwhile `logger_test.go` tests `logger.go`, and `logging_test.go` tests loggin
 
 ### Fix
 
-- [ ] Move `context_test.go` tests into `root_test.go`
-- [ ] Move `flags_test.go` tests into `init_test.go`
-- [ ] Move `logging_test.go` tests into `root_test.go`
-- [ ] Move `spinner_test.go` tests into `root_test.go`
-- [ ] Merge `logger_test.go` into `root_test.go` (or keep in `logger_test.go` since `logger.go` exists — but then `logging_test.go` should not also exist)
-- [ ] Move `json_types_test.go` tests into their respective command test files (`auth_test.go`, `config_test.go`, etc.)
-- [ ] Move `reloadConfig()` from `helpers_test.go` into a `testutil_test.go` or inline where used
-- [ ] Delete empty/orphaned test files
+- [x] Move `context_test.go` tests into `root_test.go`
+- [x] Move `flags_test.go` tests into `init_test.go`
+- [x] Move `logging_test.go` tests into `root_test.go`
+- [x] Move `spinner_test.go` tests into `root_test.go`
+- [x] Merge `logger_test.go` into `root_test.go` (or keep in `logger_test.go` since `logger.go` exists — but then `logging_test.go` should not also exist)
+- [x] Move `json_types_test.go` tests into their respective command test files (`auth_test.go`, `config_test.go`, etc.)
+- [x] Move `reloadConfig()` from `helpers_test.go` into a `testutil_test.go` or inline where used
+- [x] Delete empty/orphaned test files
 
 ## 4. Inconsistent provider structure
 

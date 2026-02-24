@@ -2,9 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
 )
 
 func TestCacheShowCmd_HasTableBorders(t *testing.T) {
@@ -128,5 +131,37 @@ func TestCacheShowCmd_ShowsCacheDir(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "Cache directory:") {
 		t.Errorf("expected cache directory path in output, got:\n%s", output)
+	}
+}
+
+// JSON output tests
+
+func TestCacheClearJSON_UsesTypedStruct(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldJSON := jsonOutput
+	jsonOutput = true
+	defer func() { jsonOutput = oldJSON }()
+
+	if err := cacheClearCmd.RunE(cacheClearCmd, nil); err != nil {
+		t.Fatalf("cache clear error: %v", err)
+	}
+
+	var result display.ActionResultJSON
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("cache clear JSON should unmarshal into ActionResultJSON: %v\nOutput: %s", err, buf.String())
+	}
+
+	if !result.Success {
+		t.Error("success should be true")
+	}
+	if result.Message == "" {
+		t.Error("message should not be empty")
 	}
 }
