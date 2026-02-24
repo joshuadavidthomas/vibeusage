@@ -14,12 +14,10 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
-	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/logging"
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
-
 	// Register all providers
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/antigravity"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/claude"
@@ -256,7 +254,7 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 }
 
 func makeProviderCmd(providerID string) *cobra.Command {
-	titleName := strutil.TitleCase(providerID)
+	titleName := provider.DisplayName(providerID)
 	return &cobra.Command{
 		Use:   providerID,
 		Short: "Show usage for " + titleName,

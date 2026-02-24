@@ -12,7 +12,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var authCmd = &cobra.Command{
@@ -124,7 +123,7 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
 		out("✓ %s is already authenticated (%s)\n",
-			strutil.TitleCase(providerID), sourceToLabel(source))
+			provider.DisplayName(providerID), sourceToLabel(source))
 
 		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
 			Title: "Re-authenticate?",
@@ -152,7 +151,7 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
 		out("✓ %s is already authenticated (%s)\n",
-			strutil.TitleCase(providerID), sourceToLabel(source))
+			provider.DisplayName(providerID), sourceToLabel(source))
 
 		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
 			Title: "Re-authenticate?",
@@ -166,13 +165,13 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 	}
 
 	if !quiet {
-		out("%s Authentication\n\n", strutil.TitleCase(providerID))
+		out("%s Authentication\n\n", provider.DisplayName(providerID))
 		outln(flow.Instructions)
 		outln()
 	}
 
 	value, err := prompt.Default.Input(prompt.InputConfig{
-		Title:       strutil.TitleCase(flow.JSONKey),
+		Title:       strings.ToUpper(flow.JSONKey[:1]) + flow.JSONKey[1:],
 		Placeholder: flow.Placeholder,
 		Validate:    flow.Validate,
 	})
@@ -186,7 +185,7 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 	}
 
 	if !quiet {
-		out("✓ %s credential saved\n", strutil.TitleCase(providerID))
+		out("✓ %s credential saved\n", provider.DisplayName(providerID))
 	}
 	return nil
 }
@@ -197,13 +196,13 @@ func authGeneric(providerID string) error {
 	if hasCreds {
 		if !quiet {
 			out("✓ %s is already authenticated (%s)\n",
-				strutil.TitleCase(providerID), sourceToLabel(source))
+				provider.DisplayName(providerID), sourceToLabel(source))
 		}
 		return nil
 	}
 
 	if !quiet {
-		out("%s Authentication\n\n", strutil.TitleCase(providerID))
+		out("%s Authentication\n\n", provider.DisplayName(providerID))
 		outln("Set credentials manually:")
 		out("  vibeusage key %s set\n", providerID)
 	}

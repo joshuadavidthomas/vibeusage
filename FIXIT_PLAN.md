@@ -135,9 +135,9 @@ Pick one pattern and apply it everywhere:
 
 ### Fix
 
-- [ ] Where code has a provider ID and needs a display name, look up `Meta().Name` from the registry instead of calling `strutil.TitleCase`
-- [ ] For non-provider uses (model names in gemini/antigravity), inline the title-casing or use `cases.Title` from `golang.org/x/text`
-- [ ] Delete `internal/strutil/` entirely
+- [x] Where code has a provider ID and needs a display name, look up `Meta().Name` from the registry instead of calling `strutil.TitleCase`
+- [x] For non-provider uses (model names in gemini/antigravity), inline the title-casing or use `cases.Title` from `golang.org/x/text`
+- [x] Delete `internal/strutil/` entirely
 
 ## 6. Fold `internal/spinner/` into `internal/display/`
 

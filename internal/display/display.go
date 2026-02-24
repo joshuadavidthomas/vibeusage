@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 var (
@@ -78,7 +78,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 	var b strings.Builder
 
 	// Title
-	title := strutil.TitleCase(snapshot.Provider)
+	title := provider.DisplayName(snapshot.Provider)
 	if cached {
 		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
@@ -258,7 +258,7 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodCo
 		fmt.Fprintf(&b, "Extra: %s%.2f / %s%.2f %s", sym, o.Used, sym, o.Limit, o.Currency)
 	}
 
-	title := strutil.TitleCase(snapshot.Provider)
+	title := provider.DisplayName(snapshot.Provider)
 	if cached {
 		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
@@ -317,7 +317,7 @@ func groupPeriods(periods []models.UsagePeriod) (session, weekly, daily, monthly
 // RenderProviderError renders a compact error line for a failed provider.
 // Only suggests auth when the error is actually about missing credentials.
 func RenderProviderError(providerID string, errMsg string) string {
-	name := strutil.TitleCase(providerID)
+	name := provider.DisplayName(providerID)
 	line := dimStyle.Render(name + ": " + errMsg)
 	if isCredentialError(errMsg) {
 		line += dimStyle.Render("  (vibeusage auth " + providerID + ")")

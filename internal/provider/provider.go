@@ -124,6 +124,17 @@ func IsFirstRun() bool {
 	return true
 }
 
+// DisplayName returns the human-readable display name for the given
+// provider ID by looking it up in the registry. If the ID is not
+// registered, it returns the ID itself as a fallback.
+func DisplayName(id string) string {
+	p, ok := Get(id)
+	if !ok {
+		return id
+	}
+	return p.Meta().Name
+}
+
 // CountConfigured returns the number of registered providers that
 // have credentials.
 func CountConfigured() int {

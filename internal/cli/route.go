@@ -16,7 +16,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/routing"
 	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var routeCmd = &cobra.Command{
@@ -212,7 +211,7 @@ func listModels(providerFilter string) error {
 
 	title := "Known Models"
 	if providerFilter != "" {
-		title = fmt.Sprintf("Models for %s", strutil.TitleCase(providerFilter))
+		title = fmt.Sprintf("Models for %s", provider.DisplayName(providerFilter))
 	}
 
 	outln(display.NewTableWithOptions(

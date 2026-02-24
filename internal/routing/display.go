@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 // RowStyle controls per-row styling in the formatted table output.
@@ -60,7 +60,7 @@ func FormatRecommendationRows(rec Recommendation, renderBar RenderBarFunc, forma
 	// Unavailable providers as dim rows.
 	sort.Strings(rec.Unavailable)
 	for _, pid := range rec.Unavailable {
-		row := unavailableRow(strutil.TitleCase(pid), "", hasMultiplier, false)
+		row := unavailableRow(provider.DisplayName(pid), "", hasMultiplier, false)
 		rows = append(rows, row)
 		styles = append(styles, RowDim)
 	}
@@ -97,7 +97,7 @@ func FormatRoleRecommendationRows(rec RoleRecommendation, renderBar RenderBarFun
 
 	// Unavailable as dim rows.
 	for _, u := range rec.Unavailable {
-		row := unavailableRow(strutil.TitleCase(u.ProviderID), u.ModelID, hasMultiplier, true)
+		row := unavailableRow(provider.DisplayName(u.ProviderID), u.ModelID, hasMultiplier, true)
 		rows = append(rows, row)
 		styles = append(styles, RowDim)
 	}
@@ -108,7 +108,7 @@ func FormatRoleRecommendationRows(rec RoleRecommendation, renderBar RenderBarFun
 }
 
 func formatCandidateRow(c Candidate, hasMultiplier, includeModel bool, modelID string, renderBar RenderBarFunc, formatReset FormatResetFunc) []string {
-	name := strutil.TitleCase(c.ProviderID)
+	name := provider.DisplayName(c.ProviderID)
 	bar := renderBar(c.Utilization)
 	util := fmt.Sprintf("%d%%", c.Utilization)
 	headroom := fmt.Sprintf("%d%%", c.EffectiveHeadroom)
