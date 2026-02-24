@@ -150,7 +150,7 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 				value, err = prompt.Default.Input(prompt.InputConfig{
 					Title:       fmt.Sprintf("%s %s credential", titleName, credType),
 					Placeholder: "paste credential here",
-					Validate:    prompt.ValidateNotEmpty,
+					Validate:    provider.ValidateNotEmpty,
 				})
 				if err != nil {
 					return err

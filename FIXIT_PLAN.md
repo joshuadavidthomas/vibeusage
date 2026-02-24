@@ -156,11 +156,11 @@ The spinner package is 3 files (~130 lines of real code). `format.go` is a type 
 
 ### Fix
 
-- [ ] Move `ValidateClaudeSessionKey` to `internal/provider/claude/`
-- [ ] Move `ValidateNotEmpty` to `internal/provider/` (shared by any `ManualKeyAuthFlow` that needs it) or keep in `prompt` since it's genuinely generic
-- [ ] Move `ValidateCodingPlanKey` to stay in minimax (already correct) — but the pattern should match the others
-- [ ] Delete `internal/prompt/validation.go` if empty after moves
-- [ ] `prompt` package should only contain prompt UI concerns (`Prompter` interface, `Huh` impl, `Mock`)
+- [x] Move `ValidateClaudeSessionKey` to `internal/provider/claude/`
+- [x] Move `ValidateNotEmpty` to `internal/provider/` (shared by any `ManualKeyAuthFlow` that needs it) or keep in `prompt` since it's genuinely generic
+- [x] Move `ValidateCodingPlanKey` to stay in minimax (already correct) — but the pattern should match the others
+- [x] Delete `internal/prompt/validation.go` if empty after moves
+- [x] `prompt` package should only contain prompt UI concerns (`Prompter` interface, `Huh` impl, `Mock`)
 
 ## Order of operations
 
