@@ -3,7 +3,6 @@ package codex
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,18 +62,10 @@ func (c Codex) Auth() provider.AuthFlow {
 			"\n" +
 			"Note: Manually obtained tokens won't auto-refresh — run auth again when they expire.",
 		Placeholder: "ey... (OAuth access token)",
-		Validate:    validateNotEmpty,
+		Validate:    provider.ValidateNotEmpty,
 		CredPath:    config.CredentialPath("codex", "oauth"),
 		JSONKey:     "access_token",
 	}
-}
-
-// validateNotEmpty is a minimal validator used by providers that accept any non-empty credential.
-func validateNotEmpty(s string) error {
-	if strings.TrimSpace(s) == "" {
-		return errors.New("value cannot be empty")
-	}
-	return nil
 }
 
 func init() {

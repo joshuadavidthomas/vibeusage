@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -52,7 +51,7 @@ func (m Minimax) Auth() provider.AuthFlow {
 			"\n" +
 			"Note: Standard API keys (sk-api-) won't work — you need a Coding Plan key.",
 		Placeholder: "sk-cp-...",
-		Validate:    ValidateCodingPlanKey,
+		Validate:    provider.ValidatePrefix("sk-cp-"),
 		CredPath:    config.CredentialPath("minimax", "apikey"),
 		JSONKey:     "api_key",
 	}
@@ -211,16 +210,4 @@ func parseResponse(resp CodingPlanResponse) *models.UsageSnapshot {
 		Identity:  identity,
 		Source:    "api_key",
 	}
-}
-
-// ValidateCodingPlanKey checks that the key has the expected sk-cp- prefix.
-func ValidateCodingPlanKey(key string) error {
-	key = strings.TrimSpace(key)
-	if key == "" {
-		return fmt.Errorf("key cannot be empty")
-	}
-	if !strings.HasPrefix(key, "sk-cp-") {
-		return fmt.Errorf("Minimax Coding Plan keys start with 'sk-cp-'. Standard API keys (sk-api-) won't work for usage tracking")
-	}
-	return nil
 }
