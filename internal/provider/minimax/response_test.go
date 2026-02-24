@@ -101,45 +101,43 @@ func TestCodingPlanResponse_UnmarshalErrorResponse(t *testing.T) {
 }
 
 func TestModelRemain_Utilization(t *testing.T) {
+	// The endpoint is /coding_plan/remains — current_interval_usage_count is the
+	// REMAINING quota, not the consumed count.
+	// utilization = (total - remaining) / total * 100
 	tests := []struct {
 		name string
 		m    ModelRemain
 		want int
 	}{
 		{
-			name: "fully used",
+			name: "fresh quota (all remaining)",
 			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 1500},
-			want: 100,
+			want: 0,
 		},
 		{
-			name: "half used",
+			name: "half remaining",
 			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 750},
 			want: 50,
 		},
 		{
-			name: "none used",
+			name: "fully exhausted",
 			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 0},
+			want: 100,
+		},
+		{
+			name: "remaining exceeds total (clamp to 0)",
+			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 2000},
 			want: 0,
 		},
 		{
-			name: "over limit",
-			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 2000},
-			want: 100,
-		},
-		{
-			name: "zero total with usage",
-			m:    ModelRemain{CurrentIntervalTotalCount: 0, CurrentIntervalUsageCount: 5},
-			want: 100,
-		},
-		{
-			name: "zero total zero usage",
+			name: "zero total zero remaining",
 			m:    ModelRemain{CurrentIntervalTotalCount: 0, CurrentIntervalUsageCount: 0},
 			want: 0,
 		},
 		{
-			name: "starter tier",
+			name: "starter tier quarter remaining",
 			m:    ModelRemain{CurrentIntervalTotalCount: 500, CurrentIntervalUsageCount: 100},
-			want: 20,
+			want: 80,
 		},
 	}
 
@@ -194,25 +192,26 @@ func TestModelRemain_ResetTime(t *testing.T) {
 }
 
 func TestModelRemain_Remaining(t *testing.T) {
+	// current_interval_usage_count IS the remaining count (endpoint: /remains).
 	tests := []struct {
 		name string
 		m    ModelRemain
 		want int
 	}{
 		{
-			name: "some remaining",
+			name: "1000 remaining",
 			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 1000},
-			want: 500,
+			want: 1000,
 		},
 		{
-			name: "none remaining",
+			name: "fully exhausted",
+			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 0},
+			want: 0,
+		},
+		{
+			name: "fresh quota",
 			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 1500},
-			want: 0,
-		},
-		{
-			name: "over limit clamps to zero",
-			m:    ModelRemain{CurrentIntervalTotalCount: 1500, CurrentIntervalUsageCount: 2000},
-			want: 0,
+			want: 1500,
 		},
 	}
 
@@ -318,13 +317,16 @@ func TestParseResponse_MultiModel(t *testing.T) {
 		t.Fatalf("expected 3 periods, got %d", len(snapshot.Periods))
 	}
 
-	// Summary takes highest utilization
+	// Summary takes highest utilization across models.
+	// M2: 750 remaining / 1500 total → 50% used.
+	// M2.5: 1500 remaining / 1500 total → 0% used (fresh quota).
+	// Highest = 50%.
 	summary := snapshot.Periods[0]
 	if summary.Name != "Coding Plan" {
 		t.Errorf("summary name = %q, want %q", summary.Name, "Coding Plan")
 	}
-	if summary.Utilization != 100 {
-		t.Errorf("summary utilization = %d, want 100", summary.Utilization)
+	if summary.Utilization != 50 {
+		t.Errorf("summary utilization = %d, want 50", summary.Utilization)
 	}
 	if summary.PeriodType != models.PeriodSession {
 		t.Errorf("summary periodType = %q, want %q", summary.PeriodType, models.PeriodSession)
@@ -343,8 +345,8 @@ func TestParseResponse_MultiModel(t *testing.T) {
 	if m2.Name != "MiniMax-M2.5" {
 		t.Errorf("m2 name = %q, want %q", m2.Name, "MiniMax-M2.5")
 	}
-	if m2.Utilization != 100 {
-		t.Errorf("m2 utilization = %d, want 100", m2.Utilization)
+	if m2.Utilization != 0 {
+		t.Errorf("m2 utilization = %d, want 0 (fresh quota: 1500 remaining / 1500 total)", m2.Utilization)
 	}
 
 	// Identity
@@ -384,8 +386,9 @@ func TestParseResponse_SingleModel(t *testing.T) {
 	if period.Name != "Coding Plan" {
 		t.Errorf("name = %q, want %q", period.Name, "Coding Plan")
 	}
-	if period.Utilization != 20 {
-		t.Errorf("utilization = %d, want 20", period.Utilization)
+	if period.Utilization != 80 {
+		// 100 remaining / 500 total → 400 used → 80%
+		t.Errorf("utilization = %d, want 80", period.Utilization)
 	}
 
 	if snapshot.Identity == nil {

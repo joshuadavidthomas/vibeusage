@@ -18,12 +18,14 @@ type CodingPlanResponse struct {
 }
 
 // ModelRemain represents a single model's quota within the current 5-hour window.
+// This comes from a "remains" endpoint, so CurrentIntervalUsageCount is the
+// number of prompts REMAINING (not consumed). Utilization = (total - remaining) / total.
 type ModelRemain struct {
 	StartTime                 int64  `json:"start_time"`                   // Unix millis
 	EndTime                   int64  `json:"end_time"`                     // Unix millis
 	RemainsTime               int64  `json:"remains_time"`                 // millis remaining in window
-	CurrentIntervalTotalCount int    `json:"current_interval_total_count"` // total prompts in window
-	CurrentIntervalUsageCount int    `json:"current_interval_usage_count"` // prompts used
+	CurrentIntervalTotalCount int    `json:"current_interval_total_count"` // total prompt quota for the window
+	CurrentIntervalUsageCount int    `json:"current_interval_usage_count"` // prompts remaining (not consumed)
 	ModelName                 string `json:"model_name"`
 }
 
@@ -33,22 +35,24 @@ type BaseResp struct {
 	StatusMsg  string `json:"status_msg"`
 }
 
-// Utilization returns the usage percentage (0-100) for this model.
+// Utilization returns the consumed percentage (0-100) for this model.
+// CurrentIntervalUsageCount is the REMAINING quota, so:
+//
+//	consumed = total - remaining
+//	utilization = consumed / total * 100
 func (m ModelRemain) Utilization() int {
 	if m.CurrentIntervalTotalCount <= 0 {
-		if m.CurrentIntervalUsageCount > 0 {
-			return 100
-		}
 		return 0
 	}
-	pct := (m.CurrentIntervalUsageCount * 100) / m.CurrentIntervalTotalCount
-	if pct > 100 {
-		return 100
+	remaining := m.CurrentIntervalUsageCount
+	if remaining > m.CurrentIntervalTotalCount {
+		remaining = m.CurrentIntervalTotalCount
 	}
-	if pct < 0 {
-		return 0
+	if remaining < 0 {
+		remaining = 0
 	}
-	return pct
+	consumed := m.CurrentIntervalTotalCount - remaining
+	return (consumed * 100) / m.CurrentIntervalTotalCount
 }
 
 // ResetTime converts end_time (Unix millis) to a time.Time pointer.
@@ -60,13 +64,13 @@ func (m ModelRemain) ResetTime() *time.Time {
 	return &t
 }
 
-// Remaining returns the number of unused prompts.
+// Remaining returns the number of prompts still available in this window.
+// CurrentIntervalUsageCount is already the remaining count (this is a "remains" endpoint).
 func (m ModelRemain) Remaining() int {
-	r := m.CurrentIntervalTotalCount - m.CurrentIntervalUsageCount
-	if r < 0 {
+	if m.CurrentIntervalUsageCount < 0 {
 		return 0
 	}
-	return r
+	return m.CurrentIntervalUsageCount
 }
 
 // ToUsagePeriod converts this model's quota to a UsagePeriod.
