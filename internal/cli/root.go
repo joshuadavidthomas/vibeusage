@@ -17,7 +17,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
 	// Register all providers
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/antigravity"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/claude"
@@ -121,9 +120,9 @@ func fetchAndDisplayAll(ctx context.Context) error {
 
 	var outcomes map[string]fetch.FetchOutcome
 
-	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
+	if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
 		spinnerIDs := availableProviderIDs(providerMap, cfg)
-		err := spinner.Run(spinnerIDs, func(onComplete func(spinner.CompletionInfo)) {
+		err := display.SpinnerRun(spinnerIDs, func(onComplete func(display.CompletionInfo)) {
 			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, orchCfg, cfg.IsProviderEnabled, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
 			})
@@ -165,8 +164,8 @@ func availableProviderIDs(providerMap map[string][]fetch.Strategy, cfg config.Co
 	return ids
 }
 
-func outcomeToCompletion(o fetch.FetchOutcome) spinner.CompletionInfo {
-	return spinner.CompletionInfo{
+func outcomeToCompletion(o fetch.FetchOutcome) display.CompletionInfo {
+	return display.CompletionInfo{
 		ProviderID: o.ProviderID,
 		Success:    o.Success,
 		Error:      o.Error,
@@ -279,8 +278,8 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 
 	var outcome fetch.FetchOutcome
 
-	if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
-		err := spinner.Run([]string{providerID}, func(onComplete func(spinner.CompletionInfo)) {
+	if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
+		err := display.SpinnerRun([]string{providerID}, func(onComplete func(display.CompletionInfo)) {
 			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh, pipeCfg)
 			onComplete(outcomeToCompletion(outcome))
 		})

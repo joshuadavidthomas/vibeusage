@@ -15,7 +15,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/routing"
-	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
 )
 
 var routeCmd = &cobra.Command{
@@ -119,8 +118,8 @@ func newRoutingServiceWithSpinner() *routing.Service {
 
 		var outcomes map[string]fetch.FetchOutcome
 		orchCfg := orchestratorConfigFromConfig(config.Get())
-		if spinner.ShouldShow(quiet, jsonOutput, !isTerminal()) {
-			_ = spinner.Run(providerIDs, func(onComplete func(spinner.CompletionInfo)) {
+		if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
+			_ = display.SpinnerRun(providerIDs, func(onComplete func(display.CompletionInfo)) {
 				outcomes = fetch.FetchAllProviders(fetchCtx, strategies, useCache, orchCfg, func(o fetch.FetchOutcome) {
 					onComplete(outcomeToCompletion(o))
 				})

@@ -145,10 +145,10 @@ The spinner package is 3 files (~130 lines of real code). `format.go` is a type 
 
 ### Fix
 
-- [ ] Move `spinner.go` and `model.go` into `internal/display/spinner.go` (or `internal/display/progress.go`)
-- [ ] Inline `CompletionInfo` and `FormatCompletionText` — the "format" file adds nothing
-- [ ] Delete `internal/spinner/`
-- [ ] Update imports in `cmd/root.go` and `cmd/route.go`
+- [x] Move `spinner.go` and `model.go` into `internal/display/spinner.go` (or `internal/display/progress.go`)
+- [x] Inline `CompletionInfo` and `FormatCompletionText` — the "format" file adds nothing
+- [x] Delete `internal/spinner/`
+- [x] Update imports in `cmd/root.go` and `cmd/route.go`
 
 ## 7. Move validation to providers
 
