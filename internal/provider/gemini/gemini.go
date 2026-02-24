@@ -17,7 +17,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 type Gemini struct{}
@@ -227,7 +226,7 @@ func (s *OAuthStrategy) parseTypedQuotaResponse(quotaResp QuotaResponse, codeAss
 			modelName = bucket.ModelID[idx+1:]
 		}
 
-		displayName := strutil.TitleCase(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
+		displayName := titleCase(strings.ReplaceAll(strings.ReplaceAll(modelName, "-", " "), "_", " "))
 		periods = append(periods, models.UsagePeriod{
 			Name:        displayName,
 			Utilization: bucket.Utilization(),
@@ -374,4 +373,16 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 func nextMidnightUTC() time.Time {
 	now := time.Now().UTC()
 	return time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+}
+
+// titleCase capitalizes the first letter of each space-separated word.
+// Used for formatting model display names (e.g. "gemini 2 5 flash" → "Gemini 2 5 Flash").
+func titleCase(s string) string {
+	words := strings.Fields(s)
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }

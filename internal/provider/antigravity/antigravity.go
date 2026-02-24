@@ -17,7 +17,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 type Antigravity struct{}
@@ -318,7 +317,7 @@ func (s *OAuthStrategy) parseModelsResponse(modelsResp FetchAvailableModelsRespo
 
 		displayName := info.DisplayName
 		if displayName == "" {
-			displayName = strutil.TitleCase(strings.ReplaceAll(strings.ReplaceAll(modelID, "-", " "), "_", " "))
+			displayName = titleCase(strings.ReplaceAll(strings.ReplaceAll(modelID, "-", " "), "_", " "))
 		}
 
 		periods = append(periods, models.UsagePeriod{
@@ -391,4 +390,16 @@ func summarizePeriods(periods []models.UsagePeriod, periodType models.PeriodType
 	}
 
 	return summary
+}
+
+// titleCase capitalizes the first letter of each space-separated word.
+// Used for formatting model display names (e.g. "claude-3-5-sonnet" → "Claude 3 5 Sonnet").
+func titleCase(s string) string {
+	words := strings.Fields(s)
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }

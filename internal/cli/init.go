@@ -9,7 +9,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/strutil"
 )
 
 var providerDescriptions = map[string]string{
@@ -95,7 +94,7 @@ func interactiveWizard() error {
 		}
 		desc := providerDescriptions[pid]
 		if desc == "" {
-			desc = strutil.TitleCase(pid) + " AI"
+			desc = provider.DisplayName(pid) + " AI"
 		}
 		label := status + pid + " — " + desc
 		options = append(options, prompt.SelectOption{Label: label, Value: pid})
