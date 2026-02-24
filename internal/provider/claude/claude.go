@@ -88,7 +88,6 @@ func init() {
 }
 
 // OAuthStrategy fetches Claude usage using OAuth credentials.
-
 type OAuthStrategy struct {
 	HTTPTimeout float64
 }
@@ -338,7 +337,6 @@ func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models
 }
 
 // WebStrategy fetches Claude usage using a session cookie.
-
 type WebStrategy struct {
 	HTTPTimeout float64
 }

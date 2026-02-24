@@ -3,6 +3,7 @@ package gemini
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,7 +75,7 @@ func (g Gemini) Auth() provider.AuthFlow {
 // validateNotEmpty is a minimal validator for providers that accept any non-empty credential.
 func validateNotEmpty(s string) error {
 	if strings.TrimSpace(s) == "" {
-		return fmt.Errorf("value cannot be empty")
+		return errors.New("value cannot be empty")
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,19 +48,21 @@ func (c Codex) FetchStatus(ctx context.Context) models.ProviderStatus {
 
 // Auth returns the manual bearer token flow for Codex.
 // Codex uses OAuth tokens managed by the Codex CLI — users must authenticate
-// with the CLI first, or provide a bearer token obtained from the browser.
+// with the CLI first, or provide an access token obtained from the browser.
 func (c Codex) Auth() provider.AuthFlow {
 	return provider.ManualKeyAuthFlow{
-		Instructions: "Codex uses OAuth tokens from the Codex CLI.\n" +
-			"Install the CLI and run `codex login`, or provide a bearer token manually:\n" +
-			"  1. Open https://chatgpt.com in your browser\n" +
-			"  2. Open DevTools (F12 or Cmd+Option+I)\n" +
-			"  3. Go to Application → Cookies → https://chatgpt.com\n" +
-			"  4. Find the __Secure-next-auth.session-token cookie\n" +
-			"  5. Copy its value\n" +
+		Instructions: "Codex uses OAuth tokens from the Codex CLI (recommended):\n" +
+			"  Install the CLI and run `codex login`\n" +
 			"\n" +
-			"Note: Tokens obtained this way won't auto-refresh — run auth again when they expire.",
-		Placeholder: "Bearer token or access token",
+			"Or provide an access token manually:\n" +
+			"  1. Open https://chatgpt.com in your browser and sign in\n" +
+			"  2. Open DevTools (F12 or Cmd+Option+I) → Network tab\n" +
+			"  3. Reload the page and click any request to chatgpt.com/backend-api/\n" +
+			"  4. In Request Headers, find the Authorization header\n" +
+			"  5. Copy the value after \"Bearer \" (starts with ey...)\n" +
+			"\n" +
+			"Note: Manually obtained tokens won't auto-refresh — run auth again when they expire.",
+		Placeholder: "ey... (OAuth access token)",
 		Validate:    validateNotEmpty,
 		CredPath:    config.CredentialPath("codex", "oauth"),
 		JSONKey:     "access_token",
@@ -69,7 +72,7 @@ func (c Codex) Auth() provider.AuthFlow {
 // validateNotEmpty is a minimal validator used by providers that accept any non-empty credential.
 func validateNotEmpty(s string) error {
 	if strings.TrimSpace(s) == "" {
-		return fmt.Errorf("value cannot be empty")
+		return errors.New("value cannot be empty")
 	}
 	return nil
 }

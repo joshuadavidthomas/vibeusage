@@ -25,11 +25,8 @@ func TestAPIKeyStrategy_IsAvailable_EnvVar(t *testing.T) {
 func TestAPIKeyStrategy_IsAvailable_NoEnvVar(t *testing.T) {
 	t.Setenv("ZAI_API_KEY", "")
 	s := &APIKeyStrategy{}
-	// Without the env var and no credential files, should be false.
-	// (credential file absence is guaranteed by the empty env var path)
-	got := s.IsAvailable()
-	// We only assert false when loadToken returns ""
-	if s.loadToken() == "" && got {
+	// Only assert false when no credential file exists either.
+	if s.loadToken() == "" && s.IsAvailable() {
 		t.Error("IsAvailable() = true, want false when no token available")
 	}
 }
