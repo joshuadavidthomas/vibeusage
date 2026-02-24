@@ -142,7 +142,7 @@ vibeusage route <model>   # Best provider for a model
 
 ### Amp
 
-[ampcode.com](https://ampcode.com) — Amp coding assistant. Reports daily usage and credit balance.
+[ampcode.com](https://ampcode.com) — Amp coding assistant. Reports Amp Free daily quota usage and credit balance.
 
 If you have the Amp CLI installed, `vibeusage` reads credentials from `~/.local/share/amp/secrets.json` automatically. It also picks up `AMP_API_KEY` if you already have it set. Otherwise:
 
@@ -178,13 +178,13 @@ The prompt walks you through extracting your session cookie from https://cursor.
 
 ### Google Antigravity
 
-[antigravity.google](https://antigravity.google) — Google's AI IDE (formerly Project IDX). Reports per-model usage and code assist quotas.
+[antigravity.google](https://antigravity.google) — Google's AI IDE (formerly Project IDX). Reports per-model usage quotas. Shows your subscription tier.
 
 `vibeusage` reads credentials from the local Antigravity IDE state automatically. Just sign into Antigravity and it should work — no manual setup needed.
 
 ### Google Gemini CLI
 
-[gemini.google.com](https://gemini.google.com) — Google Gemini AI. Reports daily request and code assist quotas. Shows your user tier.
+[gemini.google.com](https://gemini.google.com) — Google Gemini AI. Reports daily per-model request quotas. Shows your user tier.
 
 If you have the Gemini CLI installed, `vibeusage` reads its OAuth credentials from `~/.gemini/oauth_creds.json` automatically — including token refresh. This gives you the full quota view from the Cloud Code API.
 
@@ -226,7 +226,7 @@ vibeusage auth kimicode
 
 ### Kimi K2
 
-[kimi-k2.ai](https://kimi-k2.ai) — Kimi K2 API. Reports monthly token usage against your quota.
+[kimi-k2.ai](https://kimi-k2.ai) — Kimi K2 API. Reports monthly credit usage against your quota.
 
 Requires an API key. Set `KIMI_K2_API_KEY` in your environment (also accepts `KIMI_API_KEY` or `KIMI_KEY`), or store one with:
 
@@ -274,7 +274,7 @@ vibeusage auth openrouter
 
 ### Warp
 
-[warp.dev](https://warp.dev) — Warp terminal AI. Reports monthly request usage and AI action quotas.
+[warp.dev](https://warp.dev) — Warp terminal AI. Reports monthly credit usage and bonus credits.
 
 Requires an API key. Set `WARP_API_KEY` in your environment (also accepts `WARP_TOKEN`), or store one with:
 
@@ -284,7 +284,7 @@ vibeusage auth warp
 
 ### Z.ai
 
-[z.ai](https://z.ai) — Zhipu AI coding assistant. Reports credit usage against your API quota.
+[z.ai](https://z.ai) — Zhipu AI coding assistant. Reports token quotas and tool usage across session, daily, and monthly windows. Shows your plan tier (Lite, Pro, Max).
 
 Requires an API key. Get one from https://z.ai/manage-apikey/apikey-list. Set `ZAI_API_KEY` in your environment, or store one with:
 
