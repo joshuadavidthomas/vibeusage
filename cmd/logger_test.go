@@ -1,25 +1,12 @@
 package cmd
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/charmbracelet/log"
-	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 )
 
-func TestLogger_InitializedExplicitly(t *testing.T) {
-	if logger == nil {
-		t.Fatal("expected logger to be non-nil")
-	}
-}
-
-func TestConfigureLogger_UsesPackageLogger(t *testing.T) {
-	var buf bytes.Buffer
-	old := logger
-	logger = logging.NewLogger(&buf)
-	defer func() { logger = old }()
-
+func TestNewConfiguredLogger_Verbose(t *testing.T) {
 	oldVerbose := verbose
 	verbose = true
 	defer func() { verbose = oldVerbose }()
@@ -28,19 +15,14 @@ func TestConfigureLogger_UsesPackageLogger(t *testing.T) {
 	quiet = false
 	defer func() { quiet = oldQuiet }()
 
-	configureLogger()
+	l := newConfiguredLogger()
 
-	if logger.GetLevel() != log.DebugLevel {
-		t.Errorf("expected configureLogger to set DebugLevel on cmd logger, got %v", logger.GetLevel())
+	if l.GetLevel() != log.DebugLevel {
+		t.Errorf("expected DebugLevel for verbose, got %v", l.GetLevel())
 	}
 }
 
-func TestConfigureLogger_QuietMode(t *testing.T) {
-	var buf bytes.Buffer
-	old := logger
-	logger = logging.NewLogger(&buf)
-	defer func() { logger = old }()
-
+func TestNewConfiguredLogger_Quiet(t *testing.T) {
 	oldQuiet := quiet
 	quiet = true
 	defer func() { quiet = oldQuiet }()
@@ -49,19 +31,14 @@ func TestConfigureLogger_QuietMode(t *testing.T) {
 	verbose = false
 	defer func() { verbose = oldVerbose }()
 
-	configureLogger()
+	l := newConfiguredLogger()
 
-	if logger.GetLevel() != log.ErrorLevel {
-		t.Errorf("expected configureLogger to set ErrorLevel for quiet, got %v", logger.GetLevel())
+	if l.GetLevel() != log.ErrorLevel {
+		t.Errorf("expected ErrorLevel for quiet, got %v", l.GetLevel())
 	}
 }
 
-func TestConfigureLogger_DefaultMode(t *testing.T) {
-	var buf bytes.Buffer
-	old := logger
-	logger = logging.NewLogger(&buf)
-	defer func() { logger = old }()
-
+func TestNewConfiguredLogger_Default(t *testing.T) {
 	oldVerbose := verbose
 	verbose = false
 	defer func() { verbose = oldVerbose }()
@@ -70,9 +47,9 @@ func TestConfigureLogger_DefaultMode(t *testing.T) {
 	quiet = false
 	defer func() { quiet = oldQuiet }()
 
-	configureLogger()
+	l := newConfiguredLogger()
 
-	if logger.GetLevel() != log.WarnLevel {
-		t.Errorf("expected configureLogger to set WarnLevel for default, got %v", logger.GetLevel())
+	if l.GetLevel() != log.WarnLevel {
+		t.Errorf("expected WarnLevel for default, got %v", l.GetLevel())
 	}
 }

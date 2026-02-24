@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
-	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -38,7 +37,7 @@ func TestDisplayStatusTable_ContainsProviderData(t *testing.T) {
 	noColor = true
 	defer func() { noColor = oldNoColor }()
 
-	displayStatusTable(statuses, 100)
+	displayStatusTable(context.Background(), statuses, 100)
 
 	output := buf.String()
 
@@ -69,7 +68,7 @@ func TestDisplayStatusTable_HasTableBorders(t *testing.T) {
 	quiet = false
 	defer func() { quiet = oldQuiet }()
 
-	displayStatusTable(statuses, 0)
+	displayStatusTable(context.Background(), statuses, 0)
 
 	output := buf.String()
 
@@ -97,7 +96,7 @@ func TestDisplayStatusTable_QuietMode(t *testing.T) {
 	quiet = true
 	defer func() { quiet = oldQuiet }()
 
-	displayStatusTable(statuses, 0)
+	displayStatusTable(context.Background(), statuses, 0)
 
 	output := buf.String()
 
@@ -115,12 +114,9 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 		"claude": {Level: models.StatusOperational, Description: "OK"},
 	}
 
-	// Capture logger output (verbose info goes to logger, not stdout)
+	// Capture logger output via context injection
 	var logBuf bytes.Buffer
-	oldLogger := logger
-	logger = logging.NewLogger(&logBuf)
-	logging.Configure(logger, logging.Flags{Verbose: true})
-	defer func() { logger = oldLogger }()
+	ctx := newVerboseContext(&logBuf)
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -130,11 +126,7 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 	quiet = false
 	defer func() { quiet = oldQuiet }()
 
-	oldVerbose := verbose
-	verbose = true
-	defer func() { verbose = oldVerbose }()
-
-	displayStatusTable(statuses, 250)
+	displayStatusTable(ctx, statuses, 250)
 
 	logOutput := logBuf.String()
 	if !strings.Contains(logOutput, "250") {
@@ -159,7 +151,7 @@ func TestDisplayStatusTable_Headers(t *testing.T) {
 	quiet = false
 	defer func() { quiet = oldQuiet }()
 
-	displayStatusTable(statuses, 0)
+	displayStatusTable(context.Background(), statuses, 0)
 
 	output := buf.String()
 	for _, header := range []string{"Provider", "Status", "Description", "Updated"} {

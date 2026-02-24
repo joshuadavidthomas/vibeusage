@@ -50,7 +50,9 @@ var rootCmd = &cobra.Command{
 		if verbose && quiet {
 			verbose = false
 		}
-		configureLogger()
+		l := newConfiguredLogger()
+		ctx := logging.WithLogger(cmd.Context(), l)
+		cmd.SetContext(ctx)
 	},
 	RunE: runDefaultUsage,
 }
@@ -86,16 +88,6 @@ func Execute() error {
 // Commands access it via cmd.Context().
 func ExecuteContext(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
-}
-
-// configureLogger sets up the structured logger based on CLI flags.
-func configureLogger() {
-	logging.Configure(logger, logging.Flags{
-		Verbose: verbose,
-		Quiet:   quiet,
-		NoColor: noColor,
-		JSON:    jsonOutput,
-	})
 }
 
 func runDefaultUsage(cmd *cobra.Command, args []string) error {
@@ -145,7 +137,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 		return display.OutputMultiProviderJSON(outWriter, outcomes)
 	}
 
-	displayMultipleSnapshots(outcomes, durationMs)
+	displayMultipleSnapshots(ctx, outcomes, durationMs)
 	return nil
 }
 
@@ -185,7 +177,8 @@ func buildProviderMap() map[string][]fetch.Strategy {
 	return pm
 }
 
-func displayMultipleSnapshots(outcomes map[string]fetch.FetchOutcome, durationMs int64) {
+func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.FetchOutcome, durationMs int64) {
+	logger := logging.FromContext(ctx)
 	hasData := false
 	for _, o := range outcomes {
 		if o.Success && o.Snapshot != nil {
@@ -258,6 +251,8 @@ func makeProviderCmd(providerID string) *cobra.Command {
 }
 
 func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
+	logger := logging.FromContext(ctx)
+
 	p, ok := provider.Get(providerID)
 	if !ok {
 		return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
