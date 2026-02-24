@@ -608,6 +608,12 @@ func TestPaceToColor(t *testing.T) {
 		{"pace 1.30 yellow boundary", pf(1.30), 70, "yellow"},
 		{"pace 1.31 red", pf(1.31), 70, "red"},
 		{"pace 2.0 red", pf(2.0), 80, "red"},
+
+		// exhausted quota — always red regardless of pace
+		// at 100% you're blocked; "on pace" is irrelevant
+		{"pace 1.0 util 100 red", pf(1.0), 100, "red"},
+		{"pace 1.05 util 100 red", pf(1.05), 100, "red"},
+		{"pace 0.5 util 100 red", pf(0.5), 100, "red"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
