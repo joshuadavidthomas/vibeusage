@@ -2,19 +2,7 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-`vibeusage` gives you one place to see account usage, pace, and remaining headroom across your configured providers.
-
-## Why vibeusage
-
-As an OSS contributor, I’ve had free GitHub Copilot Pro access for a while, but I kept forgetting to use it and leaving free usage on the table. `vibeusage` keeps that visible across providers.
-
-Includes:
-
-- One command for all connected providers
-- Pace-aware output (not just percent used)
-- Smart model routing with `vibeusage route`
-- Works with existing local credentials where possible
-- JSON output for scripts and automation
+As an OSS contributor, I’ve had free GitHub Copilot Pro access for a while, but I kept forgetting to use it and leaving free usage on the table. `vibeusage` keeps that visible across providers and gives you one place to see account usage, pace, and remaining headroom across your configured providers.
 
 ## Installation
 
@@ -71,7 +59,6 @@ After installing, run the setup wizard once:
 
 ```bash
 vibeusage init
-
 ```
 
 Then check usage across your configured providers:
