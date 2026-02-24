@@ -412,7 +412,7 @@ func TestRenderProviderPanel_ContainsProviderTitle(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 60, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderProviderPanel(snap, false)
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
 	if !strings.Contains(result, "Copilot") {
 		t.Errorf("expected title-cased provider name 'Copilot', got: %q", result)
 	}
@@ -424,7 +424,7 @@ func TestRenderProviderPanel_HasBorder(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderProviderPanel(snap, false)
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
 	// Rounded border characters
 	if !strings.Contains(result, "╭") || !strings.Contains(result, "╰") {
 		t.Errorf("expected rounded border characters, got: %q", result)
@@ -440,7 +440,7 @@ func TestRenderProviderPanel_FiltersModelSpecificPeriods(t *testing.T) {
 		},
 	}
 
-	result := RenderProviderPanel(snap, false)
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
 	if !strings.Contains(result, "50%") {
 		t.Errorf("expected general period '50%%', got: %q", result)
 	}
@@ -459,7 +459,7 @@ func TestRenderProviderPanel_RenamesWeeklyDaily(t *testing.T) {
 		},
 	}
 
-	result := RenderProviderPanel(snap, false)
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
 	// Names without parentheses should be normalized
 	if !strings.Contains(result, "Weekly") {
 		t.Errorf("expected 'Weekly' label for weekly period, got: %q", result)
@@ -481,7 +481,7 @@ func TestRenderProviderPanel_WithOverage(t *testing.T) {
 		},
 	}
 
-	result := RenderProviderPanel(snap, false)
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
 	if !strings.Contains(result, "Extra:") {
 		t.Errorf("expected compact 'Extra:' format for overage, got: %q", result)
 	}
@@ -497,7 +497,7 @@ func TestRenderProviderPanel_AgeIndicator(t *testing.T) {
 		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderProviderPanel(snap, true)
+	result := RenderProviderPanel(snap, true, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
 	if !strings.Contains(result, "3h ago") {
 		t.Errorf("expected '3h ago' in panel title, got: %q", result)
 	}
@@ -510,7 +510,7 @@ func TestRenderProviderPanel_NoAgeIndicatorWhenFresh(t *testing.T) {
 		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderProviderPanel(snap, false)
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
 	if strings.Contains(result, "ago") {
 		t.Errorf("should not show age indicator for fresh data, got: %q", result)
 	}

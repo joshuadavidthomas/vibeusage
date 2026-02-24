@@ -158,67 +158,111 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 	return b.String()
 }
 
-// RenderProviderPanel renders a provider in compact panel format for multi-provider view.
-func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool) string {
-	var b strings.Builder
+// PeriodColWidths holds pre-computed column widths for renderPeriodTable.
+// Compute once across all panels with GlobalPeriodColWidths so every provider
+// box shares the same column widths and renders at the same total width.
+type PeriodColWidths struct{ Name, Pct, Reset int }
 
+// GlobalPeriodColWidths computes the widest values for each column across all
+// provided snapshots, using the same name normalisations as RenderProviderPanel.
+func GlobalPeriodColWidths(snapshots []models.UsageSnapshot) PeriodColWidths {
+	var cw PeriodColWidths
+	for _, s := range snapshots {
+		for _, p := range collectDisplayPeriods(s) {
+			cw.Name = max(cw.Name, len(p.Name))
+			cw.Pct = max(cw.Pct, len(fmt.Sprintf("%d%%", p.Utilization)))
+			if d := p.TimeUntilReset(); d != nil {
+				cw.Reset = max(cw.Reset, len("resets in "+models.FormatResetCountdown(d)))
+			}
+		}
+	}
+	return cw
+}
+
+// collectDisplayPeriods returns the periods shown in the compact panel view,
+// with period-type name normalisation already applied ("Weekly", "Daily", etc.).
+func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	session, weekly, daily, monthly := groupPeriods(snapshot.Periods)
-
-	// Only general periods (no model-specific) in compact view
-	nameWidth := 22
+	var out []models.UsagePeriod
 	for _, p := range session {
 		if p.Model == "" {
-			b.WriteString(FormatPeriodLine(p, nameWidth))
-			b.WriteByte('\n')
+			out = append(out, p)
 		}
 	}
 	for _, p := range weekly {
 		if p.Model == "" {
-			name := p.Name
-			if !strings.Contains(name, "(") {
-				name = "Weekly"
+			if !strings.Contains(p.Name, "(") {
+				p.Name = "Weekly"
 			}
-			pp := p
-			pp.Name = name
-			b.WriteString(FormatPeriodLine(pp, nameWidth))
-			b.WriteByte('\n')
+			out = append(out, p)
 		}
 	}
 	for _, p := range daily {
 		if p.Model == "" {
-			name := p.Name
-			if !strings.Contains(name, "(") {
-				name = "Daily"
+			if !strings.Contains(p.Name, "(") {
+				p.Name = "Daily"
 			}
-			pp := p
-			pp.Name = name
-			b.WriteString(FormatPeriodLine(pp, nameWidth))
-			b.WriteByte('\n')
+			out = append(out, p)
 		}
 	}
 	for _, p := range monthly {
 		if p.Model == "" {
-			b.WriteString(FormatPeriodLine(p, nameWidth))
-			b.WriteByte('\n')
+			out = append(out, p)
 		}
 	}
+	return out
+}
 
-	// Overage
+// renderPeriodTable renders a slice of periods as aligned rows using the
+// provided column widths.  No characters are hand-counted: the caller supplies
+// widths computed from the full dataset so every panel lines up identically.
+func renderPeriodTable(periods []models.UsagePeriod, cw PeriodColWidths) string {
+	lines := make([]string, 0, len(periods))
+	for _, p := range periods {
+		color := models.PaceToColor(p.PaceRatio(), p.Utilization)
+		pctRaw := fmt.Sprintf("%d%%", p.Utilization)
+
+		resetRaw := ""
+		if d := p.TimeUntilReset(); d != nil {
+			resetRaw = "resets in " + models.FormatResetCountdown(d)
+		}
+
+		namePad := strings.Repeat(" ", max(0, cw.Name-len(p.Name)))
+		pctPad := strings.Repeat(" ", max(0, cw.Pct-len(pctRaw)))
+		resetPad := strings.Repeat(" ", max(0, cw.Reset-len(resetRaw)))
+
+		lines = append(lines,
+			boldStyle.Render(p.Name)+namePad+
+				"  "+RenderBar(p.Utilization, 20, color)+
+				" "+pctPad+colorStyle(color).Render(pctRaw)+
+				"    "+dimStyle.Render(resetRaw)+resetPad,
+		)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// RenderProviderPanel renders a provider in compact panel format for multi-provider view.
+// Pass column widths from GlobalPeriodColWidths so all panels share identical column sizing.
+func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodColWidths) string {
+	var b strings.Builder
+
+	b.WriteString(renderPeriodTable(collectDisplayPeriods(snapshot), cw))
+
 	if snapshot.Overage != nil && snapshot.Overage.IsEnabled {
 		o := snapshot.Overage
 		sym := ""
 		if o.Currency == "USD" {
 			sym = "$"
 		}
-		fmt.Fprintf(&b, "Extra: %s%.2f / %s%.2f %s\n", sym, o.Used, sym, o.Limit, o.Currency)
+		b.WriteByte('\n')
+		fmt.Fprintf(&b, "Extra: %s%.2f / %s%.2f %s", sym, o.Used, sym, o.Limit, o.Currency)
 	}
 
-	content := strings.TrimRight(b.String(), "\n")
 	title := strutil.TitleCase(snapshot.Provider)
 	if cached {
 		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
-	return panelBorder.Render(title + "\n" + content)
+	return panelBorder.Render(title + "\n" + b.String())
 }
 
 // formatAge formats a duration as a compact human-readable age string.

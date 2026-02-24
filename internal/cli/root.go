@@ -14,6 +14,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/spinner"
@@ -207,6 +208,16 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 	}
 	sort.Strings(ids)
 
+	// Collect all successful snapshots upfront so we can compute globally
+	// consistent column widths before rendering any individual panel.
+	var snapshots []models.UsageSnapshot
+	for _, pid := range ids {
+		if o := outcomes[pid]; o.Success && o.Snapshot != nil {
+			snapshots = append(snapshots, *o.Snapshot)
+		}
+	}
+	colWidths := display.GlobalPeriodColWidths(snapshots)
+
 	type providerError struct{ id, err string }
 	var errors []providerError
 
@@ -226,7 +237,7 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 				out("%s %s: %d%%\n", pid, p.Name, p.Utilization)
 			}
 		} else {
-			outln(display.RenderProviderPanel(snap, outcome.Cached))
+			outln(display.RenderProviderPanel(snap, outcome.Cached, colWidths))
 		}
 	}
 
