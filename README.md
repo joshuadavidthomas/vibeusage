@@ -17,41 +17,34 @@ A unified CLI tool that aggregates usage statistics from Claude, OpenAI Codex, G
 
 ## Installation
 
-### Install via GitHub Releases script (macOS/Linux)
+### Quick install (recommended)
+
+Install scripts place the binary in `~/.local/bin` by default (override with `VIBEUSAGE_INSTALL_DIR`). Ensure that directory is on your `PATH`.
+
+macOS/Linux/Windows Subsystem for Linux (WSL):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/install.sh | sh
 ```
 
-### Install via GitHub Releases script (Windows PowerShell)
+Windows (PowerShell):
 
 ```powershell
-iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.ps1 -useb | iex
+iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/install.ps1 -useb | iex
 ```
 
-### Install with go install
+### Go install
 
 ```bash
 go install github.com/joshuadavidthomas/vibeusage@latest
 ```
 
-### Install from source
+### From source
 
 ```bash
 git clone https://github.com/joshuadavidthomas/vibeusage.git
 cd vibeusage
 go build -o vibeusage ./cmd/vibeusage
-```
-
-### Install a specific version with scripts
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.sh | VIBEUSAGE_VERSION=v0.1.0 sh
-```
-
-```powershell
-$env:VIBEUSAGE_VERSION = "v0.1.0"
-iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/install.ps1 -useb | iex
 ```
 
 ## Updating
@@ -60,31 +53,30 @@ iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/scripts/i
 # Check for updates
 vibeusage update --check
 
-# Update to latest release
+# Update to latest release (interactive)
 vibeusage update
 
-# Non-interactive update
+# Update to latest release (non-interactive)
 vibeusage update --yes
-
-# Install a specific version
-vibeusage update --version v0.1.0 --yes
 ```
 
-You can also re-run the install scripts to upgrade in place.
-
-Install scripts place the binary in `~/.local/bin` by default (override with `VIBEUSAGE_INSTALL_DIR`). Ensure that directory is on your `PATH`.
+You can also re-run the [install scripts](#quick-install-recommended) to upgrade in place.
 
 ## Quick Start
 
 ### First Run
 
-The first time you run vibeusage, you'll be guided through setup:
+First, run the setup wizard:
+
+```bash
+vibeusage init
+```
+
+Then fetch usage:
 
 ```bash
 vibeusage
 ```
-
-Follow the interactive wizard to configure your providers.
 
 ### Check Usage for All Providers
 
@@ -179,7 +171,7 @@ The tool will attempt to extract your session token from your browser automatica
 
 1. Open https://cursor.com in your browser
 2. Extract your session cookie
-3. Run `vibeusage key set cursor` and paste the token
+3. Run `vibeusage key cursor set` and paste the token
 
 ### Gemini
 
@@ -311,7 +303,6 @@ vibeusage
 # Show usage for a specific provider
 vibeusage claude
 vibeusage codex
-vibeusage usage claude    # Same as above
 
 # Force refresh (ignore cache)
 vibeusage --refresh
@@ -362,8 +353,8 @@ vibeusage config reset
 vibeusage key
 
 # Set a credential manually
-vibeusage key set claude
-vibeusage key set codex
+vibeusage key claude set
+vibeusage key codex set
 
 # Delete credentials
 vibeusage key claude delete
@@ -404,9 +395,6 @@ vibeusage update
 # Install without interactive prompt
 vibeusage update --yes
 
-# Install a specific version
-vibeusage update --version v0.1.0 --yes
-
 # JSON output (requires --check or --yes)
 vibeusage update --check --json
 ```
@@ -431,7 +419,7 @@ reset_format = "countdown" # "countdown" or "absolute"
 [fetch]
 timeout = 30              # Fetch timeout in seconds
 max_concurrent = 5        # Max concurrent provider fetches
-stale_threshold = 60      # Stale data threshold in minutes
+stale_threshold_minutes = 60  # Stale data threshold in minutes
 
 [credentials]
 use_keyring = false                    # Use system keyring
@@ -446,6 +434,7 @@ reuse_provider_credentials = true      # Auto-detect CLI credentials
 | `VIBEUSAGE_CACHE_DIR` | Override cache directory |
 | `VIBEUSAGE_ENABLED_PROVIDERS` | Comma-separated provider list |
 | `VIBEUSAGE_NO_COLOR` | Disable colored output |
+| `VIBEUSAGE_UPDATE_GITHUB_TOKEN` | Optional GitHub token used by `vibeusage update` (helps avoid rate limits) |
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `GEMINI_API_KEY` | Gemini API key |
@@ -530,7 +519,7 @@ go test ./... -cover
 ### Build
 
 ```bash
-go build -o vibeusage .
+go build -o vibeusage ./cmd/vibeusage
 ```
 
 ### Lint
