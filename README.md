@@ -368,19 +368,19 @@ Configuration is stored in:
 ### Default Configuration
 
 ```toml
+[credentials]
+reuse_provider_credentials = true  # Auto-detect CLI credentials
+use_keyring = false                # Use system keyring
+
 [display]
-show_remaining = true     # Show remaining % instead of used %
-pace_colors = true        # Use pace-based coloring
-reset_format = "countdown" # "countdown" or "absolute"
+pace_colors = true                 # Use pace-based coloring
+reset_format = "countdown"         # "countdown" or "absolute"
+show_remaining = true              # Show remaining % instead of used %
 
 [fetch]
-timeout = 30              # Fetch timeout in seconds
-max_concurrent = 5        # Max concurrent provider fetches
-stale_threshold_minutes = 60  # Stale data threshold in minutes
-
-[credentials]
-use_keyring = false                    # Use system keyring
-reuse_provider_credentials = true      # Auto-detect CLI credentials
+max_concurrent = 5                 # Max concurrent provider fetches
+stale_threshold_minutes = 60       # Stale data threshold in minutes
+timeout = 30                       # Fetch timeout in seconds
 ```
 
 ### Routing Roles
@@ -405,25 +405,25 @@ vibeusage route --role coding
 
 | Variable | Description |
 |----------|-------------|
-| `VIBEUSAGE_CONFIG_DIR` | Override config directory |
+| `AMP_API_KEY` | Amp API key |
+| `ANTHROPIC_API_KEY` | Claude API key |
+| `GEMINI_API_KEY` | Gemini API key |
+| `GITHUB_TOKEN` | GitHub token for Copilot |
+| `KIMI_API_KEY` | Kimi/Kimi K2 API key fallback |
+| `KIMI_CODE_API_KEY` | Kimi API key |
+| `KIMI_K2_API_KEY` | Kimi K2 API key |
+| `KIMI_KEY` | Kimi K2 API key fallback |
+| `MINIMAX_API_KEY` | Minimax Coding Plan API key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `OPENROUTER_API_KEY` | OpenRouter API key |
 | `VIBEUSAGE_CACHE_DIR` | Override cache directory |
+| `VIBEUSAGE_CONFIG_DIR` | Override config directory |
 | `VIBEUSAGE_ENABLED_PROVIDERS` | Comma-separated provider list |
 | `VIBEUSAGE_NO_COLOR` | Disable colored output |
 | `VIBEUSAGE_UPDATE_GITHUB_TOKEN` | Optional GitHub token used by `vibeusage update` (helps avoid rate limits) |
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `GEMINI_API_KEY` | Gemini API key |
-| `GITHUB_TOKEN` | GitHub token for Copilot |
-| `OPENROUTER_API_KEY` | OpenRouter API key |
 | `WARP_API_KEY` | Warp API key |
 | `WARP_TOKEN` | Warp token fallback |
-| `KIMI_K2_API_KEY` | Kimi K2 API key |
-| `KIMI_API_KEY` | Kimi/Kimi K2 API key fallback |
-| `KIMI_KEY` | Kimi K2 API key fallback |
-| `AMP_API_KEY` | Amp API key |
-| `KIMI_CODE_API_KEY` | Kimi API key |
 | `ZAI_API_KEY` | Z.ai API key |
-| `MINIMAX_API_KEY` | Minimax Coding Plan API key |
 
 ## Development
 
