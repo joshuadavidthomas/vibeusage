@@ -38,10 +38,6 @@ func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
 	outWriter = &outBuf
 	defer func() { outWriter = os.Stdout }()
 
-	oldVerbose := verbose
-	verbose = true
-	defer func() { verbose = oldVerbose }()
-
 	oldQuiet := quiet
 	quiet = false
 	defer func() { quiet = oldQuiet }()
@@ -75,10 +71,6 @@ func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
 	defer func() { outWriter = os.Stdout }()
-
-	oldVerbose := verbose
-	verbose = true
-	defer func() { verbose = oldVerbose }()
 
 	oldQuiet := quiet
 	quiet = false
@@ -119,10 +111,6 @@ func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) 
 	outWriter = &outBuf
 	defer func() { outWriter = os.Stdout }()
 
-	oldVerbose := verbose
-	verbose = false
-	defer func() { verbose = oldVerbose }()
-
 	oldQuiet := quiet
 	quiet = false
 	defer func() { quiet = oldQuiet }()
@@ -154,10 +142,6 @@ func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 	outWriter = &outBuf
 	defer func() { outWriter = os.Stdout }()
 
-	oldVerbose := verbose
-	verbose = true
-	defer func() { verbose = oldVerbose }()
-
 	oldQuiet := quiet
 	quiet = true
 	defer func() { quiet = oldQuiet }()
@@ -187,10 +171,6 @@ func TestVerboseOutput_NotOnStdout(t *testing.T) {
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
 	defer func() { outWriter = os.Stdout }()
-
-	oldVerbose := verbose
-	verbose = true
-	defer func() { verbose = oldVerbose }()
 
 	oldQuiet := quiet
 	quiet = false

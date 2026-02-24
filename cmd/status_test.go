@@ -126,10 +126,6 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 	quiet = false
 	defer func() { quiet = oldQuiet }()
 
-	oldVerbose := verbose
-	verbose = true
-	defer func() { verbose = oldVerbose }()
-
 	displayStatusTable(ctx, statuses, 250)
 
 	logOutput := logBuf.String()
