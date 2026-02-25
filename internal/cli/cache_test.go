@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
@@ -14,7 +15,7 @@ import (
 func TestCacheShowCmd_HasTableBorders(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -46,7 +47,7 @@ func TestCacheShowCmd_HasTableBorders(t *testing.T) {
 func TestCacheShowCmd_ContainsHeaders(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -79,7 +80,7 @@ func TestCacheShowCmd_ContainsHeaders(t *testing.T) {
 func TestCacheShowCmd_QuietMode(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -107,7 +108,7 @@ func TestCacheShowCmd_QuietMode(t *testing.T) {
 func TestCacheShowCmd_ShowsCacheDir(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -140,7 +141,7 @@ func TestCacheShowCmd_ShowsCacheDir(t *testing.T) {
 func TestCacheClearJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf

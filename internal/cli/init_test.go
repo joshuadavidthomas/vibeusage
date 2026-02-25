@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
@@ -156,7 +157,7 @@ func TestQuickSetup_QuietMode(t *testing.T) {
 func TestInitCommand_QuickFlag_DoesNotPanicWhenConfigMissing(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -179,7 +180,7 @@ func TestInitCommand_QuickFlag_DoesNotPanicWhenConfigMissing(t *testing.T) {
 func TestInitJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf

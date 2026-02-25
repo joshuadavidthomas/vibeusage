@@ -56,8 +56,8 @@ var rootCmd = &cobra.Command{
 		ctx := logging.WithLogger(cmd.Context(), l)
 		cmd.SetContext(ctx)
 
-		// Eagerly load config so malformed files surface a warning.
-		if _, err := config.Reload(); err != nil {
+		// Load config from disk so malformed files surface a warning.
+		if _, err := config.Init(); err != nil {
 			l.Warn("config file is malformed, using defaults", "err", err)
 		}
 	},
