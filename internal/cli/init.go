@@ -168,7 +168,7 @@ func seedDefaultRoles() {
 	outln()
 	outln("  Default roles added to config:")
 	outln("    thinking — deep reasoning models (Opus, o4, GPT-5.2)")
-	outln("    coding   — agentic coding models (Sonnet, Kimi K2, GPT-5)")
+	outln("    coding   — agentic coding models (Sonnet, Codex, GPT-5)")
 	outln("    fast     — quick lightweight models (Haiku, Flash, GPT-4o-mini)")
 	outln()
 	outln("  Customize roles with: vibeusage config edit")
