@@ -25,6 +25,7 @@ func ConfigDir() string {
 		return preferred
 	}
 	if regularFileExists(filepath.Join(canonical, "config.toml")) {
+		// TODO(v0.3.0): remove legacy macOS config-path fallback after the v0.2.0 migration window.
 		return canonical
 	}
 	return preferred
@@ -54,6 +55,7 @@ func ModelsFile() string      { return filepath.Join(CacheDir(), "models.json") 
 func MultipliersFile() string { return filepath.Join(CacheDir(), "multipliers.json") }
 func ConfigFile() string      { return filepath.Join(ConfigDir(), "config.toml") }
 
+// TODO(v0.3.0): remove legacy config path helpers after the v0.2.0 migration window.
 func legacyConfigDir() string {
 	if v := os.Getenv("VIBEUSAGE_CONFIG_DIR"); v != "" {
 		return v
@@ -64,10 +66,12 @@ func legacyConfigDir() string {
 	return filepath.Join(homeDir(), ".config", appName)
 }
 
+// TODO(v0.3.0): remove legacy config path helpers after the v0.2.0 migration window.
 func legacyConfigFile() string {
 	return filepath.Join(legacyConfigDir(), "config.toml")
 }
 
+// TODO(v0.3.0): remove legacy config path helpers after the v0.2.0 migration window.
 func legacyCredentialsDir() string {
 	return filepath.Join(legacyConfigDir(), "credentials")
 }

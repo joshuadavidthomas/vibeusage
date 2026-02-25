@@ -37,6 +37,7 @@ func FindProviderCredential(providerID string, cliPaths []string, envVars []stri
 			return true, "vibeusage", p
 		}
 		if legacy := legacyCredentialPathFor(providerID, credType); fileExists(legacy) {
+			// TODO(v0.3.0): remove legacy credential read fallback after the v0.2.0 migration window.
 			return true, "vibeusage", legacy
 		}
 	}
@@ -94,6 +95,7 @@ func ReadCredential(path string) ([]byte, error) {
 		return os.ReadFile(path)
 	}
 	if legacy := legacyCredentialPath(path); legacy != "" && fileExists(legacy) {
+		// TODO(v0.3.0): remove legacy credential read fallback after the v0.2.0 migration window.
 		return os.ReadFile(legacy)
 	}
 	return nil, nil
@@ -105,6 +107,7 @@ func DeleteCredential(path string) bool {
 		deleted = true
 	}
 	if legacy := legacyCredentialPath(path); legacy != "" {
+		// TODO(v0.3.0): remove legacy credential delete fallback after the v0.2.0 migration window.
 		if err := os.Remove(legacy); err == nil {
 			deleted = true
 		}
@@ -112,10 +115,12 @@ func DeleteCredential(path string) bool {
 	return deleted
 }
 
+// TODO(v0.3.0): remove legacy credential path helpers after the v0.2.0 migration window.
 func legacyCredentialPathFor(providerID, credType string) string {
 	return filepath.Join(legacyCredentialsDir(), providerID, credType+".json")
 }
 
+// TODO(v0.3.0): remove legacy credential path helpers after the v0.2.0 migration window.
 func legacyCredentialPath(path string) string {
 	currentDir := filepath.Clean(CredentialsDir())
 	cleanPath := filepath.Clean(path)

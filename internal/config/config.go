@@ -185,6 +185,7 @@ func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if legacyPath := legacyConfigFilePath(path); legacyPath != "" {
+			// TODO(v0.3.0): remove legacy config read fallback after the v0.2.0 migration window.
 			if legacyData, legacyErr := os.ReadFile(legacyPath); legacyErr == nil {
 				data = legacyData
 				err = nil
@@ -242,6 +243,7 @@ func saveConfigFile(cfg Config, path string) error {
 	return nil
 }
 
+// TODO(v0.3.0): remove legacy config path fallback after the v0.2.0 migration window.
 func legacyConfigFilePath(path string) string {
 	if filepath.Clean(path) != filepath.Clean(ConfigFile()) {
 		return ""
