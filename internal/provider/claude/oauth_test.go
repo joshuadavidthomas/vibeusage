@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -308,5 +309,46 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 				t.Errorf("NeedsRefresh() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestLoadKeychainCredentials(t *testing.T) {
+	old := readKeychainSecret
+	defer func() { readKeychainSecret = old }()
+
+	readKeychainSecret = func(service, account string) (string, error) {
+		if service != claudeKeychainSecret {
+			t.Fatalf("service = %q, want %q", service, claudeKeychainSecret)
+		}
+		if account != "" {
+			t.Fatalf("account = %q, want empty", account)
+		}
+		return `{"claudeAiOauth":{"accessToken":"tok","refreshToken":"ref","expiresAt":4102444800000}}`, nil
+	}
+
+	s := OAuthStrategy{}
+	creds := s.loadKeychainCredentials()
+	if creds == nil {
+		t.Fatal("expected credentials")
+	}
+	if creds.AccessToken != "tok" {
+		t.Errorf("access_token = %q, want tok", creds.AccessToken)
+	}
+	if creds.RefreshToken != "ref" {
+		t.Errorf("refresh_token = %q, want ref", creds.RefreshToken)
+	}
+}
+
+func TestLoadKeychainCredentials_Error(t *testing.T) {
+	old := readKeychainSecret
+	defer func() { readKeychainSecret = old }()
+
+	readKeychainSecret = func(service, account string) (string, error) {
+		return "", errors.New("not found")
+	}
+
+	s := OAuthStrategy{}
+	if creds := s.loadKeychainCredentials(); creds != nil {
+		t.Fatalf("expected nil credentials, got %+v", creds)
 	}
 }

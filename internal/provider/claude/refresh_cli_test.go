@@ -13,7 +13,9 @@ import (
 
 func TestTryRefreshViaCLI_UsesSingleHaikuAttempt(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
+	base := filepath.Join(dir, "config")
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", base)
+	t.Setenv("VIBEUSAGE_DATA_DIR", base)
 
 	expired := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
 	writeOAuthCred(t, "expired", "refresh", expired)
@@ -44,7 +46,9 @@ func TestTryRefreshViaCLI_UsesSingleHaikuAttempt(t *testing.T) {
 
 func TestTryRefreshViaCLI_ReturnsQuicklyAfterRefreshEvenIfCLIHangs(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
+	base := filepath.Join(dir, "config")
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", base)
+	t.Setenv("VIBEUSAGE_DATA_DIR", base)
 
 	expired := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
 	writeOAuthCred(t, "expired", "refresh", expired)
@@ -74,7 +78,9 @@ func TestTryRefreshViaCLI_ReturnsQuicklyAfterRefreshEvenIfCLIHangs(t *testing.T)
 
 func TestTryRefreshViaCLI_ReturnsNilWhenStillExpired(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
+	base := filepath.Join(dir, "config")
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", base)
+	t.Setenv("VIBEUSAGE_DATA_DIR", base)
 
 	expired := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
 	writeOAuthCred(t, "expired", "refresh", expired)

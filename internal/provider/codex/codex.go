@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/keychain"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -75,10 +77,13 @@ func init() {
 const (
 	// OAuth client ID extracted from the Codex CLI installation.
 	// Required to refresh tokens stored in ~/.codex/auth.json.
-	codexClientID   = "app_EMoamEEZ73f0CkXaXp7hrann"
-	codexTokenURL   = "https://auth.openai.com/oauth/token"
-	defaultUsageURL = "https://chatgpt.com/backend-api/wham/usage"
+	codexClientID      = "app_EMoamEEZ73f0CkXaXp7hrann"
+	codexTokenURL      = "https://auth.openai.com/oauth/token"
+	defaultUsageURL    = "https://chatgpt.com/backend-api/wham/usage"
+	codexKeychainLabel = "Codex Auth"
 )
+
+var readKeychainSecret = keychain.ReadGenericPassword
 
 type OAuthStrategy struct {
 	HTTPTimeout float64
@@ -92,7 +97,7 @@ func (s *OAuthStrategy) IsAvailable() bool {
 			return true
 		}
 	}
-	return false
+	return s.loadKeychainCredentials() != nil
 }
 
 func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -165,7 +170,45 @@ func (s *OAuthStrategy) loadCredentials() *Credentials {
 			return creds
 		}
 	}
-	return nil
+	return s.loadKeychainCredentials()
+}
+
+func (s *OAuthStrategy) loadKeychainCredentials() *Credentials {
+	secret, err := readKeychainSecret(codexKeychainLabel, codexKeychainAccount())
+	if err != nil || secret == "" {
+		return nil
+	}
+
+	var cliCreds CLICredentials
+	if err := json.Unmarshal([]byte(secret), &cliCreds); err != nil {
+		return nil
+	}
+
+	return cliCreds.EffectiveCredentials()
+}
+
+func codexKeychainAccount() string {
+	home := codexHomeDir()
+	sum := sha256.Sum256([]byte(home))
+	hash := fmt.Sprintf("%x", sum[:])
+	return "cli|" + hash[:16]
+}
+
+func codexHomeDir() string {
+	if v := strings.TrimSpace(os.Getenv("CODEX_HOME")); v != "" {
+		if strings.HasPrefix(v, "~/") {
+			home, err := os.UserHomeDir()
+			if err == nil {
+				return filepath.Clean(filepath.Join(home, v[2:]))
+			}
+		}
+		return filepath.Clean(v)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Clean(".codex")
+	}
+	return filepath.Join(home, ".codex")
 }
 
 func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *Credentials {

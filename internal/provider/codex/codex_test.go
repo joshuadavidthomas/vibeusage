@@ -2,6 +2,8 @@ package codex
 
 import (
 	"encoding/json"
+	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -180,5 +182,66 @@ func TestParseUsageResponse_NoResetTimestamp(t *testing.T) {
 	}
 	if snapshot.Periods[0].ResetsAt != nil {
 		t.Error("expected nil resets_at when no timestamp")
+	}
+}
+
+func TestLoadKeychainCredentials(t *testing.T) {
+	old := readKeychainSecret
+	defer func() { readKeychainSecret = old }()
+
+	readKeychainSecret = func(service, account string) (string, error) {
+		if service != codexKeychainLabel {
+			t.Fatalf("service = %q, want %q", service, codexKeychainLabel)
+		}
+		if account == "" {
+			t.Fatal("expected non-empty account")
+		}
+		return `{"tokens":{"access_token":"tok","refresh_token":"ref"}}`, nil
+	}
+
+	s := OAuthStrategy{}
+	creds := s.loadKeychainCredentials()
+	if creds == nil {
+		t.Fatal("expected credentials")
+	}
+	if creds.AccessToken != "tok" {
+		t.Errorf("access_token = %q, want tok", creds.AccessToken)
+	}
+	if creds.RefreshToken != "ref" {
+		t.Errorf("refresh_token = %q, want ref", creds.RefreshToken)
+	}
+}
+
+func TestLoadKeychainCredentials_Error(t *testing.T) {
+	old := readKeychainSecret
+	defer func() { readKeychainSecret = old }()
+
+	readKeychainSecret = func(service, account string) (string, error) {
+		return "", errors.New("not found")
+	}
+
+	s := OAuthStrategy{}
+	if creds := s.loadKeychainCredentials(); creds != nil {
+		t.Fatalf("expected nil credentials, got %+v", creds)
+	}
+}
+
+func TestCodexKeychainAccount_UsesCodexHome(t *testing.T) {
+	t.Setenv("CODEX_HOME", "/tmp/custom-codex-home")
+	if got := codexKeychainAccount(); got != "cli|19179ea395fa2b90" {
+		t.Errorf("codexKeychainAccount() = %q, want %q", got, "cli|19179ea395fa2b90")
+	}
+}
+
+func TestCodexHomeDir_ExpandsTilde(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir error: %v", err)
+	}
+	t.Setenv("CODEX_HOME", "~/.custom-codex")
+
+	want := home + "/.custom-codex"
+	if got := codexHomeDir(); got != want {
+		t.Errorf("codexHomeDir() = %q, want %q", got, want)
 	}
 }

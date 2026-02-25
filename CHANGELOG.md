@@ -22,6 +22,8 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Fixed
 
+- Fixed credential auto-detection for macOS users authenticated with Claude Code and Codex CLI by adding macOS Keychain credential lookup alongside file-based paths.
+- Fixed `vibeusage auth --status` / `init` setup detection for providers that are available via strategy-specific credential sources (for example, keychain-backed OAuth credentials).
 - Updated default-role seeding to read config directly from disk so existing config values are preserved when in-memory config is stale.
 - Improved fetch pipeline final error reporting so trailing "not configured" strategies don’t mask the real preceding failure reason.
 
