@@ -27,6 +27,9 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 ### Changed
 
 - Limited `vibeusage update` installs to script-managed installations.
+- Switched path management to `github.com/adrg/xdg`, with an intentional macOS preference for `~/.config/vibeusage/config.toml` when `XDG_CONFIG_HOME` is unset.
+- Moved vibeusage-managed credentials to the XDG data directory (`DataHome/vibeusage/credentials`) and added `VIBEUSAGE_DATA_DIR` override support.
+- Added temporary dual-write compatibility for config and credentials (new + legacy paths) to ease upgrades; planned for removal in v0.3.0.
 
 ## [0.1.1]
 

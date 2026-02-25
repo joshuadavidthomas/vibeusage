@@ -336,7 +336,7 @@ go install github.com/joshuadavidthomas/vibeusage@latest
 
 Configuration is stored in:
 - **Linux**: `~/.config/vibeusage/config.toml`
-- **macOS**: `~/Library/Application Support/vibeusage/config.toml`
+- **macOS**: `~/.config/vibeusage/config.toml` (preferred), `~/Library/Application Support/vibeusage/config.toml` (fallback)
 - **Windows**: `%APPDATA%\vibeusage\config.toml`
 
 ### Default Configuration
@@ -390,6 +390,7 @@ vibeusage route --role coding
 | `OPENROUTER_API_KEY` | OpenRouter API key |
 | `VIBEUSAGE_CACHE_DIR` | Override cache directory |
 | `VIBEUSAGE_CONFIG_DIR` | Override config directory |
+| `VIBEUSAGE_DATA_DIR` | Override data directory (credentials storage) |
 | `VIBEUSAGE_ENABLED_PROVIDERS` | Comma-separated provider list |
 | `VIBEUSAGE_NO_COLOR` | Disable colored output |
 | `VIBEUSAGE_UPDATE_GITHUB_TOKEN` | Optional GitHub token used by `vibeusage update` (helps avoid rate limits) |

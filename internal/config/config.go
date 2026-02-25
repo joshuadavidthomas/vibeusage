@@ -206,6 +206,20 @@ func Save(cfg Config, path string) error {
 	if path == "" {
 		path = ConfigFile()
 	}
+	if err := saveConfigFile(cfg, path); err != nil {
+		return err
+	}
+
+	legacyPath := legacyConfigFilePath(path)
+	if legacyPath != "" {
+		// TODO(v0.3.0): remove temporary dual-write compatibility after v0.2.0 migration window.
+		_ = saveConfigFile(cfg, legacyPath)
+	}
+
+	return nil
+}
+
+func saveConfigFile(cfg Config, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
@@ -218,6 +232,17 @@ func Save(cfg Config, path string) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 	return nil
+}
+
+func legacyConfigFilePath(path string) string {
+	if filepath.Clean(path) != filepath.Clean(ConfigFile()) {
+		return ""
+	}
+	legacy := legacyConfigFile()
+	if filepath.Clean(legacy) == filepath.Clean(path) {
+		return ""
+	}
+	return legacy
 }
 
 func applyEnvOverrides(cfg Config) Config {
