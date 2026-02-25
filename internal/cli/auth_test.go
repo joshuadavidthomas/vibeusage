@@ -11,6 +11,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 // writeTestConfig writes a config.toml that disables provider credential reuse
@@ -59,8 +60,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	// Use temp dir for credentials; disable provider CLI reuse to avoid
 	// detecting real Claude CLI credentials on the host.
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
-	t.Setenv("VIBEUSAGE_DATA_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	writeTestConfig(t, tmpDir)
 	reloadConfig()
@@ -105,8 +105,7 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 	defer prompt.SetDefault(old)
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
-	t.Setenv("VIBEUSAGE_DATA_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("CURSOR_API_KEY", "")
 	reloadConfig()
 
@@ -127,7 +126,7 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 
 func TestAuthStatusCommand_HasTableBorders(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -157,7 +156,7 @@ func TestAuthStatusCommand_HasTableBorders(t *testing.T) {
 
 func TestAuthStatusCommand_ContainsHeaders(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -188,7 +187,7 @@ func TestAuthStatusCommand_ContainsHeaders(t *testing.T) {
 
 func TestAuthStatusCommand_QuietMode(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -214,7 +213,7 @@ func TestAuthStatusCommand_QuietMode(t *testing.T) {
 func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	// Set up credentials so the "already authenticated" path is hit
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 
 	credDir := filepath.Join(tmpDir, "credentials", "copilot")
 	_ = os.MkdirAll(credDir, 0o755)
@@ -252,7 +251,7 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 
 func TestAuthStatusJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer

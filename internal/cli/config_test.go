@@ -9,6 +9,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestConfigReset_UsesConfirm(t *testing.T) {
@@ -23,7 +24,7 @@ func TestConfigReset_UsesConfirm(t *testing.T) {
 	defer prompt.SetDefault(old)
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 
 	// Create a config file to reset
 	cfgDir := tmpDir
@@ -58,7 +59,7 @@ func TestConfigReset_UserDeclinesConfirm(t *testing.T) {
 	defer prompt.SetDefault(old)
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 
 	// Create a config file
 	_ = os.WriteFile(filepath.Join(tmpDir, "config.toml"), []byte("[display]\n"), 0o644)
@@ -90,7 +91,7 @@ func TestConfigReset_UserDeclinesConfirm(t *testing.T) {
 
 func TestConfigResetJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer

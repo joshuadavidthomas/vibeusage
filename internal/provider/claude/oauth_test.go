@@ -2,10 +2,14 @@ package claude
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
@@ -350,5 +354,47 @@ func TestLoadKeychainCredentials_Error(t *testing.T) {
 	s := OAuthStrategy{}
 	if creds := s.loadKeychainCredentials(); creds != nil {
 		t.Fatalf("expected nil credentials, got %+v", creds)
+	}
+}
+
+func TestOAuthStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *testing.T) {
+	dir := t.TempDir()
+	testenv.ApplyVibeusage(t.Setenv, dir)
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+
+	cfg := config.DefaultConfig()
+	cfg.Credentials.ReuseProviderCredentials = false
+	if err := config.Save(cfg, ""); err != nil {
+		t.Fatalf("config.Save: %v", err)
+	}
+	if _, err := config.Reload(); err != nil {
+		t.Fatalf("config.Reload: %v", err)
+	}
+	t.Cleanup(func() { _, _ = config.Reload() })
+
+	externalPath := filepath.Join(dir, "home", ".claude", ".credentials.json")
+	if err := os.MkdirAll(filepath.Dir(externalPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(externalPath, []byte(`{"claudeAiOauth":{"accessToken":"tok"}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	old := readKeychainSecret
+	defer func() { readKeychainSecret = old }()
+	readKeychainSecret = func(service, account string) (string, error) {
+		return `{"claudeAiOauth":{"accessToken":"tok"}}`, nil
+	}
+
+	s := &OAuthStrategy{}
+	paths := s.credentialPaths()
+	if len(paths) != 1 {
+		t.Fatalf("len(paths) = %d, want 1", len(paths))
+	}
+	if paths[0] != config.CredentialPath("claude", "oauth") {
+		t.Errorf("paths[0] = %q, want %q", paths[0], config.CredentialPath("claude", "oauth"))
+	}
+	if s.loadCredentials() != nil {
+		t.Fatal("loadCredentials() returned provider CLI credentials despite reuse_provider_credentials=false")
 	}
 }

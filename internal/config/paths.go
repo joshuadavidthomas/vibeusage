@@ -35,9 +35,6 @@ func DataDir() string {
 	if v := os.Getenv("VIBEUSAGE_DATA_DIR"); v != "" {
 		return v
 	}
-	if v := os.Getenv("VIBEUSAGE_CONFIG_DIR"); v != "" {
-		return v
-	}
 	return filepath.Join(xdg.DataHome, appName)
 }
 

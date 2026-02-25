@@ -12,6 +12,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestKeySet_UsesInputPrompt(t *testing.T) {
@@ -33,7 +34,7 @@ func TestKeySet_UsesInputPrompt(t *testing.T) {
 	defer prompt.SetDefault(old)
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -69,7 +70,7 @@ func TestKeySet_UsesInputPrompt(t *testing.T) {
 
 func TestKeyDelete_UsesConfirmPrompt(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 
 	// Create a credential to delete
 	credDir := filepath.Join(tmpDir, "credentials", "claude")
@@ -114,7 +115,7 @@ func TestKeyDelete_UsesConfirmPrompt(t *testing.T) {
 
 func TestKeyDelete_UserDeclinesConfirm(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 
 	credDir := filepath.Join(tmpDir, "credentials", "claude")
 	_ = os.MkdirAll(credDir, 0o755)
@@ -153,7 +154,7 @@ func TestKeyDelete_UserDeclinesConfirm(t *testing.T) {
 
 func TestDisplayAllCredentialStatus_HasTableBorders(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -183,7 +184,7 @@ func TestDisplayAllCredentialStatus_HasTableBorders(t *testing.T) {
 
 func TestDisplayAllCredentialStatus_ContainsHeaders(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -214,7 +215,7 @@ func TestDisplayAllCredentialStatus_ContainsHeaders(t *testing.T) {
 
 func TestDisplayAllCredentialStatus_QuietMode(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -241,7 +242,7 @@ func TestDisplayAllCredentialStatus_QuietMode(t *testing.T) {
 
 func TestKeyStatusJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer

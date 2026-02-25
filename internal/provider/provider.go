@@ -99,8 +99,7 @@ func CheckCredentials(providerID string) (bool, string) {
 		return true, source
 	}
 
-	cfg := config.Get()
-	if !cfg.Credentials.ReuseProviderCredentials {
+	if !ExternalCredentialReuseEnabled() {
 		return false, ""
 	}
 

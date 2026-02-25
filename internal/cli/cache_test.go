@@ -8,11 +8,12 @@ import (
 	"testing"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestCacheShowCmd_HasTableBorders(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -44,7 +45,7 @@ func TestCacheShowCmd_HasTableBorders(t *testing.T) {
 
 func TestCacheShowCmd_ContainsHeaders(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -77,7 +78,7 @@ func TestCacheShowCmd_ContainsHeaders(t *testing.T) {
 
 func TestCacheShowCmd_QuietMode(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -105,7 +106,7 @@ func TestCacheShowCmd_QuietMode(t *testing.T) {
 
 func TestCacheShowCmd_ShowsCacheDir(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -138,7 +139,7 @@ func TestCacheShowCmd_ShowsCacheDir(t *testing.T) {
 
 func TestCacheClearJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer

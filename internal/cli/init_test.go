@@ -8,6 +8,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestInteractiveWizard_UsesMultiSelect(t *testing.T) {
@@ -154,7 +155,7 @@ func TestQuickSetup_QuietMode(t *testing.T) {
 
 func TestInitCommand_QuickFlag_DoesNotPanicWhenConfigMissing(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer
@@ -177,7 +178,7 @@ func TestInitCommand_QuickFlag_DoesNotPanicWhenConfigMissing(t *testing.T) {
 
 func TestInitJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	testenv.ApplySameDir(t.Setenv, tmp)
 	reloadConfig()
 
 	var buf bytes.Buffer

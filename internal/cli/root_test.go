@@ -13,6 +13,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 // resetPathFlags resets configPathCmd flags to defaults and registers
@@ -129,7 +130,7 @@ func TestRootCmd_VersionFlag(t *testing.T) {
 
 	// Set up temp dir to avoid first-run check
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	rootCmd.SetArgs([]string{"--version"})
@@ -156,7 +157,7 @@ func TestConfigShow_DefaultOutput(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	oldQuiet := quiet
@@ -187,7 +188,7 @@ func TestConfigShow_QuietMode(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	oldQuiet := quiet
@@ -215,7 +216,7 @@ func TestConfigShow_JSONOutput(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	oldJSON := jsonOutput
@@ -244,8 +245,7 @@ func TestConfigPath_DefaultOutput(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
-	t.Setenv("VIBEUSAGE_CACHE_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	oldQuiet := quiet
@@ -276,7 +276,7 @@ func TestConfigPath_QuietMode(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	oldQuiet := quiet
@@ -305,8 +305,7 @@ func TestConfigPath_JSONOutput(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
-	t.Setenv("VIBEUSAGE_CACHE_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	oldJSON := jsonOutput
@@ -337,7 +336,7 @@ func TestConfigPath_CacheFlag(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	tmpDir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CACHE_DIR", tmpDir)
+	testenv.ApplySameDir(t.Setenv, tmpDir)
 	reloadConfig()
 
 	oldQuiet := quiet
@@ -617,5 +616,63 @@ func TestVerboseOutput_NotOnStdout(t *testing.T) {
 	}
 	if strings.Contains(stdoutOutput, "500ms") {
 		t.Errorf("verbose duration should not appear on stdout, got %q", stdoutOutput)
+	}
+}
+
+func TestDisplayMultipleSnapshots_NoDataWithErrors_ShowsProviderErrors(t *testing.T) {
+	var logBuf bytes.Buffer
+	ctx := newDefaultContext(&logBuf)
+
+	var outBuf bytes.Buffer
+	outWriter = &outBuf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	outcomes := map[string]fetch.FetchOutcome{
+		"claude": {
+			ProviderID: "claude",
+			Success:    false,
+			Error:      "Anthropic API keys are configured, but claude.ai plan usage requires Claude OAuth/session credentials.",
+		},
+	}
+
+	displayMultipleSnapshots(ctx, outcomes, 0)
+
+	got := outBuf.String()
+	if !strings.Contains(got, "No usage data available") {
+		t.Fatalf("expected no-data message, got %q", got)
+	}
+	if !strings.Contains(got, "requires Claude OAuth/session credentials") {
+		t.Errorf("expected provider error to be shown, got %q", got)
+	}
+	if strings.Contains(got, "Configure credentials with:") {
+		t.Errorf("did not expect generic configure hint when provider errors are present, got %q", got)
+	}
+}
+
+func TestDisplayMultipleSnapshots_NoDataNoErrors_ShowsConfigureHint(t *testing.T) {
+	var logBuf bytes.Buffer
+	ctx := newDefaultContext(&logBuf)
+
+	var outBuf bytes.Buffer
+	outWriter = &outBuf
+	defer func() { outWriter = os.Stdout }()
+
+	oldQuiet := quiet
+	quiet = false
+	defer func() { quiet = oldQuiet }()
+
+	outcomes := map[string]fetch.FetchOutcome{}
+	displayMultipleSnapshots(ctx, outcomes, 0)
+
+	got := outBuf.String()
+	if !strings.Contains(got, "No usage data available") {
+		t.Fatalf("expected no-data message, got %q", got)
+	}
+	if !strings.Contains(got, "Configure credentials with:") {
+		t.Errorf("expected configure hint, got %q", got)
 	}
 }
