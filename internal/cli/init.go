@@ -18,7 +18,6 @@ var providerDescriptions = map[string]string{
 	"copilot":    "GitHub Copilot (github.com)",
 	"cursor":     "Cursor AI code editor (cursor.com)",
 	"gemini":     "Google's Gemini AI (gemini.google.com)",
-	"kimik2":     "Kimi K2 API usage (kimi-k2.ai)",
 	"kimicode":   "Kimi Code coding assistant (kimi.com)",
 	"openrouter": "OpenRouter unified model gateway (openrouter.ai)",
 	"warp":       "Warp terminal AI (warp.dev)",
@@ -145,7 +144,7 @@ func interactiveWizard() error {
 // defaultRoles defines the starter roles seeded during init.
 var defaultRoles = map[string]config.RoleConfig{
 	"thinking": {Models: []string{"claude-opus-4-6", "o4", "gpt-5-2"}},
-	"coding":   {Models: []string{"claude-sonnet-4-6", "kimi-k2", "gpt-5"}},
+	"coding":   {Models: []string{"claude-sonnet-4-6", "gemini-3.1-pro-preview", "gpt-5"}},
 	"fast":     {Models: []string{"claude-haiku-4-5", "gemini-3-flash", "gpt-4o-mini"}},
 }
 

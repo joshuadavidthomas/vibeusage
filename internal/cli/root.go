@@ -26,7 +26,6 @@ import (
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/cursor"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/gemini"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kimicode"
-	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kimik2"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/minimax"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/openrouter"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/warp"
