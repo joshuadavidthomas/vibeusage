@@ -23,7 +23,7 @@ var keyCmd = &cobra.Command{
 }
 
 func init() {
-	for _, id := range []string{"amp", "antigravity", "claude", "codex", "copilot", "cursor", "gemini", "kimik2", "kimicode", "minimax", "openrouter", "warp", "zai"} {
+	for _, id := range []string{"amp", "antigravity", "claude", "codex", "copilot", "cursor", "gemini", "kimicode", "minimax", "openrouter", "warp", "zai"} {
 		keyCmd.AddCommand(makeKeyProviderCmd(id))
 	}
 }
@@ -95,7 +95,6 @@ var credentialKeyMap = map[string]string{
 	"copilot":     "access_token",
 	"cursor":      "session_token",
 	"gemini":      "access_token",
-	"kimik2":      "api_key",
 	"kimicode":    "api_key",
 	"minimax":     "api_key",
 	"openrouter":  "api_key",
@@ -108,7 +107,7 @@ func makeKeyProviderCmd(providerID string) *cobra.Command {
 	switch providerID {
 	case "antigravity", "codex", "copilot", "gemini":
 		credType = "oauth"
-	case "amp", "kimik2", "kimicode", "minimax", "openrouter", "warp", "zai":
+	case "amp", "kimicode", "minimax", "openrouter", "warp", "zai":
 		credType = "apikey"
 	}
 

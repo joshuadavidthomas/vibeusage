@@ -224,16 +224,6 @@ Otherwise, authenticate via device flow:
 vibeusage auth kimicode
 ```
 
-### Kimi K2
-
-[kimi-k2.ai](https://kimi-k2.ai) — Kimi K2 API. Reports monthly credit usage against your quota.
-
-Requires an API key. Set `KIMI_K2_API_KEY` in your environment (also accepts `KIMI_API_KEY` or `KIMI_KEY`), or store one with:
-
-```bash
-vibeusage auth kimik2
-```
-
 ### Minimax
 
 [minimax.io](https://www.minimax.io) — Minimax AI coding assistant. Reports per-model usage against your coding plan limits.
@@ -374,10 +364,8 @@ vibeusage route --role coding
 | `ANTHROPIC_API_KEY` | Claude API key |
 | `GEMINI_API_KEY` | Gemini API key |
 | `GITHUB_TOKEN` | GitHub token for Copilot |
-| `KIMI_API_KEY` | Kimi/Kimi K2 API key fallback |
+| `KIMI_API_KEY` | Kimi API key fallback |
 | `KIMI_CODE_API_KEY` | Kimi API key |
-| `KIMI_K2_API_KEY` | Kimi K2 API key |
-| `KIMI_KEY` | Kimi K2 API key fallback |
 | `MINIMAX_API_KEY` | Minimax Coding Plan API key |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `OPENROUTER_API_KEY` | OpenRouter API key |
