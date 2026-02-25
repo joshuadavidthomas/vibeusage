@@ -20,6 +20,8 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+## [0.2.0]
+
 ### Added
 
 - Added Homebrew installation support.
@@ -63,6 +65,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Josh Thomas <josh@joshthomas.dev> (maintainer)
 
-[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.2.0...HEAD
 [0.1.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.0
 [0.1.1]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.1
+[0.2.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.2.0
