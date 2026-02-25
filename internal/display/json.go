@@ -16,7 +16,8 @@ func OutputJSON(w io.Writer, data any) error {
 	return enc.Encode(data)
 }
 
-// SnapshotToJSON converts a snapshot to a typed JSON-serializable struct.
+// SnapshotToJSON converts a fetch outcome to a JSON-serializable value.
+// Returns SnapshotErrorJSON for failures, snapshotJSON for successes.
 func SnapshotToJSON(outcome fetch.FetchOutcome) any {
 	if !outcome.Success || outcome.Snapshot == nil {
 		return SnapshotErrorJSON{
@@ -26,61 +27,38 @@ func SnapshotToJSON(outcome fetch.FetchOutcome) any {
 			},
 		}
 	}
+	return buildSnapshotJSON(outcome)
+}
 
+func buildSnapshotJSON(outcome fetch.FetchOutcome) snapshotJSON {
 	snap := outcome.Snapshot
-	data := SnapshotJSON{
+
+	var overage *models.OverageUsage
+	if snap.Overage != nil && snap.Overage.IsEnabled {
+		overage = snap.Overage
+	}
+
+	return snapshotJSON{
 		Provider: snap.Provider,
 		Source:   outcome.Source,
 		Cached:   outcome.Cached,
+		Identity: snap.Identity,
+		Periods:  snap.Periods,
+		Overage:  overage,
 	}
-
-	if snap.Identity != nil {
-		data.Identity = &IdentityJSON{
-			Email:        snap.Identity.Email,
-			Organization: snap.Identity.Organization,
-			Plan:         snap.Identity.Plan,
-		}
-	}
-
-	var periods []PeriodJSON
-	for _, p := range snap.Periods {
-		pd := PeriodJSON{
-			Name:        p.Name,
-			Utilization: p.Utilization,
-			Remaining:   p.Remaining(),
-			PeriodType:  string(p.PeriodType),
-			Model:       p.Model,
-		}
-		if p.ResetsAt != nil {
-			pd.ResetsAt = p.ResetsAt.Format(time.RFC3339)
-		}
-		periods = append(periods, pd)
-	}
-	data.Periods = periods
-
-	if snap.Overage != nil && snap.Overage.IsEnabled {
-		data.Overage = &OverageJSON{
-			Used:      snap.Overage.Used,
-			Limit:     snap.Overage.Limit,
-			Remaining: snap.Overage.Remaining(),
-			Currency:  snap.Overage.Currency,
-		}
-	}
-
-	return data
 }
 
 // OutputMultiProviderJSON outputs all outcomes as JSON.
 func OutputMultiProviderJSON(w io.Writer, outcomes map[string]fetch.FetchOutcome) error {
-	data := MultiProviderJSON{
-		Providers: make(map[string]SnapshotJSON),
+	data := multiProviderJSON{
+		Providers: make(map[string]snapshotJSON),
 		Errors:    make(map[string]string),
 		FetchedAt: time.Now().Format(time.RFC3339),
 	}
 
 	for pid, outcome := range outcomes {
 		if outcome.Success && outcome.Snapshot != nil {
-			data.Providers[pid] = SnapshotToJSON(outcome).(SnapshotJSON)
+			data.Providers[pid] = buildSnapshotJSON(outcome)
 		} else {
 			errMsg := outcome.Error
 			if errMsg == "" {

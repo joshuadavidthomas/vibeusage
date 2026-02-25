@@ -1,5 +1,12 @@
 package display
 
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
+)
+
 // SnapshotErrorJSON represents a failed fetch outcome.
 type SnapshotErrorJSON struct {
 	Error ErrorDetailJSON `json:"error"`
@@ -11,44 +18,78 @@ type ErrorDetailJSON struct {
 	Provider string `json:"provider"`
 }
 
-// SnapshotJSON represents a successful fetch outcome.
-type SnapshotJSON struct {
-	Provider string        `json:"provider"`
-	Source   string        `json:"source"`
-	Cached   bool          `json:"cached"`
-	Identity *IdentityJSON `json:"identity,omitempty"`
-	Periods  []PeriodJSON  `json:"periods"`
-	Overage  *OverageJSON  `json:"overage,omitempty"`
+// snapshotJSON is a JSON wrapper around snapshot data that adds
+// fetch metadata (source, cached).
+type snapshotJSON struct {
+	Provider string                   `json:"provider"`
+	Source   string                   `json:"source"`
+	Cached   bool                     `json:"cached"`
+	Identity *models.ProviderIdentity `json:"identity,omitempty"`
+	Periods  []models.UsagePeriod     `json:"periods"`
+	Overage  *models.OverageUsage     `json:"overage,omitempty"`
 }
 
-// IdentityJSON represents provider identity information.
-type IdentityJSON struct {
-	Email        string `json:"email"`
-	Organization string `json:"organization"`
-	Plan         string `json:"plan"`
+func (s snapshotJSON) MarshalJSON() ([]byte, error) {
+	type periodJSON struct {
+		Name        string `json:"name"`
+		Utilization int    `json:"utilization"`
+		Remaining   int    `json:"remaining"`
+		PeriodType  string `json:"period_type"`
+		ResetsAt    string `json:"resets_at,omitempty"`
+		Model       string `json:"model,omitempty"`
+	}
+
+	periods := make([]periodJSON, len(s.Periods))
+	for i, p := range s.Periods {
+		periods[i] = periodJSON{
+			Name:        p.Name,
+			Utilization: p.Utilization,
+			Remaining:   p.Remaining(),
+			PeriodType:  string(p.PeriodType),
+			Model:       p.Model,
+		}
+		if p.ResetsAt != nil {
+			periods[i].ResetsAt = p.ResetsAt.Format(time.RFC3339)
+		}
+	}
+
+	type overageJSON struct {
+		Used      float64 `json:"used"`
+		Limit     float64 `json:"limit"`
+		Remaining float64 `json:"remaining"`
+		Currency  string  `json:"currency"`
+	}
+
+	var overage *overageJSON
+	if s.Overage != nil {
+		overage = &overageJSON{
+			Used:      s.Overage.Used,
+			Limit:     s.Overage.Limit,
+			Remaining: s.Overage.Remaining(),
+			Currency:  s.Overage.Currency,
+		}
+	}
+
+	return json.Marshal(struct {
+		Provider string                   `json:"provider"`
+		Source   string                   `json:"source"`
+		Cached   bool                     `json:"cached"`
+		Identity *models.ProviderIdentity `json:"identity,omitempty"`
+		Periods  []periodJSON             `json:"periods"`
+		Overage  *overageJSON             `json:"overage,omitempty"`
+	}{
+		Provider: s.Provider,
+		Source:   s.Source,
+		Cached:   s.Cached,
+		Identity: s.Identity,
+		Periods:  periods,
+		Overage:  overage,
+	})
 }
 
-// PeriodJSON represents a single usage period.
-type PeriodJSON struct {
-	Name        string `json:"name"`
-	Utilization int    `json:"utilization"`
-	Remaining   int    `json:"remaining"`
-	PeriodType  string `json:"period_type"`
-	ResetsAt    string `json:"resets_at,omitempty"`
-	Model       string `json:"model,omitempty"`
-}
-
-// OverageJSON represents overage usage information.
-type OverageJSON struct {
-	Used      float64 `json:"used"`
-	Limit     float64 `json:"limit"`
-	Remaining float64 `json:"remaining"`
-	Currency  string  `json:"currency"`
-}
-
-// MultiProviderJSON is the top-level response for multi-provider fetches.
-type MultiProviderJSON struct {
-	Providers map[string]SnapshotJSON `json:"providers"`
+// multiProviderJSON is the top-level response for multi-provider fetches.
+type multiProviderJSON struct {
+	Providers map[string]snapshotJSON `json:"providers"`
 	Errors    map[string]string       `json:"errors"`
 	FetchedAt string                  `json:"fetched_at"`
 }
