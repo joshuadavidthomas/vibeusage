@@ -1,5 +1,7 @@
 package display
 
+import "github.com/joshuadavidthomas/vibeusage/internal/models"
+
 // SnapshotErrorJSON represents a failed fetch outcome.
 type SnapshotErrorJSON struct {
 	Error ErrorDetailJSON `json:"error"`
@@ -11,46 +13,11 @@ type ErrorDetailJSON struct {
 	Provider string `json:"provider"`
 }
 
-// SnapshotJSON represents a successful fetch outcome.
-type SnapshotJSON struct {
-	Provider string        `json:"provider"`
-	Source   string        `json:"source"`
-	Cached   bool          `json:"cached"`
-	Identity *IdentityJSON `json:"identity,omitempty"`
-	Periods  []PeriodJSON  `json:"periods"`
-	Overage  *OverageJSON  `json:"overage,omitempty"`
-}
-
-// IdentityJSON represents provider identity information.
-type IdentityJSON struct {
-	Email        string `json:"email"`
-	Organization string `json:"organization"`
-	Plan         string `json:"plan"`
-}
-
-// PeriodJSON represents a single usage period.
-type PeriodJSON struct {
-	Name        string `json:"name"`
-	Utilization int    `json:"utilization"`
-	Remaining   int    `json:"remaining"`
-	PeriodType  string `json:"period_type"`
-	ResetsAt    string `json:"resets_at,omitempty"`
-	Model       string `json:"model,omitempty"`
-}
-
-// OverageJSON represents overage usage information.
-type OverageJSON struct {
-	Used      float64 `json:"used"`
-	Limit     float64 `json:"limit"`
-	Remaining float64 `json:"remaining"`
-	Currency  string  `json:"currency"`
-}
-
-// MultiProviderJSON is the top-level response for multi-provider fetches.
-type MultiProviderJSON struct {
-	Providers map[string]SnapshotJSON `json:"providers"`
-	Errors    map[string]string       `json:"errors"`
-	FetchedAt string                  `json:"fetched_at"`
+// multiProviderJSON is the top-level response for multi-provider fetches.
+type multiProviderJSON struct {
+	Providers map[string]models.UsageSnapshot `json:"providers"`
+	Errors    map[string]string               `json:"errors"`
+	FetchedAt string                          `json:"fetched_at"`
 }
 
 // StatusEntryJSON represents a single provider's status.
