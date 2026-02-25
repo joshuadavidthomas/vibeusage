@@ -20,6 +20,8 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+## [0.1.1]
+
 ### Fixed
 
 - Fixed CLI panic when running `vibeusage init` due to a shorthand flag collision between `init --quick` and global `--quiet`.
@@ -50,5 +52,6 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Josh Thomas <josh@joshthomas.dev> (maintainer)
 
-[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.1.1...HEAD
 [0.1.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.0
+[0.1.1]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.1
