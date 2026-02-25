@@ -2,6 +2,9 @@ package fetch
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -49,28 +52,33 @@ func ResultFatal(err string) FetchResult {
 	return FetchResult{Success: false, Error: err, ShouldFallback: false}
 }
 
-// FetchAttempt records a single attempt at a strategy.
-type FetchAttempt struct {
-	Strategy   string `json:"strategy"`
-	Success    bool   `json:"success"`
-	Error      string `json:"error,omitempty"`
-	DurationMs int    `json:"duration_ms"`
-}
-
 // FetchOutcome is the complete result of fetching from a provider.
 type FetchOutcome struct {
 	ProviderID string                `json:"provider_id"`
 	Success    bool                  `json:"success"`
 	Snapshot   *models.UsageSnapshot `json:"snapshot,omitempty"`
 	Source     string                `json:"source,omitempty"`
-	Attempts   []FetchAttempt        `json:"attempts"`
 	Error      string                `json:"error,omitempty"`
 	Cached     bool                  `json:"cached"`
 }
 
 // Strategy is the interface all fetch strategies must implement.
 type Strategy interface {
-	Name() string
 	IsAvailable() bool
 	Fetch(ctx context.Context) (FetchResult, error)
+}
+
+// StrategyName returns a short identifier for a strategy derived from its
+// type name (e.g. *claude.OAuthStrategy → "oauth").
+func StrategyName(s Strategy) string {
+	t := reflect.TypeOf(s)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	name := t.Name()
+	name = strings.TrimSuffix(name, "Strategy")
+	if name == "" {
+		return fmt.Sprintf("%T", s)
+	}
+	return strings.ToLower(name)
 }

@@ -72,8 +72,6 @@ type WebStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *WebStrategy) Name() string { return "web" }
-
 func (s *WebStrategy) IsAvailable() bool {
 	path := config.CredentialPath("cursor", "session")
 	_, err := os.Stat(path)

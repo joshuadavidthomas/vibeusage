@@ -98,8 +98,6 @@ type DeviceFlowStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *DeviceFlowStrategy) Name() string { return "device_flow" }
-
 func (s *DeviceFlowStrategy) IsAvailable() bool {
 	for _, p := range s.credentialPaths() {
 		if _, err := os.Stat(p); err == nil {
@@ -205,8 +203,6 @@ func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCrede
 type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
-
-func (s *APIKeyStrategy) Name() string { return "api_key" }
 
 func (s *APIKeyStrategy) IsAvailable() bool {
 	return s.loadAPIKey() != ""

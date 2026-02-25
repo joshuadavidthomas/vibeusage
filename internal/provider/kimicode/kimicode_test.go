@@ -11,13 +11,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
-func TestDeviceFlowStrategy_Name(t *testing.T) {
-	s := &DeviceFlowStrategy{}
-	if s.Name() != "device_flow" {
-		t.Errorf("Name() = %q, want %q", s.Name(), "device_flow")
-	}
-}
-
 func TestDeviceFlowStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *testing.T) {
 	dir := t.TempDir()
 	testenv.ApplyVibeusage(t.Setenv, dir)
@@ -45,13 +38,6 @@ func TestDeviceFlowStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *
 	}
 	if s.IsAvailable() {
 		t.Fatal("IsAvailable() = true, want false when only provider CLI credentials exist")
-	}
-}
-
-func TestAPIKeyStrategy_Name(t *testing.T) {
-	s := &APIKeyStrategy{}
-	if s.Name() != "api_key" {
-		t.Errorf("Name() = %q, want %q", s.Name(), "api_key")
 	}
 }
 

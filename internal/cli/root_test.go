@@ -387,9 +387,6 @@ func TestOutcomeToCompletion_Success(t *testing.T) {
 		ProviderID: "claude",
 		Success:    true,
 		Source:     "oauth",
-		Attempts: []fetch.FetchAttempt{
-			{Strategy: "oauth", Success: true, DurationMs: 342},
-		},
 	}
 
 	got := outcomeToCompletion(o)
@@ -409,10 +406,6 @@ func TestOutcomeToCompletion_Failure(t *testing.T) {
 		ProviderID: "cursor",
 		Success:    false,
 		Error:      "auth failed",
-		Attempts: []fetch.FetchAttempt{
-			{Strategy: "api_key", Success: false, DurationMs: 50, Error: "not available"},
-			{Strategy: "web", Success: false, DurationMs: 100, Error: "auth failed"},
-		},
 	}
 
 	got := outcomeToCompletion(o)
@@ -433,10 +426,6 @@ func TestOutcomeToCompletion_Fallback(t *testing.T) {
 		ProviderID: "gemini",
 		Success:    true,
 		Source:     "code_assist",
-		Attempts: []fetch.FetchAttempt{
-			{Strategy: "oauth", Success: false, DurationMs: 200, Error: "token expired"},
-			{Strategy: "code_assist", Success: true, DurationMs: 800},
-		},
 	}
 
 	got := outcomeToCompletion(o)

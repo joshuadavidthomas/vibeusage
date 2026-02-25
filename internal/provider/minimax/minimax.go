@@ -70,8 +70,6 @@ type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *APIKeyStrategy) Name() string { return "api_key" }
-
 func (s *APIKeyStrategy) IsAvailable() bool {
 	return s.loadToken() != ""
 }
