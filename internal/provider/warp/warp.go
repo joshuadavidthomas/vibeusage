@@ -2,9 +2,7 @@ package warp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -62,39 +60,22 @@ type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
+var warpAPIKey = provider.APIKeySource{
+	EnvVars:  []string{"WARP_API_KEY", "WARP_TOKEN"},
+	CredPath: config.CredentialPath("warp", "apikey"),
+	JSONKeys: []string{"api_key", "token"},
+}
+
 func (s *APIKeyStrategy) IsAvailable() bool {
-	return s.loadToken() != ""
+	return warpAPIKey.Load() != ""
 }
 
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	token := s.loadToken()
+	token := warpAPIKey.Load()
 	if token == "" {
 		return fetch.ResultFail("No API key found. Set WARP_API_KEY or use 'vibeusage key warp set'"), nil
 	}
 	return fetchUsage(ctx, token, s.HTTPTimeout)
-}
-
-func (s *APIKeyStrategy) loadToken() string {
-	for _, envVar := range []string{"WARP_API_KEY", "WARP_TOKEN"} {
-		if key := strings.TrimSpace(os.Getenv(envVar)); key != "" {
-			return key
-		}
-	}
-	data, err := config.ReadCredential(config.CredentialPath("warp", "apikey"))
-	if err != nil || data == nil {
-		return ""
-	}
-	var creds struct {
-		APIKey string `json:"api_key"`
-		Token  string `json:"token"`
-	}
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return ""
-	}
-	if strings.TrimSpace(creds.APIKey) != "" {
-		return strings.TrimSpace(creds.APIKey)
-	}
-	return strings.TrimSpace(creds.Token)
 }
 
 func fetchUsage(ctx context.Context, token string, httpTimeout float64) (fetch.FetchResult, error) {
@@ -118,14 +99,8 @@ func fetchUsage(ctx context.Context, token string, httpTimeout float64) (fetch.F
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return fetch.ResultFatal("Token invalid or expired. Run `vibeusage auth warp` to re-authenticate."), nil
-	}
-	if resp.StatusCode != 200 {
-		return fetch.ResultFail(fmt.Sprintf("Warp usage request failed: HTTP %d (%s)", resp.StatusCode, summarizeBody(resp.Body))), nil
-	}
-	if resp.JSONErr != nil {
-		return fetch.ResultFail(fmt.Sprintf("Invalid response from Warp API: %v", resp.JSONErr)), nil
+	if r := provider.CheckResponse(resp, "warp", "Warp"); r != nil {
+		return *r, nil
 	}
 
 	snapshot, err := parseUsageSnapshot(gqlResp)
@@ -184,23 +159,23 @@ func parseUsageSnapshot(resp GraphQLResponse) (*models.UsageSnapshot, error) {
 
 	utilization := 0
 	if !info.IsUnlimited && info.RequestLimit > 0 {
-		utilization = clampPct((info.RequestsUsed * 100) / info.RequestLimit)
+		utilization = models.ClampPct((info.RequestsUsed * 100) / info.RequestLimit)
 	}
 	primary := models.UsagePeriod{
 		Name:        "Monthly Credits",
 		Utilization: utilization,
 		PeriodType:  models.PeriodMonthly,
-		ResetsAt:    parseRFC3339Ptr(info.NextRefreshTime),
+		ResetsAt:    models.ParseRFC3339Ptr(info.NextRefreshTime),
 	}
 
 	periods := []models.UsagePeriod{primary}
 	if info.BonusCredits != nil && info.BonusCredits.Total > 0 {
-		bonusUtil := clampPct((info.BonusCredits.Used * 100) / info.BonusCredits.Total)
+		bonusUtil := models.ClampPct((info.BonusCredits.Used * 100) / info.BonusCredits.Total)
 		periods = append(periods, models.UsagePeriod{
 			Name:        "Bonus Credits",
 			Utilization: bonusUtil,
 			PeriodType:  models.PeriodMonthly,
-			ResetsAt:    parseRFC3339Ptr(info.BonusCredits.NextRefreshTime),
+			ResetsAt:    models.ParseRFC3339Ptr(info.BonusCredits.NextRefreshTime),
 		})
 	}
 
@@ -215,36 +190,4 @@ func parseUsageSnapshot(resp GraphQLResponse) (*models.UsageSnapshot, error) {
 func isAuthGraphQLError(err error) bool {
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "unauthorized") || strings.Contains(s, "forbidden") || strings.Contains(s, "auth")
-}
-
-func parseRFC3339Ptr(raw string) *time.Time {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	t, err := time.Parse(time.RFC3339, raw)
-	if err != nil {
-		return nil
-	}
-	return &t
-}
-
-func clampPct(v int) int {
-	if v < 0 {
-		return 0
-	}
-	if v > 100 {
-		return 100
-	}
-	return v
-}
-
-func summarizeBody(body []byte) string {
-	s := strings.TrimSpace(string(body))
-	if s == "" {
-		return "empty body"
-	}
-	if len(s) > 120 {
-		return s[:120] + "..."
-	}
-	return s
 }

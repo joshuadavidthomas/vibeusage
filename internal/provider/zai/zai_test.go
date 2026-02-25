@@ -19,7 +19,7 @@ func TestAPIKeyStrategy_IsAvailable_NoEnvVar(t *testing.T) {
 	t.Setenv("ZAI_API_KEY", "")
 	s := &APIKeyStrategy{}
 	// Only assert false when no credential file exists either.
-	if s.loadToken() == "" && s.IsAvailable() {
+	if zaiAPIKey.Load() == "" && s.IsAvailable() {
 		t.Error("IsAvailable() = true, want false when no token available")
 	}
 }
@@ -27,7 +27,7 @@ func TestAPIKeyStrategy_IsAvailable_NoEnvVar(t *testing.T) {
 func TestAPIKeyStrategy_Fetch_NoToken(t *testing.T) {
 	t.Setenv("ZAI_API_KEY", "")
 	s := &APIKeyStrategy{}
-	if s.loadToken() != "" {
+	if zaiAPIKey.Load() != "" {
 		t.Skip("credential file present — skipping no-token test")
 	}
 

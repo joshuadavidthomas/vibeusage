@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 	"google.golang.org/protobuf/encoding/protowire"
 )
@@ -43,13 +44,10 @@ func (q *QuotaInfo) Utilization() int {
 
 // ResetTimeUTC parses the resetTime as a time.Time.
 func (q *QuotaInfo) ResetTimeUTC() *time.Time {
-	if q == nil || q.ResetTime == "" {
+	if q == nil {
 		return nil
 	}
-	if t, err := time.Parse(time.RFC3339, q.ResetTime); err == nil {
-		return &t
-	}
-	return nil
+	return models.ParseRFC3339Ptr(q.ResetTime)
 }
 
 // CodeAssistResponse represents the response from the

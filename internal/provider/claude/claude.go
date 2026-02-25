@@ -376,11 +376,7 @@ func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models
 			Utilization: int(sp.data.Utilization),
 			PeriodType:  sp.info.periodType,
 		}
-		if sp.data.ResetsAt != "" {
-			if t, err := time.Parse(time.RFC3339, sp.data.ResetsAt); err == nil {
-				p.ResetsAt = &t
-			}
-		}
+		p.ResetsAt = models.ParseRFC3339Ptr(sp.data.ResetsAt)
 		periods = append(periods, p)
 	}
 
@@ -403,11 +399,7 @@ func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models
 			PeriodType:  models.PeriodWeekly,
 			Model:       strings.ToLower(mp.modelName),
 		}
-		if mp.data.ResetsAt != "" {
-			if t, err := time.Parse(time.RFC3339, mp.data.ResetsAt); err == nil {
-				p.ResetsAt = &t
-			}
-		}
+		p.ResetsAt = models.ParseRFC3339Ptr(mp.data.ResetsAt)
 		periods = append(periods, p)
 	}
 
@@ -609,12 +601,7 @@ func (s *WebStrategy) parseWebUsageResponse(resp WebUsageResponse, overage *mode
 
 	if resp.UsageLimit > 0 {
 		utilization := int((resp.UsageAmount / resp.UsageLimit) * 100)
-		var resetsAt *time.Time
-		if resp.PeriodEnd != "" {
-			if t, err := time.Parse(time.RFC3339, resp.PeriodEnd); err == nil {
-				resetsAt = &t
-			}
-		}
+		resetsAt := models.ParseRFC3339Ptr(resp.PeriodEnd)
 		periods = append(periods, models.UsagePeriod{
 			Name:        "Usage",
 			Utilization: utilization,

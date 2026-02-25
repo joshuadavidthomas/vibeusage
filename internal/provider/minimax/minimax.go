@@ -2,9 +2,7 @@ package minimax
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -70,35 +68,22 @@ type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
+var minimaxAPIKey = provider.APIKeySource{
+	EnvVars:  []string{"MINIMAX_API_KEY"},
+	CredPath: config.CredentialPath("minimax", "apikey"),
+	JSONKeys: []string{"api_key"},
+}
+
 func (s *APIKeyStrategy) IsAvailable() bool {
-	return s.loadToken() != ""
+	return minimaxAPIKey.Load() != ""
 }
 
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	token := s.loadToken()
+	token := minimaxAPIKey.Load()
 	if token == "" {
 		return fetch.ResultFail("No API key found. Set MINIMAX_API_KEY or use 'vibeusage key minimax set'"), nil
 	}
-
 	return fetchQuota(ctx, token, s.HTTPTimeout)
-}
-
-func (s *APIKeyStrategy) loadToken() string {
-	if key := os.Getenv("MINIMAX_API_KEY"); key != "" {
-		return key
-	}
-	path := config.CredentialPath("minimax", "apikey")
-	data, err := config.ReadCredential(path)
-	if err != nil || data == nil {
-		return ""
-	}
-	var creds struct {
-		APIKey string `json:"api_key"`
-	}
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return ""
-	}
-	return creds.APIKey
 }
 
 // fetchQuota makes the API call and parses the response.

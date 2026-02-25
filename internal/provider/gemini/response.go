@@ -3,6 +3,7 @@ package gemini
 import (
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
@@ -31,13 +32,7 @@ func (b *QuotaBucket) Utilization() int {
 
 // ResetTimeUTC parses the reset_time as a time.Time.
 func (b *QuotaBucket) ResetTimeUTC() *time.Time {
-	if b.ResetTime == "" {
-		return nil
-	}
-	if t, err := time.Parse(time.RFC3339, b.ResetTime); err == nil {
-		return &t
-	}
-	return nil
+	return models.ParseRFC3339Ptr(b.ResetTime)
 }
 
 // CodeAssistResponse represents the response from the Gemini code assist endpoint.

@@ -90,33 +90,22 @@ type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
+var ampAPIKey = provider.APIKeySource{
+	EnvVars:  []string{"AMP_API_KEY"},
+	CredPath: config.CredentialPath("amp", "apikey"),
+	JSONKeys: []string{"api_key"},
+}
+
 func (s *APIKeyStrategy) IsAvailable() bool {
-	return s.loadToken() != ""
+	return ampAPIKey.Load() != ""
 }
 
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	token := s.loadToken()
+	token := ampAPIKey.Load()
 	if token == "" {
 		return fetch.ResultFail("No API key found. Set AMP_API_KEY or use 'vibeusage key amp set'"), nil
 	}
 	return fetchBalance(ctx, token, "api_key", s.HTTPTimeout)
-}
-
-func (s *APIKeyStrategy) loadToken() string {
-	if token := strings.TrimSpace(os.Getenv("AMP_API_KEY")); token != "" {
-		return token
-	}
-	data, err := config.ReadCredential(config.CredentialPath("amp", "apikey"))
-	if err != nil || data == nil {
-		return ""
-	}
-	var creds struct {
-		APIKey string `json:"api_key"`
-	}
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(creds.APIKey)
 }
 
 func loadCLISecretsToken() (string, bool) {
@@ -159,14 +148,8 @@ func fetchBalance(ctx context.Context, token string, source string, httpTimeout 
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return fetch.ResultFatal("Token invalid or expired. Run `vibeusage auth amp` to re-authenticate."), nil
-	}
-	if resp.StatusCode != 200 {
-		return fetch.ResultFail(fmt.Sprintf("Amp usage request failed: HTTP %d (%s)", resp.StatusCode, summarizeBody(resp.Body))), nil
-	}
-	if resp.JSONErr != nil {
-		return fetch.ResultFail(fmt.Sprintf("Invalid response from Amp API: %v", resp.JSONErr)), nil
+	if r := provider.CheckResponse(resp, "amp", "Amp"); r != nil {
+		return *r, nil
 	}
 	if rpcResp.Error != nil {
 		msg := strings.TrimSpace(rpcResp.Error.Message)
@@ -308,15 +291,4 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 		snapshot.Identity = &models.ProviderIdentity{Organization: fmt.Sprintf("Credits: $%.2f", overage.Limit)}
 	}
 	return snapshot, nil
-}
-
-func summarizeBody(body []byte) string {
-	s := strings.TrimSpace(string(body))
-	if s == "" {
-		return "empty body"
-	}
-	if len(s) > 120 {
-		return s[:120] + "..."
-	}
-	return s
 }
