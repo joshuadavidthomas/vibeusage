@@ -8,20 +8,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
-// writeTestConfig writes a config.toml that disables provider credential reuse
-// to prevent tests from detecting real CLI credentials on the host machine.
-func writeTestConfig(t *testing.T, configDir string) {
-	t.Helper()
-	configContent := []byte("[credentials]\nreuse_provider_credentials = false\n")
-	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), configContent, 0o644); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
-	}
+func noReuseConfig() config.Config {
+	cfg := config.DefaultConfig()
+	cfg.Credentials.ReuseProviderCredentials = false
+	return cfg
 }
 
 func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
@@ -62,8 +59,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("ANTHROPIC_API_KEY", "")
-	writeTestConfig(t, tmpDir)
-	reloadConfig()
+	config.Override(t, noReuseConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -107,7 +103,7 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("CURSOR_API_KEY", "")
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -127,7 +123,7 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 func TestAuthStatusCommand_HasTableBorders(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -157,7 +153,7 @@ func TestAuthStatusCommand_HasTableBorders(t *testing.T) {
 func TestAuthStatusCommand_ContainsHeaders(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -188,7 +184,7 @@ func TestAuthStatusCommand_ContainsHeaders(t *testing.T) {
 func TestAuthStatusCommand_QuietMode(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -234,7 +230,7 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	// Force config reload to pick up new env
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	p, _ := provider.Get("copilot")
 	err := authProvider("copilot", p)
@@ -252,7 +248,7 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 func TestAuthStatusJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf

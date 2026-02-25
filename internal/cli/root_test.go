@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -131,7 +132,7 @@ func TestRootCmd_VersionFlag(t *testing.T) {
 	// Set up temp dir to avoid first-run check
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	rootCmd.SetArgs([]string{"--version"})
 	defer rootCmd.SetArgs(nil)
@@ -158,7 +159,7 @@ func TestConfigShow_DefaultOutput(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	oldQuiet := quiet
 	quiet = false
@@ -189,7 +190,7 @@ func TestConfigShow_QuietMode(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	oldQuiet := quiet
 	quiet = true
@@ -217,7 +218,7 @@ func TestConfigShow_JSONOutput(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	oldJSON := jsonOutput
 	jsonOutput = true
@@ -246,7 +247,7 @@ func TestConfigPath_DefaultOutput(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	oldQuiet := quiet
 	quiet = false
@@ -277,7 +278,7 @@ func TestConfigPath_QuietMode(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	oldQuiet := quiet
 	quiet = true
@@ -306,7 +307,7 @@ func TestConfigPath_JSONOutput(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	oldJSON := jsonOutput
 	jsonOutput = true
@@ -337,7 +338,7 @@ func TestConfigPath_CacheFlag(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	oldQuiet := quiet
 	quiet = true

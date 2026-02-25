@@ -96,13 +96,7 @@ func TestCLISecretsStrategy_IsAvailable_RespectsReuseProviderCredentials(t *test
 
 	cfg := config.DefaultConfig()
 	cfg.Credentials.ReuseProviderCredentials = false
-	if err := config.Save(cfg, ""); err != nil {
-		t.Fatalf("config.Save: %v", err)
-	}
-	if _, err := config.Reload(); err != nil {
-		t.Fatalf("config.Reload: %v", err)
-	}
-	t.Cleanup(func() { _, _ = config.Reload() })
+	config.Override(t, cfg)
 
 	secretsPath := filepath.Join(dir, "home", ".local", "share", "amp", "secrets.json")
 	if err := os.MkdirAll(filepath.Dir(secretsPath), 0o755); err != nil {

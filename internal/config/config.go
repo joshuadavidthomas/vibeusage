@@ -96,7 +96,7 @@ func SeedDefaultRoles() bool {
 	if err := Save(cfg, ""); err != nil {
 		return false
 	}
-	_, _ = Reload()
+	set(cfg)
 	return true
 }
 
@@ -153,30 +153,33 @@ var (
 	configMu     sync.RWMutex
 )
 
+// Get returns the current config. If Init has not been called, returns
+// DefaultConfig.
 func Get() Config {
 	configMu.RLock()
+	defer configMu.RUnlock()
 	if c := globalConfig; c != nil {
-		configMu.RUnlock()
 		return c.clone()
 	}
-	configMu.RUnlock()
-
-	configMu.Lock()
-	defer configMu.Unlock()
-	if globalConfig != nil {
-		return globalConfig.clone()
-	}
-	c, _ := Load("")
-	globalConfig = &c
-	return c.clone()
+	return DefaultConfig()
 }
 
-func Reload() (Config, error) {
+// Init loads config from disk and sets the global. Call once at startup.
+// Returns the loaded config and any parse error (defaults are used on error).
+func Init() (Config, error) {
+	c, err := Load("")
 	configMu.Lock()
 	defer configMu.Unlock()
-	c, err := Load("")
 	globalConfig = &c
 	return c.clone(), err
+}
+
+// set replaces the global config value. Used by Init, SeedDefaultRoles,
+// and Override.
+func set(cfg Config) {
+	configMu.Lock()
+	defer configMu.Unlock()
+	globalConfig = &cfg
 }
 
 func Load(path string) (Config, error) {

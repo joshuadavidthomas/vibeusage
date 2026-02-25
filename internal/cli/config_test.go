@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
@@ -35,7 +36,7 @@ func TestConfigReset_UsesConfirm(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	err := configResetCmd.RunE(configResetCmd, nil)
 	if err != nil {
@@ -68,7 +69,7 @@ func TestConfigReset_UserDeclinesConfirm(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	cmd := configResetCmd
 	err := cmd.RunE(cmd, nil)
@@ -92,7 +93,7 @@ func TestConfigReset_UserDeclinesConfirm(t *testing.T) {
 func TestConfigResetJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf

@@ -480,9 +480,9 @@ enabled_providers = ["claude", "copilot", "gemini"]
 	}
 }
 
-// Get and Reload (existing tests plus new ones)
+// Get and Init (existing tests plus new ones)
 
-func TestGetAndReload_NoConcurrentRace(t *testing.T) {
+func TestGetAndInit_NoConcurrentRace(t *testing.T) {
 	setupTempDir(t)
 	var wg sync.WaitGroup
 	_ = Get()
@@ -494,7 +494,7 @@ func TestGetAndReload_NoConcurrentRace(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			_, _ = Reload()
+			_, _ = Init()
 		}()
 	}
 	wg.Wait()
@@ -520,14 +520,9 @@ func TestGet_ReturnsCopy(t *testing.T) {
 	}
 
 	// Slice isolation: mutating EnabledProviders must not affect another copy
-	configMu.Lock()
-	globalConfig = nil
-	configMu.Unlock()
-
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
-	configPath := filepath.Join(dir, "config", "config.toml")
-	writeTestFile(t, configPath, []byte(`enabled_providers = ["claude", "copilot"]`))
+	cfgWithProviders := DefaultConfig()
+	cfgWithProviders.EnabledProviders = []string{"claude", "copilot"}
+	set(cfgWithProviders)
 
 	cfg5 := Get()
 	if len(cfg5.EnabledProviders) != 2 {
@@ -540,32 +535,41 @@ func TestGet_ReturnsCopy(t *testing.T) {
 	}
 }
 
-func TestReload_ReturnsCurrentConfig(t *testing.T) {
+func TestInit_ReturnsCurrentConfig(t *testing.T) {
 	setupTempDir(t)
-	cfg, err := Reload()
+	cfg, err := Init()
 	if err != nil {
-		t.Errorf("Reload() error = %v, want nil", err)
+		t.Errorf("Init() error = %v, want nil", err)
 	}
 	if cfg.Fetch.Timeout <= 0 {
-		t.Error("Reload() should return a valid config with positive timeout")
+		t.Error("Init() should return a valid config with positive timeout")
 	}
 }
 
-func TestReload_MalformedTOML_ReturnsError(t *testing.T) {
+func TestInit_MalformedTOML_ReturnsError(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "config", "config.toml")
 	writeTestFile(t, path, []byte("this is [[[not valid toml"))
 
-	_, err := Reload()
+	_, err := Init()
 	if err == nil {
-		t.Error("Reload() should return an error for malformed config file")
+		t.Error("Init() should return an error for malformed config file")
 	}
 	if !strings.Contains(err.Error(), "parsing config") {
 		t.Errorf("error should contain 'parsing config', got: %v", err)
 	}
 }
 
-func TestGet_LoadsOnFirstCall(t *testing.T) {
+func TestGet_ReturnsDefaultWhenNotInitialized(t *testing.T) {
+	setupTempDir(t) // clears global
+
+	cfg := Get()
+	if cfg.Fetch.Timeout != DefaultConfig().Fetch.Timeout {
+		t.Errorf("Get() without Init should return defaults. Fetch.Timeout = %v, want %v", cfg.Fetch.Timeout, DefaultConfig().Fetch.Timeout)
+	}
+}
+
+func TestInit_LoadsFromFile(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "config", "config.toml")
 	writeTestFile(t, path, []byte(`
@@ -573,13 +577,17 @@ func TestGet_LoadsOnFirstCall(t *testing.T) {
 timeout = 77.0
 `))
 
+	if _, err := Init(); err != nil {
+		t.Fatalf("Init() error: %v", err)
+	}
+
 	cfg := Get()
 	if cfg.Fetch.Timeout != 77.0 {
-		t.Errorf("Get() should load from file. Fetch.Timeout = %v, want 77.0", cfg.Fetch.Timeout)
+		t.Errorf("Get() after Init should load from file. Fetch.Timeout = %v, want 77.0", cfg.Fetch.Timeout)
 	}
 }
 
-func TestReload_PicksUpChanges(t *testing.T) {
+func TestInit_PicksUpChanges(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "config", "config.toml")
 	writeTestFile(t, path, []byte(`
@@ -587,9 +595,12 @@ func TestReload_PicksUpChanges(t *testing.T) {
 timeout = 10.0
 `))
 
-	cfg1 := Get()
+	cfg1, err := Init()
+	if err != nil {
+		t.Fatalf("Init() error: %v", err)
+	}
 	if cfg1.Fetch.Timeout != 10.0 {
-		t.Fatalf("initial Get() Fetch.Timeout = %v, want 10.0", cfg1.Fetch.Timeout)
+		t.Fatalf("initial Init() Fetch.Timeout = %v, want 10.0", cfg1.Fetch.Timeout)
 	}
 
 	writeTestFile(t, path, []byte(`
@@ -597,12 +608,12 @@ timeout = 10.0
 timeout = 20.0
 `))
 
-	cfg2, err := Reload()
+	cfg2, err := Init()
 	if err != nil {
-		t.Fatalf("Reload() error: %v", err)
+		t.Fatalf("Init() error: %v", err)
 	}
 	if cfg2.Fetch.Timeout != 20.0 {
-		t.Errorf("Reload() Fetch.Timeout = %v, want 20.0", cfg2.Fetch.Timeout)
+		t.Errorf("Init() Fetch.Timeout = %v, want 20.0", cfg2.Fetch.Timeout)
 	}
 }
 

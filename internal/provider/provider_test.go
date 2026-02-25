@@ -275,8 +275,7 @@ func TestAvailableIDs_IsSorted(t *testing.T) {
 
 func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
 	testenv.ApplySameDir(t.Setenv, t.TempDir())
-	_, _ = config.Reload()
-	defer func() { _, _ = config.Reload() }()
+	config.Override(t, config.DefaultConfig())
 
 	orig := registry
 	registry = map[string]Provider{}
@@ -300,11 +299,7 @@ func TestCheckCredentials_NoStrategyFallbackWhenReuseDisabled(t *testing.T) {
 	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	cfg := config.DefaultConfig()
 	cfg.Credentials.ReuseProviderCredentials = false
-	if err := config.Save(cfg, ""); err != nil {
-		t.Fatalf("Save config error: %v", err)
-	}
-	_, _ = config.Reload()
-	defer func() { _, _ = config.Reload() }()
+	config.Override(t, cfg)
 
 	orig := registry
 	registry = map[string]Provider{}

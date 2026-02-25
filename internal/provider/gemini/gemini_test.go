@@ -19,13 +19,7 @@ func TestOAuthStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *testi
 
 	cfg := config.DefaultConfig()
 	cfg.Credentials.ReuseProviderCredentials = false
-	if err := config.Save(cfg, ""); err != nil {
-		t.Fatalf("config.Save: %v", err)
-	}
-	if _, err := config.Reload(); err != nil {
-		t.Fatalf("config.Reload: %v", err)
-	}
-	t.Cleanup(func() { _, _ = config.Reload() })
+	config.Override(t, cfg)
 
 	externalPath := filepath.Join(dir, "home", ".gemini", "oauth_creds.json")
 	if err := os.MkdirAll(filepath.Dir(externalPath), 0o755); err != nil {

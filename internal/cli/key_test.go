@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
@@ -40,7 +41,7 @@ func TestKeySet_UsesInputPrompt(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	// Get the claude subcommand, then its "set" subcommand
 	claudeCmd := findSubcommand(keyCmd, "claude")
@@ -92,7 +93,7 @@ func TestKeyDelete_UsesConfirmPrompt(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	claudeCmd := findSubcommand(keyCmd, "claude")
 	if claudeCmd == nil {
@@ -136,7 +137,7 @@ func TestKeyDelete_UserDeclinesConfirm(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	claudeCmd := findSubcommand(keyCmd, "claude")
 	deleteCmd := findSubcommand(claudeCmd, "delete")
@@ -155,7 +156,7 @@ func TestKeyDelete_UserDeclinesConfirm(t *testing.T) {
 func TestDisplayAllCredentialStatus_HasTableBorders(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -185,7 +186,7 @@ func TestDisplayAllCredentialStatus_HasTableBorders(t *testing.T) {
 func TestDisplayAllCredentialStatus_ContainsHeaders(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -216,7 +217,7 @@ func TestDisplayAllCredentialStatus_ContainsHeaders(t *testing.T) {
 func TestDisplayAllCredentialStatus_QuietMode(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -243,7 +244,7 @@ func TestDisplayAllCredentialStatus_QuietMode(t *testing.T) {
 func TestKeyStatusJSON_UsesTypedStruct(t *testing.T) {
 	tmp := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmp)
-	reloadConfig()
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf

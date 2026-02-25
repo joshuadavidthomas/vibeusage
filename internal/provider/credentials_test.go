@@ -24,10 +24,7 @@ func withTempCredentialDir(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
 	testenv.ApplyVibeusage(t.Setenv, dir)
-	// Force config reload so paths pick up the new env.
-	if _, err := config.Reload(); err != nil {
-		t.Fatalf("config.Reload: %v", err)
-	}
+	config.Override(t, config.DefaultConfig())
 }
 
 func TestFindCredential_VibeusageStorage(t *testing.T) {
@@ -128,14 +125,9 @@ func TestFindCredential_CLIPaths(t *testing.T) {
 	})
 
 	// Enable reuse of provider credentials
-	cfg := config.Get()
+	cfg := config.DefaultConfig()
 	cfg.Credentials.ReuseProviderCredentials = true
-	if err := config.Save(cfg, ""); err != nil {
-		t.Fatalf("config.Save: %v", err)
-	}
-	if _, err := config.Reload(); err != nil {
-		t.Fatalf("config.Reload: %v", err)
-	}
+	config.Override(t, cfg)
 
 	found, source, _ := FindCredential("testprov")
 	if !found {

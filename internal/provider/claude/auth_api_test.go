@@ -13,8 +13,7 @@ import (
 
 func TestSaveClaudeCredential_SessionKey(t *testing.T) {
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
-	_, _ = config.Reload()
-	defer func() { _, _ = config.Reload() }()
+	config.Override(t, config.DefaultConfig())
 
 	sessionKey := fakeClaudeSessionKey("test")
 	if err := saveClaudeCredential(sessionKey); err != nil {
@@ -40,8 +39,7 @@ func TestSaveClaudeCredential_SessionKey(t *testing.T) {
 
 func TestSaveClaudeCredential_APIKey(t *testing.T) {
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
-	_, _ = config.Reload()
-	defer func() { _, _ = config.Reload() }()
+	config.Override(t, config.DefaultConfig())
 
 	apiKey := fakeClaudeAPIKey("test")
 	if err := saveClaudeCredential(apiKey); err != nil {
@@ -78,8 +76,7 @@ func TestAPIKeyStrategy_LoadAPIKey_Env(t *testing.T) {
 func TestAPIKeyStrategy_LoadAPIKey_File(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
-	_, _ = config.Reload()
-	defer func() { _, _ = config.Reload() }()
+	config.Override(t, config.DefaultConfig())
 
 	path := config.CredentialPath("claude", "apikey")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
