@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
@@ -140,5 +141,56 @@ func TestDisplayName_Empty(t *testing.T) {
 
 	if got := DisplayName(""); got != "" {
 		t.Errorf("DisplayName(%q) = %q, want %q", "", got, "")
+	}
+}
+
+func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", t.TempDir())
+	_, _ = config.Reload()
+	defer func() { _, _ = config.Reload() }()
+
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+
+	hasCreds, source := CheckCredentials("alpha")
+	if !hasCreds {
+		t.Fatal("expected credentials via strategy fallback")
+	}
+	if source != "provider_cli" {
+		t.Errorf("source = %q, want %q", source, "provider_cli")
+	}
+}
+
+func TestCheckCredentials_NoStrategyFallbackWhenReuseDisabled(t *testing.T) {
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", t.TempDir())
+	cfg := config.DefaultConfig()
+	cfg.Credentials.ReuseProviderCredentials = false
+	if err := config.Save(cfg, ""); err != nil {
+		t.Fatalf("Save config error: %v", err)
+	}
+	_, _ = config.Reload()
+	defer func() { _, _ = config.Reload() }()
+
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+
+	hasCreds, source := CheckCredentials("alpha")
+	if hasCreds {
+		t.Fatal("expected no credentials when reuse_provider_credentials=false")
+	}
+	if source != "" {
+		t.Errorf("source = %q, want empty", source)
 	}
 }

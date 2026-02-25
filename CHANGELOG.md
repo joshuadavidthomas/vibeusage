@@ -20,6 +20,12 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed credential auto-detection for macOS users authenticated with Claude Code and Codex CLI by adding macOS Keychain credential lookup alongside file-based paths.
+- Fixed `vibeusage auth --status` / `init` setup detection for providers that are available via strategy-specific credential sources (for example, keychain-backed OAuth credentials).
+- Added macOS keychain troubleshooting notes for Claude/Codex in the README.
+
 ## [0.2.0]
 
 ### Added

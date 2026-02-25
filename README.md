@@ -146,7 +146,7 @@ vibeusage auth amp
 
 [claude.ai](https://claude.ai) — Anthropic's Claude AI assistant. Reports session (5-hour) and weekly usage periods, plus overage spend if enabled. Shows your plan tier (Pro, Max, etc.).
 
-If you have Claude Code installed, vibeusage reads its OAuth credentials from `~/.claude/.credentials.json` automatically — including token refresh. This is the recommended path.
+If you have Claude Code installed, vibeusage reads its OAuth credentials automatically — from `~/.claude/.credentials.json` on Linux/Windows, or from macOS Keychain on macOS — including token refresh. This is the recommended path.
 
 As a fallback, you can authenticate with a browser session key:
 
@@ -154,7 +154,7 @@ As a fallback, you can authenticate with a browser session key:
 vibeusage auth claude
 ```
 
-This will prompt you to copy the `sessionKey` cookie from https://claude.ai (DevTools → Application → Cookies). Session keys don't auto-refresh, so you'll need to re-auth when they expire.
+This prompts you to copy the `sessionKey` cookie from https://claude.ai (DevTools → Application → Cookies). Session keys don't auto-refresh, so you'll need to re-auth when they expire.
 
 ### Cursor
 
@@ -232,7 +232,7 @@ vibeusage auth minimax
 
 [chatgpt.com](https://chatgpt.com) — OpenAI's ChatGPT and Codex. Reports session and weekly usage periods. Shows your subscription tier (Plus, Pro, etc.).
 
-If you have the Codex CLI installed, vibeusage reads its OAuth credentials from `~/.codex/auth.json` automatically — including token refresh. This is the recommended path:
+If you have the Codex CLI installed, vibeusage reads its OAuth credentials automatically — from `~/.codex/auth.json` or macOS Keychain (when configured) — including token refresh. This is the recommended path:
 
 ```bash
 # Authenticate with the Codex CLI first
@@ -243,6 +243,25 @@ vibeusage codex
 ```
 
 As a fallback, `vibeusage auth codex` lets you paste a bearer token manually, though those don't auto-refresh.
+
+### macOS Keychain troubleshooting (Claude/Codex)
+
+If `vibeusage` says Claude or Codex is not configured on macOS, but their CLIs are logged in:
+
+```bash
+claude auth status --json
+codex login status
+```
+
+If those succeed, macOS may be blocking keychain access for your terminal process. Open **Keychain Access**, find the relevant entries (`Claude Code-credentials` and/or `Codex Auth`), and allow your terminal app access when prompted.
+
+If your keychain is locked (common over SSH/headless sessions), unlock it first:
+
+```bash
+security unlock-keychain
+```
+
+Then run `vibeusage auth --status` again.
 
 ### OpenRouter
 

@@ -100,6 +100,8 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	t.Setenv("VIBEUSAGE_DATA_DIR", tmpDir)
+	t.Setenv("CURSOR_API_KEY", "")
 	reloadConfig()
 
 	var buf bytes.Buffer

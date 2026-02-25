@@ -14,16 +14,20 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/keychain"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 const (
-	oauthUsageURL    = "https://api.anthropic.com/api/oauth/usage"
-	oauthTokenURL    = "https://api.anthropic.com/oauth/token"
-	webBaseURL       = "https://claude.ai/api/organizations"
-	anthropicBetaTag = "oauth-2025-04-20"
+	oauthUsageURL        = "https://api.anthropic.com/api/oauth/usage"
+	oauthTokenURL        = "https://api.anthropic.com/oauth/token"
+	webBaseURL           = "https://claude.ai/api/organizations"
+	anthropicBetaTag     = "oauth-2025-04-20"
+	claudeKeychainSecret = "Claude Code-credentials"
 )
+
+var readKeychainSecret = keychain.ReadGenericPassword
 
 type Claude struct{}
 
@@ -90,7 +94,7 @@ func (s *OAuthStrategy) IsAvailable() bool {
 			return true
 		}
 	}
-	return false
+	return s.loadKeychainCredentials() != nil
 }
 
 func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -173,7 +177,25 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 			return &creds
 		}
 	}
-	return nil
+	return s.loadKeychainCredentials()
+}
+
+func (s *OAuthStrategy) loadKeychainCredentials() *OAuthCredentials {
+	secret, err := readKeychainSecret(claudeKeychainSecret, "")
+	if err != nil || secret == "" {
+		return nil
+	}
+
+	var cliCreds ClaudeCLICredentials
+	if err := json.Unmarshal([]byte(secret), &cliCreds); err != nil || cliCreds.ClaudeAiOauth == nil {
+		return nil
+	}
+
+	creds := cliCreds.ClaudeAiOauth.ToOAuthCredentials()
+	if creds.AccessToken == "" {
+		return nil
+	}
+	return &creds
 }
 
 func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {

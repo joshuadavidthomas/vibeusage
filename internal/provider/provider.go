@@ -95,7 +95,27 @@ func FindCredential(providerID string) (bool, string, string) {
 // and where they came from.
 func CheckCredentials(providerID string) (bool, string) {
 	found, source, _ := FindCredential(providerID)
-	return found, source
+	if found {
+		return true, source
+	}
+
+	cfg := config.Get()
+	if !cfg.Credentials.ReuseProviderCredentials {
+		return false, ""
+	}
+
+	p, ok := Get(providerID)
+	if !ok {
+		return false, ""
+	}
+
+	for _, s := range p.FetchStrategies() {
+		if s.IsAvailable() {
+			return true, "provider_cli"
+		}
+	}
+
+	return false, ""
 }
 
 // GetAllCredentialStatus returns the credential status for every
