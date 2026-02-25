@@ -46,7 +46,7 @@ func RenderBar(utilization int, width int, color string) string {
 
 func FormatPeriodLine(period models.UsagePeriod, nameWidth int) string {
 	paceRatio := period.PaceRatio()
-	color := models.PaceToColor(paceRatio, period.Utilization)
+	color := PaceToColor(paceRatio, period.Utilization)
 
 	bar := RenderBar(period.Utilization, 20, color)
 
@@ -62,7 +62,7 @@ func FormatPeriodLine(period models.UsagePeriod, nameWidth int) string {
 
 	reset := ""
 	if d := period.TimeUntilReset(); d != nil {
-		reset = dimStyle.Render("resets in " + models.FormatResetCountdown(d))
+		reset = dimStyle.Render("resets in " + FormatResetCountdown(d))
 	}
 
 	return boldStyle.Render(name) + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset
@@ -118,7 +118,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 			}
 
 			paceRatio := p.PaceRatio()
-			color := models.PaceToColor(paceRatio, p.Utilization)
+			color := PaceToColor(paceRatio, p.Utilization)
 			bar := RenderBar(p.Utilization, 20, color)
 
 			pctText := fmt.Sprintf("%d%%", p.Utilization)
@@ -130,7 +130,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 
 			reset := ""
 			if d := p.TimeUntilReset(); d != nil {
-				reset = dimStyle.Render("resets in " + models.FormatResetCountdown(d))
+				reset = dimStyle.Render("resets in " + FormatResetCountdown(d))
 			}
 
 			b.WriteString(boldStyle.Render(name) + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset + "\n")
@@ -167,7 +167,7 @@ func GlobalPeriodColWidths(snapshots []models.UsageSnapshot) PeriodColWidths {
 			cw.Name = max(cw.Name, len(p.Name))
 			cw.Pct = max(cw.Pct, len(fmt.Sprintf("%d%%", p.Utilization)))
 			if d := p.TimeUntilReset(); d != nil {
-				cw.Reset = max(cw.Reset, len("resets in "+models.FormatResetCountdown(d)))
+				cw.Reset = max(cw.Reset, len("resets in "+FormatResetCountdown(d)))
 			}
 		}
 	}
@@ -214,12 +214,12 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 func renderPeriodTable(periods []models.UsagePeriod, cw PeriodColWidths) string {
 	lines := make([]string, 0, len(periods))
 	for _, p := range periods {
-		color := models.PaceToColor(p.PaceRatio(), p.Utilization)
+		color := PaceToColor(p.PaceRatio(), p.Utilization)
 		pctRaw := fmt.Sprintf("%d%%", p.Utilization)
 
 		resetRaw := ""
 		if d := p.TimeUntilReset(); d != nil {
-			resetRaw = "resets in " + models.FormatResetCountdown(d)
+			resetRaw = "resets in " + FormatResetCountdown(d)
 		}
 
 		namePad := strings.Repeat(" ", max(0, cw.Name-len(p.Name)))

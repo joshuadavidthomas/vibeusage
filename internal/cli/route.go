@@ -8,11 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/catalog"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
-	"github.com/joshuadavidthomas/vibeusage/internal/catalog"
-	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/routing"
 )
@@ -412,7 +411,7 @@ func renderRouteTable(ft routing.FormattedTable) {
 
 // routeRenderBar renders a utilization bar with color for the route table.
 func routeRenderBar(utilization int) string {
-	return display.RenderBar(utilization, 15, models.PaceToColor(nil, utilization))
+	return display.RenderBar(utilization, 15, display.PaceToColor(nil, utilization))
 }
 
 // routeFormatReset formats a duration until reset for the route table.
@@ -420,7 +419,7 @@ func routeFormatReset(d *time.Duration) string {
 	if d == nil {
 		return ""
 	}
-	return models.FormatResetCountdown(d)
+	return display.FormatResetCountdown(d)
 }
 
 // toDisplayStyles converts routing.RowStyle to display.RowStyle.
