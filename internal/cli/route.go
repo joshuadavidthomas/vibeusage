@@ -11,7 +11,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
-	"github.com/joshuadavidthomas/vibeusage/internal/modelmap"
+	"github.com/joshuadavidthomas/vibeusage/internal/catalog"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/routing"
@@ -79,19 +79,19 @@ func init() {
 // spinner is shown so the user knows what is happening. Once data is cached on
 // disk the call returns near-instantly with no visible output.
 func preloadModelData(ctx context.Context) {
-	if modelmap.CacheIsFresh() {
+	if catalog.CacheIsFresh() {
 		// Fast path: data is on disk and within TTL — load silently.
-		modelmap.Preload(ctx)
+		catalog.Preload(ctx)
 		return
 	}
 
 	if !display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
-		modelmap.Preload(ctx)
+		catalog.Preload(ctx)
 		return
 	}
 
 	_ = display.SpinnerRun([]string{"models.dev"}, func(onComplete func(display.CompletionInfo)) {
-		modelmap.Preload(ctx)
+		catalog.Preload(ctx)
 		onComplete(display.CompletionInfo{ProviderID: "models.dev", Success: true})
 	})
 }
@@ -113,7 +113,7 @@ func newRoutingService() *routing.Service {
 		},
 		LookupMultiplier: func(modelName string, providerID string) *float64 {
 			if providerID == "copilot" {
-				return modelmap.LookupMultiplier(modelName)
+				return catalog.LookupMultiplier(modelName)
 			}
 			return nil
 		},
@@ -160,20 +160,20 @@ func newRoutingServiceWithSpinner() *routing.Service {
 }
 
 func listModels(providerFilter string) error {
-	var allModels []modelmap.ModelInfo
+	var allModels []catalog.ModelInfo
 
 	if providerFilter != "" {
-		allModels = modelmap.ListModelsForProvider(providerFilter)
+		allModels = catalog.ListModelsForProvider(providerFilter)
 		if len(allModels) == 0 {
 			return fmt.Errorf("no models found for provider %q", providerFilter)
 		}
 	} else {
-		allModels = modelmap.ListModels()
+		allModels = catalog.ListModels()
 	}
 
 	// Filter to models that have at least one configured provider,
 	// and only show configured providers in the list.
-	var filtered []modelmap.ModelInfo
+	var filtered []catalog.ModelInfo
 	for _, m := range allModels {
 		configured := provider.ConfiguredIDs(m.Providers)
 		if len(configured) > 0 {
@@ -375,7 +375,7 @@ func displayRoleRecommendation(rec routing.RoleRecommendation) error {
 // Adapter functions to convert between modelmap types and routing types.
 
 func adaptLookup(query string) *routing.ModelInfo {
-	info := modelmap.Lookup(query)
+	info := catalog.Lookup(query)
 	if info == nil {
 		return nil
 	}
@@ -383,7 +383,7 @@ func adaptLookup(query string) *routing.ModelInfo {
 }
 
 func adaptSearch(query string) []routing.ModelInfo {
-	results := modelmap.Search(query)
+	results := catalog.Search(query)
 	out := make([]routing.ModelInfo, len(results))
 	for i, r := range results {
 		out[i] = routing.ModelInfo{ID: r.ID, Name: r.Name, Providers: r.Providers}
@@ -392,7 +392,7 @@ func adaptSearch(query string) []routing.ModelInfo {
 }
 
 func adaptMatchPrefix(prefix string) []routing.ModelInfo {
-	results := modelmap.MatchPrefix(prefix)
+	results := catalog.MatchPrefix(prefix)
 	out := make([]routing.ModelInfo, len(results))
 	for i, r := range results {
 		out[i] = routing.ModelInfo{ID: r.ID, Name: r.Name, Providers: r.Providers}

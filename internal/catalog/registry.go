@@ -1,4 +1,4 @@
-package modelmap
+package catalog
 
 import "strings"
 

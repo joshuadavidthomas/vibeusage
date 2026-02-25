@@ -9,8 +9,8 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 )
 
-// ModelInfo holds resolved model information. Mirrors modelmap.ModelInfo
-// to avoid coupling routing directly to the modelmap package.
+// ModelInfo holds resolved model information. Mirrors catalog.ModelInfo
+// to avoid coupling routing directly to the catalog package.
 type ModelInfo struct {
 	ID        string
 	Name      string
