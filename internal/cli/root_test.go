@@ -13,6 +13,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
@@ -451,8 +452,7 @@ func TestOutcomeToCompletion_Fallback(t *testing.T) {
 // Logging/verbose output tests
 
 func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
-	var logBuf bytes.Buffer
-	ctx := newVerboseContext(&logBuf)
+	ctx, logBuf := logging.NewTestContext(logging.Flags{Verbose: true})
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -485,8 +485,7 @@ func TestVerboseOutput_MultipleSnapshots_LogsDuration(t *testing.T) {
 }
 
 func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
-	var logBuf bytes.Buffer
-	ctx := newVerboseContext(&logBuf)
+	ctx, logBuf := logging.NewTestContext(logging.Flags{Verbose: true})
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -524,8 +523,7 @@ func TestVerboseOutput_MultipleSnapshots_LogsErrors(t *testing.T) {
 }
 
 func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) {
-	var logBuf bytes.Buffer
-	ctx := newDefaultContext(&logBuf)
+	ctx, logBuf := logging.NewTestContext(logging.Flags{})
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -555,8 +553,7 @@ func TestVerboseOutput_MultipleSnapshots_SuppressedWhenNotVerbose(t *testing.T) 
 }
 
 func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
-	var logBuf bytes.Buffer
-	ctx := newQuietContext(&logBuf)
+	ctx, logBuf := logging.NewTestContext(logging.Flags{Quiet: true})
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -585,8 +582,7 @@ func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 func TestVerboseOutput_NotOnStdout(t *testing.T) {
 	// Verbose logging should go to the logger (stderr), NOT to outWriter (stdout).
 	// This ensures piped output is clean.
-	var logBuf bytes.Buffer
-	ctx := newVerboseContext(&logBuf)
+	ctx, _ := logging.NewTestContext(logging.Flags{Verbose: true})
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -621,8 +617,7 @@ func TestVerboseOutput_NotOnStdout(t *testing.T) {
 }
 
 func TestDisplayMultipleSnapshots_NoDataWithErrors_ShowsProviderErrors(t *testing.T) {
-	var logBuf bytes.Buffer
-	ctx := newDefaultContext(&logBuf)
+	ctx, _ := logging.NewTestContext(logging.Flags{})
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
@@ -655,8 +650,7 @@ func TestDisplayMultipleSnapshots_NoDataWithErrors_ShowsProviderErrors(t *testin
 }
 
 func TestDisplayMultipleSnapshots_NoDataNoErrors_ShowsConfigureHint(t *testing.T) {
-	var logBuf bytes.Buffer
-	ctx := newDefaultContext(&logBuf)
+	ctx, _ := logging.NewTestContext(logging.Flags{})
 
 	var outBuf bytes.Buffer
 	outWriter = &outBuf
