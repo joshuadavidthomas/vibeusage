@@ -147,8 +147,12 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 	}
 
 	lastErr := "No strategies available"
-	if len(attempts) > 0 {
-		lastErr = attempts[len(attempts)-1].Error
+	for i := len(attempts) - 1; i >= 0; i-- {
+		if attempts[i].Error == "not configured" {
+			continue
+		}
+		lastErr = attempts[i].Error
+		break
 	}
 
 	return FetchOutcome{

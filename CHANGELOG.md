@@ -20,6 +20,11 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Fixed
+
+- Updated default-role seeding to read config directly from disk so existing config values are preserved when in-memory config is stale.
+- Improved fetch pipeline final error reporting so trailing "not configured" strategies don’t mask the real preceding failure reason.
+
 ## [0.2.0]
 
 ### Added

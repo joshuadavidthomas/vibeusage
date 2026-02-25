@@ -81,7 +81,10 @@ func DefaultRoles() map[string]RoleConfig {
 // SeedDefaultRoles writes the default roles to the config file if no roles
 // are configured yet. Returns true if roles were seeded.
 func SeedDefaultRoles() bool {
-	cfg := Get()
+	cfg, err := Load("")
+	if err != nil {
+		return false
+	}
 	if len(cfg.Roles) > 0 {
 		return false
 	}
