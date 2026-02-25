@@ -244,25 +244,6 @@ vibeusage codex
 
 As a fallback, `vibeusage auth codex` lets you paste a bearer token manually, though those don't auto-refresh.
 
-### macOS Keychain troubleshooting (Claude/Codex)
-
-If `vibeusage` says Claude or Codex is not configured on macOS, but their CLIs are logged in:
-
-```bash
-claude auth status --json
-codex login status
-```
-
-If those succeed, macOS may be blocking keychain access for your terminal process. Open **Keychain Access**, find the relevant entries (`Claude Code-credentials` and/or `Codex Auth`), and allow your terminal app access when prompted.
-
-If your keychain is locked (common over SSH/headless sessions), unlock it first:
-
-```bash
-security unlock-keychain
-```
-
-Then run `vibeusage auth --status` again.
-
 ### OpenRouter
 
 [openrouter.ai](https://openrouter.ai) — Unified model gateway. Reports credit usage (dollars spent vs. total credits).
@@ -321,6 +302,27 @@ Global options:
 | `--verbose` | `-v` | Show detailed output |
 | `--quiet` | `-q` | Minimal output |
 | `--refresh` | `-r` | Disable cache fallback (fresh data or error) |
+
+## Troubleshooting
+
+### macOS Keychain (Claude/Codex)
+
+If `vibeusage` says Claude or Codex is not configured on macOS, but their CLIs are logged in:
+
+```bash
+claude auth status --json
+codex login status
+```
+
+If those succeed, macOS may be blocking keychain access for your terminal process. Open **Keychain Access**, find the relevant entries (`Claude Code-credentials` and/or `Codex Auth`), and allow your terminal app access when prompted.
+
+If your keychain is locked (common over SSH/headless sessions), unlock it first:
+
+```bash
+security unlock-keychain
+```
+
+Then run `vibeusage auth --status` again.
 
 ## Updating
 
