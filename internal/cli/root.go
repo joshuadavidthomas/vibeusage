@@ -187,6 +187,24 @@ func buildProviderMap() map[string][]fetch.Strategy {
 
 func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.FetchOutcome, durationMs int64) {
 	logger := logging.FromContext(ctx)
+
+	ids := make([]string, 0, len(outcomes))
+	for id := range outcomes {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	type providerError struct{ id, err string }
+	var errors []providerError
+	for _, pid := range ids {
+		outcome := outcomes[pid]
+		if !outcome.Success || outcome.Snapshot == nil {
+			if outcome.Error != "" {
+				errors = append(errors, providerError{pid, outcome.Error})
+			}
+		}
+	}
+
 	hasData := false
 	for _, o := range outcomes {
 		if o.Success && o.Snapshot != nil {
@@ -198,17 +216,21 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 	if !hasData {
 		if !quiet {
 			outln("No usage data available")
-			outln("\nConfigure credentials with:")
-			outln("  vibeusage key <provider> set")
+			if len(errors) > 0 {
+				outln()
+				for _, e := range errors {
+					outln(display.RenderProviderError(e.id, e.err))
+				}
+			} else {
+				outln("\nConfigure credentials with:")
+				outln("  vibeusage key <provider> set")
+			}
+		}
+		for _, e := range errors {
+			logger.Debug("provider error", "provider", e.id, "error", e.err)
 		}
 		return
 	}
-
-	ids := make([]string, 0, len(outcomes))
-	for id := range outcomes {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 
 	// Collect all successful snapshots upfront so we can compute globally
 	// consistent column widths before rendering any individual panel.
@@ -220,15 +242,9 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 	}
 	colWidths := display.GlobalPeriodColWidths(snapshots)
 
-	type providerError struct{ id, err string }
-	var errors []providerError
-
 	for _, pid := range ids {
 		outcome := outcomes[pid]
 		if !outcome.Success || outcome.Snapshot == nil {
-			if outcome.Error != "" {
-				errors = append(errors, providerError{pid, outcome.Error})
-			}
 			continue
 		}
 

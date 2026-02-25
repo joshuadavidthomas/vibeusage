@@ -120,6 +120,9 @@ func (s *OAuthStrategy) IsAvailable() bool {
 			return true
 		}
 	}
+	if !provider.ExternalCredentialReuseEnabled() {
+		return false
+	}
 	return s.loadKeychainCredentials() != nil
 }
 
@@ -135,7 +138,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 	if creds.NeedsRefresh() {
 		refreshed := s.refreshToken(ctx, creds)
-		if refreshed == nil {
+		if refreshed == nil && provider.ExternalCredentialReuseEnabled() {
 			refreshed = s.tryRefreshViaCLI(ctx)
 		}
 		if refreshed == nil {
@@ -174,10 +177,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 func (s *OAuthStrategy) credentialPaths() []string {
 	home, _ := os.UserHomeDir()
-	return []string{
-		config.CredentialPath("claude", "oauth"),
-		filepath.Join(home, ".claude", ".credentials.json"),
-	}
+	return provider.CredentialSearchPaths("claude", "oauth", filepath.Join(home, ".claude", ".credentials.json"))
 }
 
 func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
@@ -202,6 +202,9 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 		if creds.AccessToken != "" {
 			return &creds
 		}
+	}
+	if !provider.ExternalCredentialReuseEnabled() {
+		return nil
 	}
 	return s.loadKeychainCredentials()
 }

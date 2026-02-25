@@ -1,9 +1,13 @@
 package antigravity
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestMeta(t *testing.T) {
@@ -27,6 +31,44 @@ func TestFetchStrategies(t *testing.T) {
 	}
 	if strategies[0].Name() != "oauth" {
 		t.Errorf("strategy name = %q, want %q", strategies[0].Name(), "oauth")
+	}
+}
+
+func TestOAuthStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *testing.T) {
+	dir := t.TempDir()
+	testenv.ApplyVibeusage(t.Setenv, dir)
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+	// os.UserConfigDir on linux uses XDG_CONFIG_HOME before HOME/.config.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "home", ".config"))
+
+	cfg := config.DefaultConfig()
+	cfg.Credentials.ReuseProviderCredentials = false
+	if err := config.Save(cfg, ""); err != nil {
+		t.Fatalf("config.Save: %v", err)
+	}
+	if _, err := config.Reload(); err != nil {
+		t.Fatalf("config.Reload: %v", err)
+	}
+	t.Cleanup(func() { _, _ = config.Reload() })
+
+	externalPath := filepath.Join(dir, "home", ".config", "Antigravity", "credentials.json")
+	if err := os.MkdirAll(filepath.Dir(externalPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(externalPath, []byte(`{"apiKey":"tok"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	s := &OAuthStrategy{}
+	paths := s.credentialPaths()
+	if len(paths) != 1 {
+		t.Fatalf("len(paths) = %d, want 1", len(paths))
+	}
+	if paths[0] != config.CredentialPath("antigravity", "oauth") {
+		t.Errorf("paths[0] = %q, want %q", paths[0], config.CredentialPath("antigravity", "oauth"))
+	}
+	if s.IsAvailable() {
+		t.Fatal("IsAvailable() = true, want false when only provider CLI credentials exist")
 	}
 }
 

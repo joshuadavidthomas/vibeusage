@@ -72,6 +72,9 @@ type CLISecretsStrategy struct {
 func (s *CLISecretsStrategy) Name() string { return "provider_cli" }
 
 func (s *CLISecretsStrategy) IsAvailable() bool {
+	if !provider.ExternalCredentialReuseEnabled() {
+		return false
+	}
 	_, ok := loadCLISecretsToken()
 	return ok
 }

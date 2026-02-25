@@ -7,6 +7,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 // stubProvider implements Provider for tests.
@@ -145,7 +146,7 @@ func TestDisplayName_Empty(t *testing.T) {
 }
 
 func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", t.TempDir())
+	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	_, _ = config.Reload()
 	defer func() { _, _ = config.Reload() }()
 
@@ -168,7 +169,7 @@ func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
 }
 
 func TestCheckCredentials_NoStrategyFallbackWhenReuseDisabled(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", t.TempDir())
+	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	cfg := config.DefaultConfig()
 	cfg.Credentials.ReuseProviderCredentials = false
 	if err := config.Save(cfg, ""); err != nil {

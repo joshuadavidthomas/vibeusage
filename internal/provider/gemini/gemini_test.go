@@ -1,12 +1,52 @@
 package gemini
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func ptrFloat64(f float64) *float64 { return &f }
+
+func TestOAuthStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *testing.T) {
+	dir := t.TempDir()
+	testenv.ApplyVibeusage(t.Setenv, dir)
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+
+	cfg := config.DefaultConfig()
+	cfg.Credentials.ReuseProviderCredentials = false
+	if err := config.Save(cfg, ""); err != nil {
+		t.Fatalf("config.Save: %v", err)
+	}
+	if _, err := config.Reload(); err != nil {
+		t.Fatalf("config.Reload: %v", err)
+	}
+	t.Cleanup(func() { _, _ = config.Reload() })
+
+	externalPath := filepath.Join(dir, "home", ".gemini", "oauth_creds.json")
+	if err := os.MkdirAll(filepath.Dir(externalPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(externalPath, []byte(`{"access_token":"tok"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	s := &OAuthStrategy{}
+	paths := s.credentialPaths()
+	if len(paths) != 1 {
+		t.Fatalf("len(paths) = %d, want 1", len(paths))
+	}
+	if paths[0] != config.CredentialPath("gemini", "oauth") {
+		t.Errorf("paths[0] = %q, want %q", paths[0], config.CredentialPath("gemini", "oauth"))
+	}
+	if s.IsAvailable() {
+		t.Fatal("IsAvailable() = true, want false when only provider CLI credentials exist")
+	}
+}
 
 func TestParseTypedQuotaResponse_FullResponse(t *testing.T) {
 	quota := QuotaResponse{

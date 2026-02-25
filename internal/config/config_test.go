@@ -769,6 +769,18 @@ func TestDataDir_EnvOverride(t *testing.T) {
 	}
 }
 
+func TestDataDir_DoesNotFallBackToConfigDirEnv(t *testing.T) {
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", "/custom/config")
+	t.Setenv("VIBEUSAGE_DATA_DIR", "")
+	got := DataDir()
+	if got == "/custom/config" {
+		t.Fatalf("DataDir() should not fall back to VIBEUSAGE_CONFIG_DIR")
+	}
+	if filepath.Base(got) != "vibeusage" {
+		t.Errorf("DataDir() = %q, should end with 'vibeusage'", got)
+	}
+}
+
 func TestConfigDir_DefaultContainsVibeusage(t *testing.T) {
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", "")
 	got := ConfigDir()

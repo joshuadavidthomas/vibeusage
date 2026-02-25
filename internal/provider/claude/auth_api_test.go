@@ -8,10 +8,11 @@ import (
 	"testing"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestSaveClaudeCredential_SessionKey(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", t.TempDir())
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	_, _ = config.Reload()
 	defer func() { _, _ = config.Reload() }()
 
@@ -38,7 +39,7 @@ func TestSaveClaudeCredential_SessionKey(t *testing.T) {
 }
 
 func TestSaveClaudeCredential_APIKey(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", t.TempDir())
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	_, _ = config.Reload()
 	defer func() { _, _ = config.Reload() }()
 
@@ -76,7 +77,7 @@ func TestAPIKeyStrategy_LoadAPIKey_Env(t *testing.T) {
 
 func TestAPIKeyStrategy_LoadAPIKey_File(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "")
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", t.TempDir())
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	_, _ = config.Reload()
 	defer func() { _, _ = config.Reload() }()
 

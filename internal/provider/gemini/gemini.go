@@ -103,10 +103,7 @@ func (s *OAuthStrategy) IsAvailable() bool {
 
 func (s *OAuthStrategy) credentialPaths() []string {
 	home, _ := os.UserHomeDir()
-	return []string{
-		config.CredentialPath("gemini", "oauth"),
-		filepath.Join(home, ".gemini", "oauth_creds.json"),
-	}
+	return provider.CredentialSearchPaths("gemini", "oauth", filepath.Join(home, ".gemini", "oauth_creds.json"))
 }
 
 func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {

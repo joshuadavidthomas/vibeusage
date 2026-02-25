@@ -110,13 +110,12 @@ func (s *DeviceFlowStrategy) IsAvailable() bool {
 }
 
 func (s *DeviceFlowStrategy) credentialPaths() []string {
-	paths := []string{config.CredentialPath("kimicode", "oauth")}
 	// kimi-cli stores credentials at ~/.kimi/credentials/kimi-code.json
 	home, err := os.UserHomeDir()
-	if err == nil {
-		paths = append(paths, filepath.Join(home, ".kimi", "credentials", "kimi-code.json"))
+	if err != nil {
+		return provider.CredentialSearchPaths("kimicode", "oauth")
 	}
-	return paths
+	return provider.CredentialSearchPaths("kimicode", "oauth", filepath.Join(home, ".kimi", "credentials", "kimi-code.json"))
 }
 
 func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {

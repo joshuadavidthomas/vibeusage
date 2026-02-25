@@ -84,6 +84,9 @@ func (s *OAuthStrategy) IsAvailable() bool {
 			return true
 		}
 	}
+	if !provider.ExternalCredentialReuseEnabled() {
+		return false
+	}
 	// Check if Antigravity's VS Code state database exists
 	if _, err := os.Stat(vscdbPath()); err == nil {
 		return true
@@ -92,11 +95,11 @@ func (s *OAuthStrategy) IsAvailable() bool {
 }
 
 func (s *OAuthStrategy) credentialPaths() []string {
-	paths := []string{config.CredentialPath("antigravity", "oauth")}
+	var external []string
 	if configDir, err := os.UserConfigDir(); err == nil {
-		paths = append(paths, filepath.Join(configDir, "Antigravity", "credentials.json"))
+		external = append(external, filepath.Join(configDir, "Antigravity", "credentials.json"))
 	}
-	return paths
+	return provider.CredentialSearchPaths("antigravity", "oauth", external...)
 }
 
 // vscdbPath returns the path to Antigravity's VS Code state database.
@@ -169,6 +172,10 @@ func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
 		if err := json.Unmarshal(data, &oauthCreds); err == nil && oauthCreds.AccessToken != "" {
 			return &oauthCreds
 		}
+	}
+
+	if !provider.ExternalCredentialReuseEnabled() {
+		return nil
 	}
 
 	// Try reading from Antigravity's VS Code state database
