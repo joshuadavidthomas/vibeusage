@@ -32,3 +32,23 @@ func ValidatePrefix(prefix string) func(string) error {
 		return nil
 	}
 }
+
+// ValidateAnyPrefix returns a validator that rejects empty values and accepts
+// values that start with any one of the provided prefixes.
+func ValidateAnyPrefix(prefixes ...string) func(string) error {
+	return func(s string) error {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return errors.New("value cannot be empty")
+		}
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(s, prefix) {
+				return nil
+			}
+		}
+		if len(prefixes) == 0 {
+			return errors.New("no valid prefixes configured")
+		}
+		return fmt.Errorf("must start with one of: %s", strings.Join(prefixes, ", "))
+	}
+}

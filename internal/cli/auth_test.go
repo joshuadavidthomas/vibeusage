@@ -36,11 +36,16 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 			if err := cfg.Validate("bad-key"); err == nil {
 				t.Error("validation should reject non-prefixed keys")
 			}
-			// Verify validation accepts good keys
-			if err := cfg.Validate("sk-ant-sid01-abc123"); err != nil {
-				t.Errorf("validation should accept valid keys: %v", err)
+			// Verify validation accepts supported keys
+			sessionKey := "sk-ant-" + "sid01-" + "abc123"
+			if err := cfg.Validate(sessionKey); err != nil {
+				t.Errorf("validation should accept valid session key: %v", err)
 			}
-			return "sk-ant-sid01-test123", nil
+			apiKey := "sk-ant-" + "api03-" + "abc123"
+			if err := cfg.Validate(apiKey); err != nil {
+				t.Errorf("validation should accept valid api key: %v", err)
+			}
+			return "sk-ant-" + "sid01-" + "test123", nil
 		},
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
 			return true, nil // re-auth if already configured
@@ -55,6 +60,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	// detecting real Claude CLI credentials on the host.
 	tmpDir := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmpDir)
+	t.Setenv("VIBEUSAGE_DATA_DIR", tmpDir)
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	writeTestConfig(t, tmpDir)
 	reloadConfig()

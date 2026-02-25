@@ -53,6 +53,7 @@ func (c Claude) FetchStrategies() []fetch.Strategy {
 	timeout := config.Get().Fetch.Timeout
 	return []fetch.Strategy{
 		&OAuthStrategy{HTTPTimeout: timeout},
+		&APIKeyStrategy{HTTPTimeout: timeout},
 		&WebStrategy{HTTPTimeout: timeout},
 	}
 }
@@ -61,20 +62,45 @@ func (c Claude) FetchStatus(ctx context.Context) models.ProviderStatus {
 	return provider.FetchStatuspageStatus(ctx, "https://status.anthropic.com/api/v2/status.json")
 }
 
-// Auth returns the manual session key flow for Claude.
+// Auth returns a manual credential flow for Claude.
+//
+// Accepted inputs:
+// - Anthropic API key (sk-ant-api... / sk-ant-admin-...)
+// - claude.ai sessionKey cookie (sk-ant-sid01-...) as web fallback
 func (c Claude) Auth() provider.AuthFlow {
 	return provider.ManualKeyAuthFlow{
-		Instructions: "Get your session key from claude.ai:\n" +
+		Instructions: "Provide one of the following credentials:\n" +
+			"\n" +
+			"Option A (recommended): Claude CLI OAuth\n" +
+			"  Run `claude auth login` and vibeusage will auto-detect it.\n" +
+			"\n" +
+			"Option B: Anthropic API key\n" +
+			"  Use a key from https://platform.claude.com/settings/keys (starts with sk-ant-api or sk-ant-admin-).\n" +
+			"\n" +
+			"Option C (fallback): claude.ai session key\n" +
 			"  1. Open https://claude.ai in your browser\n" +
 			"  2. Open DevTools (F12 or Cmd+Option+I)\n" +
 			"  3. Go to Application → Cookies → https://claude.ai\n" +
 			"  4. Find the sessionKey cookie\n" +
 			"  5. Copy its value (starts with sk-ant-sid01-)",
-		Placeholder: "sk-ant-sid01-...",
-		Validate:    provider.ValidatePrefix("sk-ant-sid01-"),
-		CredPath:    config.CredentialPath("claude", "session"),
-		JSONKey:     "session_key",
+		Placeholder: "sk-ant-sid01-... or sk-ant-api...",
+		Validate:    provider.ValidateAnyPrefix("sk-ant-sid01-", "sk-ant-api", "sk-ant-admin-"),
+		Save:        saveClaudeCredential,
 	}
+}
+
+func saveClaudeCredential(value string) error {
+	value = strings.TrimSpace(value)
+
+	path := config.CredentialPath("claude", "session")
+	key := "session_key"
+	if strings.HasPrefix(value, "sk-ant-api") || strings.HasPrefix(value, "sk-ant-admin-") {
+		path = config.CredentialPath("claude", "apikey")
+		key = "api_key"
+	}
+
+	content, _ := json.Marshal(map[string]string{key: value})
+	return config.WriteCredential(path, content)
 }
 
 func init() {
@@ -419,6 +445,50 @@ func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models
 	}
 }
 
+// APIKeyStrategy recognizes Anthropic API keys and preserves them for auth
+// workflows. Claude consumer quota metrics still come from OAuth/session data.
+type APIKeyStrategy struct {
+	HTTPTimeout float64
+}
+
+func (s *APIKeyStrategy) Name() string { return "apikey" }
+
+func (s *APIKeyStrategy) IsAvailable() bool {
+	return s.loadAPIKey() != ""
+}
+
+func (s *APIKeyStrategy) Fetch(_ context.Context) (fetch.FetchResult, error) {
+	key := s.loadAPIKey()
+	if key == "" {
+		return fetch.ResultFail("No API key found"), nil
+	}
+
+	if !strings.HasPrefix(key, "sk-ant-") {
+		return fetch.ResultFatal("Invalid Anthropic API key format"), nil
+	}
+
+	return fetch.ResultFail("Anthropic API keys are configured, but claude.ai plan usage requires Claude OAuth/session credentials."), nil
+}
+
+func (s *APIKeyStrategy) loadAPIKey() string {
+	if v := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")); v != "" {
+		return v
+	}
+
+	data, err := config.ReadCredential(config.CredentialPath("claude", "apikey"))
+	if err != nil || data == nil {
+		return ""
+	}
+
+	var key struct {
+		APIKey string `json:"api_key"`
+	}
+	if err := json.Unmarshal(data, &key); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(key.APIKey)
+}
+
 // WebStrategy fetches Claude usage using a session cookie.
 type WebStrategy struct {
 	HTTPTimeout float64
@@ -427,8 +497,7 @@ type WebStrategy struct {
 func (s *WebStrategy) Name() string { return "web" }
 
 func (s *WebStrategy) IsAvailable() bool {
-	_, err := os.Stat(config.CredentialPath("claude", "session"))
-	return err == nil
+	return s.loadSessionKey() != ""
 }
 
 func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -482,13 +551,18 @@ func (s *WebStrategy) loadSessionKey() string {
 	if err != nil || data == nil {
 		return ""
 	}
+
+	value := ""
 	var creds WebSessionCredentials
-	if err := json.Unmarshal(data, &creds); err != nil {
+	if err := json.Unmarshal(data, &creds); err == nil {
+		value = strings.TrimSpace(creds.SessionKey)
+	} else {
 		// Try raw string
-		return string(data)
+		value = strings.TrimSpace(string(data))
 	}
-	if creds.SessionKey != "" {
-		return creds.SessionKey
+
+	if strings.HasPrefix(value, "sk-ant-sid01-") {
+		return value
 	}
 	return ""
 }

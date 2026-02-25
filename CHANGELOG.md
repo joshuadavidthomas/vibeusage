@@ -20,6 +20,11 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Changed
+
+- Updated `vibeusage auth claude` to accept either claude.ai `sessionKey` credentials (`sk-ant-sid01-...`) or Anthropic API keys (`sk-ant-api...` / `sk-ant-admin-...`).
+- Reordered Claude fetch strategy flow to prefer OAuth first and keep web session usage as the last-resort fallback.
+
 ### Fixed
 
 - Fixed credential auto-detection for macOS users authenticated with Claude Code and Codex CLI by adding macOS Keychain credential lookup alongside file-based paths.

@@ -34,6 +34,9 @@ type ManualKeyAuthFlow struct {
 	CredPath string
 	// JSONKey is the key name used in the JSON credential file (e.g. "session_key").
 	JSONKey string
+	// Save optionally overrides how credentials are persisted. If nil, the CLI
+	// writes {JSONKey: value} to CredPath.
+	Save func(value string) error
 }
 
 // Authenticate is not directly called — the cmd layer uses the fields
