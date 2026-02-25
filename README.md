@@ -316,7 +316,19 @@ vibeusage update
 vibeusage update --yes
 ```
 
-You can also re-run the [install scripts](#quick-install-recommended) to upgrade in place.
+`vibeusage update` only applies updates for installs managed by the official install scripts.
+
+If you installed with Homebrew, upgrade with:
+
+```bash
+brew upgrade vibeusage
+```
+
+If you installed with `go install`, rerun:
+
+```bash
+go install github.com/joshuadavidthomas/vibeusage@latest
+```
 
 ## Configuration
 

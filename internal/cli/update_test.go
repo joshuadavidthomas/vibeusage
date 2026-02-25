@@ -18,10 +18,12 @@ type fakeUpdaterService struct {
 	checkErr    error
 	applyResult updater.ApplyResult
 	applyErr    error
+	checkCalls  int
 	applyCalls  int
 }
 
 func (f *fakeUpdaterService) Check(ctx context.Context, req updater.CheckRequest) (updater.CheckResult, error) {
+	f.checkCalls++
 	if f.checkErr != nil {
 		return updater.CheckResult{}, f.checkErr
 	}
@@ -101,6 +103,10 @@ func TestRunUpdate_ApplyRequiresYesNonInteractive(t *testing.T) {
 	updaterFactory = func() updater.Service { return service }
 	defer func() { updaterFactory = oldFactory }()
 
+	oldSupportChecker := selfUpdateSupportChecker
+	selfUpdateSupportChecker = func() error { return nil }
+	defer func() { selfUpdateSupportChecker = oldSupportChecker }()
+
 	oldJSON := jsonOutput
 	jsonOutput = false
 	defer func() { jsonOutput = oldJSON }()
@@ -139,6 +145,10 @@ func TestRunUpdate_ApplyWithYes(t *testing.T) {
 	oldFactory := updaterFactory
 	updaterFactory = func() updater.Service { return service }
 	defer func() { updaterFactory = oldFactory }()
+
+	oldSupportChecker := selfUpdateSupportChecker
+	selfUpdateSupportChecker = func() error { return nil }
+	defer func() { selfUpdateSupportChecker = oldSupportChecker }()
 
 	oldJSON := jsonOutput
 	jsonOutput = false
@@ -188,5 +198,37 @@ func TestRunUpdate_CheckError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to check for updates") {
 		t.Fatalf("error = %q, want wrapped check failure", err.Error())
+	}
+}
+
+func TestRunUpdate_UnmanagedInstallRejected(t *testing.T) {
+	service := &fakeUpdaterService{}
+
+	oldFactory := updaterFactory
+	updaterFactory = func() updater.Service { return service }
+	defer func() { updaterFactory = oldFactory }()
+
+	oldSupportChecker := selfUpdateSupportChecker
+	selfUpdateSupportChecker = func() error {
+		return errors.New("self-update is not supported for Homebrew installs")
+	}
+	defer func() { selfUpdateSupportChecker = oldSupportChecker }()
+
+	oldCheckOnly := updateCheckOnly
+	updateCheckOnly = false
+	defer func() { updateCheckOnly = oldCheckOnly }()
+
+	err := runUpdate(context.Background())
+	if err == nil {
+		t.Fatal("expected unmanaged-install error")
+	}
+	if !strings.Contains(err.Error(), "not supported") {
+		t.Fatalf("error = %q, want unsupported install guidance", err.Error())
+	}
+	if service.checkCalls != 0 {
+		t.Fatalf("checkCalls = %d, want 0", service.checkCalls)
+	}
+	if service.applyCalls != 0 {
+		t.Fatalf("applyCalls = %d, want 0", service.applyCalls)
 	}
 }

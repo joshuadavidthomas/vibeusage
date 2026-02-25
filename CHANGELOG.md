@@ -24,6 +24,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Added Homebrew installation support.
 
+### Changed
+
+- Limited `vibeusage update` installs to script-managed installations.
+
 ## [0.1.1]
 
 ### Fixed
