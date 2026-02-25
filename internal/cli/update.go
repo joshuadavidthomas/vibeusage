@@ -21,9 +21,17 @@ var updaterFactory = func() updater.Service {
 	return updater.NewClient()
 }
 
+var selfUpdateSupportChecker = func() error {
+	return updater.AssertSelfUpdateSupported("")
+}
+
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Check for updates and install newer releases",
+	Long: "Check for newer vibeusage releases.\n\n" +
+		"Install mode is only supported for installs managed by the official install scripts.\n" +
+		"If you installed via a package manager (for example Homebrew), use that package manager to upgrade.\n" +
+		"`vibeusage update --check` works for all install methods.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runUpdate(cmd.Context())
 	},
@@ -36,6 +44,12 @@ func init() {
 }
 
 func runUpdate(ctx context.Context) error {
+	if !updateCheckOnly {
+		if err := selfUpdateSupportChecker(); err != nil {
+			return err
+		}
+	}
+
 	service := updaterFactory()
 	check, err := service.Check(ctx, updater.CheckRequest{
 		CurrentVersion: version,
@@ -126,6 +140,12 @@ func outputUpdateCheck(check updater.CheckResult) error {
 		} else {
 			out("Update available: %s → %s\n", check.CurrentVersion, check.TargetVersion)
 		}
+
+		if err := selfUpdateSupportChecker(); err != nil {
+			out("%s\n", err)
+			return nil
+		}
+
 		out("Run `vibeusage update --yes` to install.\n")
 		return nil
 	}

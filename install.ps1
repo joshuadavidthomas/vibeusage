@@ -63,6 +63,7 @@ try {
 
   New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
   Copy-Item -Path $binaryPath -Destination (Join-Path $InstallDir "vibeusage.exe") -Force
+  Set-Content -Path (Join-Path $InstallDir ".vibeusage-managed-by") -Value "install-script" -NoNewline
 
   Write-Host "Installed vibeusage to $(Join-Path $InstallDir 'vibeusage.exe')"
   Write-Host "Run: vibeusage --version"

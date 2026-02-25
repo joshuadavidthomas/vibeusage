@@ -124,5 +124,7 @@ else
   chmod 0755 "$INSTALL_DIR/vibeusage"
 fi
 
+printf '%s\n' 'install-script' > "$INSTALL_DIR/.vibeusage-managed-by"
+
 echo "Installed vibeusage to $INSTALL_DIR/vibeusage"
 echo "Run: vibeusage --version"
