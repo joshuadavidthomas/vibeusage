@@ -184,7 +184,16 @@ func Load(path string) (Config, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return applyEnvOverrides(cfg), nil
+		if legacyPath := legacyConfigFilePath(path); legacyPath != "" {
+			// TODO(v0.3.0): remove legacy config read fallback after the v0.2.0 migration window.
+			if legacyData, legacyErr := os.ReadFile(legacyPath); legacyErr == nil {
+				data = legacyData
+				err = nil
+			}
+		}
+		if err != nil {
+			return applyEnvOverrides(cfg), nil
+		}
 	}
 
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
@@ -206,6 +215,20 @@ func Save(cfg Config, path string) error {
 	if path == "" {
 		path = ConfigFile()
 	}
+	if err := saveConfigFile(cfg, path); err != nil {
+		return err
+	}
+
+	legacyPath := legacyConfigFilePath(path)
+	if legacyPath != "" {
+		// TODO(v0.3.0): remove temporary dual-write compatibility after v0.2.0 migration window.
+		_ = saveConfigFile(cfg, legacyPath)
+	}
+
+	return nil
+}
+
+func saveConfigFile(cfg Config, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
@@ -218,6 +241,18 @@ func Save(cfg Config, path string) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 	return nil
+}
+
+// TODO(v0.3.0): remove legacy config path fallback after the v0.2.0 migration window.
+func legacyConfigFilePath(path string) string {
+	if filepath.Clean(path) != filepath.Clean(ConfigFile()) {
+		return ""
+	}
+	legacy := legacyConfigFile()
+	if filepath.Clean(legacy) == filepath.Clean(path) {
+		return ""
+	}
+	return legacy
 }
 
 func applyEnvOverrides(cfg Config) Config {

@@ -23,6 +23,7 @@ func withTempCredentialDir(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
+	t.Setenv("VIBEUSAGE_DATA_DIR", filepath.Join(dir, "data"))
 	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(dir, "cache"))
 	// Force config reload so paths pick up the new env.
 	if _, err := config.Reload(); err != nil {
