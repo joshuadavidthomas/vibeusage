@@ -280,7 +280,7 @@ func displayRecommendation(rec routing.Recommendation) error {
 	}
 
 	out("Route: %s\n\n", rec.ModelName)
-	renderRouteTable(routing.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset))
+	renderRouteTable(display.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset))
 	return nil
 }
 
@@ -367,7 +367,7 @@ func displayRoleRecommendation(rec routing.RoleRecommendation) error {
 	}
 
 	out("Route: %s (role)\n\n", rec.Role)
-	renderRouteTable(routing.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset))
+	renderRouteTable(display.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset))
 	return nil
 }
 
@@ -401,11 +401,11 @@ func adaptMatchPrefix(prefix string) []routing.ModelInfo {
 
 // renderRouteTable renders a FormattedTable to the output writer using the
 // shared route table options (noColor flag, terminal width, row styles).
-func renderRouteTable(ft routing.FormattedTable) {
+func renderRouteTable(ft display.FormattedTable) {
 	outln(display.NewTableWithOptions(
 		ft.Headers,
 		ft.Rows,
-		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: toDisplayStyles(ft.Styles)},
+		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: ft.Styles},
 	))
 }
 
@@ -420,20 +420,4 @@ func routeFormatReset(d *time.Duration) string {
 		return ""
 	}
 	return display.FormatResetCountdown(d)
-}
-
-// toDisplayStyles converts routing.RowStyle to display.RowStyle.
-func toDisplayStyles(styles []routing.RowStyle) []display.RowStyle {
-	result := make([]display.RowStyle, len(styles))
-	for i, s := range styles {
-		switch s {
-		case routing.RowBold:
-			result[i] = display.RowBold
-		case routing.RowDim:
-			result[i] = display.RowDim
-		default:
-			result[i] = display.RowNormal
-		}
-	}
-	return result
 }
