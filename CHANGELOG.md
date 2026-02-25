@@ -20,6 +20,12 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed CLI panic when running `vibeusage init` due to a shorthand flag collision between `init --quick` and global `--quiet`.
+- Fixed CLI panic when running `vibeusage config path` due to a shorthand flag collision between `config path --credentials` and global `--refresh`.
+- Added regression tests to catch Cobra flag-merge panics across the full command tree.
+
 ## [0.1.0]
 
 ### Added

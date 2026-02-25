@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -23,6 +25,18 @@ func resetPathFlags(t *testing.T) {
 		_ = configPathCmd.Flags().Set("cache", "false")
 		_ = configPathCmd.Flags().Set("credentials", "false")
 	})
+}
+
+func collectCommandPaths(cmd *cobra.Command, prefix []string) [][]string {
+	paths := [][]string{append([]string{}, prefix...)}
+	for _, sub := range cmd.Commands() {
+		if !sub.IsAvailableCommand() || sub.IsAdditionalHelpTopicCommand() {
+			continue
+		}
+		next := append(append([]string{}, prefix...), sub.Name())
+		paths = append(paths, collectCommandPaths(sub, next)...)
+	}
+	return paths
 }
 
 // Root command tests
@@ -72,6 +86,39 @@ func TestRootCmd_HasPersistentFlags(t *testing.T) {
 		if f == nil {
 			t.Errorf("rootCmd missing persistent flag %q", name)
 		}
+	}
+}
+
+func TestAllCommands_FlagMergingDoesNotPanic(t *testing.T) {
+	paths := collectCommandPaths(rootCmd, nil)
+	for _, path := range paths {
+		path := append([]string{}, path...)
+		name := "root"
+		if len(path) > 0 {
+			name = strings.Join(path, " ")
+		}
+
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("flag merge panicked for %q: %v", name, r)
+				}
+			}()
+
+			var cmd *cobra.Command
+			if len(path) == 0 {
+				cmd = rootCmd
+			} else {
+				found, _, err := rootCmd.Find(path)
+				if err != nil {
+					t.Fatalf("failed to resolve command %q: %v", name, err)
+				}
+				cmd = found
+			}
+
+			cmd.InitDefaultHelpFlag()
+			_ = cmd.Flags()
+		})
 	}
 }
 

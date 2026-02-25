@@ -47,7 +47,7 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	initCmd.Flags().BoolP("quick", "q", false, "Quick setup with default provider (Claude)")
+	initCmd.Flags().Bool("quick", false, "Quick setup with default provider (Claude)")
 }
 
 func quickSetup() error {

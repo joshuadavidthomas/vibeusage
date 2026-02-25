@@ -152,6 +152,27 @@ func TestQuickSetup_QuietMode(t *testing.T) {
 	}
 }
 
+func TestInitCommand_QuickFlag_DoesNotPanicWhenConfigMissing(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", tmp)
+	reloadConfig()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	oldJSON := jsonOutput
+	jsonOutput = false
+	defer func() { jsonOutput = oldJSON }()
+
+	rootCmd.SetArgs([]string{"init", "--quick"})
+	defer rootCmd.SetArgs(nil)
+
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("init --quick should execute without panic or error: %v", err)
+	}
+}
+
 // JSON output tests
 
 func TestInitJSON_UsesTypedStruct(t *testing.T) {
