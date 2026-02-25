@@ -227,6 +227,27 @@ func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
 	}
 }
 
+func TestLoad_DefaultPathFallsBackToLegacyConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "legacy-base"))
+
+	oldConfigHome := xdg.ConfigHome
+	xdg.ConfigHome = filepath.Join(dir, "primary-base")
+	t.Cleanup(func() { xdg.ConfigHome = oldConfigHome })
+
+	legacyPath := legacyConfigFile()
+	writeTestFile(t, legacyPath, []byte("[fetch]\ntimeout = 12.5\n"))
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error = %v, want nil", err)
+	}
+	if cfg.Fetch.Timeout != 12.5 {
+		t.Errorf("Fetch.Timeout = %v, want 12.5 from legacy config", cfg.Fetch.Timeout)
+	}
+}
+
 func TestLoad_MalformedTOML_ReturnsDefaultsAndError(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "bad.toml")

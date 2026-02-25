@@ -184,7 +184,15 @@ func Load(path string) (Config, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return applyEnvOverrides(cfg), nil
+		if legacyPath := legacyConfigFilePath(path); legacyPath != "" {
+			if legacyData, legacyErr := os.ReadFile(legacyPath); legacyErr == nil {
+				data = legacyData
+				err = nil
+			}
+		}
+		if err != nil {
+			return applyEnvOverrides(cfg), nil
+		}
 	}
 
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
