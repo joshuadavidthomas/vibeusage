@@ -27,6 +27,9 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Fixed
 
+- Fixed provider credential leakage when `credentials.reuse_provider_credentials = false` by making provider strategy availability/loading consistently honor the setting.
+- Fixed credential path coupling by removing `DataDir()` fallback to `VIBEUSAGE_CONFIG_DIR`; credentials now use the data path unless `VIBEUSAGE_DATA_DIR` is explicitly set.
+- Fixed no-data output to show provider-specific fetch errors when providers are configured but all strategies fail.
 - Fixed credential auto-detection for macOS users authenticated with Claude Code and Codex CLI by adding macOS Keychain credential lookup alongside file-based paths.
 - Fixed `vibeusage auth --status` / `init` setup detection for providers that are available via strategy-specific credential sources (for example, keychain-backed OAuth credentials).
 - Updated default-role seeding to read config directly from disk so existing config values are preserved when in-memory config is stale.
