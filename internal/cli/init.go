@@ -2,6 +2,7 @@ package cli
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -141,36 +142,22 @@ func interactiveWizard() error {
 	return nil
 }
 
-// defaultRoles defines the starter roles seeded during init.
-var defaultRoles = map[string]config.RoleConfig{
-	"thinking": {Models: []string{"claude-opus-4-6", "o4", "gpt-5-2"}},
-	"coding":   {Models: []string{"claude-sonnet-4-6", "gemini-3.1-pro-preview", "gpt-5"}},
-	"fast":     {Models: []string{"claude-haiku-4-5", "gemini-3-flash", "gpt-4o-mini"}},
-}
-
 func seedDefaultRoles() {
-	cfg := config.Get()
-	if len(cfg.Roles) > 0 {
+	if !config.SeedDefaultRoles() {
 		return
 	}
 
-	for name, role := range defaultRoles {
-		cfg.Roles[name] = role
-	}
-
-	if err := config.Save(cfg, ""); err != nil {
-		// Non-fatal — roles are a convenience, not a requirement.
-		return
-	}
-	// We just saved this config, so a parse error here would be unexpected.
-	_, _ = config.Reload()
-
+	roles := config.DefaultRoles()
 	outln()
 	outln("  Default roles added to config:")
-	outln("    thinking — deep reasoning models (Opus, o4, GPT-5.2)")
-	outln("    coding   — agentic coding models (Sonnet, Codex, GPT-5)")
-	outln("    fast     — quick lightweight models (Haiku, Flash, GPT-4o-mini)")
+	outln("    thinking — deep reasoning models (" + joinModelNames(roles["thinking"].Models) + ")")
+	outln("    coding   — agentic coding models (" + joinModelNames(roles["coding"].Models) + ")")
+	outln("    fast     — quick lightweight models (" + joinModelNames(roles["fast"].Models) + ")")
 	outln()
 	outln("  Customize roles with: vibeusage config edit")
 	outln("  Route by role with:   vibeusage route --role thinking")
+}
+
+func joinModelNames(models []string) string {
+	return strings.Join(models, ", ")
 }

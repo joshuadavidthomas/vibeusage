@@ -69,6 +69,34 @@ func DefaultConfig() Config {
 	}
 }
 
+// DefaultRoles returns the starter roles seeded during init.
+func DefaultRoles() map[string]RoleConfig {
+	return map[string]RoleConfig{
+		"thinking": {Models: []string{"claude-opus-4-6", "gpt-5.2-pro", "gemini-3.1-pro-preview"}},
+		"coding":   {Models: []string{"claude-sonnet-4-6", "gpt-5.3-codex"}},
+		"fast":     {Models: []string{"claude-haiku-4-5", "gpt-5.1-codex-mini", "gemini-3-flash-preview"}},
+	}
+}
+
+// SeedDefaultRoles writes the default roles to the config file if no roles
+// are configured yet. Returns true if roles were seeded.
+func SeedDefaultRoles() bool {
+	cfg := Get()
+	if len(cfg.Roles) > 0 {
+		return false
+	}
+
+	for name, role := range DefaultRoles() {
+		cfg.Roles[name] = role
+	}
+
+	if err := Save(cfg, ""); err != nil {
+		return false
+	}
+	_, _ = Reload()
+	return true
+}
+
 func (c Config) clone() Config {
 	out := c
 	if c.EnabledProviders != nil {
