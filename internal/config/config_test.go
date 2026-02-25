@@ -1736,3 +1736,45 @@ func TestWriteCredential_ErrorWrapping_WriteFile(t *testing.T) {
 		t.Errorf("error should contain context 'writing credential', got: %v", err)
 	}
 }
+
+func TestSeedDefaultRoles_PreservesExistingConfigWhenCacheIsStale(t *testing.T) {
+	dir := t.TempDir()
+	cfgDir := filepath.Join(dir, "config")
+	dataDir := filepath.Join(dir, "data")
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", cfgDir)
+	t.Setenv("VIBEUSAGE_DATA_DIR", dataDir)
+
+	configMu.Lock()
+	globalConfig = nil
+	configMu.Unlock()
+	_ = Get() // prime cache with defaults before config file exists
+
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll config dir: %v", err)
+	}
+	content := []byte("[fetch]\ntimeout = 45\n\n[display]\nreset_format = \"absolute\"\n\n[credentials]\nreuse_provider_credentials = false\n")
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), content, 0o644); err != nil {
+		t.Fatalf("WriteFile config.toml: %v", err)
+	}
+
+	if seeded := SeedDefaultRoles(); !seeded {
+		t.Fatal("SeedDefaultRoles() = false, want true")
+	}
+
+	loaded, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if loaded.Fetch.Timeout != 45 {
+		t.Errorf("fetch.timeout = %v, want 45", loaded.Fetch.Timeout)
+	}
+	if loaded.Display.ResetFormat != "absolute" {
+		t.Errorf("display.reset_format = %q, want %q", loaded.Display.ResetFormat, "absolute")
+	}
+	if loaded.Credentials.ReuseProviderCredentials {
+		t.Error("credentials.reuse_provider_credentials was overwritten; want false preserved")
+	}
+	if len(loaded.Roles) == 0 {
+		t.Error("expected default roles to be seeded")
+	}
+}
