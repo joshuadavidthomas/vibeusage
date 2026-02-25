@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- Added Homebrew installation support.
+
 ## [0.1.1]
 
 ### Fixed
