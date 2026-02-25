@@ -170,8 +170,13 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 		outln()
 	}
 
+	title := "Credential"
+	if flow.JSONKey != "" {
+		title = strings.ToUpper(flow.JSONKey[:1]) + flow.JSONKey[1:]
+	}
+
 	value, err := prompt.Default.Input(prompt.InputConfig{
-		Title:       strings.ToUpper(flow.JSONKey[:1]) + flow.JSONKey[1:],
+		Title:       title,
 		Placeholder: flow.Placeholder,
 		Validate:    flow.Validate,
 	})
@@ -179,9 +184,15 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 		return err
 	}
 
-	credData, _ := json.Marshal(map[string]string{flow.JSONKey: value})
-	if err := config.WriteCredential(flow.CredPath, credData); err != nil {
-		return fmt.Errorf("error saving credential: %w", err)
+	if flow.Save != nil {
+		if err := flow.Save(value); err != nil {
+			return fmt.Errorf("error saving credential: %w", err)
+		}
+	} else {
+		credData, _ := json.Marshal(map[string]string{flow.JSONKey: value})
+		if err := config.WriteCredential(flow.CredPath, credData); err != nil {
+			return fmt.Errorf("error saving credential: %w", err)
+		}
 	}
 
 	if !quiet {
