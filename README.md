@@ -2,7 +2,7 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-As an OSS contributor, I’ve had free GitHub Copilot Pro access for a while, but I kept forgetting to use it and leaving free usage on the table. `vibeusage` keeps that visible across providers and gives you one place to see account usage, pace, and remaining headroom across your configured providers.
+As an OSS contributor, I’ve had free GitHub Copilot Pro access for a while, but I kept forgetting to use it and leaving free usage on the table. vibeusage keeps that visible across providers and gives you one place to see account usage, pace, and remaining headroom across your configured providers.
 
 ## Installation
 
@@ -40,7 +40,7 @@ go build -o vibeusage ./cmd/vibeusage
 
 ## Quick Start
 
-If you already use AI coding tools (Claude Code, Codex CLI, Gemini CLI, Copilot, etc.), `vibeusage` auto-detects their credentials. Just run:
+If you already use AI coding tools (Claude Code, Codex CLI, Gemini CLI, Copilot, etc.), vibeusage auto-detects their credentials. Just run:
 
 ```bash
 $ vibeusage
@@ -105,7 +105,7 @@ vibeusage route --list
 vibeusage route --list-roles
 ```
 
-If a model name is close but not exact, `vibeusage` suggests likely matches.
+If a model name is close but not exact, vibeusage suggests likely matches.
 
 Role-based model groups are configured in `config.toml` under `[roles.<name>]` (see [Routing Roles](#routing-roles)).
 
@@ -123,13 +123,13 @@ vibeusage route <model>   # Best provider for a model
 
 ## Providers
 
-`vibeusage` checks for existing credentials first — CLI/app state files, then environment variables — so most providers work automatically if you already use their tools. Manual auth is there as a fallback.
+vibeusage checks for existing credentials first — CLI/app state files, then environment variables — so most providers work automatically if you already use their tools. Manual auth is there as a fallback.
 
 ### Amp
 
 [ampcode.com](https://ampcode.com) — Amp coding assistant. Reports Amp Free daily quota usage and credit balance.
 
-If you have the Amp CLI installed, `vibeusage` reads credentials from `~/.local/share/amp/secrets.json` automatically. It also picks up `AMP_API_KEY` if you already have it set. Otherwise:
+If you have the Amp CLI installed, vibeusage reads credentials from `~/.local/share/amp/secrets.json` automatically. It also picks up `AMP_API_KEY` if you already have it set. Otherwise:
 
 ```bash
 vibeusage auth amp
@@ -139,7 +139,7 @@ vibeusage auth amp
 
 [claude.ai](https://claude.ai) — Anthropic's Claude AI assistant. Reports session (5-hour) and weekly usage periods, plus overage spend if enabled. Shows your plan tier (Pro, Max, etc.).
 
-If you have Claude Code installed, `vibeusage` reads its OAuth credentials from `~/.claude/.credentials.json` automatically — including token refresh. This is the recommended path.
+If you have Claude Code installed, vibeusage reads its OAuth credentials from `~/.claude/.credentials.json` automatically — including token refresh. This is the recommended path.
 
 As a fallback, you can authenticate with a browser session key:
 
@@ -165,13 +165,13 @@ The prompt walks you through extracting your session cookie from https://cursor.
 
 [antigravity.google](https://antigravity.google) — Google's AI IDE. Reports per-model usage quotas. Shows your subscription tier.
 
-`vibeusage` reads credentials from the local Antigravity IDE state automatically. Just sign into Antigravity and it should work — no manual setup needed.
+vibeusage reads credentials from the local Antigravity IDE state automatically. Just sign into Antigravity and it should work — no manual setup needed.
 
 ### Google Gemini CLI
 
 [gemini.google.com](https://gemini.google.com) — Google Gemini AI. Reports daily per-model request quotas. Shows your user tier.
 
-If you have the Gemini CLI installed, `vibeusage` reads its OAuth credentials from `~/.gemini/oauth_creds.json` automatically — including token refresh. This gives you the full quota view from the Cloud Code API.
+If you have the Gemini CLI installed, vibeusage reads its OAuth credentials from `~/.gemini/oauth_creds.json` automatically — including token refresh. This gives you the full quota view from the Cloud Code API.
 
 You can also use an AI Studio API key:
 
@@ -187,9 +187,9 @@ The API key path reports rate-limit-based usage (requests per minute/day) rather
 
 ### GitHub Copilot
 
-[github.com/features/copilot](https://github.com/features/copilot) — GitHub's AI pair programmer. Reports monthly usage across premium interactions, chat, and completions quotas.
+[github.com/features/copilot](https://github.com/features/copilot) — GitHub's AI pair programmer. Reports monthly usage across premium interactions, chat, and completions quotas. [Smart routing](#smart-routing) takes into account the multiplier Copilot applies to model requests when considering the Copilot provider.
 
-`vibeusage` reuses existing Copilot credentials from `~/.config/github-copilot/hosts.json` when available. If you don't have those, authenticate via device flow:
+vibeusage reuses existing Copilot credentials from `~/.config/github-copilot/hosts.json` when available. If you don't have those, authenticate via device flow:
 
 ```bash
 vibeusage auth copilot
@@ -201,7 +201,7 @@ This opens a browser-based GitHub authorization flow — you'll get a device cod
 
 [kimi.com](https://www.kimi.com) — Moonshot AI coding assistant. Reports weekly usage and per-window quotas.
 
-If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, `vibeusage` reads its credentials from `~/.kimi/credentials/kimi-code.json` automatically — including token refresh. It also picks up `KIMI_CODE_API_KEY` if set.
+If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, vibeusage reads its credentials from `~/.kimi/credentials/kimi-code.json` automatically — including token refresh. It also picks up `KIMI_CODE_API_KEY` if set.
 
 Otherwise, authenticate via device flow:
 
@@ -225,7 +225,7 @@ vibeusage auth minimax
 
 [chatgpt.com](https://chatgpt.com) — OpenAI's ChatGPT and Codex. Reports session and weekly usage periods. Shows your subscription tier (Plus, Pro, etc.).
 
-If you have the Codex CLI installed, `vibeusage` reads its OAuth credentials from `~/.codex/auth.json` automatically — including token refresh. This is the recommended path:
+If you have the Codex CLI installed, vibeusage reads its OAuth credentials from `~/.codex/auth.json` automatically — including token refresh. This is the recommended path:
 
 ```bash
 # Authenticate with the Codex CLI first
@@ -414,4 +414,4 @@ See `docs/releasing.md` for the tag-and-publish workflow.
 
 ## License
 
-`vibeusage` is licensed under the MIT license. See the [`LICENSE`](LICENSE) file for more information.
+vibeusage is licensed under the MIT license. See the [`LICENSE`](LICENSE) file for more information.
