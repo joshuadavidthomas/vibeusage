@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -95,67 +96,130 @@ func preloadModelData(ctx context.Context) {
 	})
 }
 
-// newRoutingService creates a routing.Service wired to the concrete
-// implementations: modelmap, provider, fetch, config.
-func newRoutingService() *routing.Service {
-	return &routing.Service{
-		LookupModel:         adaptLookup,
-		SearchModels:        adaptSearch,
-		ConfiguredProviders: provider.ConfiguredIDs,
-		ProviderStrategies: func(id string) []fetch.Strategy {
-			p, _ := provider.Get(id)
-			return p.FetchStrategies()
-		},
-		FetchAll: func(ctx context.Context, strategies map[string][]fetch.Strategy, useCache bool) map[string]fetch.FetchOutcome {
-			orchCfg := orchestratorConfigFromConfig(config.Get())
-			return fetch.FetchAllProviders(ctx, strategies, useCache, orchCfg, nil)
-		},
-		LookupMultiplier: func(modelName string, providerID string) *float64 {
-			if providerID == "copilot" {
-				return catalog.LookupMultiplier(modelName)
-			}
-			return nil
-		},
-		GetRole: func(name string) (*routing.RoleConfig, bool) {
-			cfg := config.Get()
-			role, ok := cfg.GetRole(name)
-			if !ok {
-				return nil, false
-			}
-			return &routing.RoleConfig{Models: role.Models}, true
-		},
-		RoleNames: func() []string {
-			return config.Get().RoleNames()
-		},
-		MatchPrefix: adaptMatchPrefix,
-		UseCache:    !refresh,
+// fetchAllWithSpinner fetches usage from all providers in the strategy map,
+// wrapping with a spinner for terminal output when appropriate.
+func fetchAllWithSpinner(ctx context.Context, strategies map[string][]fetch.Strategy, useCache bool) map[string]fetch.FetchOutcome {
+	providerIDs := make([]string, 0, len(strategies))
+	for pid := range strategies {
+		providerIDs = append(providerIDs, pid)
 	}
-}
 
-// newRoutingServiceWithSpinner creates a routing.Service where FetchAll
-// is wrapped with a spinner for terminal output.
-func newRoutingServiceWithSpinner() *routing.Service {
-	svc := newRoutingService()
-	svc.FetchAll = func(fetchCtx context.Context, strategies map[string][]fetch.Strategy, useCache bool) map[string]fetch.FetchOutcome {
-		providerIDs := make([]string, 0, len(strategies))
-		for pid := range strategies {
-			providerIDs = append(providerIDs, pid)
-		}
+	orchCfg := orchestratorConfigFromConfig(config.Get())
 
+	if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
 		var outcomes map[string]fetch.FetchOutcome
-		orchCfg := orchestratorConfigFromConfig(config.Get())
-		if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
-			_ = display.SpinnerRun(providerIDs, func(onComplete func(display.CompletionInfo)) {
-				outcomes = fetch.FetchAllProviders(fetchCtx, strategies, useCache, orchCfg, func(o fetch.FetchOutcome) {
-					onComplete(outcomeToCompletion(o))
-				})
+		_ = display.SpinnerRun(providerIDs, func(onComplete func(display.CompletionInfo)) {
+			outcomes = fetch.FetchAllProviders(ctx, strategies, useCache, orchCfg, func(o fetch.FetchOutcome) {
+				onComplete(outcomeToCompletion(o))
 			})
-		} else {
-			outcomes = fetch.FetchAllProviders(fetchCtx, strategies, useCache, orchCfg, nil)
-		}
+		})
 		return outcomes
 	}
-	return svc
+
+	return fetch.FetchAllProviders(ctx, strategies, useCache, orchCfg, nil)
+}
+
+// lookupStrategies returns fetch strategies for a provider.
+func lookupStrategies(id string) []fetch.Strategy {
+	p, _ := provider.Get(id)
+	return p.FetchStrategies()
+}
+
+// lookupMultiplier returns the cost multiplier for a model+provider pair.
+func lookupMultiplier(modelName string, providerID string) *float64 {
+	if providerID == "copilot" {
+		return catalog.LookupMultiplier(modelName)
+	}
+	return nil
+}
+
+// routeModel resolves a model query, fetches usage from all configured
+// providers that offer it, and returns a ranked recommendation.
+func routeModel(cmd *cobra.Command, query string) error {
+	rec, err := doRouteModel(cmd.Context(), query)
+	if err != nil {
+		return err
+	}
+
+	if jsonOutput {
+		return display.OutputJSON(outWriter, rec)
+	}
+
+	if quiet {
+		if rec.Best != nil {
+			out("%s\n", rec.Best.ProviderID)
+		}
+		return nil
+	}
+
+	return displayRecommendation(rec)
+}
+
+// doRouteModel resolves a model query, fetches usage from all configured
+// providers that offer it, and returns a ranked recommendation.
+func doRouteModel(ctx context.Context, query string) (routing.Recommendation, error) {
+	info := catalog.Lookup(query)
+	if info == nil {
+		suggestions := catalog.Search(query)
+		if len(suggestions) > 0 {
+			msg := fmt.Sprintf("unknown model %q. Did you mean:", query)
+			for _, sug := range suggestions {
+				if len(msg) > 200 {
+					break
+				}
+				msg += fmt.Sprintf("\n  %s (%s)", sug.ID, sug.Name)
+			}
+			return routing.Recommendation{}, fmt.Errorf("%s", msg)
+		}
+		return routing.Recommendation{}, fmt.Errorf("unknown model %q. Use 'vibeusage route --list' to see available models", query)
+	}
+
+	configuredIDs := provider.ConfiguredIDs(info.Providers)
+	if len(configuredIDs) == 0 {
+		return routing.Recommendation{}, fmt.Errorf(
+			"%s is available from %s, but none are configured.\nSet up a provider with: vibeusage auth <provider>",
+			info.Name, strings.Join(info.Providers, ", "),
+		)
+	}
+
+	strategyMap := routing.BuildStrategyMap(configuredIDs, lookupStrategies)
+	outcomes := fetchAllWithSpinner(ctx, strategyMap, !refresh)
+	providerData := routing.BuildProviderData(outcomes)
+
+	multipliers := make(map[string]*float64)
+	for _, pid := range configuredIDs {
+		if mult := lookupMultiplier(info.Name, pid); mult != nil {
+			multipliers[pid] = mult
+		}
+	}
+
+	candidates, unavailable := routing.Rank(configuredIDs, providerData, multipliers)
+
+	rec := routing.Recommendation{
+		ModelID:     info.ID,
+		ModelName:   info.Name,
+		Candidates:  candidates,
+		Unavailable: unavailable,
+	}
+	if len(candidates) > 0 {
+		rec.Best = &candidates[0]
+	}
+
+	return rec, nil
+}
+
+func displayRecommendation(rec routing.Recommendation) error {
+	if rec.Best == nil {
+		out("No usage data available for %s from any configured provider.\n", rec.ModelName)
+		if len(rec.Unavailable) > 0 {
+			out("Failed to fetch: %s\n", strings.Join(rec.Unavailable, ", "))
+		}
+		return nil
+	}
+
+	out("Route: %s\n\n", rec.ModelName)
+	renderRouteTable(display.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset))
+	return nil
 }
 
 func listModels(providerFilter string) error {
@@ -191,11 +255,11 @@ func listModels(providerFilter string) error {
 
 	// Build a reverse map: model ID → role names.
 	cfg := config.Get()
-	roles := make(map[string]routing.RoleConfig)
+	roles := make(map[string][]string)
 	for name, role := range cfg.Roles {
-		roles[name] = routing.RoleConfig{Models: role.Models}
+		roles[name] = role.Models
 	}
-	modelRoles := routing.BuildModelRolesMap(roles, adaptMatchPrefix, adaptLookup)
+	modelRoles := buildModelRolesMap(roles)
 
 	if jsonOutput {
 		type jsonModel struct {
@@ -248,10 +312,8 @@ func listModels(providerFilter string) error {
 	return nil
 }
 
-func routeModel(cmd *cobra.Command, query string) error {
-	svc := newRoutingServiceWithSpinner()
-
-	rec, err := svc.RouteModel(cmd.Context(), query)
+func routeByRole(cmd *cobra.Command, roleName string) error {
+	rec, err := doRouteByRole(cmd.Context(), roleName)
 	if err != nil {
 		return err
 	}
@@ -262,25 +324,104 @@ func routeModel(cmd *cobra.Command, query string) error {
 
 	if quiet {
 		if rec.Best != nil {
-			out("%s\n", rec.Best.ProviderID)
+			out("%s %s\n", rec.Best.ModelID, rec.Best.ProviderID)
 		}
 		return nil
 	}
 
-	return displayRecommendation(rec)
+	return displayRoleRecommendation(rec)
 }
 
-func displayRecommendation(rec routing.Recommendation) error {
+// doRouteByRole resolves a role to its constituent models, fetches usage from
+// all relevant providers, and returns a ranked recommendation.
+func doRouteByRole(ctx context.Context, roleName string) (routing.RoleRecommendation, error) {
+	cfg := config.Get()
+	role, ok := cfg.GetRole(roleName)
+	if !ok {
+		names := cfg.RoleNames()
+		if len(names) > 0 {
+			return routing.RoleRecommendation{}, fmt.Errorf("unknown role %q. Available roles: %s", roleName, strings.Join(names, ", "))
+		}
+		return routing.RoleRecommendation{}, fmt.Errorf("unknown role %q. No roles configured.\nAdd roles to your config:\n  vibeusage config edit\n\nExample:\n  [roles.%s]\n  models = [\"claude-sonnet-4-6\", \"gpt-5\"]", roleName, roleName)
+	}
+
+	if len(role.Models) == 0 {
+		return routing.RoleRecommendation{}, fmt.Errorf("role %q has no models configured", roleName)
+	}
+
+	var modelEntries []routing.RoleModelEntry
+	allProviderIDs := make(map[string]bool)
+
+	for _, modelID := range role.Models {
+		matches := catalog.MatchPrefix(modelID)
+		if len(matches) == 0 {
+			if info := catalog.Lookup(modelID); info != nil {
+				matches = []catalog.ModelInfo{*info}
+			}
+		}
+		if len(matches) == 0 {
+			continue
+		}
+
+		best := matches[0]
+		configured := provider.ConfiguredIDs(best.Providers)
+		if len(configured) == 0 {
+			continue
+		}
+
+		modelEntries = append(modelEntries, routing.RoleModelEntry{
+			ModelID:     best.ID,
+			ModelName:   best.Name,
+			ProviderIDs: configured,
+		})
+		for _, pid := range configured {
+			allProviderIDs[pid] = true
+		}
+	}
+
+	if len(modelEntries) == 0 {
+		return routing.RoleRecommendation{}, fmt.Errorf("no models in role %q are available from configured providers.\nModels in role: %s", roleName, strings.Join(role.Models, ", "))
+	}
+
+	var providerList []string
+	for pid := range allProviderIDs {
+		providerList = append(providerList, pid)
+	}
+	sort.Strings(providerList)
+
+	strategyMap := routing.BuildStrategyMap(providerList, lookupStrategies)
+	outcomes := fetchAllWithSpinner(ctx, strategyMap, !refresh)
+	providerData := routing.BuildProviderData(outcomes)
+
+	candidates, unavailable := routing.RankByRole(modelEntries, providerData, lookupMultiplier)
+
+	rec := routing.RoleRecommendation{
+		Role:        roleName,
+		Candidates:  candidates,
+		Unavailable: unavailable,
+	}
+	if len(candidates) > 0 {
+		rec.Best = &candidates[0]
+	}
+
+	return rec, nil
+}
+
+func displayRoleRecommendation(rec routing.RoleRecommendation) error {
 	if rec.Best == nil {
-		out("No usage data available for %s from any configured provider.\n", rec.ModelName)
+		out("No usage data available for role %q from any configured provider.\n", rec.Role)
 		if len(rec.Unavailable) > 0 {
-			out("Failed to fetch: %s\n", strings.Join(rec.Unavailable, ", "))
+			out("Failed to fetch:")
+			for _, u := range rec.Unavailable {
+				out(" %s(%s)", u.ModelID, u.ProviderID)
+			}
+			outln("")
 		}
 		return nil
 	}
 
-	out("Route: %s\n\n", rec.ModelName)
-	renderRouteTable(display.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset))
+	out("Route: %s (role)\n\n", rec.Role)
+	renderRouteTable(display.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset))
 	return nil
 }
 
@@ -331,72 +472,36 @@ func listRoles() error {
 	return nil
 }
 
-func routeByRole(cmd *cobra.Command, roleName string) error {
-	svc := newRoutingServiceWithSpinner()
+// buildModelRolesMap returns a map from canonical model ID to sorted role names.
+func buildModelRolesMap(roles map[string][]string) map[string][]string {
+	result := make(map[string][]string)
 
-	rec, err := svc.RouteByRole(cmd.Context(), roleName)
-	if err != nil {
-		return err
-	}
-
-	if jsonOutput {
-		return display.OutputJSON(outWriter, rec)
-	}
-
-	if quiet {
-		if rec.Best != nil {
-			out("%s %s\n", rec.Best.ModelID, rec.Best.ProviderID)
-		}
-		return nil
-	}
-
-	return displayRoleRecommendation(rec)
-}
-
-func displayRoleRecommendation(rec routing.RoleRecommendation) error {
-	if rec.Best == nil {
-		out("No usage data available for role %q from any configured provider.\n", rec.Role)
-		if len(rec.Unavailable) > 0 {
-			out("Failed to fetch:")
-			for _, u := range rec.Unavailable {
-				out(" %s(%s)", u.ModelID, u.ProviderID)
+	for roleName, models := range roles {
+		for _, modelID := range models {
+			matches := catalog.MatchPrefix(modelID)
+			if len(matches) == 0 {
+				if info := catalog.Lookup(modelID); info != nil {
+					matches = []catalog.ModelInfo{*info}
+				}
 			}
-			outln("")
+			for _, info := range matches {
+				result[info.ID] = append(result[info.ID], roleName)
+			}
 		}
-		return nil
 	}
 
-	out("Route: %s (role)\n\n", rec.Role)
-	renderRouteTable(display.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset))
-	return nil
-}
-
-// Adapter functions to convert between modelmap types and routing types.
-
-func adaptLookup(query string) *routing.ModelInfo {
-	info := catalog.Lookup(query)
-	if info == nil {
-		return nil
+	for id, roleNames := range result {
+		sort.Strings(roleNames)
+		deduped := roleNames[:0]
+		for i, r := range roleNames {
+			if i == 0 || r != roleNames[i-1] {
+				deduped = append(deduped, r)
+			}
+		}
+		result[id] = deduped
 	}
-	return &routing.ModelInfo{ID: info.ID, Name: info.Name, Providers: info.Providers}
-}
 
-func adaptSearch(query string) []routing.ModelInfo {
-	results := catalog.Search(query)
-	out := make([]routing.ModelInfo, len(results))
-	for i, r := range results {
-		out[i] = routing.ModelInfo{ID: r.ID, Name: r.Name, Providers: r.Providers}
-	}
-	return out
-}
-
-func adaptMatchPrefix(prefix string) []routing.ModelInfo {
-	results := catalog.MatchPrefix(prefix)
-	out := make([]routing.ModelInfo, len(results))
-	for i, r := range results {
-		out[i] = routing.ModelInfo{ID: r.ID, Name: r.Name, Providers: r.Providers}
-	}
-	return out
+	return result
 }
 
 // renderRouteTable renders a FormattedTable to the output writer using the
