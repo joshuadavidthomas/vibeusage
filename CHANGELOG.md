@@ -22,6 +22,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Changed
 
+- **Breaking:** `--json` output now serializes usage snapshots directly from the model types. Removed `remaining`, `cached` fields; added `fetched_at`, `is_enabled`, `source` fields. `resets_at` uses Go's default time format. Identity fields with empty values are now omitted.
 - Updated `vibeusage auth claude` to accept either claude.ai `sessionKey` credentials (`sk-ant-sid01-...`) or Anthropic API keys (`sk-ant-api...` / `sk-ant-admin-...`).
 - Reordered Claude fetch strategy flow to prefer OAuth first and keep web session usage as the last-resort fallback.
 
