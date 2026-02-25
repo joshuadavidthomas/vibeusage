@@ -7,13 +7,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-func TestAPIKeyStrategy_Name(t *testing.T) {
-	s := &APIKeyStrategy{}
-	if s.Name() != "api_key" {
-		t.Errorf("Name() = %q, want %q", s.Name(), "api_key")
-	}
-}
-
 func TestAPIKeyStrategy_IsAvailable_EnvVar(t *testing.T) {
 	t.Setenv("MINIMAX_API_KEY", "sk-cp-test")
 	s := &APIKeyStrategy{}

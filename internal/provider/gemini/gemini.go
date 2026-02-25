@@ -90,8 +90,6 @@ type OAuthStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *OAuthStrategy) Name() string { return "oauth" }
-
 func (s *OAuthStrategy) IsAvailable() bool {
 	for _, p := range s.credentialPaths() {
 		if _, err := os.Stat(p); err == nil {
@@ -253,8 +251,6 @@ func (s *OAuthStrategy) parseTypedQuotaResponse(quotaResp QuotaResponse, codeAss
 type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
-
-func (s *APIKeyStrategy) Name() string { return "api_key" }
 
 func (s *APIKeyStrategy) IsAvailable() bool {
 	if os.Getenv("GEMINI_API_KEY") != "" {

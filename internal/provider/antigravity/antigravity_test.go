@@ -29,9 +29,6 @@ func TestFetchStrategies(t *testing.T) {
 	if len(strategies) != 1 {
 		t.Fatalf("len(strategies) = %d, want 1", len(strategies))
 	}
-	if strategies[0].Name() != "oauth" {
-		t.Errorf("strategy name = %q, want %q", strategies[0].Name(), "oauth")
-	}
 }
 
 func TestOAuthStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *testing.T) {

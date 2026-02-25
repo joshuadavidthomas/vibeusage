@@ -23,7 +23,6 @@ func TestFetchAllProviders_MultipleProviders(t *testing.T) {
 	providerMap := map[string][]Strategy{
 		"provider-a": {
 			&mockStrategy{
-				name:      "strategy-a",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("provider-a", "strategy-a", 40)), nil
@@ -32,7 +31,6 @@ func TestFetchAllProviders_MultipleProviders(t *testing.T) {
 		},
 		"provider-b": {
 			&mockStrategy{
-				name:      "strategy-b",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("provider-b", "strategy-b", 60)), nil
@@ -41,7 +39,6 @@ func TestFetchAllProviders_MultipleProviders(t *testing.T) {
 		},
 		"provider-c": {
 			&mockStrategy{
-				name:      "strategy-c",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("provider-c", "strategy-c", 80)), nil
@@ -99,7 +96,6 @@ func TestFetchAllProviders_MixedResults(t *testing.T) {
 	providerMap := map[string][]Strategy{
 		"succeeder": {
 			&mockStrategy{
-				name:      "good",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("succeeder", "good", 50)), nil
@@ -108,7 +104,6 @@ func TestFetchAllProviders_MixedResults(t *testing.T) {
 		},
 		"failer": {
 			&mockStrategy{
-				name:      "bad",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultFatal("credentials revoked"), nil
@@ -141,7 +136,6 @@ func TestFetchAllProviders_OnCompleteCallback(t *testing.T) {
 	providerMap := map[string][]Strategy{
 		"alpha": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("alpha", "s", 10)), nil
@@ -150,7 +144,6 @@ func TestFetchAllProviders_OnCompleteCallback(t *testing.T) {
 		},
 		"beta": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("beta", "s", 20)), nil
@@ -194,7 +187,6 @@ func TestFetchAllProviders_ContextCancellation(t *testing.T) {
 	providerMap := map[string][]Strategy{
 		"blocking": {
 			&mockStrategy{
-				name:      "blocker",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					<-ctx.Done()
@@ -233,7 +225,6 @@ func TestFetchAllProviders_ConcurrencyLimit(t *testing.T) {
 	makeStrategy := func(pid string) []Strategy {
 		return []Strategy{
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					cur := concurrentCount.Add(1)
@@ -287,7 +278,6 @@ func TestFetchEnabledProviders_FiltersDisabled(t *testing.T) {
 	providerMap := map[string][]Strategy{
 		"alpha": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("alpha", "s", 10)), nil
@@ -296,7 +286,6 @@ func TestFetchEnabledProviders_FiltersDisabled(t *testing.T) {
 		},
 		"beta": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					t.Error("beta should not be fetched — it's not enabled")
@@ -306,7 +295,6 @@ func TestFetchEnabledProviders_FiltersDisabled(t *testing.T) {
 		},
 		"gamma": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("gamma", "s", 30)), nil
@@ -339,7 +327,6 @@ func TestFetchEnabledProviders_AllEnabledByDefault(t *testing.T) {
 	providerMap := map[string][]Strategy{
 		"alpha": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("alpha", "s", 10)), nil
@@ -348,7 +335,6 @@ func TestFetchEnabledProviders_AllEnabledByDefault(t *testing.T) {
 		},
 		"beta": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("beta", "s", 20)), nil
@@ -372,7 +358,6 @@ func TestFetchEnabledProviders_WithProviderConfigDisabled(t *testing.T) {
 	providerMap := map[string][]Strategy{
 		"alpha": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					return ResultOK(testSnapshot("alpha", "s", 10)), nil
@@ -381,7 +366,6 @@ func TestFetchEnabledProviders_WithProviderConfigDisabled(t *testing.T) {
 		},
 		"beta": {
 			&mockStrategy{
-				name:      "s",
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
 					t.Error("beta should not be fetched — disabled in config")

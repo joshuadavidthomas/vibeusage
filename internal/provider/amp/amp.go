@@ -69,8 +69,6 @@ type CLISecretsStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *CLISecretsStrategy) Name() string { return "provider_cli" }
-
 func (s *CLISecretsStrategy) IsAvailable() bool {
 	if !provider.ExternalCredentialReuseEnabled() {
 		return false
@@ -84,15 +82,13 @@ func (s *CLISecretsStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 	if !ok {
 		return fetch.ResultFail("No Amp CLI credentials found in ~/.local/share/amp/secrets.json"), nil
 	}
-	return fetchBalance(ctx, token, s.Name(), s.HTTPTimeout)
+	return fetchBalance(ctx, token, "provider_cli", s.HTTPTimeout)
 }
 
 // APIKeyStrategy supports manual key entry or AMP_API_KEY.
 type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
-
-func (s *APIKeyStrategy) Name() string { return "api_key" }
 
 func (s *APIKeyStrategy) IsAvailable() bool {
 	return s.loadToken() != ""
@@ -103,7 +99,7 @@ func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	if token == "" {
 		return fetch.ResultFail("No API key found. Set AMP_API_KEY or use 'vibeusage key amp set'"), nil
 	}
-	return fetchBalance(ctx, token, s.Name(), s.HTTPTimeout)
+	return fetchBalance(ctx, token, "api_key", s.HTTPTimeout)
 }
 
 func (s *APIKeyStrategy) loadToken() string {

@@ -43,7 +43,6 @@ type stubStrategy struct {
 	available bool
 }
 
-func (s *stubStrategy) Name() string      { return "stub" }
 func (s *stubStrategy) IsAvailable() bool { return s.available }
 func (s *stubStrategy) Fetch(_ context.Context) (fetch.FetchResult, error) {
 	return fetch.FetchResult{}, nil

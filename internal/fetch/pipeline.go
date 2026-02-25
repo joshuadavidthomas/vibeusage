@@ -9,20 +9,15 @@ import (
 // All configuration (timeout, stale threshold, cache) is provided via cfg
 // rather than read from a global singleton.
 func ExecutePipeline(ctx context.Context, providerID string, strategies []Strategy, useCache bool, cfg PipelineConfig) FetchOutcome {
-	var attempts []FetchAttempt
+	anyAttempted := false
+	lastErr := ""
 
-	// Try each strategy
 	for _, strategy := range strategies {
 		if !strategy.IsAvailable() {
-			attempts = append(attempts, FetchAttempt{
-				Strategy: strategy.Name(),
-				Success:  false,
-				Error:    "not configured",
-			})
 			continue
 		}
 
-		start := time.Now()
+		anyAttempted = true
 
 		resultCh := make(chan fetchAttemptResult, 1)
 		go func() {
@@ -38,37 +33,22 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 			return FetchOutcome{
 				ProviderID: providerID,
 				Success:    false,
-				Attempts:   attempts,
 				Error:      "Context cancelled",
 			}
 		case <-time.After(cfg.Timeout):
-			durationMs := int(time.Since(start).Milliseconds())
-			attempts = append(attempts, FetchAttempt{
-				Strategy:   strategy.Name(),
-				Success:    false,
-				Error:      "Fetch timed out",
-				DurationMs: durationMs,
-			})
+			lastErr = "Fetch timed out"
 			continue
 		case r := <-resultCh:
 			result = r.result
 			fetchErr = r.err
 		}
 
-		durationMs := int(time.Since(start).Milliseconds())
-
 		if fetchErr != nil {
-			attempts = append(attempts, FetchAttempt{
-				Strategy:   strategy.Name(),
-				Success:    false,
-				Error:      fetchErr.Error(),
-				DurationMs: durationMs,
-			})
+			lastErr = fetchErr.Error()
 			continue
 		}
 
 		if result.Success && result.Snapshot != nil {
-			// Cache the result
 			if cfg.Cache != nil {
 				_ = cfg.Cache.Save(*result.Snapshot)
 			}
@@ -77,41 +57,19 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 				ProviderID: providerID,
 				Success:    true,
 				Snapshot:   result.Snapshot,
-				Source:     strategy.Name(),
-				Attempts:   attempts,
+				Source:     StrategyName(strategy),
 			}
 		}
 
 		if !result.ShouldFallback {
-			attempts = append(attempts, FetchAttempt{
-				Strategy:   strategy.Name(),
-				Success:    false,
-				Error:      result.Error,
-				DurationMs: durationMs,
-			})
 			return FetchOutcome{
 				ProviderID: providerID,
 				Success:    false,
-				Attempts:   attempts,
 				Error:      result.Error,
 			}
 		}
 
-		attempts = append(attempts, FetchAttempt{
-			Strategy:   strategy.Name(),
-			Success:    false,
-			Error:      result.Error,
-			DurationMs: durationMs,
-		})
-	}
-
-	// Did any strategy actually attempt a fetch (had credentials)?
-	anyAttempted := false
-	for _, a := range attempts {
-		if a.Error != "not configured" {
-			anyAttempted = true
-			break
-		}
+		lastErr = result.Error
 	}
 
 	// All strategies failed — try cache fallback.
@@ -128,7 +86,6 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 					Success:    true,
 					Snapshot:   cached,
 					Source:     "cache",
-					Attempts:   attempts,
 					Cached:     true,
 				}
 			}
@@ -139,26 +96,19 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 					Success:    true,
 					Snapshot:   cached,
 					Source:     "cache",
-					Attempts:   attempts,
 					Cached:     true,
 				}
 			}
 		}
 	}
 
-	lastErr := "No strategies available"
-	for i := len(attempts) - 1; i >= 0; i-- {
-		if attempts[i].Error == "not configured" {
-			continue
-		}
-		lastErr = attempts[i].Error
-		break
+	if lastErr == "" {
+		lastErr = "No strategies available"
 	}
 
 	return FetchOutcome{
 		ProviderID: providerID,
 		Success:    false,
-		Attempts:   attempts,
 		Error:      lastErr,
 	}
 }

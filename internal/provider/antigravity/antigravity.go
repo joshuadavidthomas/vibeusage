@@ -76,8 +76,6 @@ type OAuthStrategy struct {
 	vscdb       *vscdbResult // cached vscdb data (credentials + subscription)
 }
 
-func (s *OAuthStrategy) Name() string { return "oauth" }
-
 func (s *OAuthStrategy) IsAvailable() bool {
 	for _, p := range s.credentialPaths() {
 		if _, err := os.Stat(p); err == nil {

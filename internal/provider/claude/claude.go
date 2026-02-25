@@ -112,8 +112,6 @@ type OAuthStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *OAuthStrategy) Name() string { return "oauth" }
-
 func (s *OAuthStrategy) IsAvailable() bool {
 	for _, p := range s.credentialPaths() {
 		if _, err := os.Stat(p); err == nil {
@@ -454,8 +452,6 @@ type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *APIKeyStrategy) Name() string { return "apikey" }
-
 func (s *APIKeyStrategy) IsAvailable() bool {
 	return s.loadAPIKey() != ""
 }
@@ -496,8 +492,6 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 type WebStrategy struct {
 	HTTPTimeout float64
 }
-
-func (s *WebStrategy) Name() string { return "web" }
 
 func (s *WebStrategy) IsAvailable() bool {
 	return s.loadSessionKey() != ""

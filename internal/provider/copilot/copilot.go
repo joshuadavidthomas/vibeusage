@@ -64,8 +64,6 @@ type DeviceFlowStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *DeviceFlowStrategy) Name() string { return "device_flow" }
-
 func (s *DeviceFlowStrategy) IsAvailable() bool {
 	path := config.CredentialPath("copilot", "oauth")
 	_, err := os.Stat(path)
