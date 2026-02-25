@@ -167,7 +167,7 @@ var configEditCmd = &cobra.Command{
 
 func init() {
 	configPathCmd.Flags().BoolP("cache", "c", false, "Show cache directory")
-	configPathCmd.Flags().BoolP("credentials", "r", false, "Show credentials directory")
+	configPathCmd.Flags().Bool("credentials", false, "Show credentials directory")
 	configResetCmd.Flags().BoolP("confirm", "y", false, "Skip confirmation")
 
 	configCmd.AddCommand(configShowCmd)
