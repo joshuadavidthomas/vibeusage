@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -115,8 +116,7 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 	}
 
 	// Capture logger output via context injection
-	var logBuf bytes.Buffer
-	ctx := newVerboseContext(&logBuf)
+	ctx, logBuf := logging.NewTestContext(logging.Flags{Verbose: true})
 
 	var buf bytes.Buffer
 	outWriter = &buf
