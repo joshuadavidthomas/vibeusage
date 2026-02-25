@@ -189,5 +189,3 @@ func (s UsageSnapshot) ModelPeriods() []UsagePeriod {
 func (s UsageSnapshot) IsStale(maxAgeMinutes int) bool {
 	return time.Since(s.FetchedAt).Minutes() > float64(maxAgeMinutes)
 }
-
-
