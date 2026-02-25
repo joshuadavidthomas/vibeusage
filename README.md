@@ -38,21 +38,6 @@ cd vibeusage
 go build -o vibeusage ./cmd/vibeusage
 ```
 
-## Updating
-
-```bash
-# Check for updates
-vibeusage update --check
-
-# Update to latest release (interactive)
-vibeusage update
-
-# Update to latest release (non-interactive)
-vibeusage update --yes
-```
-
-You can also re-run the [install scripts](#quick-install-recommended) to upgrade in place.
-
 ## Quick Start
 
 If you already use AI coding tools (Claude Code, Codex CLI, Gemini CLI, Copilot, etc.), `vibeusage` auto-detects their credentials. Just run:
@@ -178,7 +163,7 @@ The prompt walks you through extracting your session cookie from https://cursor.
 
 ### Google Antigravity
 
-[antigravity.google](https://antigravity.google) — Google's AI IDE (formerly Project IDX). Reports per-model usage quotas. Shows your subscription tier.
+[antigravity.google](https://antigravity.google) — Google's AI IDE. Reports per-model usage quotas. Shows your subscription tier.
 
 `vibeusage` reads credentials from the local Antigravity IDE state automatically. Just sign into Antigravity and it should work — no manual setup needed.
 
@@ -311,6 +296,21 @@ Global options:
 | `--quiet` | `-q` | Minimal output |
 | `--refresh` | `-r` | Disable cache fallback (fresh data or error) |
 
+## Updating
+
+```bash
+# Check for updates
+vibeusage update --check
+
+# Update to latest release (interactive)
+vibeusage update
+
+# Update to latest release (non-interactive)
+vibeusage update --yes
+```
+
+You can also re-run the [install scripts](#quick-install-recommended) to upgrade in place.
+
 ## Configuration
 
 ### Config File Location
@@ -414,8 +414,4 @@ See `docs/releasing.md` for the tag-and-publish workflow.
 
 ## License
 
-MIT
-
-## Author
-
-Josh Thomas - [@joshuadavidthomas](https://github.com/joshuadavidthomas)
+`vibeusage` is licensed under the MIT license. See the [`LICENSE`](LICENSE) file for more information.
