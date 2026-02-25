@@ -1,4 +1,4 @@
-package routing
+package display
 
 import (
 	"fmt"
@@ -6,16 +6,14 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/routing"
 )
 
-// RowStyle controls per-row styling in the formatted table output.
-type RowStyle int
+// RenderBarFunc renders a utilization bar for the given percentage.
+type RenderBarFunc func(utilization int) string
 
-const (
-	RowNormal RowStyle = iota
-	RowBold
-	RowDim
-)
+// FormatResetFunc formats a duration until reset for display.
+type FormatResetFunc func(d *time.Duration) string
 
 // FormattedTable holds the pre-formatted rows, headers, and styles
 // for a routing recommendation table.
@@ -25,16 +23,10 @@ type FormattedTable struct {
 	Styles  []RowStyle
 }
 
-// RenderBarFunc renders a utilization bar for the given percentage.
-type RenderBarFunc func(utilization int) string
-
-// FormatResetFunc formats a duration until reset for display.
-type FormatResetFunc func(d *time.Duration) string
-
 // FormatRecommendationRows builds formatted table rows for a single-model
 // recommendation. The renderBar and formatReset callbacks allow the caller to
-// inject presentation-layer rendering without coupling routing to display.
-func FormatRecommendationRows(rec Recommendation, renderBar RenderBarFunc, formatReset FormatResetFunc) FormattedTable {
+// inject presentation-layer rendering.
+func FormatRecommendationRows(rec routing.Recommendation, renderBar RenderBarFunc, formatReset FormatResetFunc) FormattedTable {
 	hasMultiplier := false
 	for _, c := range rec.Candidates {
 		if c.Multiplier != nil {
@@ -65,14 +57,14 @@ func FormatRecommendationRows(rec Recommendation, renderBar RenderBarFunc, forma
 		styles = append(styles, RowDim)
 	}
 
-	headers := buildHeaders(hasMultiplier, false)
+	headers := buildRouteHeaders(hasMultiplier, false)
 
 	return FormattedTable{Headers: headers, Rows: rows, Styles: styles}
 }
 
 // FormatRoleRecommendationRows builds formatted table rows for a role-based
 // recommendation, which includes a "Model" column.
-func FormatRoleRecommendationRows(rec RoleRecommendation, renderBar RenderBarFunc, formatReset FormatResetFunc) FormattedTable {
+func FormatRoleRecommendationRows(rec routing.RoleRecommendation, renderBar RenderBarFunc, formatReset FormatResetFunc) FormattedTable {
 	hasMultiplier := false
 	for _, c := range rec.Candidates {
 		if c.Multiplier != nil {
@@ -102,12 +94,28 @@ func FormatRoleRecommendationRows(rec RoleRecommendation, renderBar RenderBarFun
 		styles = append(styles, RowDim)
 	}
 
-	headers := buildHeaders(hasMultiplier, true)
+	headers := buildRouteHeaders(hasMultiplier, true)
 
 	return FormattedTable{Headers: headers, Rows: rows, Styles: styles}
 }
 
-func formatCandidateRow(c Candidate, hasMultiplier, includeModel bool, modelID string, renderBar RenderBarFunc, formatReset FormatResetFunc) []string {
+// FormatMultiplier formats a cost multiplier for display.
+// nil → "—", 0 → "free", integer → "3x", fractional → "0.33x".
+func FormatMultiplier(m *float64) string {
+	if m == nil {
+		return "—"
+	}
+	v := *m
+	if v == 0 {
+		return "free"
+	}
+	if v == float64(int(v)) {
+		return fmt.Sprintf("%dx", int(v))
+	}
+	return fmt.Sprintf("%.2gx", v)
+}
+
+func formatCandidateRow(c routing.Candidate, hasMultiplier, includeModel bool, modelID string, renderBar RenderBarFunc, formatReset FormatResetFunc) []string {
 	name := provider.DisplayName(c.ProviderID)
 	bar := renderBar(c.Utilization)
 	util := fmt.Sprintf("%d%%", c.Utilization)
@@ -154,7 +162,7 @@ func unavailableRow(providerName, modelID string, hasMultiplier, includeModel bo
 	return row
 }
 
-func buildHeaders(hasMultiplier, includeModel bool) []string {
+func buildRouteHeaders(hasMultiplier, includeModel bool) []string {
 	var headers []string
 	if includeModel {
 		headers = append(headers, "Model")

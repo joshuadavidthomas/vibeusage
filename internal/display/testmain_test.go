@@ -36,7 +36,9 @@ func TestMain(m *testing.M) {
 	// Register providers used by display tests so DisplayName resolves correctly.
 	for _, p := range []displayStubProvider{
 		{id: "claude", name: "Claude"},
+		{id: "codex", name: "Codex"},
 		{id: "copilot", name: "Copilot"},
+		{id: "cursor", name: "Cursor"},
 		{id: "empty", name: "Empty"},
 	} {
 		provider.Register(p)

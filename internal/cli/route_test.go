@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/routing"
 )
@@ -146,10 +147,10 @@ func TestDisplayRoleRecommendation_WithCandidates(t *testing.T) {
 }
 
 func TestRenderRouteTable_RendersHeaders(t *testing.T) {
-	ft := routing.FormattedTable{
+	ft := display.FormattedTable{
 		Headers: []string{"Provider", "Usage", "Headroom"},
 		Rows:    [][]string{{"Claude", "40%", "60%"}},
-		Styles:  []routing.RowStyle{routing.RowBold},
+		Styles:  []display.RowStyle{display.RowBold},
 	}
 
 	var buf bytes.Buffer

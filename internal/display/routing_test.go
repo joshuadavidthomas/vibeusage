@@ -1,4 +1,4 @@
-package routing
+package display
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/routing"
 )
 
 // stubRenderBar is a test double for the bar renderer.
@@ -22,12 +23,14 @@ func stubFormatReset(d *time.Duration) string {
 	return "2h"
 }
 
+func floatPtr(v float64) *float64 { return &v }
+
 func TestFormatRecommendationRows_SingleModel(t *testing.T) {
 	reset := time.Now().Add(2 * time.Hour)
-	rec := Recommendation{
+	rec := routing.Recommendation{
 		ModelID:   "claude-sonnet-4-6",
 		ModelName: "Claude Sonnet 4.6",
-		Best: &Candidate{
+		Best: &routing.Candidate{
 			ProviderID:        "claude",
 			Headroom:          80,
 			Utilization:       20,
@@ -36,7 +39,7 @@ func TestFormatRecommendationRows_SingleModel(t *testing.T) {
 			ResetsAt:          &reset,
 			Plan:              "Pro",
 		},
-		Candidates: []Candidate{
+		Candidates: []routing.Candidate{
 			{
 				ProviderID:        "claude",
 				Headroom:          80,
@@ -104,10 +107,10 @@ func TestFormatRecommendationRows_SingleModel(t *testing.T) {
 
 func TestFormatRecommendationRows_NoMultiplier(t *testing.T) {
 	reset := time.Now().Add(1 * time.Hour)
-	rec := Recommendation{
+	rec := routing.Recommendation{
 		ModelID:   "gpt-5",
 		ModelName: "GPT-5",
-		Best: &Candidate{
+		Best: &routing.Candidate{
 			ProviderID:        "codex",
 			Headroom:          90,
 			Utilization:       10,
@@ -116,7 +119,7 @@ func TestFormatRecommendationRows_NoMultiplier(t *testing.T) {
 			ResetsAt:          &reset,
 			Plan:              "Plus",
 		},
-		Candidates: []Candidate{
+		Candidates: []routing.Candidate{
 			{
 				ProviderID:        "codex",
 				Headroom:          90,
@@ -139,10 +142,10 @@ func TestFormatRecommendationRows_NoMultiplier(t *testing.T) {
 
 func TestFormatRoleRecommendationRows(t *testing.T) {
 	reset := time.Now().Add(2 * time.Hour)
-	rec := RoleRecommendation{
+	rec := routing.RoleRecommendation{
 		Role: "thinking",
-		Best: &RoleCandidate{
-			Candidate: Candidate{
+		Best: &routing.RoleCandidate{
+			Candidate: routing.Candidate{
 				ProviderID:        "claude",
 				Headroom:          80,
 				Utilization:       20,
@@ -154,9 +157,9 @@ func TestFormatRoleRecommendationRows(t *testing.T) {
 			ModelID:   "claude-opus-4-6",
 			ModelName: "Claude Opus 4.6",
 		},
-		Candidates: []RoleCandidate{
+		Candidates: []routing.RoleCandidate{
 			{
-				Candidate: Candidate{
+				Candidate: routing.Candidate{
 					ProviderID:        "claude",
 					Headroom:          80,
 					Utilization:       20,
@@ -169,7 +172,7 @@ func TestFormatRoleRecommendationRows(t *testing.T) {
 				ModelName: "Claude Opus 4.6",
 			},
 		},
-		Unavailable: []RoleUnavailable{
+		Unavailable: []routing.RoleUnavailable{
 			{ModelID: "o4", ProviderID: "codex"},
 		},
 	}
@@ -177,7 +180,7 @@ func TestFormatRoleRecommendationRows(t *testing.T) {
 	result := FormatRoleRecommendationRows(rec, stubRenderBar, stubFormatReset)
 
 	// Should include Model column
-	if !containsString(result.Headers, "Model") {
+	if containsString(result.Headers, "Model") == false {
 		t.Errorf("headers = %v, want Model column", result.Headers)
 	}
 
@@ -193,7 +196,7 @@ func TestFormatRoleRecommendationRows(t *testing.T) {
 }
 
 func TestFormatRecommendationRows_NoBest(t *testing.T) {
-	rec := Recommendation{
+	rec := routing.Recommendation{
 		ModelID:     "gpt-5",
 		ModelName:   "GPT-5",
 		Unavailable: []string{"codex"},
@@ -212,10 +215,10 @@ func TestFormatRecommendationRows_NoBest(t *testing.T) {
 
 func TestFormatRecommendationRows_PlanFallback(t *testing.T) {
 	reset := time.Now().Add(1 * time.Hour)
-	rec := Recommendation{
+	rec := routing.Recommendation{
 		ModelID:   "gpt-5",
 		ModelName: "GPT-5",
-		Best: &Candidate{
+		Best: &routing.Candidate{
 			ProviderID:        "codex",
 			Headroom:          90,
 			Utilization:       10,
@@ -224,7 +227,7 @@ func TestFormatRecommendationRows_PlanFallback(t *testing.T) {
 			ResetsAt:          &reset,
 			Plan:              "",
 		},
-		Candidates: []Candidate{
+		Candidates: []routing.Candidate{
 			{
 				ProviderID:        "codex",
 				Headroom:          90,
@@ -243,6 +246,31 @@ func TestFormatRecommendationRows_PlanFallback(t *testing.T) {
 	lastCol := result.Rows[0][len(result.Rows[0])-1]
 	if lastCol != "—" {
 		t.Errorf("plan column = %q, want %q", lastCol, "—")
+	}
+}
+
+func TestFormatMultiplier(t *testing.T) {
+	tests := []struct {
+		name       string
+		multiplier *float64
+		want       string
+	}{
+		{"nil multiplier", nil, "—"},
+		{"zero (free)", floatPtr(0), "free"},
+		{"integer 1x", floatPtr(1), "1x"},
+		{"integer 3x", floatPtr(3), "3x"},
+		{"integer 10x", floatPtr(10), "10x"},
+		{"fractional 0.33x", floatPtr(0.33), "0.33x"},
+		{"fractional 1.5x", floatPtr(1.5), "1.5x"},
+		{"fractional 0.5x", floatPtr(0.5), "0.5x"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatMultiplier(tt.multiplier)
+			if got != tt.want {
+				t.Errorf("FormatMultiplier(%v) = %q, want %q", tt.multiplier, got, tt.want)
+			}
+		})
 	}
 }
 
