@@ -55,13 +55,10 @@ func (u *UsageDetail) Utilization() int {
 
 // ResetTimeUTC parses the resetTime as a time.Time.
 func (u *UsageDetail) ResetTimeUTC() *time.Time {
-	if u == nil || u.ResetTime == "" {
+	if u == nil {
 		return nil
 	}
-	if t, err := time.Parse(time.RFC3339, u.ResetTime); err == nil {
-		return &t
-	}
-	return nil
+	return models.ParseRFC3339Ptr(u.ResetTime)
 }
 
 // Limit represents a per-window usage limit.

@@ -1,6 +1,44 @@
 package provider
 
-import "github.com/joshuadavidthomas/vibeusage/internal/config"
+import (
+	"encoding/json"
+	"os"
+	"strings"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
+)
+
+// APIKeySource describes where to find an API key for a provider. Declare one
+// per provider and call Load() from both IsAvailable and Fetch.
+type APIKeySource struct {
+	EnvVars  []string // environment variables to check, in order
+	CredPath string   // credential file path
+	JSONKeys []string // JSON keys to try within the credential file
+}
+
+// Load checks environment variables and then the credential file for an API
+// key. Returns the first non-empty value found, or "".
+func (s APIKeySource) Load() string {
+	for _, env := range s.EnvVars {
+		if v := strings.TrimSpace(os.Getenv(env)); v != "" {
+			return v
+		}
+	}
+	data, err := config.ReadCredential(s.CredPath)
+	if err != nil || data == nil {
+		return ""
+	}
+	var raw map[string]string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ""
+	}
+	for _, key := range s.JSONKeys {
+		if v := strings.TrimSpace(raw[key]); v != "" {
+			return v
+		}
+	}
+	return ""
+}
 
 // ExternalCredentialReuseEnabled reports whether provider strategies should
 // consider credentials managed outside vibeusage storage (CLI files, keychains,

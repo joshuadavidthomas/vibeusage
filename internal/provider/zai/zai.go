@@ -2,9 +2,7 @@ package zai
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -68,35 +66,22 @@ type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
+var zaiAPIKey = provider.APIKeySource{
+	EnvVars:  []string{"ZAI_API_KEY"},
+	CredPath: config.CredentialPath("zai", "apikey"),
+	JSONKeys: []string{"api_key"},
+}
+
 func (s *APIKeyStrategy) IsAvailable() bool {
-	return s.loadToken() != ""
+	return zaiAPIKey.Load() != ""
 }
 
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	token := s.loadToken()
+	token := zaiAPIKey.Load()
 	if token == "" {
 		return fetch.ResultFail("No API key found. Set ZAI_API_KEY or use 'vibeusage key zai set'"), nil
 	}
-
 	return fetchQuota(ctx, token, s.HTTPTimeout)
-}
-
-func (s *APIKeyStrategy) loadToken() string {
-	if key := os.Getenv("ZAI_API_KEY"); key != "" {
-		return key
-	}
-	path := config.CredentialPath("zai", "apikey")
-	data, err := config.ReadCredential(path)
-	if err != nil || data == nil {
-		return ""
-	}
-	var creds struct {
-		APIKey string `json:"api_key"`
-	}
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return ""
-	}
-	return creds.APIKey
 }
 
 // fetchQuota makes the API call and parses the response.
@@ -149,7 +134,7 @@ func parseQuotaResponse(resp QuotaResponse) *models.UsageSnapshot {
 	for _, limit := range resp.Data.Limits {
 		period := models.UsagePeriod{
 			Name:        limit.DisplayName(),
-			Utilization: clamp(limit.Percentage, 0, 100),
+			Utilization: models.ClampPct(limit.Percentage),
 			PeriodType:  limit.PeriodType(),
 			ResetsAt:    limit.ResetTime(),
 		}
@@ -175,14 +160,4 @@ func parseQuotaResponse(resp QuotaResponse) *models.UsageSnapshot {
 		Identity:  identity,
 		Source:    "api_key",
 	}
-}
-
-func clamp(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
 }

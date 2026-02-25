@@ -18,7 +18,7 @@ func TestAPIKeyStrategy_IsAvailable_EnvVar(t *testing.T) {
 func TestAPIKeyStrategy_IsAvailable_NoEnvVar(t *testing.T) {
 	t.Setenv("MINIMAX_API_KEY", "")
 	s := &APIKeyStrategy{}
-	if s.loadToken() == "" && s.IsAvailable() {
+	if minimaxAPIKey.Load() == "" && s.IsAvailable() {
 		t.Error("IsAvailable() = true, want false when no token available")
 	}
 }
@@ -26,7 +26,7 @@ func TestAPIKeyStrategy_IsAvailable_NoEnvVar(t *testing.T) {
 func TestAPIKeyStrategy_Fetch_NoToken(t *testing.T) {
 	t.Setenv("MINIMAX_API_KEY", "")
 	s := &APIKeyStrategy{}
-	if s.loadToken() != "" {
+	if minimaxAPIKey.Load() != "" {
 		t.Skip("credential file present — skipping no-token test")
 	}
 

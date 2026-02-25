@@ -2,10 +2,6 @@ package openrouter
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -62,33 +58,22 @@ type APIKeyStrategy struct {
 	HTTPTimeout float64
 }
 
+var openrouterAPIKey = provider.APIKeySource{
+	EnvVars:  []string{"OPENROUTER_API_KEY"},
+	CredPath: config.CredentialPath("openrouter", "apikey"),
+	JSONKeys: []string{"api_key"},
+}
+
 func (s *APIKeyStrategy) IsAvailable() bool {
-	return s.loadToken() != ""
+	return openrouterAPIKey.Load() != ""
 }
 
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	token := s.loadToken()
+	token := openrouterAPIKey.Load()
 	if token == "" {
 		return fetch.ResultFail("No API key found. Set OPENROUTER_API_KEY or use 'vibeusage key openrouter set'"), nil
 	}
 	return fetchCredits(ctx, token, s.HTTPTimeout)
-}
-
-func (s *APIKeyStrategy) loadToken() string {
-	if key := strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY")); key != "" {
-		return key
-	}
-	data, err := config.ReadCredential(config.CredentialPath("openrouter", "apikey"))
-	if err != nil || data == nil {
-		return ""
-	}
-	var creds struct {
-		APIKey string `json:"api_key"`
-	}
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return ""
-	}
-	return strings.TrimSpace(creds.APIKey)
 }
 
 func fetchCredits(ctx context.Context, token string, httpTimeout float64) (fetch.FetchResult, error) {
@@ -99,14 +84,8 @@ func fetchCredits(ctx context.Context, token string, httpTimeout float64) (fetch
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return fetch.ResultFatal("API key is invalid or expired. Run `vibeusage auth openrouter` to re-authenticate."), nil
-	}
-	if resp.StatusCode != 200 {
-		return fetch.ResultFail(fmt.Sprintf("OpenRouter credits request failed: HTTP %d (%s)", resp.StatusCode, summarizeBody(resp.Body))), nil
-	}
-	if resp.JSONErr != nil {
-		return fetch.ResultFail(fmt.Sprintf("Invalid response from OpenRouter API: %v", resp.JSONErr)), nil
+	if r := provider.CheckResponse(resp, "openrouter", "OpenRouter"); r != nil {
+		return *r, nil
 	}
 
 	snapshot, err := parseCreditsSnapshot(parsed)
@@ -166,15 +145,4 @@ func parseCreditsSnapshot(resp CreditsResponse) (*models.UsageSnapshot, error) {
 		Source: "api_key",
 	}
 	return snapshot, nil
-}
-
-func summarizeBody(body []byte) string {
-	s := strings.TrimSpace(string(body))
-	if s == "" {
-		return "empty body"
-	}
-	if len(s) > 120 {
-		return s[:120] + "..."
-	}
-	return s
 }

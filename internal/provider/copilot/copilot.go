@@ -132,12 +132,7 @@ func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
 func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	var resetsAt *time.Time
-	if resp.QuotaResetDateUTC != "" {
-		if t, err := time.Parse(time.RFC3339, resp.QuotaResetDateUTC); err == nil {
-			resetsAt = &t
-		}
-	}
+	resetsAt := models.ParseRFC3339Ptr(resp.QuotaResetDateUTC)
 
 	if resp.QuotaSnapshots != nil {
 		type quotaEntry struct {
