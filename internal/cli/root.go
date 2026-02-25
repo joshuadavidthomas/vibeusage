@@ -126,7 +126,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 	var outcomes map[string]fetch.FetchOutcome
 
 	if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
-		spinnerIDs := availableProviderIDs(providerMap, cfg)
+		spinnerIDs := provider.AvailableIDs(cfg)
 		err := display.SpinnerRun(spinnerIDs, func(onComplete func(display.CompletionInfo)) {
 			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, orchCfg, cfg.IsProviderEnabled, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
@@ -147,26 +147,6 @@ func fetchAndDisplayAll(ctx context.Context) error {
 
 	displayMultipleSnapshots(ctx, outcomes, durationMs)
 	return nil
-}
-
-// availableProviderIDs returns enabled provider IDs that have at least one
-// available strategy. Used to filter what the spinner tracks — providers
-// with no credentials are silently excluded.
-func availableProviderIDs(providerMap map[string][]fetch.Strategy, cfg config.Config) []string {
-	var ids []string
-	for pid, strategies := range providerMap {
-		if !cfg.IsProviderEnabled(pid) {
-			continue
-		}
-		for _, s := range strategies {
-			if s.IsAvailable() {
-				ids = append(ids, pid)
-				break
-			}
-		}
-	}
-	sort.Strings(ids)
-	return ids
 }
 
 func outcomeToCompletion(o fetch.FetchOutcome) display.CompletionInfo {

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"sort"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
@@ -77,6 +78,25 @@ func ConfiguredIDs(providerIDs []string) []string {
 		}
 	}
 	return result
+}
+
+// AvailableIDs returns registered provider IDs that are enabled in the given
+// config and have at least one available fetch strategy. The result is sorted.
+func AvailableIDs(cfg config.Config) []string {
+	var ids []string
+	for id, p := range registry {
+		if !cfg.IsProviderEnabled(id) {
+			continue
+		}
+		for _, s := range p.FetchStrategies() {
+			if s.IsAvailable() {
+				ids = append(ids, id)
+				break
+			}
+		}
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 // FindCredential checks for credentials for the given provider in

@@ -145,6 +145,134 @@ func TestDisplayName_Empty(t *testing.T) {
 	}
 }
 
+func TestAvailableIDs_FiltersEnabledAndAvailable(t *testing.T) {
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+	Register(&stubProvider{
+		id:         "beta",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+	Register(&stubProvider{
+		id:         "gamma",
+		strategies: []fetch.Strategy{&stubStrategy{available: false}},
+	})
+
+	cfg := config.DefaultConfig()
+
+	got := AvailableIDs(cfg)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 available, got %d: %v", len(got), got)
+	}
+	if got[0] != "alpha" || got[1] != "beta" {
+		t.Errorf("got %v, want [alpha beta]", got)
+	}
+}
+
+func TestAvailableIDs_RespectsEnabledProviders(t *testing.T) {
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+	Register(&stubProvider{
+		id:         "beta",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+
+	cfg := config.DefaultConfig()
+	cfg.EnabledProviders = []string{"alpha"}
+
+	got := AvailableIDs(cfg)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 available, got %d: %v", len(got), got)
+	}
+	if got[0] != "alpha" {
+		t.Errorf("got %q, want alpha", got[0])
+	}
+}
+
+func TestAvailableIDs_RespectsProviderDisabled(t *testing.T) {
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+	Register(&stubProvider{
+		id:         "beta",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+
+	cfg := config.DefaultConfig()
+	cfg.Providers["beta"] = config.ProviderConfig{Enabled: false}
+
+	got := AvailableIDs(cfg)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 available, got %d: %v", len(got), got)
+	}
+	if got[0] != "alpha" {
+		t.Errorf("got %q, want alpha", got[0])
+	}
+}
+
+func TestAvailableIDs_EmptyWhenNoneAvailable(t *testing.T) {
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: false}},
+	})
+
+	cfg := config.DefaultConfig()
+
+	got := AvailableIDs(cfg)
+	if len(got) != 0 {
+		t.Fatalf("expected 0, got %d: %v", len(got), got)
+	}
+}
+
+func TestAvailableIDs_IsSorted(t *testing.T) {
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "zeta",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+	Register(&stubProvider{
+		id:         "mu",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+
+	cfg := config.DefaultConfig()
+
+	got := AvailableIDs(cfg)
+	if len(got) != 3 {
+		t.Fatalf("expected 3, got %d: %v", len(got), got)
+	}
+	if got[0] != "alpha" || got[1] != "mu" || got[2] != "zeta" {
+		t.Errorf("got %v, want [alpha mu zeta]", got)
+	}
+}
+
 func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
 	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	_, _ = config.Reload()
