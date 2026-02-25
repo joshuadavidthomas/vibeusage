@@ -35,6 +35,24 @@ archives:
 checksum:
   name_template: checksums.txt
 
+brews:
+  - name: vibeusage
+    ids:
+      - vibeusage
+    repository:
+      owner: joshuadavidthomas
+      name: homebrew-homebrew
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/joshuadavidthomas/vibeusage
+    description: "Track usage quotas across AI coding tool providers"
+    license: MIT
+    install: |
+      bin.install "vibeusage"
+    test: |
+      system "#{bin}/vibeusage", "--version"
+
 changelog:
   sort: asc
   filters:

@@ -6,7 +6,7 @@ As an OSS contributor, I’ve had free GitHub Copilot Pro access for a while, bu
 
 ## Installation
 
-### Quick install (recommended)
+### Quick install
 
 macOS/Linux/Windows Subsystem for Linux (WSL):
 
@@ -21,6 +21,13 @@ iwr https://raw.githubusercontent.com/joshuadavidthomas/vibeusage/main/install.p
 ```
 
 Install scripts place the binary in `~/.local/bin` by default (override with `VIBEUSAGE_INSTALL_DIR`). Ensure that directory is on your `PATH`.
+
+### Homebrew
+
+```bash
+brew tap joshuadavidthomas/homebrew
+brew install vibeusage
+```
 
 ### Go install
 

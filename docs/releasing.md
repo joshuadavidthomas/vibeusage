@@ -19,6 +19,14 @@ Assets include:
 - `vibeusage_windows_<arch>.zip` (windows)
 - `checksums.txt`
 
+GoReleaser also updates the Homebrew tap repository with `Formula/vibeusage.rb`.
+
+## Prerequisites
+
+A `release` GitHub environment with the following secrets:
+
+- `HOMEBREW_TAP_GITHUB_TOKEN` - a classic PAT (or fine-grained token) with write access to `joshuadavidthomas/homebrew-homebrew`, so GoReleaser can update the tap repo
+
 ## How to cut a release
 
 1. Ensure CI is green on `main`.
