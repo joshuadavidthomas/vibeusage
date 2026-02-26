@@ -50,9 +50,7 @@ func (c Claude) Auth() provider.AuthFlow {
 			"  2. Open DevTools (F12 or Cmd+Option+I)\n" +
 			"  3. Go to Application → Cookies → https://claude.ai\n" +
 			"  4. Find the sessionKey cookie\n" +
-			"  5. Copy its value (starts with sk-ant-sid01-)\n" +
-			"\n" +
-			"Or run `claude auth login` and vibeusage will auto-detect it.",
+			"  5. Copy its value (starts with sk-ant-sid01-)",
 		Placeholder: "sk-ant-sid01-...",
 		Validate:    provider.ValidateAnyPrefix("sk-ant-sid01-"),
 		Save:        saveClaudeCredential,
