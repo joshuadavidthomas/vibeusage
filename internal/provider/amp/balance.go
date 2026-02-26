@@ -17,10 +17,10 @@ import (
 var internalRPCURL = "https://ampcode.com/api/internal"
 
 type jsonRPCRequest struct {
-	JSONRPC string   `json:"jsonrpc"`
-	ID      string   `json:"id"`
-	Method  string   `json:"method"`
-	Params  []string `json:"params"`
+	JSONRPC string      `json:"jsonrpc"`
+	ID      string      `json:"id"`
+	Method  string      `json:"method"`
+	Params  interface{} `json:"params"`
 }
 
 type rpcResponse struct {
@@ -43,7 +43,7 @@ func fetchBalance(ctx context.Context, token string, source string, httpTimeout 
 		JSONRPC: "2.0",
 		ID:      "vibeusage",
 		Method:  "userDisplayBalanceInfo",
-		Params:  []string{},
+		Params:  map[string]any{},
 	}
 
 	var rpcResp rpcResponse
