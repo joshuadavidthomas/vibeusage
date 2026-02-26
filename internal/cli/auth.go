@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -20,7 +21,14 @@ var authCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		showStatus, _ := cmd.Flags().GetBool("status")
 
-		if showStatus || len(args) == 0 {
+		if showStatus {
+			return authStatusCommand()
+		}
+
+		if len(args) == 0 {
+			if provider.IsFirstRun() {
+				return authSetup()
+			}
 			return authStatusCommand()
 		}
 
@@ -34,8 +42,81 @@ var authCmd = &cobra.Command{
 	},
 }
 
+var providerDescriptions = map[string]string{
+	"amp":         "Amp coding assistant (ampcode.com)",
+	"antigravity": "Antigravity AI (antigravity.ai)",
+	"claude":      "Anthropic's Claude AI assistant (claude.ai)",
+	"codex":       "OpenAI's Codex/ChatGPT (platform.openai.com)",
+	"copilot":     "GitHub Copilot (github.com)",
+	"cursor":      "Cursor AI code editor (cursor.com)",
+	"gemini":      "Google's Gemini AI (gemini.google.com)",
+	"kimicode":    "Kimi Code coding assistant (kimi.com)",
+	"minimax":     "MiniMax AI (minimax.io)",
+	"openrouter":  "OpenRouter unified model gateway (openrouter.ai)",
+	"warp":        "Warp terminal AI (warp.dev)",
+	"zai":         "Z.ai coding assistant (z.ai)",
+}
+
 func init() {
 	authCmd.Flags().Bool("status", false, "Show authentication status")
+}
+
+// authSetup runs an interactive multi-select to pick and authenticate
+// providers. Used when `vibeusage auth` is run with no configured providers.
+func authSetup() error {
+	if quiet {
+		outln("Use 'vibeusage auth <provider>' to set up providers")
+		return nil
+	}
+
+	allProviders := provider.ListIDs()
+	sort.Strings(allProviders)
+
+	options := make([]prompt.SelectOption, 0, len(allProviders))
+	for _, pid := range allProviders {
+		desc := providerDescriptions[pid]
+		if desc == "" {
+			desc = provider.DisplayName(pid)
+		}
+		options = append(options, prompt.SelectOption{Label: pid + " — " + desc, Value: pid})
+	}
+
+	selected, err := prompt.Default.MultiSelect(prompt.MultiSelectConfig{
+		Title:       "Choose providers to set up",
+		Description: "Space to select, Enter to confirm",
+		Options:     options,
+		Validate: func(selected []string) error {
+			if len(selected) == 0 {
+				return errors.New("select at least one provider (use Space to toggle)")
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	outln()
+	var failed []string
+	for _, pid := range selected {
+		p, ok := provider.Get(pid)
+		if !ok {
+			continue
+		}
+		if err := authProvider(pid, p); err != nil {
+			out("✗ %s: %v\n", pid, err)
+			failed = append(failed, pid)
+		}
+	}
+
+	if len(failed) > 0 {
+		outln()
+		out("Failed: %s\n", strings.Join(failed, ", "))
+		outln("Retry with: vibeusage auth <provider>")
+	}
+	outln()
+	outln("Run 'vibeusage' to see your usage.")
+	return nil
 }
 
 func authStatusCommand() error {

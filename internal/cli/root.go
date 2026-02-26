@@ -348,21 +348,9 @@ func orchestratorConfigFromConfig(cfg config.Config) fetch.OrchestratorConfig {
 func showFirstRunMessage() {
 	outln()
 	outln("Welcome to vibeusage!")
-	outln()
-	outln("No providers are configured yet.")
 	outln("Track your usage across AI providers in one place.")
 	outln()
-	outln("Get started:")
-	outln("  vibeusage auth          Show all providers")
-
-	ids := provider.ListIDs()
-	sort.Strings(ids)
-	count := 3
-	if len(ids) < count {
-		count = len(ids)
-	}
-	for _, id := range ids[:count] {
-		out("  vibeusage auth %-8s Set up %s\n", id, provider.DisplayName(id))
-	}
+	outln("Get started with:")
+	outln("  vibeusage auth")
 	outln()
 }
