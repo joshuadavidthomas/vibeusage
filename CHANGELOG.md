@@ -22,14 +22,20 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Added
 
+- Added `vibeusage usage` command to group provider-specific usage commands.
 - Added `vibeusage auth <provider> --delete` to remove credentials and disable a provider.
 - Added `vibeusage auth <provider> --token <value>` for non-interactive credential setup (useful for scripting and CI).
 
 ### Changed
 
+- **Breaking:** Provider-specific usage commands moved from top-level (`vibeusage claude`, `vibeusage codex`, etc.) to `vibeusage usage <provider>`.
 - **Breaking:** `--json` output now serializes usage snapshots directly from the model types. Removed `remaining`, `cached` fields; added `fetched_at`, `is_enabled`, `source` fields. `resets_at` uses Go's default time format. Identity fields with empty values are now omitted.
 - Reordered Claude fetch strategy flow to prefer OAuth first and keep web session usage as the last-resort fallback.
 - Providers without a dedicated auth flow now prompt for credentials inline instead of telling users to run a separate command.
+
+### Deprecated
+
+- Top-level provider commands (`vibeusage claude`, `vibeusage codex`, etc.) are deprecated and will be removed in v0.4.0. Deprecated stubs currently remain with error messages pointing to `vibeusage usage <provider>`. Use `vibeusage usage <provider>` instead.
 
 ### Removed
 
