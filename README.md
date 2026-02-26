@@ -148,12 +148,6 @@ vibeusage auth amp
 
 If you have Claude Code installed, vibeusage reads its OAuth credentials automatically — from `~/.claude/.credentials.json` on Linux/Windows, or from macOS Keychain on macOS — including token refresh. This is the recommended path.
 
-`vibeusage auth claude` accepts either:
-- an Anthropic API key (`sk-ant-api...` / `sk-ant-admin-...`), or
-- a claude.ai `sessionKey` cookie (`sk-ant-sid01-...`) as web fallback.
-
-Note: Claude plan/quota tracking still comes from Claude OAuth/session credentials; API keys are accepted for setup but may not expose the same claude.ai plan usage data.
-
 As a fallback, you can authenticate with a browser session key:
 
 ```bash
@@ -407,7 +401,6 @@ vibeusage route --role coding
 | Variable | Description |
 |----------|-------------|
 | `AMP_API_KEY` | Amp API key |
-| `ANTHROPIC_API_KEY` | Claude API key |
 | `GEMINI_API_KEY` | Gemini API key |
 | `GITHUB_TOKEN` | GitHub token for Copilot |
 | `KIMI_API_KEY` | Kimi API key fallback |
