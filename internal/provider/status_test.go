@@ -161,3 +161,160 @@ func TestFetchGoogleAppsStatus_ContextCancellation(t *testing.T) {
 		t.Errorf("expected StatusUnknown on cancelled context, got %v", status.Level)
 	}
 }
+
+func TestFetchOnlineOrNotStatus_NoIncidents(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Status</title>
+  </channel>
+</rss>`))
+	}))
+	defer srv.Close()
+
+	status := fetchOnlineOrNotStatusFromURL(context.Background(), srv.URL)
+	if status.Level != models.StatusOperational {
+		t.Errorf("expected StatusOperational for empty feed, got %v", status.Level)
+	}
+	if status.Description != "All systems operational" {
+		t.Errorf("expected 'All systems operational', got %q", status.Description)
+	}
+}
+
+func TestFetchOnlineOrNotStatus_ResolvedIncidents(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Status</title>
+    <item>
+      <title>API Outage</title>
+      <description><![CDATA[<strong>RESOLVED</strong> - This incident has been resolved.]]></description>
+      <pubDate>Thu, 26 Feb 2026 10:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`))
+	}))
+	defer srv.Close()
+
+	status := fetchOnlineOrNotStatusFromURL(context.Background(), srv.URL)
+	if status.Level != models.StatusOperational {
+		t.Errorf("expected StatusOperational for resolved incidents, got %v", status.Level)
+	}
+}
+
+func TestFetchOnlineOrNotStatus_UnresolvedIncident(t *testing.T) {
+	// Use parseOnlineOrNotFeed directly to avoid timing issues with RSS dates
+	feed := rssFeed{
+		Channel: rssChannel{
+			Items: []rssItem{
+				{
+					Title:       "API Degradation",
+					Description: "<strong>Investigating</strong> - We are investigating an issue.",
+					PubDate:     time.Now().UTC().Format(time.RFC1123),
+				},
+			},
+		},
+	}
+
+	status := parseOnlineOrNotFeed(feed)
+	if status.Level != models.StatusDegraded {
+		t.Errorf("expected StatusDegraded for unresolved incident, got %v", status.Level)
+	}
+	if status.Description != "API Degradation" {
+		t.Errorf("expected description 'API Degradation', got %q", status.Description)
+	}
+}
+
+func TestFetchOnlineOrNotStatus_OldIncidentIgnored(t *testing.T) {
+	feed := rssFeed{
+		Channel: rssChannel{
+			Items: []rssItem{
+				{
+					Title:       "Old Outage",
+					Description: "<strong>Investigating</strong> - We are investigating.",
+					PubDate:     time.Now().UTC().Add(-48 * time.Hour).Format(time.RFC1123),
+				},
+			},
+		},
+	}
+
+	status := parseOnlineOrNotFeed(feed)
+	if status.Level != models.StatusOperational {
+		t.Errorf("expected StatusOperational for old incident, got %v", status.Level)
+	}
+}
+
+func TestFetchOnlineOrNotStatus_CaseInsensitiveResolved(t *testing.T) {
+	feed := rssFeed{
+		Channel: rssChannel{
+			Items: []rssItem{
+				{
+					Title:       "Resolved Issue",
+					Description: "<strong>resolved</strong> - This has been resolved.",
+					PubDate:     time.Now().UTC().Format(time.RFC1123),
+				},
+			},
+		},
+	}
+
+	status := parseOnlineOrNotFeed(feed)
+	if status.Level != models.StatusOperational {
+		t.Errorf("expected StatusOperational for resolved (lowercase) incident, got %v", status.Level)
+	}
+}
+
+func TestFetchOnlineOrNotStatus_ServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer srv.Close()
+
+	status := fetchOnlineOrNotStatusFromURL(context.Background(), srv.URL)
+	if status.Level != models.StatusUnknown {
+		t.Errorf("expected StatusUnknown on server error, got %v", status.Level)
+	}
+}
+
+func TestFetchOnlineOrNotStatus_ContextCancellation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(5 * time.Second)
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	status := fetchOnlineOrNotStatusFromURL(ctx, srv.URL)
+	if status.Level != models.StatusUnknown {
+		t.Errorf("expected StatusUnknown on cancelled context, got %v", status.Level)
+	}
+}
+
+func TestParseRSSDate(t *testing.T) {
+	tests := []struct {
+		input   string
+		wantErr bool
+	}{
+		{"Thu, 26 Feb 2026 10:00:00 GMT", false},
+		{"Mon, 01 Jan 2024 00:00:00 UTC", false},
+		{"invalid date", true},
+		{"", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			_, err := parseRSSDate(tt.input)
+			if tt.wantErr && err == nil {
+				t.Errorf("expected error for %q", tt.input)
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error for %q: %v", tt.input, err)
+			}
+		})
+	}
+}

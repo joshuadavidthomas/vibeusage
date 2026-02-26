@@ -19,6 +19,7 @@ func (o OpenRouter) Meta() provider.Metadata {
 		Name:        "OpenRouter",
 		Description: "OpenRouter unified model gateway",
 		Homepage:    "https://openrouter.ai",
+		StatusURL:   "https://status.openrouter.ai",
 	}
 }
 
@@ -31,8 +32,8 @@ func (o OpenRouter) FetchStrategies() []fetch.Strategy {
 	return []fetch.Strategy{&APIKeyStrategy{HTTPTimeout: timeout}}
 }
 
-func (o OpenRouter) FetchStatus(_ context.Context) models.ProviderStatus {
-	return models.ProviderStatus{Level: models.StatusUnknown}
+func (o OpenRouter) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchOnlineOrNotStatus(ctx, "https://status.openrouter.ai")
 }
 
 func (o OpenRouter) Auth() provider.AuthFlow {

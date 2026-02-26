@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/xml"
 	"strings"
 	"time"
 
@@ -9,8 +10,19 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-// FetchStatuspageStatus fetches status from a Statuspage.io endpoint.
-func FetchStatuspageStatus(ctx context.Context, url string) models.ProviderStatus {
+// statuspageAPIPath is the standard Statuspage.io API path for current status.
+const statuspageAPIPath = "/api/v2/status.json"
+
+// FetchStatuspageStatus fetches status from a Statuspage.io base URL.
+// Pass the base status page URL (e.g., "https://status.anthropic.com"),
+// and the function will append the standard API path.
+func FetchStatuspageStatus(ctx context.Context, baseURL string) models.ProviderStatus {
+	url := strings.TrimSuffix(baseURL, "/") + statuspageAPIPath
+	return fetchStatuspageStatusFromURL(ctx, url)
+}
+
+// fetchStatuspageStatusFromURL is the testable core of FetchStatuspageStatus.
+func fetchStatuspageStatusFromURL(ctx context.Context, url string) models.ProviderStatus {
 	client := httpclient.NewWithTimeout(10 * time.Second)
 	var data struct {
 		Status struct {
@@ -111,4 +123,102 @@ func googleSeverityToLevel(severity string) models.StatusLevel {
 	default:
 		return models.StatusDegraded
 	}
+}
+
+// onlineOrNotRSSPath is the standard OnlineOrNot RSS feed path.
+const onlineOrNotRSSPath = "/incidents.rss"
+
+// rssItem represents a single item in an RSS feed.
+type rssItem struct {
+	Title       string `xml:"title"`
+	Description string `xml:"description"`
+	PubDate     string `xml:"pubDate"`
+}
+
+// rssChannel represents the channel element in an RSS feed.
+type rssChannel struct {
+	Items []rssItem `xml:"item"`
+}
+
+// rssFeed represents the root element of an RSS feed.
+type rssFeed struct {
+	Channel rssChannel `xml:"channel"`
+}
+
+// FetchOnlineOrNotStatus fetches status from an OnlineOrNot base URL.
+// Pass the base status page URL (e.g., "https://status.openrouter.ai"),
+// and the function will append the standard RSS feed path.
+func FetchOnlineOrNotStatus(ctx context.Context, baseURL string) models.ProviderStatus {
+	rssURL := strings.TrimSuffix(baseURL, "/") + onlineOrNotRSSPath
+	return fetchOnlineOrNotStatusFromURL(ctx, rssURL)
+}
+
+// fetchOnlineOrNotStatusFromURL is the testable core of FetchOnlineOrNotStatus.
+func fetchOnlineOrNotStatusFromURL(ctx context.Context, rssURL string) models.ProviderStatus {
+	client := httpclient.NewWithTimeout(10 * time.Second)
+
+	resp, err := client.DoCtx(ctx, "GET", rssURL, nil)
+	if err != nil || resp.StatusCode != 200 {
+		return models.ProviderStatus{Level: models.StatusUnknown}
+	}
+
+	var feed rssFeed
+	if err := xml.Unmarshal(resp.Body, &feed); err != nil {
+		return models.ProviderStatus{Level: models.StatusUnknown}
+	}
+
+	return parseOnlineOrNotFeed(feed)
+}
+
+// parseOnlineOrNotFeed parses an OnlineOrNot RSS feed and returns a ProviderStatus.
+// Exported for testing.
+func parseOnlineOrNotFeed(feed rssFeed) models.ProviderStatus {
+	now := time.Now().UTC()
+
+	// If no items, assume operational
+	if len(feed.Channel.Items) == 0 {
+		return models.ProviderStatus{
+			Level:       models.StatusOperational,
+			Description: "All systems operational",
+			UpdatedAt:   &now,
+		}
+	}
+
+	// Check the most recent incidents (within last 24 hours)
+	// If any are unresolved, report degraded status
+	const lookbackWindow = 24 * time.Hour
+	cutoff := now.Add(-lookbackWindow)
+
+	var unresolved []rssItem
+	for _, item := range feed.Channel.Items {
+		pubDate, _ := parseRSSDate(item.PubDate)
+		if pubDate.Before(cutoff) {
+			continue // Skip old incidents
+		}
+
+		// Check if resolved - RSS descriptions contain "RESOLVED" when done
+		descLower := strings.ToLower(item.Description)
+		if !strings.Contains(descLower, "resolved") {
+			unresolved = append(unresolved, item)
+		}
+	}
+
+	if len(unresolved) > 0 {
+		return models.ProviderStatus{
+			Level:       models.StatusDegraded,
+			Description: unresolved[0].Title,
+			UpdatedAt:   &now,
+		}
+	}
+
+	return models.ProviderStatus{
+		Level:       models.StatusOperational,
+		Description: "All systems operational",
+		UpdatedAt:   &now,
+	}
+}
+
+// parseRSSDate parses RSS pubDate format (RFC1123).
+func parseRSSDate(s string) (time.Time, error) {
+	return time.Parse(time.RFC1123, s)
 }

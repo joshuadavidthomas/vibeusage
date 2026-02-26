@@ -20,20 +20,46 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show health status for all providers",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+		providers := provider.All()
 		start := time.Now()
-		statuses := fetchAllStatuses(cmd.Context(), provider.All(), statusMaxConcurrent)
+
+		var statuses map[string]models.ProviderStatus
+
+		if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
+			ids := make([]string, 0, len(providers))
+			for id := range providers {
+				ids = append(ids, id)
+			}
+			sort.Strings(ids)
+
+			err := display.SpinnerRun(ids, func(onComplete func(display.CompletionInfo)) {
+				statuses = fetchAllStatuses(ctx, providers, statusMaxConcurrent, func(pid string) {
+					onComplete(display.CompletionInfo{
+						ProviderID: pid,
+						Success:    true,
+					})
+				})
+			})
+			if err != nil {
+				return err
+			}
+		} else {
+			statuses = fetchAllStatuses(ctx, providers, statusMaxConcurrent, nil)
+		}
+
 		durationMs := time.Since(start).Milliseconds()
 
 		if jsonOutput {
 			return display.OutputStatusJSON(outWriter, statuses)
 		}
 
-		displayStatusTable(cmd.Context(), statuses, durationMs)
+		displayStatusTable(ctx, statuses, durationMs)
 		return nil
 	},
 }
 
-func fetchAllStatuses(ctx context.Context, providers map[string]provider.Provider, maxConcurrent int) map[string]models.ProviderStatus {
+func fetchAllStatuses(ctx context.Context, providers map[string]provider.Provider, maxConcurrent int, onComplete func(string)) map[string]models.ProviderStatus {
 	if maxConcurrent <= 0 {
 		maxConcurrent = 5
 	}
@@ -54,6 +80,10 @@ func fetchAllStatuses(ctx context.Context, providers map[string]provider.Provide
 			mu.Lock()
 			statuses[pid] = status
 			mu.Unlock()
+
+			if onComplete != nil {
+				onComplete(pid)
+			}
 		}(id, p)
 	}
 

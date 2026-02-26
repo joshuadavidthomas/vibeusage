@@ -17,6 +17,7 @@ func (a Amp) Meta() provider.Metadata {
 		Name:        "Amp",
 		Description: "Amp coding assistant",
 		Homepage:    "https://ampcode.com",
+		StatusURL:   "https://ampcodestatus.com",
 	}
 }
 
@@ -35,8 +36,8 @@ func (a Amp) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (a Amp) FetchStatus(_ context.Context) models.ProviderStatus {
-	return models.ProviderStatus{Level: models.StatusUnknown}
+func (a Amp) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchStatuspageStatus(ctx, "https://ampcodestatus.com")
 }
 
 func (a Amp) Auth() provider.AuthFlow {

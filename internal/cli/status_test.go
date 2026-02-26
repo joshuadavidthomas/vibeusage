@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -180,7 +182,7 @@ func TestFetchAllStatuses_ThreadsContext(t *testing.T) {
 		},
 	}
 
-	statuses := fetchAllStatuses(ctx, providers, 5)
+	statuses := fetchAllStatuses(ctx, providers, 5, nil)
 
 	if statuses["slow"].Level != models.StatusUnknown {
 		t.Errorf("expected StatusUnknown from cancelled context, got %v", statuses["slow"].Level)
@@ -218,7 +220,7 @@ func TestFetchAllStatuses_BoundsConcurrency(t *testing.T) {
 		}
 	}
 
-	statuses := fetchAllStatuses(context.Background(), providers, maxConcurrent)
+	statuses := fetchAllStatuses(context.Background(), providers, maxConcurrent, nil)
 
 	if len(statuses) != numProviders {
 		t.Errorf("expected %d results, got %d", numProviders, len(statuses))
@@ -245,7 +247,7 @@ func TestFetchAllStatuses_CollectsAllResults(t *testing.T) {
 		},
 	}
 
-	statuses := fetchAllStatuses(context.Background(), providers, 5)
+	statuses := fetchAllStatuses(context.Background(), providers, 5, nil)
 
 	if len(statuses) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(statuses))
@@ -255,6 +257,66 @@ func TestFetchAllStatuses_CollectsAllResults(t *testing.T) {
 	}
 	if statuses["down"].Level != models.StatusMajorOutage {
 		t.Errorf("expected StatusMajorOutage for 'down', got %v", statuses["down"].Level)
+	}
+}
+
+func TestFetchAllStatuses_CallbackInvoked(t *testing.T) {
+	var called []string
+	var mu sync.Mutex
+
+	providers := map[string]provider.Provider{
+		"a": &statusStubProvider{
+			id: "a",
+			fetchStatus: func(ctx context.Context) models.ProviderStatus {
+				return models.ProviderStatus{Level: models.StatusOperational}
+			},
+		},
+		"b": &statusStubProvider{
+			id: "b",
+			fetchStatus: func(ctx context.Context) models.ProviderStatus {
+				return models.ProviderStatus{Level: models.StatusDegraded}
+			},
+		},
+	}
+
+	callback := func(id string) {
+		mu.Lock()
+		defer mu.Unlock()
+		called = append(called, id)
+	}
+
+	fetchAllStatuses(context.Background(), providers, 5, callback)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(called) != 2 {
+		t.Errorf("expected callback invoked 2 times, got %d", len(called))
+	}
+
+	// Sort to make comparison deterministic
+	sort.Strings(called)
+	if called[0] != "a" || called[1] != "b" {
+		t.Errorf("expected callbacks for 'a' and 'b', got %v", called)
+	}
+}
+
+func TestFetchAllStatuses_CallbackNil(t *testing.T) {
+	// Ensure no panic when callback is nil
+	providers := map[string]provider.Provider{
+		"test": &statusStubProvider{
+			id: "test",
+			fetchStatus: func(ctx context.Context) models.ProviderStatus {
+				return models.ProviderStatus{Level: models.StatusOperational}
+			},
+		},
+	}
+
+	// Should not panic
+	statuses := fetchAllStatuses(context.Background(), providers, 5, nil)
+
+	if len(statuses) != 1 {
+		t.Errorf("expected 1 result, got %d", len(statuses))
 	}
 }
 

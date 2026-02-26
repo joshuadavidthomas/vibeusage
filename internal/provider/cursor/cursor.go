@@ -40,7 +40,7 @@ func (c Cursor) FetchStrategies() []fetch.Strategy {
 }
 
 func (c Cursor) FetchStatus(ctx context.Context) models.ProviderStatus {
-	return provider.FetchStatuspageStatus(ctx, "https://status.cursor.com/api/v2/status.json")
+	return provider.FetchStatuspageStatus(ctx, "https://status.cursor.com")
 }
 
 const (

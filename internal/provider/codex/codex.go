@@ -45,7 +45,7 @@ func (c Codex) FetchStrategies() []fetch.Strategy {
 }
 
 func (c Codex) FetchStatus(ctx context.Context) models.ProviderStatus {
-	return provider.FetchStatuspageStatus(ctx, "https://status.openai.com/api/v2/status.json")
+	return provider.FetchStatuspageStatus(ctx, "https://status.openai.com")
 }
 
 // Auth returns the manual bearer token flow for Codex.

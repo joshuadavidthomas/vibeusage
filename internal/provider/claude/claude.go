@@ -39,7 +39,7 @@ func (c Claude) FetchStrategies() []fetch.Strategy {
 }
 
 func (c Claude) FetchStatus(ctx context.Context) models.ProviderStatus {
-	return provider.FetchStatuspageStatus(ctx, "https://status.anthropic.com/api/v2/status.json")
+	return provider.FetchStatuspageStatus(ctx, "https://status.anthropic.com")
 }
 
 // Auth returns a manual credential flow for Claude.
