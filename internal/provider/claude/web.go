@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
@@ -38,9 +37,10 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	sessionCookie := httpclient.WithCookie("sessionKey", sessionKey)
 
-	// Fetch usage
+	// Fetch usage — the web endpoint now returns the same format as
+	// the OAuth endpoint (five_hour, seven_day, per-model breakdowns).
 	usageURL := webBaseURL + "/" + orgID + "/usage"
-	var usageResp WebUsageResponse
+	var usageResp OAuthUsageResponse
 	resp, err := client.GetJSONCtx(ctx, usageURL, &usageResp, sessionCookie)
 	if err != nil {
 		return fetch.ResultFail("Request failed: " + err.Error()), nil
@@ -56,7 +56,9 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail(fmt.Sprintf("Invalid usage response: %v", resp.JSONErr)), nil
 	}
 
-	// Fetch overage
+	// Fetch overage from separate endpoint as fallback — the web
+	// endpoint may return extra_usage as null even when the OAuth
+	// endpoint populates it.
 	var overage *models.OverageUsage
 	overageURL := webBaseURL + "/" + orgID + "/overage_spend_limit"
 	var overageResp WebOverageResponse
@@ -65,7 +67,7 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		overage = overageResp.ToOverageUsage()
 	}
 
-	snapshot := s.parseWebUsageResponse(usageResp, overage)
+	snapshot := parseUsageResponse(usageResp, "web", overage)
 	return fetch.ResultOK(*snapshot), nil
 }
 
@@ -129,38 +131,4 @@ func (s *WebStrategy) findChatOrgID(orgs []WebOrganization) string {
 		return orgs[0].OrgID()
 	}
 	return ""
-}
-
-func (s *WebStrategy) parseWebUsageResponse(resp WebUsageResponse, overage *models.OverageUsage) *models.UsageSnapshot {
-	var periods []models.UsagePeriod
-
-	if resp.UsageLimit > 0 {
-		utilization := int((resp.UsageAmount / resp.UsageLimit) * 100)
-		resetsAt := models.ParseRFC3339Ptr(resp.PeriodEnd)
-		periods = append(periods, models.UsagePeriod{
-			Name:        "Usage",
-			Utilization: utilization,
-			PeriodType:  models.PeriodDaily,
-			ResetsAt:    resetsAt,
-		})
-	}
-
-	var identity *models.ProviderIdentity
-	if resp.Email != "" || resp.Organization != "" || resp.Plan != "" {
-		identity = &models.ProviderIdentity{
-			Email:        resp.Email,
-			Organization: resp.Organization,
-			Plan:         resp.Plan,
-		}
-	}
-
-	now := time.Now().UTC()
-	return &models.UsageSnapshot{
-		Provider:  "claude",
-		FetchedAt: now,
-		Periods:   periods,
-		Overage:   overage,
-		Identity:  identity,
-		Source:    "web",
-	}
 }

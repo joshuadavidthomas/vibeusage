@@ -2,23 +2,18 @@ package claude
 
 import (
 	"testing"
-	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-func TestParseWebUsageResponse_FullResponse(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount:  42.5,
-		UsageLimit:   100.0,
-		PeriodEnd:    "2025-02-19T22:00:00Z",
-		Email:        "user@example.com",
-		Organization: "My Org",
-		Plan:         "pro",
+func TestParseUsageResponse_WebSource(t *testing.T) {
+	resp := OAuthUsageResponse{
+		FiveHour:       &UsagePeriodResponse{Utilization: 25.0, ResetsAt: "2025-02-19T22:00:00Z"},
+		SevenDay:       &UsagePeriodResponse{Utilization: 10.0, ResetsAt: "2025-02-26T00:00:00Z"},
+		SevenDaySonnet: &UsagePeriodResponse{Utilization: 15.0, ResetsAt: "2025-02-26T00:00:00Z"},
 	}
 
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, nil)
+	snapshot := parseUsageResponse(resp, "web", nil)
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
@@ -30,54 +25,34 @@ func TestParseWebUsageResponse_FullResponse(t *testing.T) {
 		t.Errorf("source = %q, want %q", snapshot.Source, "web")
 	}
 
-	// Should have 1 period
-	if len(snapshot.Periods) != 1 {
-		t.Fatalf("len(periods) = %d, want 1", len(snapshot.Periods))
+	// Should have 3 periods: Session (5h), All Models, Sonnet
+	if len(snapshot.Periods) != 3 {
+		t.Fatalf("len(periods) = %d, want 3", len(snapshot.Periods))
 	}
 
 	p := snapshot.Periods[0]
-	if p.Name != "Usage" {
-		t.Errorf("period name = %q, want %q", p.Name, "Usage")
+	if p.Name != "Session (5h)" {
+		t.Errorf("period[0] name = %q, want %q", p.Name, "Session (5h)")
 	}
-	// 42.5/100.0 = 42.5% -> int(42)
-	if p.Utilization != 42 {
-		t.Errorf("utilization = %d, want 42", p.Utilization)
+	if p.Utilization != 25 {
+		t.Errorf("period[0] utilization = %d, want 25", p.Utilization)
 	}
-	if p.PeriodType != models.PeriodDaily {
-		t.Errorf("period_type = %q, want %q", p.PeriodType, models.PeriodDaily)
-	}
-	if p.ResetsAt == nil {
-		t.Fatal("expected resets_at to be set")
-	}
-	expected := time.Date(2025, 2, 19, 22, 0, 0, 0, time.UTC)
-	if !p.ResetsAt.Equal(expected) {
-		t.Errorf("resets_at = %v, want %v", p.ResetsAt, expected)
+	if p.PeriodType != models.PeriodSession {
+		t.Errorf("period[0] type = %q, want %q", p.PeriodType, models.PeriodSession)
 	}
 
-	// Identity
-	if snapshot.Identity == nil {
-		t.Fatal("expected identity to be set")
+	p = snapshot.Periods[2]
+	if p.Name != "Sonnet" {
+		t.Errorf("period[2] name = %q, want %q", p.Name, "Sonnet")
 	}
-	if snapshot.Identity.Email != "user@example.com" {
-		t.Errorf("email = %q, want %q", snapshot.Identity.Email, "user@example.com")
-	}
-	if snapshot.Identity.Organization != "My Org" {
-		t.Errorf("organization = %q, want %q", snapshot.Identity.Organization, "My Org")
-	}
-	if snapshot.Identity.Plan != "pro" {
-		t.Errorf("plan = %q, want %q", snapshot.Identity.Plan, "pro")
-	}
-
-	// No overage
-	if snapshot.Overage != nil {
-		t.Error("expected overage to be nil")
+	if p.Model != "sonnet" {
+		t.Errorf("period[2] model = %q, want %q", p.Model, "sonnet")
 	}
 }
 
-func TestParseWebUsageResponse_WithOverage(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount: 50.0,
-		UsageLimit:  100.0,
+func TestParseUsageResponse_WebWithOverageOverride(t *testing.T) {
+	resp := OAuthUsageResponse{
+		FiveHour: &UsagePeriodResponse{Utilization: 50.0},
 	}
 	overage := &models.OverageUsage{
 		Used:      25.50,
@@ -86,8 +61,7 @@ func TestParseWebUsageResponse_WithOverage(t *testing.T) {
 		IsEnabled: true,
 	}
 
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, overage)
+	snapshot := parseUsageResponse(resp, "web", overage)
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
@@ -100,124 +74,52 @@ func TestParseWebUsageResponse_WithOverage(t *testing.T) {
 	}
 }
 
-func TestParseWebUsageResponse_ZeroLimit(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount: 0,
-		UsageLimit:  0,
+func TestParseUsageResponse_InlineExtraUsageTakesPrecedence(t *testing.T) {
+	resp := OAuthUsageResponse{
+		FiveHour: &UsagePeriodResponse{Utilization: 50.0},
+		ExtraUsage: &ExtraUsageResponse{
+			IsEnabled:    true,
+			UsedCredits:  1000,
+			MonthlyLimit: 5000,
+		},
+	}
+	overrideOverage := &models.OverageUsage{
+		Used:      99.99,
+		Limit:     200.00,
+		Currency:  "USD",
+		IsEnabled: true,
 	}
 
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, nil)
+	snapshot := parseUsageResponse(resp, "web", overrideOverage)
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
 	}
-	// With zero limit, no period should be created
+	if snapshot.Overage == nil {
+		t.Fatal("expected overage to be present")
+	}
+	// Inline extra_usage should win over the override
+	if snapshot.Overage.Used != 10.0 { // 1000 / 100.0
+		t.Errorf("overage used = %v, want 10.0 (from inline extra_usage)", snapshot.Overage.Used)
+	}
+}
+
+func TestParseUsageResponse_EmptyResponse(t *testing.T) {
+	resp := OAuthUsageResponse{}
+
+	snapshot := parseUsageResponse(resp, "web", nil)
+
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
 	if len(snapshot.Periods) != 0 {
 		t.Errorf("len(periods) = %d, want 0", len(snapshot.Periods))
 	}
-}
-
-func TestParseWebUsageResponse_NoIdentity(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount: 10.0,
-		UsageLimit:  50.0,
-	}
-
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, nil)
-
-	if snapshot == nil {
-		t.Fatal("expected non-nil snapshot")
-	}
 	if snapshot.Identity != nil {
-		t.Error("expected identity to be nil when no email/org/plan")
+		t.Error("expected identity to be nil")
 	}
-}
-
-func TestParseWebUsageResponse_InvalidPeriodEnd(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount: 50.0,
-		UsageLimit:  100.0,
-		PeriodEnd:   "not-a-date",
-	}
-
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, nil)
-
-	if snapshot == nil {
-		t.Fatal("expected non-nil snapshot")
-	}
-	if len(snapshot.Periods) != 1 {
-		t.Fatalf("len(periods) = %d, want 1", len(snapshot.Periods))
-	}
-	// Period should exist but resets_at should be nil
-	if snapshot.Periods[0].ResetsAt != nil {
-		t.Error("expected resets_at to be nil for invalid date")
-	}
-}
-
-func TestParseWebUsageResponse_EmptyPeriodEnd(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount: 50.0,
-		UsageLimit:  100.0,
-	}
-
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, nil)
-
-	if snapshot == nil {
-		t.Fatal("expected non-nil snapshot")
-	}
-	if len(snapshot.Periods) != 1 {
-		t.Fatalf("len(periods) = %d, want 1", len(snapshot.Periods))
-	}
-	if snapshot.Periods[0].ResetsAt != nil {
-		t.Error("expected resets_at to be nil when period_end is empty")
-	}
-}
-
-func TestParseWebUsageResponse_HighUtilization(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount: 95.0,
-		UsageLimit:  100.0,
-	}
-
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, nil)
-
-	if snapshot == nil {
-		t.Fatal("expected non-nil snapshot")
-	}
-	if len(snapshot.Periods) != 1 {
-		t.Fatalf("len(periods) = %d, want 1", len(snapshot.Periods))
-	}
-	if snapshot.Periods[0].Utilization != 95 {
-		t.Errorf("utilization = %d, want 95", snapshot.Periods[0].Utilization)
-	}
-}
-
-func TestParseWebUsageResponse_PartialIdentity(t *testing.T) {
-	resp := WebUsageResponse{
-		UsageAmount: 50.0,
-		UsageLimit:  100.0,
-		Email:       "user@example.com",
-	}
-
-	s := WebStrategy{}
-	snapshot := s.parseWebUsageResponse(resp, nil)
-
-	if snapshot == nil {
-		t.Fatal("expected non-nil snapshot")
-	}
-	if snapshot.Identity == nil {
-		t.Fatal("expected identity when email is present")
-	}
-	if snapshot.Identity.Email != "user@example.com" {
-		t.Errorf("email = %q, want %q", snapshot.Identity.Email, "user@example.com")
-	}
-	if snapshot.Identity.Organization != "" {
-		t.Errorf("organization = %q, want empty", snapshot.Identity.Organization)
+	if snapshot.Overage != nil {
+		t.Error("expected overage to be nil")
 	}
 }
 

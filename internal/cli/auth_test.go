@@ -39,9 +39,10 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 			if err := cfg.Validate(sessionKey); err != nil {
 				t.Errorf("validation should accept valid session key: %v", err)
 			}
+			// API keys are no longer accepted for Claude auth
 			apiKey := "sk-ant-" + "api03-" + "abc123"
-			if err := cfg.Validate(apiKey); err != nil {
-				t.Errorf("validation should accept valid api key: %v", err)
+			if err := cfg.Validate(apiKey); err == nil {
+				t.Error("validation should reject api keys")
 			}
 			return "sk-ant-" + "sid01-" + "test123", nil
 		},

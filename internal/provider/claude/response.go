@@ -19,7 +19,9 @@ type ExtraUsageResponse struct {
 	MonthlyLimit float64 `json:"monthly_limit"`
 }
 
-// OAuthUsageResponse represents the full response from /api/oauth/usage.
+// OAuthUsageResponse represents the usage response returned by both the OAuth
+// endpoint (/api/oauth/usage) and the web session endpoint
+// (/api/organizations/{orgID}/usage).
 type OAuthUsageResponse struct {
 	FiveHour       *UsagePeriodResponse `json:"five_hour,omitempty"`
 	SevenDay       *UsagePeriodResponse `json:"seven_day,omitempty"`
@@ -82,16 +84,6 @@ func (c OAuthCredentials) NeedsRefresh() bool {
 // ClaudeCLICredentials represents the Claude CLI credentials file format.
 type ClaudeCLICredentials struct {
 	ClaudeAiOauth *ClaudeCLIOAuth `json:"claudeAiOauth,omitempty"`
-}
-
-// WebUsageResponse represents the response from /api/organizations/{orgID}/usage.
-type WebUsageResponse struct {
-	UsageAmount  float64 `json:"usage_amount"`
-	UsageLimit   float64 `json:"usage_limit"`
-	PeriodEnd    string  `json:"period_end,omitempty"`
-	Email        string  `json:"email,omitempty"`
-	Organization string  `json:"organization,omitempty"`
-	Plan         string  `json:"plan,omitempty"`
 }
 
 // WebOverageResponse represents the response from /api/organizations/{orgID}/overage_spend_limit.
