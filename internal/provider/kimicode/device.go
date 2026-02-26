@@ -174,18 +174,18 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	// Try to open browser
 	deviceflow.OpenBrowser(verificationURI)
 
-	ctx, cancel := deviceflow.InterruptContext()
+	ctx, cancel := deviceflow.PollContext()
 	defer cancel()
 
 	// Poll for token
-	for attempt := 0; attempt < 120; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return false, nil
-			case <-time.After(time.Duration(interval) * time.Second):
+	first := true
+	for {
+		if !first {
+			if !deviceflow.PollWait(ctx, interval) {
+				break
 			}
 		}
+		first = false
 
 		var tokenResp TokenResponse
 		pollResp, err := client.PostFormCtx(context.Background(), oauthBaseURL()+tokenPath,
@@ -198,10 +198,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			opts...,
 		)
 		if err != nil {
-			if attempt < 3 {
-				continue
-			}
-			return false, fmt.Errorf("network error: %w", err)
+			continue
 		}
 		if pollResp.JSONErr != nil {
 			continue

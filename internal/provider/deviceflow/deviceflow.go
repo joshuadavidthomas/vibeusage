@@ -10,9 +10,13 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+// PollTimeout is the maximum time to wait for browser authorization.
+const PollTimeout = 2 * time.Minute
 
 var (
 	green  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
@@ -69,9 +73,21 @@ func WriteOpening(w io.Writer, url string) {
 	OpenBrowser(url)
 }
 
-// InterruptContext returns a context that is cancelled on SIGINT/SIGTERM.
-// Call the returned cancel function to clean up signal handling.
-func InterruptContext() (context.Context, context.CancelFunc) {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	return ctx, cancel
+// PollContext returns a context that is cancelled on SIGINT or after
+// PollTimeout, whichever comes first. Call cancel to clean up.
+func PollContext() (context.Context, context.CancelFunc) {
+	sigCtx, sigCancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := context.WithTimeout(sigCtx, PollTimeout)
+	return ctx, func() { cancel(); sigCancel() }
+}
+
+// PollWait sleeps for the given interval or until the context is cancelled.
+// Returns false if the context was cancelled (caller should stop polling).
+func PollWait(ctx context.Context, interval int) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(time.Duration(interval) * time.Second):
+		return true
+	}
 }

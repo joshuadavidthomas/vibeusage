@@ -226,18 +226,18 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		_, _ = fmt.Fprintf(w, "Code: %s\n", displayCode)
 	}
 
-	ctx, cancel := deviceflow.InterruptContext()
+	ctx, cancel := deviceflow.PollContext()
 	defer cancel()
 
 	// Poll for token
-	for attempt := 0; attempt < 60; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return false, nil
-			case <-time.After(time.Duration(interval) * time.Second):
+	first := true
+	for {
+		if !first {
+			if !deviceflow.PollWait(ctx, interval) {
+				break
 			}
 		}
+		first = false
 
 		var tokenResp TokenResponse
 		pollResp, err := client.PostForm(tokenURL,
@@ -250,10 +250,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			httpclient.WithHeader("Accept", "application/json"),
 		)
 		if err != nil {
-			if attempt < 3 {
-				continue
-			}
-			return false, fmt.Errorf("network error: %w", err)
+			continue
 		}
 		if pollResp.JSONErr != nil {
 			continue
