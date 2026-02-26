@@ -81,7 +81,7 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	token := minimaxAPIKey.Load()
 	if token == "" {
-		return fetch.ResultFail("No API key found. Set MINIMAX_API_KEY or use 'vibeusage key minimax set'"), nil
+		return fetch.ResultFail("No API key found. Set MINIMAX_API_KEY or use 'vibeusage auth minimax'"), nil
 	}
 	return fetchQuota(ctx, token, s.HTTPTimeout)
 }

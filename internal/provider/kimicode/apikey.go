@@ -21,7 +21,7 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	apiKey := s.loadAPIKey()
 	if apiKey == "" {
-		return fetch.ResultFail("No API key found. Set KIMI_CODE_API_KEY or use 'vibeusage key kimicode set'"), nil
+		return fetch.ResultFail("No API key found. Set KIMI_CODE_API_KEY or use 'vibeusage auth kimicode'"), nil
 	}
 
 	return fetchUsage(ctx, apiKey, "api_key", s.HTTPTimeout)

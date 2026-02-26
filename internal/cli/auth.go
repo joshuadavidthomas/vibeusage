@@ -39,6 +39,16 @@ var authCmd = &cobra.Command{
 			return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
 		}
 
+		deleteFlag, _ := cmd.Flags().GetBool("delete")
+		if deleteFlag {
+			return authDeleteProvider(providerID)
+		}
+
+		token, _ := cmd.Flags().GetString("token")
+		if token != "" {
+			return authSetToken(providerID, p, token)
+		}
+
 		return authProvider(providerID, p)
 	},
 }
@@ -60,6 +70,8 @@ var providerDescriptions = map[string]string{
 
 func init() {
 	authCmd.Flags().Bool("status", false, "Show authentication status")
+	authCmd.Flags().Bool("delete", false, "Delete credentials for a provider")
+	authCmd.Flags().String("token", "", "Set a credential non-interactively")
 }
 
 // authSetup runs an interactive multi-select to pick and authenticate
@@ -421,13 +433,117 @@ func authGeneric(providerID string) error {
 			out("✓ %s is already authenticated (%s)\n",
 				provider.DisplayName(providerID), sourceToLabel(source))
 		}
+		enableProvider(providerID)
 		return nil
 	}
 
+	if quiet {
+		return fmt.Errorf("no auth flow for %s; set credentials with --token or an environment variable", providerID)
+	}
+
+	out("%s Authentication\n\n", provider.DisplayName(providerID))
+
+	value, err := prompt.Default.Input(prompt.InputConfig{
+		Title:       fmt.Sprintf("%s credential", provider.DisplayName(providerID)),
+		Placeholder: "paste credential here",
+		Validate:    provider.ValidateNotEmpty,
+	})
+	if err != nil {
+		return err
+	}
+
+	credData, _ := json.Marshal(map[string]string{"api_key": value})
+	path := config.CredentialPath(providerID, "apikey")
+	if err := config.WriteCredential(path, credData); err != nil {
+		return fmt.Errorf("error saving credential: %w", err)
+	}
+
 	if !quiet {
-		out("%s Authentication\n\n", provider.DisplayName(providerID))
-		outln("Set credentials manually:")
-		out("  vibeusage key %s set\n", providerID)
+		out("✓ %s credential saved\n", provider.DisplayName(providerID))
+	}
+	enableProvider(providerID)
+	return nil
+}
+
+// authDeleteProvider removes credentials and disables a provider.
+func authDeleteProvider(providerID string) error {
+	if !quiet {
+		ok, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title: fmt.Sprintf("Delete %s credentials?", provider.DisplayName(providerID)),
+		})
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+	}
+
+	removeProviderCredentials(providerID)
+
+	// Remove from enabled list.
+	enabled := config.ReadEnabledProviders()
+	var kept []string
+	for _, id := range enabled {
+		if id != providerID {
+			kept = append(kept, id)
+		}
+	}
+	_ = config.WriteEnabledProviders(kept)
+
+	config.ClearProviderCache(providerID)
+
+	if !quiet {
+		out("✓ Deleted credentials for %s\n", provider.DisplayName(providerID))
+	}
+	return nil
+}
+
+// authSetToken sets a credential non-interactively via --token and enables
+// the provider. Uses the provider's ManualKeyAuthFlow if available for
+// proper validation and storage, otherwise falls back to generic storage.
+func authSetToken(providerID string, p provider.Provider, token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("credential cannot be empty")
+	}
+
+	auth, ok := p.(provider.Authenticator)
+	if ok {
+		flow := auth.Auth()
+		if f, isManual := flow.(provider.ManualKeyAuthFlow); isManual {
+			if f.Validate != nil {
+				if err := f.Validate(token); err != nil {
+					return err
+				}
+			}
+			if f.Save != nil {
+				if err := f.Save(token); err != nil {
+					return fmt.Errorf("error saving credential: %w", err)
+				}
+			} else if f.JSONKey != "" {
+				credData, _ := json.Marshal(map[string]string{f.JSONKey: token})
+				if err := config.WriteCredential(f.CredPath, credData); err != nil {
+					return fmt.Errorf("error saving credential: %w", err)
+				}
+			}
+			enableProvider(providerID)
+			if !quiet {
+				out("✓ %s credential saved\n", provider.DisplayName(providerID))
+			}
+			return nil
+		}
+	}
+
+	// Fallback for providers without a ManualKeyAuthFlow.
+	credData, _ := json.Marshal(map[string]string{"api_key": token})
+	path := config.CredentialPath(providerID, "apikey")
+	if err := config.WriteCredential(path, credData); err != nil {
+		return fmt.Errorf("error saving credential: %w", err)
+	}
+	enableProvider(providerID)
+	if !quiet {
+		out("✓ %s credential saved\n", provider.DisplayName(providerID))
 	}
 	return nil
 }

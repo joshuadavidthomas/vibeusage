@@ -243,6 +243,171 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	}
 }
 
+// --delete flag tests
+
+func TestAuthDelete_RemovesCredentialsAndDisables(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	// Create credentials
+	credDir := filepath.Join(tmpDir, "credentials", "claude")
+	_ = os.MkdirAll(credDir, 0o755)
+	_ = os.WriteFile(filepath.Join(credDir, "session.json"), []byte(`{"session_key":"test"}`), 0o600)
+
+	// Enable the provider
+	_ = config.WriteEnabledProviders([]string{"claude", "copilot"})
+
+	mock := &prompt.Mock{
+		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
+			if !strings.Contains(cfg.Title, "Claude") {
+				t.Errorf("expected Claude in confirm title, got %q", cfg.Title)
+			}
+			return true, nil
+		},
+	}
+
+	old := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(old)
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	err := authDeleteProvider("claude")
+	if err != nil {
+		t.Fatalf("authDeleteProvider error: %v", err)
+	}
+
+	// Credential should be gone
+	if _, err := os.Stat(filepath.Join(credDir, "session.json")); !os.IsNotExist(err) {
+		t.Error("credential file should have been deleted")
+	}
+
+	// Should be removed from enabled list
+	enabled := config.ReadEnabledProviders()
+	for _, id := range enabled {
+		if id == "claude" {
+			t.Error("claude should have been removed from enabled providers")
+		}
+	}
+	if len(enabled) != 1 || enabled[0] != "copilot" {
+		t.Errorf("expected [copilot], got %v", enabled)
+	}
+
+	if len(mock.ConfirmCalls) != 1 {
+		t.Fatalf("expected 1 Confirm call, got %d", len(mock.ConfirmCalls))
+	}
+}
+
+func TestAuthDelete_UserDeclinesConfirm(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	credDir := filepath.Join(tmpDir, "credentials", "claude")
+	_ = os.MkdirAll(credDir, 0o755)
+	credPath := filepath.Join(credDir, "session.json")
+	_ = os.WriteFile(credPath, []byte(`{"session_key":"test"}`), 0o600)
+
+	mock := &prompt.Mock{
+		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
+			return false, nil
+		},
+	}
+
+	old := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(old)
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	err := authDeleteProvider("claude")
+	if err != nil {
+		t.Fatalf("authDeleteProvider error: %v", err)
+	}
+
+	// Credential should still exist
+	if _, err := os.Stat(credPath); os.IsNotExist(err) {
+		t.Error("credential file should not have been deleted")
+	}
+}
+
+// --token flag tests
+
+func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	t.Setenv("CURSOR_API_KEY", "")
+	config.Override(t, config.DefaultConfig())
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	p, _ := provider.Get("cursor")
+	err := authSetToken("cursor", p, "my-session-token")
+	if err != nil {
+		t.Fatalf("authSetToken error: %v", err)
+	}
+
+	// Credential should be saved
+	credPath := filepath.Join(tmpDir, "credentials", "cursor", "session.json")
+	if _, err := os.Stat(credPath); os.IsNotExist(err) {
+		t.Error("expected credential file to be created")
+	}
+
+	// Should be enabled
+	enabled := config.ReadEnabledProviders()
+	found := false
+	for _, id := range enabled {
+		if id == "cursor" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("cursor should be in enabled providers")
+	}
+}
+
+func TestAuthSetToken_ValidatesInput(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	config.Override(t, config.DefaultConfig())
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	p, _ := provider.Get("claude")
+
+	// Claude requires sk-ant-sid01- prefix
+	err := authSetToken("claude", p, "bad-key")
+	if err == nil {
+		t.Error("expected validation error for bad key")
+	}
+}
+
+func TestAuthSetToken_RejectsEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	p, _ := provider.Get("cursor")
+	err := authSetToken("cursor", p, "  ")
+	if err == nil {
+		t.Error("expected error for empty/whitespace token")
+	}
+}
+
 // JSON output tests
 
 func TestAuthStatusJSON_UsesTypedStruct(t *testing.T) {

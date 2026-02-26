@@ -141,7 +141,8 @@ vibeusage --refresh       # Bypass cache fallback
 vibeusage auth            # Enable/manage providers interactively
 vibeusage auth <provider> # Auth a specific provider
 vibeusage auth --status   # Credential/auth status
-vibeusage key             # Credential sources and state
+vibeusage auth <provider> --delete  # Remove credentials
+vibeusage auth <provider> --token <value>  # Set credential non-interactively
 vibeusage route <model>   # Best provider for a model
 ```
 
@@ -189,7 +190,7 @@ Cursor requires a browser session token:
 vibeusage auth cursor
 ```
 
-The prompt walks you through extracting your session cookie from https://cursor.com (DevTools → Application → Cookies). You can also set it directly with `vibeusage key cursor set`.
+The prompt walks you through extracting your session cookie from https://cursor.com (DevTools → Application → Cookies). You can also set it directly with `vibeusage auth cursor --token <value>`.
 
 ### Google Antigravity
 
@@ -303,7 +304,6 @@ vibeusage auth zai
 # Inspect provider/credential state
 vibeusage status
 vibeusage auth --status
-vibeusage key
 
 # Config and cache
 vibeusage config show

@@ -54,7 +54,7 @@ func (m ManualKeyAuthFlow) Authenticate(w io.Writer, quiet bool) (bool, error) {
 
 // Authenticator is an optional interface that providers can implement
 // to declare their auth flow. Providers that don't implement this
-// get the generic fallback (pointing to `vibeusage key <provider> set`).
+// get a generic credential prompt fallback.
 type Authenticator interface {
 	Auth() AuthFlow
 }

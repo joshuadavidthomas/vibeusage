@@ -79,7 +79,7 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	token := zaiAPIKey.Load()
 	if token == "" {
-		return fetch.ResultFail("No API key found. Set ZAI_API_KEY or use 'vibeusage key zai set'"), nil
+		return fetch.ResultFail("No API key found. Set ZAI_API_KEY or use 'vibeusage auth zai'"), nil
 	}
 	return fetchQuota(ctx, token, s.HTTPTimeout)
 }

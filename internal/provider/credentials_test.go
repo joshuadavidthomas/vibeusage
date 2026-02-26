@@ -162,28 +162,6 @@ func TestCheckCredentials(t *testing.T) {
 	}
 }
 
-func TestGetAllCredentialStatus(t *testing.T) {
-	withIsolatedRegistry(t)
-	withTempCredentialDir(t)
-
-	Register(&stubProvider{id: "alpha"})
-	Register(&stubProvider{id: "beta"})
-
-	_ = config.WriteCredential(config.CredentialPath("alpha", "oauth"), []byte(`{}`))
-
-	status := GetAllCredentialStatus()
-
-	if len(status) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(status))
-	}
-	if !status["alpha"].HasCredentials {
-		t.Error("alpha should have credentials")
-	}
-	if status["beta"].HasCredentials {
-		t.Error("beta should not have credentials")
-	}
-}
-
 func TestIsFirstRun_NoCreds(t *testing.T) {
 	withIsolatedRegistry(t)
 	withTempCredentialDir(t)

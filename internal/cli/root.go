@@ -76,7 +76,7 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(cacheCmd)
-	rootCmd.AddCommand(keyCmd)
+
 	rootCmd.AddCommand(routeCmd)
 	rootCmd.AddCommand(updateCmd)
 
