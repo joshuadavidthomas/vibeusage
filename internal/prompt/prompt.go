@@ -17,6 +17,7 @@ type ConfirmConfig struct {
 	Description string
 	Affirmative string
 	Negative    string
+	Default     bool
 }
 
 // SelectOption represents a single option in a multi-select.
@@ -72,7 +73,7 @@ func (h *Huh) Input(cfg InputConfig) (string, error) {
 }
 
 func (h *Huh) Confirm(cfg ConfirmConfig) (bool, error) {
-	var value bool
+	value := cfg.Default
 	confirm := huh.NewConfirm().
 		Title(cfg.Title).
 		Value(&value)

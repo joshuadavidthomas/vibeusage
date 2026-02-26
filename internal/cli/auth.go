@@ -254,6 +254,7 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 			Title:       "Use detected credentials?",
 			Affirmative: "Yes",
 			Negative:    "No, enter manually",
+			Default:     true,
 		})
 		if err != nil {
 			return err
@@ -284,6 +285,7 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 			Title:       "Use detected credentials?",
 			Affirmative: "Yes",
 			Negative:    "No, enter manually",
+			Default:     true,
 		})
 		if err != nil {
 			return err
