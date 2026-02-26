@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/BurntSushi/toml"
@@ -38,8 +37,7 @@ type RoleConfig struct {
 }
 
 type Config struct {
-	EnabledProviders []string                  `toml:"enabled_providers" json:"enabled_providers"`
-	Display          DisplayConfig             `toml:"display" json:"display"`
+	Display DisplayConfig `toml:"display" json:"display"`
 	Fetch            FetchConfig               `toml:"fetch" json:"fetch"`
 	Credentials      CredentialsConfig         `toml:"credentials" json:"credentials"`
 	Providers        map[string]ProviderConfig `toml:"providers" json:"providers"`
@@ -48,7 +46,6 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		EnabledProviders: nil,
 		Display: DisplayConfig{
 			ShowRemaining: true,
 			PaceColors:    true,
@@ -100,10 +97,6 @@ func SeedDefaultRoles() bool {
 
 func (c Config) clone() Config {
 	out := c
-	if c.EnabledProviders != nil {
-		out.EnabledProviders = make([]string, len(c.EnabledProviders))
-		copy(out.EnabledProviders, c.EnabledProviders)
-	}
 	out.Providers = make(map[string]ProviderConfig, len(c.Providers))
 	for k, v := range c.Providers {
 		out.Providers[k] = v
@@ -121,10 +114,11 @@ func (c Config) IsProviderEnabled(providerID string) bool {
 	if pc, ok := c.Providers[providerID]; ok && !pc.Enabled {
 		return false
 	}
-	if len(c.EnabledProviders) == 0 {
+	enabled := ReadEnabledProviders()
+	if len(enabled) == 0 {
 		return true
 	}
-	for _, id := range c.EnabledProviders {
+	for _, id := range enabled {
 		if id == providerID {
 			return true
 		}
@@ -260,17 +254,6 @@ func legacyConfigFilePath(path string) string {
 }
 
 func applyEnvOverrides(cfg Config) Config {
-	if v := os.Getenv("VIBEUSAGE_ENABLED_PROVIDERS"); v != "" {
-		parts := strings.Split(v, ",")
-		var providers []string
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				providers = append(providers, p)
-			}
-		}
-		cfg.EnabledProviders = providers
-	}
 	if os.Getenv("VIBEUSAGE_NO_COLOR") != "" {
 		cfg.Display.PaceColors = false
 	}

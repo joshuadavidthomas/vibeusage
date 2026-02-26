@@ -26,8 +26,7 @@ var authCmd = &cobra.Command{
 		}
 
 		if len(args) == 0 {
-			cfg := config.Get()
-			if len(cfg.EnabledProviders) == 0 {
+			if len(config.ReadEnabledProviders()) == 0 {
 				return authSetup()
 			}
 			return authStatusCommand()
@@ -216,24 +215,10 @@ func authProvider(providerID string, p provider.Provider) error {
 	return err
 }
 
-// enableProvider adds a provider to the enabled_providers list in config,
+// enableProvider adds a provider to the enabled list in the data directory,
 // making provider tracking opt-in via the auth command.
 func enableProvider(providerID string) {
-	cfg, err := config.Load("")
-	if err != nil {
-		return
-	}
-	for _, id := range cfg.EnabledProviders {
-		if id == providerID {
-			return
-		}
-	}
-	cfg.EnabledProviders = append(cfg.EnabledProviders, providerID)
-	sort.Strings(cfg.EnabledProviders)
-	if err := config.Save(cfg, ""); err != nil {
-		return
-	}
-	config.SetGlobal(cfg)
+	config.AddEnabledProvider(providerID)
 }
 
 // authDeviceFlow runs an OAuth/device-code flow with detected-credential check.

@@ -35,9 +35,8 @@ type AuthStatusEntryJSON struct {
 
 // ConfigShowJSON represents the config show JSON output.
 type ConfigShowJSON struct {
-	Fetch            ConfigFetchJSON       `json:"fetch"`
-	EnabledProviders []string              `json:"enabled_providers"`
-	Display          ConfigDisplayJSON     `json:"display"`
+	Fetch   ConfigFetchJSON   `json:"fetch"`
+	Display ConfigDisplayJSON `json:"display"`
 	Credentials      ConfigCredentialsJSON `json:"credentials"`
 	Roles            any                   `json:"roles"`
 	Path             string                `json:"path"`

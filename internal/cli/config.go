@@ -32,7 +32,6 @@ var configShowCmd = &cobra.Command{
 					StaleThresholdMinutes: cfg.Fetch.StaleThresholdMinutes,
 					MaxConcurrent:         cfg.Fetch.MaxConcurrent,
 				},
-				EnabledProviders: cfg.EnabledProviders,
 				Display: display.ConfigDisplayJSON{
 					ShowRemaining: cfg.Display.ShowRemaining,
 					PaceColors:    cfg.Display.PaceColors,
