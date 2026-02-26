@@ -148,7 +148,7 @@ Role-based model groups are configured in `config.toml` under `[roles.<name>]` (
 vibeusage                      # Usage for all enabled providers
 vibeusage usage <provider>     # Usage for one provider
 vibeusage --json               # JSON output
-vibeusage --refresh            # Bypass cache fallback
+vibeusage --no-cache           # Disable cache fallback on API failure
 vibeusage auth                 # Enable/manage providers interactively
 vibeusage auth <provider>      # Auth a specific provider
 vibeusage auth --status        # Credential/auth status
@@ -319,11 +319,9 @@ vibeusage auth zai
 vibeusage status
 vibeusage auth --status
 
-# Config and cache
+# Config
 vibeusage config show
 vibeusage config path
-vibeusage cache show
-vibeusage cache clear
 
 # Route discovery
 vibeusage route --list
@@ -338,7 +336,7 @@ Global options:
 | `--no-color` | | Disable colored output |
 | `--verbose` | `-v` | Show detailed output |
 | `--quiet` | `-q` | Minimal output |
-| `--refresh` | `-r` | Disable cache fallback (fresh data or error) |
+| `--no-cache` | | Disable cache fallback on API failure |
 
 ## Troubleshooting
 
@@ -360,6 +358,16 @@ security unlock-keychain
 ```
 
 Then run `vibeusage auth --status` again.
+
+### Clearing the cache
+
+vibeusage caches usage data to gracefully handle API failures. If you see `(2h ago)` in output, the API was down and cached data was served. To clear this cache:
+
+```bash
+rm -rf "$(vibeusage config path --cache)"
+```
+
+Use `--no-cache` to bypass the cache and fail fast if the API is unreachable.
 
 ## Updating
 
@@ -410,7 +418,6 @@ show_remaining = true              # Show remaining % instead of used %
 
 [fetch]
 max_concurrent = 5                 # Max concurrent provider fetches
-stale_threshold_minutes = 60       # Stale data threshold in minutes
 timeout = 30                       # Fetch timeout in seconds
 ```
 

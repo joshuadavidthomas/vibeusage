@@ -73,31 +73,17 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 	}
 
 	// All strategies failed — try cache fallback.
-	// If a real fetch was attempted (credentials exist, API failed),
-	// always serve cache — the service is probably just down.
-	// If nothing was even attempted (no credentials), only serve
-	// cache within the stale threshold — old data with no way to
-	// refresh is misleading.
+	// Only serve cache when credentials exist (anyAttempted=true) but
+	// the API failed. This provides resilience when services are down
+	// without misleading unconfigured users with old data.
 	if useCache && cfg.Cache != nil {
-		if cached := cfg.Cache.Load(providerID); cached != nil {
-			if anyAttempted {
-				return FetchOutcome{
-					ProviderID: providerID,
-					Success:    true,
-					Snapshot:   cached,
-					Source:     "cache",
-					Cached:     true,
-				}
-			}
-			ageMinutes := int(time.Since(cached.FetchedAt).Minutes())
-			if ageMinutes < cfg.StaleThresholdMinutes {
-				return FetchOutcome{
-					ProviderID: providerID,
-					Success:    true,
-					Snapshot:   cached,
-					Source:     "cache",
-					Cached:     true,
-				}
+		if cached := cfg.Cache.Load(providerID); cached != nil && anyAttempted {
+			return FetchOutcome{
+				ProviderID: providerID,
+				Success:    true,
+				Snapshot:   cached,
+				Source:     "cache",
+				Cached:     true,
 			}
 		}
 	}

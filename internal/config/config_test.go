@@ -84,9 +84,6 @@ func TestDefaultConfig_Values(t *testing.T) {
 	if cfg.Fetch.MaxConcurrent != 5 {
 		t.Errorf("Fetch.MaxConcurrent = %d, want 5", cfg.Fetch.MaxConcurrent)
 	}
-	if cfg.Fetch.StaleThresholdMinutes != 60 {
-		t.Errorf("Fetch.StaleThresholdMinutes = %d, want 60", cfg.Fetch.StaleThresholdMinutes)
-	}
 	if cfg.Credentials.UseKeyring {
 		t.Error("Credentials.UseKeyring should default to false")
 	}

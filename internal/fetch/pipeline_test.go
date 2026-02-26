@@ -48,9 +48,9 @@ func (c *memCache) Load(providerID string) *models.UsageSnapshot {
 
 func defaultTestPipelineCfg() PipelineConfig {
 	return PipelineConfig{
-		Timeout:               30 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 newMemCache(),
+		Timeout: 30 * time.Second,
+
+		Cache: newMemCache(),
 	}
 }
 
@@ -252,9 +252,9 @@ func TestExecutePipeline_EmptyStrategies(t *testing.T) {
 
 func TestExecutePipeline_Timeout(t *testing.T) {
 	cfg := PipelineConfig{
-		Timeout:               50 * time.Millisecond,
-		StaleThresholdMinutes: 60,
-		Cache:                 newMemCache(),
+		Timeout: 50 * time.Millisecond,
+
+		Cache: newMemCache(),
 	}
 
 	strategy := &mockStrategy{
@@ -280,9 +280,9 @@ func TestExecutePipeline_TimeoutFallsBackToNextStrategy(t *testing.T) {
 	type fastStrategy struct{ mockStrategy }
 
 	cfg := PipelineConfig{
-		Timeout:               50 * time.Millisecond,
-		StaleThresholdMinutes: 60,
-		Cache:                 newMemCache(),
+		Timeout: 50 * time.Millisecond,
+
+		Cache: newMemCache(),
 	}
 
 	snap := testSnapshot("test", "fast", 42)
@@ -374,9 +374,9 @@ func TestExecutePipeline_CacheFallback(t *testing.T) {
 	}
 
 	cfg := PipelineConfig{
-		Timeout:               30 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 cache,
+		Timeout: 30 * time.Second,
+
+		Cache: cache,
 	}
 
 	strategy := &mockStrategy{
@@ -416,9 +416,9 @@ func TestExecutePipeline_CacheFallbackServesStaleWhenFetchAttempted(t *testing.T
 	}
 
 	cfg := PipelineConfig{
-		Timeout:               30 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 cache,
+		Timeout: 30 * time.Second,
+
+		Cache: cache,
 	}
 
 	strategy := &mockStrategy{
@@ -449,9 +449,9 @@ func TestExecutePipeline_CacheFallbackRejectsStaleWhenNotConfigured(t *testing.T
 	}
 
 	cfg := PipelineConfig{
-		Timeout:               30 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 cache,
+		Timeout: 30 * time.Second,
+
+		Cache: cache,
 	}
 
 	strategy := &mockStrategy{
@@ -475,9 +475,9 @@ func TestExecutePipeline_CacheFallbackRejectsStaleWhenNotConfigured(t *testing.T
 
 func TestExecutePipeline_CacheFallbackNoData(t *testing.T) {
 	cfg := PipelineConfig{
-		Timeout:               30 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 newMemCache(),
+		Timeout: 30 * time.Second,
+
+		Cache: newMemCache(),
 	}
 
 	strategy := &mockStrategy{
@@ -510,9 +510,9 @@ func TestExecutePipeline_CacheDisabled(t *testing.T) {
 	}
 
 	cfg := PipelineConfig{
-		Timeout:               30 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 cache,
+		Timeout: 30 * time.Second,
+
+		Cache: cache,
 	}
 
 	strategy := &mockStrategy{
@@ -601,9 +601,9 @@ func TestExecutePipeline_LastErrorPropagated(t *testing.T) {
 func TestExecutePipeline_SuccessCachesResult(t *testing.T) {
 	cache := newMemCache()
 	cfg := PipelineConfig{
-		Timeout:               30 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 cache,
+		Timeout: 30 * time.Second,
+
+		Cache: cache,
 	}
 
 	snap := testSnapshot("cache-test-provider", "mock", 60)
@@ -734,7 +734,9 @@ func TestExecutePipeline_SkipsUnavailableTriesAvailable(t *testing.T) {
 	}
 }
 
-func TestExecutePipeline_CacheFallbackServesFreshWhenNotConfigured(t *testing.T) {
+func TestExecutePipeline_NoCacheFallbackWhenNotConfigured(t *testing.T) {
+	// When no strategies are available (unconfigured provider), cache should NOT be served
+	// even if fresh data exists. This prevents misleading users with old data.
 	cache := newMemCache()
 	cache.data["test-provider"] = models.UsageSnapshot{
 		Provider:  "test-provider",
@@ -743,9 +745,8 @@ func TestExecutePipeline_CacheFallbackServesFreshWhenNotConfigured(t *testing.T)
 	}
 
 	cfg := PipelineConfig{
-		Timeout:               5 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 cache,
+		Timeout: 5 * time.Second,
+		Cache:   cache,
 	}
 
 	strategy := &mockStrategy{
@@ -755,19 +756,19 @@ func TestExecutePipeline_CacheFallbackServesFreshWhenNotConfigured(t *testing.T)
 	ctx := context.Background()
 	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
 
-	if !outcome.Success {
-		t.Fatalf("expected success from fresh cache, got error: %s", outcome.Error)
+	if outcome.Success {
+		t.Fatal("expected failure when no strategies available, got success")
 	}
-	if !outcome.Cached {
-		t.Error("expected Cached=true")
+	if outcome.Error != "No strategies available" {
+		t.Errorf("expected 'No strategies available', got: %s", outcome.Error)
 	}
 }
 
 func TestExecutePipeline_NilCacheNoFallback(t *testing.T) {
 	cfg := PipelineConfig{
-		Timeout:               5 * time.Second,
-		StaleThresholdMinutes: 60,
-		Cache:                 nil,
+		Timeout: 5 * time.Second,
+
+		Cache: nil,
 	}
 
 	strategy := &mockStrategy{

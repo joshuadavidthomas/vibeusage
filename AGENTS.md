@@ -42,7 +42,7 @@ The `vibeusage` shell alias runs `go run ./cmd/vibeusage` with these env vars. W
 - `internal/strutil/title.go` replaces deprecated `strings.Title`
 - `charmbracelet/log` for structured verbose/debug output
 - ANSI-aware padding: don't use `%-*s` with styled text; pad manually after styling
-- Cache fallback: always serves stale cache when credentials exist (API down); rejects stale cache when unconfigured
-- `--refresh` global flag disables cache fallback entirely
+- Cache fallback: serves cached data only when API fetch fails (credentials exist but service is down)
+- `--no-cache` flag disables cache fallback entirely (fails fast on API errors)
 - Error messages: include underlying errors (e.g. JSON parse errors) — don't swallow them
 - Error hints: only suggest `vibeusage auth` when the error is actually about credentials

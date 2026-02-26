@@ -45,9 +45,8 @@ type ConfigShowJSON struct {
 
 // ConfigFetchJSON represents the fetch section of config.
 type ConfigFetchJSON struct {
-	Timeout               float64 `json:"timeout"`
-	StaleThresholdMinutes int     `json:"stale_threshold_minutes"`
-	MaxConcurrent         int     `json:"max_concurrent"`
+	Timeout       float64 `json:"timeout"`
+	MaxConcurrent int     `json:"max_concurrent"`
 }
 
 // ConfigDisplayJSON represents the display section of config.

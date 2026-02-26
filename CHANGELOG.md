@@ -39,6 +39,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Removed
 
+- **Breaking:** Removed `vibeusage cache` command, `fetch.stale_threshold_minutes` config option, and `--refresh` flag. Cache is now only used for resilience when APIs fail. Use `--no-cache` to fail fast instead of falling back to cached data.
 - **Breaking:** Removed v0.2.0 legacy migration compatibility layer. Config and credentials are no longer read from or dual-written to legacy paths. Ensure you've run v0.2.0+ at least once before upgrading to ensure data is migrated.
 - **Breaking:** Removed `vibeusage key` command. All credential management is now handled through `vibeusage auth`. Use `vibeusage auth --status` instead of `vibeusage key` for credential status, `vibeusage auth <provider> --token <value>` instead of `vibeusage key <provider> set`, and `vibeusage auth <provider> --delete` instead of `vibeusage key <provider> delete`.
 - Removed Anthropic API key (`sk-ant-api...` / `sk-ant-admin-...`) support from Claude provider. Regular API keys cannot access consumer plan usage data — they live in a separate billing system with no access to Pro/Max rate limit information. Future Admin API key support tracked in [#97](https://github.com/joshuadavidthomas/vibeusage/issues/97). `vibeusage auth claude` now only accepts `sessionKey` cookies (`sk-ant-sid01-...`).

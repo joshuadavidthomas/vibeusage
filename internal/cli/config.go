@@ -28,9 +28,8 @@ var configShowCmd = &cobra.Command{
 		if jsonOutput {
 			return display.OutputJSON(outWriter, display.ConfigShowJSON{
 				Fetch: display.ConfigFetchJSON{
-					Timeout:               cfg.Fetch.Timeout,
-					StaleThresholdMinutes: cfg.Fetch.StaleThresholdMinutes,
-					MaxConcurrent:         cfg.Fetch.MaxConcurrent,
+					Timeout:       cfg.Fetch.Timeout,
+					MaxConcurrent: cfg.Fetch.MaxConcurrent,
 				},
 				Display: display.ConfigDisplayJSON{
 					ShowRemaining: cfg.Display.ShowRemaining,
