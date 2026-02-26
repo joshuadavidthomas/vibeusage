@@ -21,6 +21,7 @@ func (w Warp) Meta() provider.Metadata {
 		Name:        "Warp",
 		Description: "Warp terminal AI",
 		Homepage:    "https://warp.dev",
+		StatusURL:   "https://status.warp.dev",
 	}
 }
 
@@ -33,8 +34,8 @@ func (w Warp) FetchStrategies() []fetch.Strategy {
 	return []fetch.Strategy{&APIKeyStrategy{HTTPTimeout: timeout}}
 }
 
-func (w Warp) FetchStatus(_ context.Context) models.ProviderStatus {
-	return models.ProviderStatus{Level: models.StatusUnknown}
+func (w Warp) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchStatuspageStatus(ctx, "https://status.warp.dev")
 }
 
 func (w Warp) Auth() provider.AuthFlow {

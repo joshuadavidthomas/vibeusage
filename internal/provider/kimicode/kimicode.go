@@ -23,6 +23,7 @@ func (k KimiCode) Meta() provider.Metadata {
 		Name:        "Kimi Code",
 		Description: "Moonshot AI coding assistant",
 		Homepage:    "https://www.kimi.com",
+		StatusURL:   "https://status.moonshot.cn",
 	}
 }
 
@@ -40,8 +41,8 @@ func (k KimiCode) FetchStrategies() []fetch.Strategy {
 	}
 }
 
-func (k KimiCode) FetchStatus(_ context.Context) models.ProviderStatus {
-	return models.ProviderStatus{Level: models.StatusUnknown}
+func (k KimiCode) FetchStatus(ctx context.Context) models.ProviderStatus {
+	return provider.FetchStatuspageStatus(ctx, "https://status.moonshot.cn")
 }
 
 // Auth returns the Kimi Code device flow.

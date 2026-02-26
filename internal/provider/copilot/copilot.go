@@ -42,7 +42,7 @@ func (c Copilot) FetchStrategies() []fetch.Strategy {
 }
 
 func (c Copilot) FetchStatus(ctx context.Context) models.ProviderStatus {
-	return provider.FetchStatuspageStatus(ctx, "https://www.githubstatus.com/api/v2/status.json")
+	return provider.FetchStatuspageStatus(ctx, "https://www.githubstatus.com")
 }
 
 // Auth returns the GitHub device flow for Copilot.
