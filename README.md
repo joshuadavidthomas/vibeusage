@@ -50,7 +50,10 @@ go build -o vibeusage ./cmd/vibeusage
 Set up the providers you use:
 
 ```bash
-$ vibeusage auth
+vibeusage auth
+```
+
+```bash
 ┃ Choose providers to set up
 ┃ Space to select, Enter to confirm
 ┃ > claude — Anthropic's Claude AI assistant (claude.ai) [detected: provider CLI]
@@ -63,9 +66,11 @@ $ vibeusage auth
 Providers with existing CLI credentials are detected automatically — just select them and hit Enter. For others, vibeusage walks you through authentication (API keys, device flows, or browser tokens).
 
 Then check your usage:
+```bash
+vibeusage
+```
 
 ```bash
-$ vibeusage
 ╭─Claude───────────────────────────────────────────────────────────────╮
 │ Session (5h)           ███████░░░░░░░░░░░░░ 38%    resets in 1h 40m  │
 │ Weekly                 ██████████████████░░ 98%    resets in 16h 40m │
@@ -92,7 +97,10 @@ Inspired by OpenRouter-style routing, `vibeusage route` picks the best provider 
 You can route a model to the provider with the best current headroom:
 
 ```bash
-$ vibeusage route claude-opus-4-6
+vibeusage route claude-opus-4-6
+```
+
+```bash
 Route: Claude Opus 4.6
 
 ╭─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
@@ -107,7 +115,10 @@ Route: Claude Opus 4.6
 Or route via your own role/model group:
 
 ```bash
-$ vibeusage route --role coding
+vibeusage route --role coding
+```
+
+```bash
 Route: coding (role)
 
 ╭──────────────────┬─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
