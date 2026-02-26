@@ -32,7 +32,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Fixed
 
-- Fixed Claude web session strategy silently returning empty usage data. The `claude.ai` usage endpoint changed its response format to match the OAuth endpoint (`five_hour`/`seven_day`/per-model breakdowns instead of `usage_amount`/`usage_limit`), but the web strategy was still parsing the old format.
+- Fixed Claude web session strategy silently returning empty usage data. The `claude.ai` usage endpoint returns the same response format as the OAuth endpoint (`five_hour`/`seven_day`/per-model breakdowns), but the web strategy was parsing a different format (`usage_amount`/`usage_limit`).
 - Fixed provider credential leakage when `credentials.reuse_provider_credentials = false` by making provider strategy availability/loading consistently honor the setting.
 - Fixed credential path coupling by removing `DataDir()` fallback to `VIBEUSAGE_CONFIG_DIR`; credentials now use the data path unless `VIBEUSAGE_DATA_DIR` is explicitly set.
 - Fixed no-data output to show provider-specific fetch errors when providers are configured but all strategies fail.
