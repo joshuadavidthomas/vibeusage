@@ -3,9 +3,12 @@ package copilot
 import (
 	"context"
 	"encoding/json"
+	"bufio"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -212,10 +215,14 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	}
 
 	// Display instructions — GitHub requires entering the code manually,
-	// so we show it and let the user open the URL themselves.
+	// so show it and wait for the user to press Enter before opening the browser.
 	if !quiet {
-		_, _ = fmt.Fprintf(w, "Open %s and enter code: %s\n", verificationURI, displayCode)
-		_, _ = fmt.Fprintln(w, "Waiting for authorization...")
+		_, _ = fmt.Fprintf(w, "Your code: %s\n", displayCode)
+		_, _ = fmt.Fprintf(w, "Press Enter to open %s", verificationURI)
+		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
+		_, _ = fmt.Fprintf(w, "Opening %s\n", verificationURI)
+		openBrowser(verificationURI)
+		_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
 	} else {
 		_, _ = fmt.Fprintln(w, verificationURI)
 		_, _ = fmt.Fprintf(w, "Code: %s\n", displayCode)
@@ -286,4 +293,19 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
 	}
 	return false, nil
+}
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		return
+	}
+	_ = cmd.Start()
 }
