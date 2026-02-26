@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
 )
 
@@ -120,6 +121,10 @@ func (h *Huh) MultiSelect(cfg MultiSelectConfig) ([]string, error) {
 		})
 	}
 
-	err := huh.NewForm(huh.NewGroup(ms)).Run()
+	// Create a custom keymap that includes Escape to quit
+	keymap := huh.NewDefaultKeyMap()
+	keymap.Quit = key.NewBinding(key.WithKeys("esc", "ctrl+c"))
+
+	err := huh.NewForm(huh.NewGroup(ms)).WithKeyMap(keymap).Run()
 	return selected, err
 }
