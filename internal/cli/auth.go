@@ -141,6 +141,15 @@ func authSetup() error {
 	}
 	_ = config.WriteEnabledProviders(kept)
 
+	// Track removals for summary.
+	var removed []string
+	for id := range enabledSet {
+		if !selectedSet[id] {
+			removed = append(removed, id)
+		}
+	}
+	sort.Strings(removed)
+
 	outln()
 	var failed []string
 	for _, pid := range newProviders {
@@ -154,13 +163,19 @@ func authSetup() error {
 		}
 	}
 
+	// Summary
+	outln()
+	finalEnabled := config.ReadEnabledProviders()
+	if len(finalEnabled) > 0 {
+		out("Enabled: %s\n", strings.Join(finalEnabled, ", "))
+	}
+	if len(removed) > 0 {
+		out("Removed: %s\n", strings.Join(removed, ", "))
+	}
 	if len(failed) > 0 {
-		outln()
-		out("Failed: %s\n", strings.Join(failed, ", "))
+		out("Failed:  %s\n", strings.Join(failed, ", "))
 		outln("Retry with: vibeusage auth <provider>")
 	}
-	outln()
-	outln("Run 'vibeusage' to see your usage.")
 	return nil
 }
 
