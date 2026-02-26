@@ -21,8 +21,9 @@ type ConfirmConfig struct {
 
 // SelectOption represents a single option in a multi-select.
 type SelectOption struct {
-	Label string
-	Value string
+	Label    string
+	Value    string
+	Selected bool
 }
 
 // MultiSelectConfig holds configuration for a multi-select prompt.
@@ -94,7 +95,7 @@ func (h *Huh) MultiSelect(cfg MultiSelectConfig) ([]string, error) {
 	var selected []string
 	options := make([]huh.Option[string], len(cfg.Options))
 	for i, opt := range cfg.Options {
-		options[i] = huh.NewOption(opt.Label, opt.Value)
+		options[i] = huh.NewOption(opt.Label, opt.Value).Selected(opt.Selected)
 	}
 
 	ms := huh.NewMultiSelect[string]().

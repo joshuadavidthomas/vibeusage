@@ -26,10 +26,7 @@ var authCmd = &cobra.Command{
 		}
 
 		if len(args) == 0 {
-			if len(config.ReadEnabledProviders()) == 0 {
-				return authSetup()
-			}
-			return authStatusCommand()
+			return authSetup()
 		}
 
 		providerID := args[0]
@@ -72,6 +69,11 @@ func authSetup() error {
 	allProviders := provider.ListIDs()
 	sort.Strings(allProviders)
 
+	enabledSet := make(map[string]bool)
+	for _, id := range config.ReadEnabledProviders() {
+		enabledSet[id] = true
+	}
+
 	options := make([]prompt.SelectOption, 0, len(allProviders))
 	for _, pid := range allProviders {
 		hasCreds, source := provider.CheckCredentials(pid)
@@ -86,11 +88,20 @@ func authSetup() error {
 		if hasCreds {
 			desc += " [detected: " + sourceToLabel(source) + "]"
 		}
-		options = append(options, prompt.SelectOption{Label: prefix + pid + " — " + desc, Value: pid})
+		options = append(options, prompt.SelectOption{
+			Label:    prefix + pid + " — " + desc,
+			Value:    pid,
+			Selected: enabledSet[pid],
+		})
+	}
+
+	title := "Choose providers to set up"
+	if len(enabledSet) > 0 {
+		title = "Manage enabled providers"
 	}
 
 	selected, err := prompt.Default.MultiSelect(prompt.MultiSelectConfig{
-		Title:       "Choose providers to set up",
+		Title:       title,
 		Description: "Space to select, Enter to confirm",
 		Options:     options,
 		Validate: func(selected []string) error {
@@ -131,6 +142,11 @@ func authStatusCommand() error {
 	allProviders := provider.ListIDs()
 	sort.Strings(allProviders)
 
+	enabledSet := make(map[string]bool)
+	for _, id := range config.ReadEnabledProviders() {
+		enabledSet[id] = true
+	}
+
 	if jsonOutput {
 		data := make(map[string]display.AuthStatusEntryJSON)
 		for _, pid := range allProviders {
@@ -138,6 +154,7 @@ func authStatusCommand() error {
 			data[pid] = display.AuthStatusEntryJSON{
 				Authenticated: hasCreds,
 				Source:        sourceToLabel(source),
+				Enabled:       enabledSet[pid],
 			}
 		}
 		return display.OutputJSON(outWriter, data)
@@ -147,8 +164,10 @@ func authStatusCommand() error {
 		for _, pid := range allProviders {
 			hasCreds, _ := provider.CheckCredentials(pid)
 			status := "not configured"
-			if hasCreds {
-				status = "authenticated"
+			if hasCreds && enabledSet[pid] {
+				status = "enabled"
+			} else if hasCreds {
+				status = "authenticated (not enabled)"
 			}
 			out("%s: %s\n", pid, status)
 		}
@@ -156,14 +175,17 @@ func authStatusCommand() error {
 	}
 
 	var rows [][]string
-	var unconfigured []string
+	var unenabled []string
 	for _, pid := range allProviders {
 		hasCreds, source := provider.CheckCredentials(pid)
-		if hasCreds {
+		if hasCreds && enabledSet[pid] {
+			rows = append(rows, []string{pid, "✓ Enabled", sourceToLabel(source)})
+		} else if hasCreds {
 			rows = append(rows, []string{pid, "✓ Authenticated", sourceToLabel(source)})
+			unenabled = append(unenabled, pid)
 		} else {
 			rows = append(rows, []string{pid, "✗ Not configured", "—"})
-			unconfigured = append(unconfigured, pid)
+			unenabled = append(unenabled, pid)
 		}
 	}
 
@@ -173,10 +195,10 @@ func authStatusCommand() error {
 		display.TableOptions{Title: "Authentication Status", NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
-	if len(unconfigured) > 0 {
+	if len(unenabled) > 0 {
 		outln()
-		outln("To configure a provider, run:")
-		for _, pid := range unconfigured {
+		outln("To enable a provider, run:")
+		for _, pid := range unenabled {
 			out("  vibeusage auth %s\n", pid)
 		}
 	}
