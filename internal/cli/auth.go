@@ -246,7 +246,7 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
 			Title:       "Use detected credentials?",
 			Affirmative: "Yes",
-			Negative:    "No, enter new",
+			Negative:    "No, enter manually",
 		})
 		if err != nil {
 			return err
@@ -276,7 +276,7 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
 			Title:       "Use detected credentials?",
 			Affirmative: "Yes",
-			Negative:    "No, enter new",
+			Negative:    "No, enter manually",
 		})
 		if err != nil {
 			return err
