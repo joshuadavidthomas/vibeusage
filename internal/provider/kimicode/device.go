@@ -165,9 +165,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 
 	// Display instructions
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "🔐 Kimi Device Flow Authentication")
-		_, _ = fmt.Fprintf(w, "Authorize in your browser: %s\n", verificationURI)
-		_, _ = fmt.Fprintln(w, "Waiting for authorization...")
+		_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
 	} else {
 		_, _ = fmt.Fprintln(w, verificationURI)
 		_, _ = fmt.Fprintf(w, "Code: %s\n", userCode)
