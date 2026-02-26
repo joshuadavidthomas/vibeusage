@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -213,17 +211,15 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		displayCode = userCode[:4] + "-" + userCode[4:]
 	}
 
-	// Display instructions
+	// Display instructions — GitHub requires entering the code manually,
+	// so we show it and let the user open the URL themselves.
 	if !quiet {
-		_, _ = fmt.Fprintf(w, "Opening %s\n", verificationURI)
-		_, _ = fmt.Fprintf(w, "Enter code: %s\n", displayCode)
-		_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
+		_, _ = fmt.Fprintf(w, "Open %s and enter code: %s\n", verificationURI, displayCode)
+		_, _ = fmt.Fprintln(w, "Waiting for authorization...")
 	} else {
 		_, _ = fmt.Fprintln(w, verificationURI)
 		_, _ = fmt.Fprintf(w, "Code: %s\n", displayCode)
 	}
-
-	openBrowser(verificationURI)
 
 	// Poll for token
 	for attempt := 0; attempt < 60; attempt++ {
@@ -290,19 +286,4 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
 	}
 	return false, nil
-}
-
-func openBrowser(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		return
-	}
-	_ = cmd.Start()
 }
