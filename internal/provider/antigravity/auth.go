@@ -7,12 +7,11 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
@@ -81,13 +80,13 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 	)
 
 	if !quiet {
-		_, _ = fmt.Fprintf(w, "Opening %s\n", authURL)
-		_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
+		deviceflow.WriteOpening(w, authURL)
+		deviceflow.WriteWaiting(w)
 	} else {
 		_, _ = fmt.Fprintln(w, authURL)
 	}
 
-	openBrowser(authURL)
+	deviceflow.OpenBrowser(authURL)
 
 	// Wait for the callback (with timeout).
 	select {
@@ -101,7 +100,7 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 		return exchangeCode(w, result.code, redirectURI, quiet)
 	case <-time.After(5 * time.Minute):
 		if !quiet {
-			_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
+			deviceflow.WriteTimeout(w)
 		}
 		return false, nil
 	}
@@ -149,7 +148,7 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 	}
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "✓ Authentication successful!")
+		deviceflow.WriteSuccess(w)
 		if tokenResp.RefreshToken != "" {
 			_, _ = fmt.Fprintln(w, "  Token will refresh automatically — no need to open the IDE.")
 		}
@@ -158,18 +157,3 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 	return true, nil
 }
 
-// openBrowser tries to open a URL in the default browser.
-func openBrowser(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		return
-	}
-	_ = cmd.Start()
-}

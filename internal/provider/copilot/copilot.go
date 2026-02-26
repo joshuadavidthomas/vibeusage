@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -16,6 +14,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider/deviceflow"
 )
 
 type Copilot struct{}
@@ -220,9 +219,8 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		_, _ = fmt.Fprintf(w, "Copy this code: %s\n", displayCode)
 		_, _ = fmt.Fprintf(w, "Press Enter to open %s", verificationURI)
 		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
-		_, _ = fmt.Fprintf(w, "Opening %s\n", verificationURI)
-		openBrowser(verificationURI)
-		_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
+		deviceflow.WriteOpening(w, verificationURI)
+		deviceflow.WriteWaiting(w)
 	} else {
 		_, _ = fmt.Fprintln(w, verificationURI)
 		_, _ = fmt.Fprintf(w, "Code: %s\n", displayCode)
@@ -259,7 +257,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "✓ Authentication successful!")
+				deviceflow.WriteSuccess(w)
 			}
 			return true, nil
 		}
@@ -272,12 +270,12 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			continue
 		case "expired_token":
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✗ Device code expired.")
+				deviceflow.WriteExpired(w)
 			}
 			return false, nil
 		case "access_denied":
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✗ Authorization denied by user.")
+				deviceflow.WriteDenied(w)
 			}
 			return false, nil
 		default:
@@ -290,22 +288,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	}
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
+		deviceflow.WriteTimeout(w)
 	}
 	return false, nil
-}
-
-func openBrowser(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		return
-	}
-	_ = cmd.Start()
 }
