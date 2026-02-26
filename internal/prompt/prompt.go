@@ -30,6 +30,7 @@ type MultiSelectConfig struct {
 	Title       string
 	Description string
 	Options     []SelectOption
+	Validate    func([]string) error
 }
 
 // Prompter defines the interface for interactive user prompts.
@@ -103,6 +104,12 @@ func (h *Huh) MultiSelect(cfg MultiSelectConfig) ([]string, error) {
 
 	if cfg.Description != "" {
 		ms.Description(cfg.Description)
+	}
+	if cfg.Validate != nil {
+		validate := cfg.Validate
+		ms.Validate(func(v []string) error {
+			return validate(v)
+		})
 	}
 
 	err := huh.NewForm(huh.NewGroup(ms)).Run()

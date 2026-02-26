@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
@@ -124,15 +125,15 @@ func interactiveWizard() error {
 		Title:       "Choose providers to set up",
 		Description: "Space to select, Enter to confirm",
 		Options:     options,
+		Validate: func(selected []string) error {
+			if len(selected) == 0 {
+				return errors.New("select at least one provider (use Space to toggle)")
+			}
+			return nil
+		},
 	})
 	if err != nil {
 		return err
-	}
-
-	if len(selected) == 0 {
-		outln("\nNo providers selected. You can set up providers later:")
-		outln("  vibeusage init")
-		return nil
 	}
 
 	// Save selected providers as the enabled set.
@@ -140,41 +141,24 @@ func interactiveWizard() error {
 
 	// Authenticate each selected provider inline.
 	outln()
-	var succeeded, failed, skipped []string
+	var failed []string
 	for _, pid := range selected {
 		p, ok := provider.Get(pid)
 		if !ok {
 			continue
 		}
 
-		hasCreds, _ := provider.CheckCredentials(pid)
-		if hasCreds {
-			out("  ✓ %s already configured\n", pid)
-			skipped = append(skipped, pid)
-			continue
-		}
-
-		outln()
 		if err := authProvider(pid, p); err != nil {
 			out("  ✗ %s: %v\n", pid, err)
 			failed = append(failed, pid)
-		} else {
-			succeeded = append(succeeded, pid)
 		}
 	}
 
 	// Seed default roles if none exist.
 	seedDefaultRoles()
 
-	// Print summary.
-	outln()
-	if len(succeeded) > 0 {
-		out("  ✓ Authenticated: %s\n", strings.Join(succeeded, ", "))
-	}
-	if len(skipped) > 0 {
-		out("  ✓ Already configured: %s\n", strings.Join(skipped, ", "))
-	}
 	if len(failed) > 0 {
+		outln()
 		out("  ✗ Failed: %s\n", strings.Join(failed, ", "))
 		outln("    Retry with: vibeusage init")
 	}

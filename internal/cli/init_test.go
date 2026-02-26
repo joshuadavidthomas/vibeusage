@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/charmbracelet/huh"
+
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
@@ -65,18 +67,19 @@ func TestInteractiveWizard_UsesMultiSelect(t *testing.T) {
 	if len(mock.InputCalls) != 2 {
 		t.Errorf("expected 2 Input calls (one per selected provider), got %d", len(mock.InputCalls))
 	}
-
-	// Summary should report success.
-	output := buf.String()
-	if !bytes.Contains([]byte(output), []byte("Authenticated")) {
-		t.Errorf("expected success summary in output, got:\n%s", output)
-	}
 }
 
-func TestInteractiveWizard_NoSelection(t *testing.T) {
+func TestInteractiveWizard_ValidationRejectsEmpty(t *testing.T) {
 	mock := &prompt.Mock{
 		MultiSelectFunc: func(cfg prompt.MultiSelectConfig) ([]string, error) {
-			return nil, nil // user selected nothing
+			// Simulate what huh does: the validate func is passed through.
+			if cfg.Validate != nil {
+				if err := cfg.Validate(nil); err == nil {
+					t.Error("validation should reject empty selection")
+				}
+			}
+			// Return an error as if the user cancelled after seeing the validation error.
+			return nil, huh.ErrUserAborted
 		},
 	}
 
@@ -89,13 +92,8 @@ func TestInteractiveWizard_NoSelection(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	err := interactiveWizard()
-	if err != nil {
-		t.Fatalf("interactiveWizard() error: %v", err)
-	}
-
-	output := buf.String()
-	if !bytes.Contains([]byte(output), []byte("vibeusage init")) {
-		t.Error("expected fallback instructions when no providers selected")
+	if err == nil {
+		t.Error("expected error when user aborts")
 	}
 }
 
