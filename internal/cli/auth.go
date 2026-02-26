@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -308,7 +310,13 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 			return err
 		}
 		if useExisting {
-			return nil
+			// Verify the detected credentials actually work.
+			if verifyCredentialsFn(providerID) {
+				return nil
+			}
+			if !quiet {
+				out("✗ Detected credentials are expired or invalid, re-authenticating...\n")
+			}
 		}
 	}
 
@@ -320,6 +328,31 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 		return fmt.Errorf("authentication failed")
 	}
 	return nil
+}
+
+// HACK: package-level var to allow test stubbing. This should be replaced
+// with a proper interface (e.g. a Verifier on the auth command struct) once
+// the CLI is refactored away from package-level state.
+var verifyCredentialsFn = verifyCredentialsDefault
+
+func verifyCredentialsDefault(providerID string) bool {
+	p, ok := provider.Get(providerID)
+	if !ok {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for _, s := range p.FetchStrategies() {
+		if !s.IsAvailable() {
+			continue
+		}
+		result, err := s.Fetch(ctx)
+		if err != nil {
+			continue
+		}
+		return result.Success
+	}
+	return false
 }
 
 // authManualKey runs an interactive manual-key input flow.

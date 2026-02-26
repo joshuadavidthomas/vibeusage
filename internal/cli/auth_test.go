@@ -210,6 +210,11 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	_ = os.MkdirAll(credDir, 0o755)
 	_ = os.WriteFile(filepath.Join(credDir, "oauth.json"), []byte(`{"access_token":"test"}`), 0o600)
 
+	// Stub verify so it doesn't make real network calls
+	oldVerify := verifyCredentialsFn
+	verifyCredentialsFn = func(string) bool { return true }
+	defer func() { verifyCredentialsFn = oldVerify }()
+
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
 			return true, nil // user says yes to use existing creds
