@@ -26,7 +26,8 @@ var authCmd = &cobra.Command{
 		}
 
 		if len(args) == 0 {
-			if provider.IsFirstRun() {
+			cfg := config.Get()
+			if len(cfg.EnabledProviders) == 0 {
 				return authSetup()
 			}
 			return authStatusCommand()
@@ -74,11 +75,19 @@ func authSetup() error {
 
 	options := make([]prompt.SelectOption, 0, len(allProviders))
 	for _, pid := range allProviders {
+		hasCreds, source := provider.CheckCredentials(pid)
+		prefix := ""
+		if hasCreds {
+			prefix = "✓ "
+		}
 		desc := providerDescriptions[pid]
 		if desc == "" {
 			desc = provider.DisplayName(pid)
 		}
-		options = append(options, prompt.SelectOption{Label: pid + " — " + desc, Value: pid})
+		if hasCreds {
+			desc += " [detected: " + sourceToLabel(source) + "]"
+		}
+		options = append(options, prompt.SelectOption{Label: prefix + pid + " — " + desc, Value: pid})
 	}
 
 	selected, err := prompt.Default.MultiSelect(prompt.MultiSelectConfig{
