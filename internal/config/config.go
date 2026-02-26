@@ -17,9 +17,8 @@ type DisplayConfig struct {
 }
 
 type FetchConfig struct {
-	Timeout               float64 `toml:"timeout" json:"timeout"`
-	MaxConcurrent         int     `toml:"max_concurrent" json:"max_concurrent"`
-	StaleThresholdMinutes int     `toml:"stale_threshold_minutes" json:"stale_threshold_minutes"`
+	Timeout       float64 `toml:"timeout" json:"timeout"`
+	MaxConcurrent int     `toml:"max_concurrent" json:"max_concurrent"`
 }
 
 type CredentialsConfig struct {
@@ -52,9 +51,8 @@ func DefaultConfig() Config {
 			ResetFormat:   "countdown",
 		},
 		Fetch: FetchConfig{
-			Timeout:               30.0,
-			MaxConcurrent:         5,
-			StaleThresholdMinutes: 60,
+			Timeout:       30.0,
+			MaxConcurrent: 5,
 		},
 		Credentials: CredentialsConfig{
 			UseKeyring: false,

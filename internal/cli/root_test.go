@@ -45,7 +45,7 @@ func collectCommandPaths(cmd *cobra.Command, prefix []string) [][]string {
 // Root command tests
 
 func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
-	expected := []string{"auth", "status", "config", "cache", "update", "usage"}
+	expected := []string{"auth", "status", "config", "update", "usage", "route"}
 	for _, name := range expected {
 		found := false
 		for _, cmd := range rootCmd.Commands() {

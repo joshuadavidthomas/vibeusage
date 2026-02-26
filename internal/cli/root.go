@@ -40,7 +40,7 @@ var (
 	noColor    bool
 	verbose    bool
 	quiet      bool
-	refresh    bool
+	noCache    bool
 )
 
 var rootCmd = &cobra.Command{
@@ -69,13 +69,12 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Minimal output")
-	rootCmd.PersistentFlags().BoolVarP(&refresh, "refresh", "r", false, "Disable cache fallback — fresh data or error")
+	rootCmd.PersistentFlags().BoolVar(&noCache, "no-cache", false, "Disable cache fallback on API failure")
 	rootCmd.Flags().Bool("version", false, "Show version and exit")
 
 	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(cacheCmd)
 
 	rootCmd.AddCommand(routeCmd)
 	rootCmd.AddCommand(updateCmd)
@@ -129,7 +128,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 	if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
 		spinnerIDs := provider.AvailableIDs(cfg)
 		err := display.SpinnerRun(spinnerIDs, func(onComplete func(display.CompletionInfo)) {
-			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, orchCfg, cfg.IsProviderEnabled, func(o fetch.FetchOutcome) {
+			outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !noCache, orchCfg, cfg.IsProviderEnabled, func(o fetch.FetchOutcome) {
 				onComplete(outcomeToCompletion(o))
 			})
 		})
@@ -137,7 +136,7 @@ func fetchAndDisplayAll(ctx context.Context) error {
 			return fmt.Errorf("spinner error: %w", err)
 		}
 	} else {
-		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !refresh, orchCfg, cfg.IsProviderEnabled, nil)
+		outcomes = fetch.FetchEnabledProviders(ctx, providerMap, !noCache, orchCfg, cfg.IsProviderEnabled, nil)
 	}
 
 	durationMs := time.Since(start).Milliseconds()
@@ -296,14 +295,14 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 
 	if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
 		err := display.SpinnerRun([]string{providerID}, func(onComplete func(display.CompletionInfo)) {
-			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh, pipeCfg)
+			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !noCache, pipeCfg)
 			onComplete(outcomeToCompletion(outcome))
 		})
 		if err != nil {
 			return fmt.Errorf("spinner error: %w", err)
 		}
 	} else {
-		outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !refresh, pipeCfg)
+		outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !noCache, pipeCfg)
 	}
 
 	durationMs := time.Since(start).Milliseconds()
@@ -347,9 +346,8 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 
 func pipelineConfigFromConfig(cfg config.Config) fetch.PipelineConfig {
 	return fetch.PipelineConfig{
-		Timeout:               time.Duration(cfg.Fetch.Timeout * float64(time.Second)),
-		StaleThresholdMinutes: cfg.Fetch.StaleThresholdMinutes,
-		Cache:                 config.FileCache{},
+		Timeout: time.Duration(cfg.Fetch.Timeout * float64(time.Second)),
+		Cache:   config.FileCache{},
 	}
 }
 

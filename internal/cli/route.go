@@ -183,7 +183,7 @@ func doRouteModel(ctx context.Context, query string) (routing.Recommendation, er
 	}
 
 	strategyMap := routing.BuildStrategyMap(configuredIDs, lookupStrategies)
-	outcomes := fetchAllWithSpinner(ctx, strategyMap, !refresh)
+	outcomes := fetchAllWithSpinner(ctx, strategyMap, !noCache)
 	providerData := routing.BuildProviderData(outcomes)
 
 	multipliers := make(map[string]*float64)
@@ -390,7 +390,7 @@ func doRouteByRole(ctx context.Context, roleName string) (routing.RoleRecommenda
 	sort.Strings(providerList)
 
 	strategyMap := routing.BuildStrategyMap(providerList, lookupStrategies)
-	outcomes := fetchAllWithSpinner(ctx, strategyMap, !refresh)
+	outcomes := fetchAllWithSpinner(ctx, strategyMap, !noCache)
 	providerData := routing.BuildProviderData(outcomes)
 
 	candidates, unavailable := routing.RankByRole(modelEntries, providerData, lookupMultiplier)
