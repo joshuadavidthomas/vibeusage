@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
@@ -118,7 +118,7 @@ func authSetup() error {
 
 	selected, err := prompt.Default.MultiSelect(prompt.MultiSelectConfig{
 		Title:       title,
-		Description: "Space to select, Enter to confirm",
+		Description: "Space to select, Enter to confirm, Esc to cancel",
 		Options:     options,
 		Validate: func(selected []string) error {
 			if len(selected) == 0 {
@@ -128,6 +128,9 @@ func authSetup() error {
 		},
 	})
 	if err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return nil
+		}
 		return err
 	}
 
