@@ -122,26 +122,6 @@ func (w Window) DisplayName() string {
 	}
 }
 
-// DeviceCodeResponse represents the response from the Kimi device authorization endpoint.
-type DeviceCodeResponse struct {
-	UserCode                string `json:"user_code"`
-	DeviceCode              string `json:"device_code"`
-	VerificationURIComplete string `json:"verification_uri_complete"`
-	Interval                int    `json:"interval,omitempty"`
-	ExpiresIn               int    `json:"expires_in,omitempty"`
-}
-
-// TokenResponse represents the response from the Kimi OAuth token endpoint.
-type TokenResponse struct {
-	AccessToken  string `json:"access_token,omitempty"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresIn    int    `json:"expires_in,omitempty"`
-	Scope        string `json:"scope,omitempty"`
-	TokenType    string `json:"token_type,omitempty"`
-	Error        string `json:"error,omitempty"`
-	ErrorDesc    string `json:"error_description,omitempty"`
-}
-
 // OAuthCredentials is an alias for the shared OAuth credential type.
 type OAuthCredentials = oauth.Credentials
 

@@ -1,11 +1,9 @@
 package copilot
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -49,7 +47,31 @@ func (c Copilot) FetchStatus(ctx context.Context) models.ProviderStatus {
 
 // Auth returns the GitHub device flow for Copilot.
 func (c Copilot) Auth() provider.AuthFlow {
-	return provider.DeviceAuthFlow{RunFlow: RunDeviceFlow}
+	return provider.DeviceAuthFlow{
+		Config: deviceflow.Config{
+			DeviceCodeURL: deviceCodeURL,
+			DeviceCodeParams: map[string]string{
+				"client_id": clientID,
+				"scope":     "read:user",
+			},
+			TokenURL: tokenURL,
+			TokenParams: map[string]string{
+				"client_id":  clientID,
+				"grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+			},
+			HTTPOptions:     []httpclient.RequestOption{httpclient.WithHeader("Accept", "application/json")},
+			HTTPTimeout:     config.Get().Fetch.Timeout,
+			ManualCodeEntry: true,
+			FormatCode: func(code string) string {
+				if len(code) == 8 {
+					return code[:4] + "-" + code[4:]
+				}
+				return code
+			},
+			CredentialPath:  config.CredentialPath("copilot", "oauth"),
+			ShowRefreshHint: true,
+		},
+	}
 }
 
 func init() {
@@ -211,133 +233,4 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 		Identity:  identity,
 		Source:    "device_flow",
 	}
-}
-
-// RunDeviceFlow runs the interactive GitHub device flow for auth.
-// Output is written to w, allowing callers to control where messages go.
-func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
-	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
-
-	// Request device code
-	var dcResp DeviceCodeResponse
-	resp, err := client.PostForm(deviceCodeURL,
-		map[string]string{
-			"client_id": clientID,
-			"scope":     "read:user",
-		},
-		&dcResp,
-		httpclient.WithHeader("Accept", "application/json"),
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to request device code: %w", err)
-	}
-	if resp.JSONErr != nil {
-		return false, fmt.Errorf("invalid device code response: %w", resp.JSONErr)
-	}
-
-	deviceCode := dcResp.DeviceCode
-	userCode := dcResp.UserCode
-	verificationURI := dcResp.VerificationURI
-	interval := dcResp.Interval
-	if interval == 0 {
-		interval = 5
-	}
-
-	// Format the user code with a dash for readability (GitHub uses 8-char codes).
-	displayCode := userCode
-	if len(userCode) == 8 {
-		displayCode = userCode[:4] + "-" + userCode[4:]
-	}
-
-	// Display instructions — GitHub requires entering the code manually,
-	// so show it and wait for the user to press Enter before opening the browser.
-	if !quiet {
-		_, _ = fmt.Fprintf(w, "Copy this code: %s\n", displayCode)
-		_, _ = fmt.Fprintf(w, "Press Enter to open %s", verificationURI)
-		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
-		deviceflow.WriteOpening(w, verificationURI)
-		deviceflow.WriteWaiting(w)
-	} else {
-		_, _ = fmt.Fprintln(w, verificationURI)
-		_, _ = fmt.Fprintf(w, "Code: %s\n", displayCode)
-	}
-
-	ctx, cancel := deviceflow.PollContext()
-	defer cancel()
-
-	// Poll for token
-	first := true
-	for {
-		if !first {
-			if !deviceflow.PollWait(ctx, interval) {
-				break
-			}
-		}
-		first = false
-
-		var tokenResp TokenResponse
-		pollResp, err := client.PostForm(tokenURL,
-			map[string]string{
-				"client_id":   clientID,
-				"device_code": deviceCode,
-				"grant_type":  "urn:ietf:params:oauth:grant-type:device_code",
-			},
-			&tokenResp,
-			httpclient.WithHeader("Accept", "application/json"),
-		)
-		if err != nil {
-			continue
-		}
-		if pollResp.JSONErr != nil {
-			continue
-		}
-
-		if tokenResp.AccessToken != "" {
-			creds := OAuthCredentials{
-				AccessToken:  tokenResp.AccessToken,
-				RefreshToken: tokenResp.RefreshToken,
-			}
-			if tokenResp.ExpiresIn > 0 {
-				creds.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
-			}
-			content, _ := json.Marshal(creds)
-			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
-			if !quiet {
-				deviceflow.WriteSuccess(w)
-				if tokenResp.RefreshToken != "" {
-					_, _ = fmt.Fprintln(w, "  Token will refresh automatically.")
-				}
-			}
-			return true, nil
-		}
-
-		switch tokenResp.Error {
-		case "authorization_pending":
-			continue
-		case "slow_down":
-			interval += 5
-			continue
-		case "expired_token":
-			if !quiet {
-				deviceflow.WriteExpired(w)
-			}
-			return false, nil
-		case "access_denied":
-			if !quiet {
-				deviceflow.WriteDenied(w)
-			}
-			return false, nil
-		default:
-			desc := tokenResp.ErrorDescription
-			if desc == "" {
-				desc = tokenResp.Error
-			}
-			return false, fmt.Errorf("authentication error: %s", desc)
-		}
-	}
-
-	if !quiet {
-		deviceflow.WriteTimeout(w)
-	}
-	return false, nil
 }
