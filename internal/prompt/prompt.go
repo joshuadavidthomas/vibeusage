@@ -94,9 +94,15 @@ func (h *Huh) Confirm(cfg ConfirmConfig) (bool, error) {
 
 func (h *Huh) MultiSelect(cfg MultiSelectConfig) ([]string, error) {
 	var selected []string
+	for _, opt := range cfg.Options {
+		if opt.Selected {
+			selected = append(selected, opt.Value)
+		}
+	}
+
 	options := make([]huh.Option[string], len(cfg.Options))
 	for i, opt := range cfg.Options {
-		options[i] = huh.NewOption(opt.Label, opt.Value).Selected(opt.Selected)
+		options[i] = huh.NewOption(opt.Label, opt.Value)
 	}
 
 	ms := huh.NewMultiSelect[string]().
