@@ -11,7 +11,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/deviceflow"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 )
 
 const (

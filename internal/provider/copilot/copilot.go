@@ -14,7 +14,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/deviceflow"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 )
 
 type Copilot struct{}
