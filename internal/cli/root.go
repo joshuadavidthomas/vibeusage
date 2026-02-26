@@ -178,7 +178,8 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 	for _, pid := range ids {
 		outcome := outcomes[pid]
 		if !outcome.Success || outcome.Snapshot == nil {
-			if outcome.Error != "" {
+			// Skip unconfigured providers — only show real fetch errors.
+			if outcome.Error != "" && outcome.Error != "No strategies available" {
 				errors = append(errors, providerError{pid, outcome.Error})
 			}
 		}
