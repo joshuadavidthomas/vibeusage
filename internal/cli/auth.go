@@ -9,6 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
@@ -74,6 +76,8 @@ func authSetup() error {
 		enabledSet[id] = true
 	}
 
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
 	options := make([]prompt.SelectOption, 0, len(allProviders))
 	for _, pid := range allProviders {
 		hasCreds, source := provider.CheckCredentials(pid)
@@ -81,11 +85,12 @@ func authSetup() error {
 		if desc == "" {
 			desc = provider.DisplayName(pid)
 		}
+		label := pid + " — " + desc
 		if hasCreds {
-			desc += " [detected: " + sourceToLabel(source) + "]"
+			label += " " + dim.Render("[detected: "+sourceToLabel(source)+"]")
 		}
 		options = append(options, prompt.SelectOption{
-			Label:    pid + " — " + desc,
+			Label:    label,
 			Value:    pid,
 			Selected: enabledSet[pid],
 		})
