@@ -145,17 +145,20 @@ Role-based model groups are configured in `config.toml` under `[roles.<name>]` (
 ## Core Commands
 
 ```bash
-vibeusage                 # Usage for all enabled providers
-vibeusage <provider>      # Usage for one provider
-vibeusage --json          # JSON output
-vibeusage --refresh       # Bypass cache fallback
-vibeusage auth            # Enable/manage providers interactively
-vibeusage auth <provider> # Auth a specific provider
-vibeusage auth --status   # Credential/auth status
-vibeusage auth <provider> --delete  # Remove credentials
+vibeusage                      # Usage for all enabled providers
+vibeusage usage <provider>     # Usage for one provider
+vibeusage --json               # JSON output
+vibeusage --refresh            # Bypass cache fallback
+vibeusage auth                 # Enable/manage providers interactively
+vibeusage auth <provider>      # Auth a specific provider
+vibeusage auth --status        # Credential/auth status
+vibeusage auth <provider> --delete         # Remove credentials
 vibeusage auth <provider> --token <value>  # Set credential non-interactively
-vibeusage route <model>   # Best provider for a model
+vibeusage route <model>        # Best provider for a model
 ```
+
+> [!NOTE]
+> Provider-specific commands moved from `vibeusage <provider>` to `vibeusage usage <provider>` in v0.3.0. The old commands still work but show a deprecation message. They will be removed in v0.4.0.
 
 ## Providers
 
@@ -219,7 +222,7 @@ You can also use an AI Studio API key:
 
 ```bash
 # If you already have GEMINI_API_KEY set, it just works
-vibeusage gemini
+vibeusage usage gemini
 
 # Otherwise, set one up:
 vibeusage auth gemini
@@ -274,7 +277,7 @@ If you have the Codex CLI installed, vibeusage reads its OAuth credentials autom
 codex auth login
 
 # Then vibeusage picks it up automatically
-vibeusage codex
+vibeusage usage codex
 ```
 
 As a fallback, `vibeusage auth codex` lets you paste a bearer token manually, though those don't auto-refresh.

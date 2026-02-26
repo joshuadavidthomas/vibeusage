@@ -45,7 +45,7 @@ func collectCommandPaths(cmd *cobra.Command, prefix []string) [][]string {
 // Root command tests
 
 func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
-	expected := []string{"auth", "status", "config", "cache", "update"}
+	expected := []string{"auth", "status", "config", "cache", "update", "usage"}
 	for _, name := range expected {
 		found := false
 		for _, cmd := range rootCmd.Commands() {
@@ -56,28 +56,6 @@ func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("rootCmd missing expected subcommand %q", name)
-		}
-	}
-}
-
-func TestRootCmd_HasProviderSubcommands(t *testing.T) {
-	providers := []string{"claude", "codex", "copilot", "cursor", "gemini", "openrouter", "warp", "kimicode", "amp"}
-	for _, name := range providers {
-		found := false
-		for _, cmd := range rootCmd.Commands() {
-			if cmd.Name() == name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("rootCmd missing provider subcommand %q", name)
-		}
-	}
-
-	for _, cmd := range rootCmd.Commands() {
-		if cmd.Name() == "kimi" {
-			t.Error("rootCmd should not expose legacy provider subcommand \"kimi\"")
 		}
 	}
 }
