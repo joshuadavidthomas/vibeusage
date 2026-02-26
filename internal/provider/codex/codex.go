@@ -95,9 +95,6 @@ func (s *OAuthStrategy) IsAvailable() bool {
 			return true
 		}
 	}
-	if !provider.ExternalCredentialReuseEnabled() {
-		return false
-	}
 	return s.loadKeychainCredentials() != nil
 }
 
@@ -167,9 +164,6 @@ func (s *OAuthStrategy) loadCredentials() *Credentials {
 		if creds := cliCreds.EffectiveCredentials(); creds != nil {
 			return creds
 		}
-	}
-	if !provider.ExternalCredentialReuseEnabled() {
-		return nil
 	}
 	return s.loadKeychainCredentials()
 }
@@ -258,9 +252,6 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *C
 }
 
 func (s *OAuthStrategy) getUsageURL() string {
-	if !provider.ExternalCredentialReuseEnabled() {
-		return defaultUsageURL
-	}
 	// Check for custom URL in codex config
 	home, _ := os.UserHomeDir()
 	configPath := filepath.Join(home, ".codex", "config.toml")

@@ -60,7 +60,7 @@ type ConfigDisplayJSON struct {
 // ConfigCredentialsJSON represents the credentials section of config.
 type ConfigCredentialsJSON struct {
 	UseKeyring               bool `json:"use_keyring"`
-	ReuseProviderCredentials bool `json:"reuse_provider_credentials"`
+
 }
 
 // ActionResultJSON is a generic success/message response used by

@@ -2,16 +2,10 @@ package amp
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
-	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestParseDisplayBalance_FreeTier(t *testing.T) {
@@ -86,29 +80,5 @@ func TestFetchBalance_AuthError(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(result.Error), "amp") {
 		t.Errorf("error = %q, want amp auth hint", result.Error)
-	}
-}
-
-func TestCLISecretsStrategy_IsAvailable_RespectsReuseProviderCredentials(t *testing.T) {
-	dir := t.TempDir()
-	testenv.ApplyVibeusage(t.Setenv, dir)
-	t.Setenv("HOME", filepath.Join(dir, "home"))
-
-	cfg := config.DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	config.Override(t, cfg)
-
-	secretsPath := filepath.Join(dir, "home", ".local", "share", "amp", "secrets.json")
-	if err := os.MkdirAll(filepath.Dir(secretsPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	content, _ := json.Marshal(map[string]string{"apiKey@https://ampcode.com/": "amp-token"})
-	if err := os.WriteFile(secretsPath, content, 0o600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	s := &CLISecretsStrategy{}
-	if s.IsAvailable() {
-		t.Fatal("IsAvailable() = true, want false when reuse_provider_credentials=false")
 	}
 }

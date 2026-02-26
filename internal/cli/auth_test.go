@@ -15,12 +15,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
-func noReuseConfig() config.Config {
-	cfg := config.DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	return cfg
-}
-
 func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	mock := &prompt.Mock{
 		InputFunc: func(cfg prompt.InputConfig) (string, error) {
@@ -60,7 +54,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("ANTHROPIC_API_KEY", "")
-	config.Override(t, noReuseConfig())
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf

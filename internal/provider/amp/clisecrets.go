@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 // CLISecretsStrategy loads Amp credentials from the local secrets file.
@@ -17,9 +16,6 @@ type CLISecretsStrategy struct {
 }
 
 func (s *CLISecretsStrategy) IsAvailable() bool {
-	if !provider.ExternalCredentialReuseEnabled() {
-		return false
-	}
 	_, ok := loadCLISecretsToken()
 	return ok
 }

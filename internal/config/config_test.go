@@ -31,9 +31,9 @@ func setupTempDir(t *testing.T) string {
 	return dir
 }
 
-// setupTempDirWithCredentialIsolation sets up temp dirs AND writes a config
-// that disables ReuseProviderCredentials and clears all provider env vars.
-// This prevents tests from detecting real CLI credentials on the developer machine.
+// setupTempDirWithCredentialIsolation sets up temp dirs and clears all
+// provider env vars. This prevents tests from detecting real CLI
+// credentials on the developer machine.
 func setupTempDirWithCredentialIsolation(t *testing.T) string {
 	t.Helper()
 	dir := setupTempDir(t)
@@ -45,14 +45,6 @@ func setupTempDirWithCredentialIsolation(t *testing.T) string {
 		"KIMI_CODE_API_KEY", "MINIMAX_API_KEY", "ZAI_API_KEY",
 	} {
 		t.Setenv(envVar, "")
-	}
-
-	// Write a config that disables CLI credential reuse
-	cfg := DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	configPath := filepath.Join(dir, "config", "config.toml")
-	if err := Save(cfg, configPath); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
 	}
 
 	// Reset global config again so it picks up the new file
@@ -101,9 +93,6 @@ func TestDefaultConfig_Values(t *testing.T) {
 	}
 	if cfg.Credentials.UseKeyring {
 		t.Error("Credentials.UseKeyring should default to false")
-	}
-	if !cfg.Credentials.ReuseProviderCredentials {
-		t.Error("Credentials.ReuseProviderCredentials should default to true")
 	}
 	if cfg.Providers == nil {
 		t.Error("Providers map should be initialized (non-nil)")
@@ -1793,9 +1782,6 @@ func TestSeedDefaultRoles_PreservesExistingConfigWhenCacheIsStale(t *testing.T) 
 	}
 	if loaded.Display.ResetFormat != "absolute" {
 		t.Errorf("display.reset_format = %q, want %q", loaded.Display.ResetFormat, "absolute")
-	}
-	if loaded.Credentials.ReuseProviderCredentials {
-		t.Error("credentials.reuse_provider_credentials was overwritten; want false preserved")
 	}
 	if len(loaded.Roles) == 0 {
 		t.Error("expected default roles to be seeded")

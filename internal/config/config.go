@@ -24,8 +24,7 @@ type FetchConfig struct {
 }
 
 type CredentialsConfig struct {
-	UseKeyring               bool `toml:"use_keyring" json:"use_keyring"`
-	ReuseProviderCredentials bool `toml:"reuse_provider_credentials" json:"reuse_provider_credentials"`
+	UseKeyring bool `toml:"use_keyring" json:"use_keyring"`
 }
 
 type ProviderConfig struct {
@@ -61,8 +60,7 @@ func DefaultConfig() Config {
 			StaleThresholdMinutes: 60,
 		},
 		Credentials: CredentialsConfig{
-			UseKeyring:               false,
-			ReuseProviderCredentials: true,
+			UseKeyring: false,
 		},
 		Providers: make(map[string]ProviderConfig),
 		Roles:     make(map[string]RoleConfig),

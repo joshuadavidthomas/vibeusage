@@ -294,26 +294,3 @@ func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
 	}
 }
 
-func TestCheckCredentials_NoStrategyFallbackWhenReuseDisabled(t *testing.T) {
-	testenv.ApplySameDir(t.Setenv, t.TempDir())
-	cfg := config.DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	config.Override(t, cfg)
-
-	orig := registry
-	registry = map[string]Provider{}
-	defer func() { registry = orig }()
-
-	Register(&stubProvider{
-		id:         "alpha",
-		strategies: []fetch.Strategy{&stubStrategy{available: true}},
-	})
-
-	hasCreds, source := CheckCredentials("alpha")
-	if hasCreds {
-		t.Fatal("expected no credentials when reuse_provider_credentials=false")
-	}
-	if source != "" {
-		t.Errorf("source = %q, want empty", source)
-	}
-}

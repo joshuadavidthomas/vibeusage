@@ -39,8 +39,7 @@ var configShowCmd = &cobra.Command{
 					ResetFormat:   cfg.Display.ResetFormat,
 				},
 				Credentials: display.ConfigCredentialsJSON{
-					UseKeyring:               cfg.Credentials.UseKeyring,
-					ReuseProviderCredentials: cfg.Credentials.ReuseProviderCredentials,
+					UseKeyring: cfg.Credentials.UseKeyring,
 				},
 				Roles: cfg.Roles,
 				Path:  cfgPath,
