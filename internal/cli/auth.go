@@ -77,10 +77,6 @@ func authSetup() error {
 	options := make([]prompt.SelectOption, 0, len(allProviders))
 	for _, pid := range allProviders {
 		hasCreds, source := provider.CheckCredentials(pid)
-		prefix := ""
-		if hasCreds {
-			prefix = "✓ "
-		}
 		desc := providerDescriptions[pid]
 		if desc == "" {
 			desc = provider.DisplayName(pid)
@@ -89,7 +85,7 @@ func authSetup() error {
 			desc += " [detected: " + sourceToLabel(source) + "]"
 		}
 		options = append(options, prompt.SelectOption{
-			Label:    prefix + pid + " — " + desc,
+			Label:    pid + " — " + desc,
 			Value:    pid,
 			Selected: enabledSet[pid],
 		})
@@ -115,9 +111,32 @@ func authSetup() error {
 		return err
 	}
 
+	// Only auth newly-selected providers; already-enabled ones stay as-is.
+	var newProviders []string
+	for _, pid := range selected {
+		if !enabledSet[pid] {
+			newProviders = append(newProviders, pid)
+		}
+	}
+
+	// Build the final enabled set from the selection.
+	// Deselected providers get removed; authProvider calls enableProvider
+	// for successful new auths, so start with just the kept ones.
+	selectedSet := make(map[string]bool, len(selected))
+	for _, pid := range selected {
+		selectedSet[pid] = true
+	}
+	var kept []string
+	for _, pid := range config.ReadEnabledProviders() {
+		if selectedSet[pid] {
+			kept = append(kept, pid)
+		}
+	}
+	_ = config.WriteEnabledProviders(kept)
+
 	outln()
 	var failed []string
-	for _, pid := range selected {
+	for _, pid := range newProviders {
 		p, ok := provider.Get(pid)
 		if !ok {
 			continue
