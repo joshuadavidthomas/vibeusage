@@ -1,12 +1,17 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
@@ -20,8 +25,12 @@ var authCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		showStatus, _ := cmd.Flags().GetBool("status")
 
-		if showStatus || len(args) == 0 {
+		if showStatus {
 			return authStatusCommand()
+		}
+
+		if len(args) == 0 {
+			return authSetup()
 		}
 
 		providerID := args[0]
@@ -34,13 +43,152 @@ var authCmd = &cobra.Command{
 	},
 }
 
+var providerDescriptions = map[string]string{
+	"amp":         "Amp coding assistant (ampcode.com)",
+	"antigravity": "Antigravity AI (antigravity.ai)",
+	"claude":      "Anthropic's Claude AI assistant (claude.ai)",
+	"codex":       "OpenAI's Codex/ChatGPT (platform.openai.com)",
+	"copilot":     "GitHub Copilot (github.com)",
+	"cursor":      "Cursor AI code editor (cursor.com)",
+	"gemini":      "Google's Gemini AI (gemini.google.com)",
+	"kimicode":    "Kimi Code coding assistant (kimi.com)",
+	"minimax":     "MiniMax AI (minimax.io)",
+	"openrouter":  "OpenRouter unified model gateway (openrouter.ai)",
+	"warp":        "Warp terminal AI (warp.dev)",
+	"zai":         "Z.ai coding assistant (z.ai)",
+}
+
 func init() {
 	authCmd.Flags().Bool("status", false, "Show authentication status")
+}
+
+// authSetup runs an interactive multi-select to pick and authenticate
+// providers. Used when `vibeusage auth` is run with no configured providers.
+func authSetup() error {
+	if quiet {
+		outln("Use 'vibeusage auth <provider>' to set up providers")
+		return nil
+	}
+
+	allProviders := provider.ListIDs()
+	sort.Strings(allProviders)
+
+	enabledSet := make(map[string]bool)
+	for _, id := range config.ReadEnabledProviders() {
+		enabledSet[id] = true
+	}
+
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	options := make([]prompt.SelectOption, 0, len(allProviders))
+	for _, pid := range allProviders {
+		hasCreds, source := provider.CheckCredentials(pid)
+		desc := providerDescriptions[pid]
+		if desc == "" {
+			desc = provider.DisplayName(pid)
+		}
+		label := pid + " — " + desc
+		if hasCreds {
+			label += " " + dim.Render("[detected: "+sourceToLabel(source)+"]")
+		}
+		options = append(options, prompt.SelectOption{
+			Label:    label,
+			Value:    pid,
+			Selected: enabledSet[pid],
+		})
+	}
+
+	title := "Choose providers to set up"
+	if len(enabledSet) > 0 {
+		title = "Manage enabled providers"
+	}
+
+	selected, err := prompt.Default.MultiSelect(prompt.MultiSelectConfig{
+		Title:       title,
+		Description: "Space to select, Enter to confirm",
+		Options:     options,
+		Validate: func(selected []string) error {
+			if len(selected) == 0 {
+				return errors.New("select at least one provider (use Space to toggle)")
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Only auth newly-selected providers; already-enabled ones stay as-is.
+	var newProviders []string
+	for _, pid := range selected {
+		if !enabledSet[pid] {
+			newProviders = append(newProviders, pid)
+		}
+	}
+
+	// Build the final enabled set from the selection.
+	// Deselected providers get removed; authProvider calls enableProvider
+	// for successful new auths, so start with just the kept ones.
+	selectedSet := make(map[string]bool, len(selected))
+	for _, pid := range selected {
+		selectedSet[pid] = true
+	}
+	var kept []string
+	for _, pid := range config.ReadEnabledProviders() {
+		if selectedSet[pid] {
+			kept = append(kept, pid)
+		} else {
+			removeProviderCredentials(pid)
+		}
+	}
+	_ = config.WriteEnabledProviders(kept)
+
+	// Track removals for summary.
+	var removed []string
+	for id := range enabledSet {
+		if !selectedSet[id] {
+			removed = append(removed, id)
+		}
+	}
+	sort.Strings(removed)
+
+	outln()
+	var failed []string
+	for _, pid := range newProviders {
+		p, ok := provider.Get(pid)
+		if !ok {
+			continue
+		}
+		if err := authProvider(pid, p); err != nil {
+			out("✗ %s: %v\n", pid, err)
+			failed = append(failed, pid)
+		}
+	}
+
+	// Summary
+	outln()
+	finalEnabled := config.ReadEnabledProviders()
+	if len(finalEnabled) > 0 {
+		out("Enabled: %s\n", strings.Join(finalEnabled, ", "))
+	}
+	if len(removed) > 0 {
+		out("Removed: %s\n", strings.Join(removed, ", "))
+	}
+	if len(failed) > 0 {
+		out("Failed:  %s\n", strings.Join(failed, ", "))
+		outln("Retry with: vibeusage auth <provider>")
+	}
+	return nil
 }
 
 func authStatusCommand() error {
 	allProviders := provider.ListIDs()
 	sort.Strings(allProviders)
+
+	enabledSet := make(map[string]bool)
+	for _, id := range config.ReadEnabledProviders() {
+		enabledSet[id] = true
+	}
 
 	if jsonOutput {
 		data := make(map[string]display.AuthStatusEntryJSON)
@@ -49,6 +197,7 @@ func authStatusCommand() error {
 			data[pid] = display.AuthStatusEntryJSON{
 				Authenticated: hasCreds,
 				Source:        sourceToLabel(source),
+				Enabled:       enabledSet[pid],
 			}
 		}
 		return display.OutputJSON(outWriter, data)
@@ -58,8 +207,10 @@ func authStatusCommand() error {
 		for _, pid := range allProviders {
 			hasCreds, _ := provider.CheckCredentials(pid)
 			status := "not configured"
-			if hasCreds {
-				status = "authenticated"
+			if hasCreds && enabledSet[pid] {
+				status = "enabled"
+			} else if hasCreds {
+				status = "authenticated (not enabled)"
 			}
 			out("%s: %s\n", pid, status)
 		}
@@ -67,14 +218,17 @@ func authStatusCommand() error {
 	}
 
 	var rows [][]string
-	var unconfigured []string
+	var unenabled []string
 	for _, pid := range allProviders {
 		hasCreds, source := provider.CheckCredentials(pid)
-		if hasCreds {
+		if hasCreds && enabledSet[pid] {
+			rows = append(rows, []string{pid, "✓ Enabled", sourceToLabel(source)})
+		} else if hasCreds {
 			rows = append(rows, []string{pid, "✓ Authenticated", sourceToLabel(source)})
+			unenabled = append(unenabled, pid)
 		} else {
 			rows = append(rows, []string{pid, "✗ Not configured", "—"})
-			unconfigured = append(unconfigured, pid)
+			unenabled = append(unenabled, pid)
 		}
 	}
 
@@ -84,10 +238,10 @@ func authStatusCommand() error {
 		display.TableOptions{Title: "Authentication Status", NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
-	if len(unconfigured) > 0 {
+	if len(unenabled) > 0 {
 		outln()
-		outln("To configure a provider, run:")
-		for _, pid := range unconfigured {
+		outln("To enable a provider, run:")
+		for _, pid := range unenabled {
 			out("  vibeusage auth %s\n", pid)
 		}
 	}
@@ -96,7 +250,9 @@ func authStatusCommand() error {
 }
 
 // authProvider dispatches to the appropriate auth flow based on what the
-// provider declares via the Authenticator interface.
+// provider declares via the Authenticator interface. On success, the
+// provider is added to enabled_providers so only explicitly authed
+// providers are tracked.
 func authProvider(providerID string, p provider.Provider) error {
 	auth, ok := p.(provider.Authenticator)
 	if !ok {
@@ -108,31 +264,59 @@ func authProvider(providerID string, p provider.Provider) error {
 		return authGeneric(providerID)
 	}
 
+	var err error
 	switch f := flow.(type) {
 	case provider.DeviceAuthFlow:
-		return authDeviceFlow(providerID, f)
+		err = authDeviceFlow(providerID, f)
 	case provider.ManualKeyAuthFlow:
-		return authManualKey(providerID, f)
+		err = authManualKey(providerID, f)
 	default:
 		return authGeneric(providerID)
 	}
+
+	if err == nil {
+		enableProvider(providerID)
+	}
+	return err
 }
 
-// authDeviceFlow runs an OAuth/device-code flow with re-auth check.
+// enableProvider adds a provider to the enabled list in the data directory,
+// making provider tracking opt-in via the auth command.
+func enableProvider(providerID string) {
+	config.AddEnabledProvider(providerID)
+}
+
+// removeProviderCredentials deletes all vibeusage-stored credentials for a provider.
+func removeProviderCredentials(providerID string) {
+	for _, credType := range []string{"oauth", "session", "apikey"} {
+		config.DeleteCredential(config.CredentialPath(providerID, credType))
+	}
+}
+
+// authDeviceFlow runs an OAuth/device-code flow with detected-credential check.
 func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
-		out("✓ %s is already authenticated (%s)\n",
+		out("✓ %s credentials detected (%s)\n",
 			provider.DisplayName(providerID), sourceToLabel(source))
 
-		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: "Re-authenticate?",
+		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title:       "Use detected credentials?",
+			Affirmative: "Yes",
+			Negative:    "No, enter manually",
+			Default:     true,
 		})
 		if err != nil {
 			return err
 		}
-		if !reauth {
-			return nil
+		if useExisting {
+			// Verify the detected credentials actually work.
+			if verifyCredentialsFn(providerID) {
+				return nil
+			}
+			if !quiet {
+				out("✗ Detected credentials are expired or invalid, re-authenticating...\n")
+			}
 		}
 	}
 
@@ -146,20 +330,48 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 	return nil
 }
 
+// HACK: package-level var to allow test stubbing. This should be replaced
+// with a proper interface (e.g. a Verifier on the auth command struct) once
+// the CLI is refactored away from package-level state.
+var verifyCredentialsFn = verifyCredentialsDefault
+
+func verifyCredentialsDefault(providerID string) bool {
+	p, ok := provider.Get(providerID)
+	if !ok {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for _, s := range p.FetchStrategies() {
+		if !s.IsAvailable() {
+			continue
+		}
+		result, err := s.Fetch(ctx)
+		if err != nil {
+			continue
+		}
+		return result.Success
+	}
+	return false
+}
+
 // authManualKey runs an interactive manual-key input flow.
 func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
-		out("✓ %s is already authenticated (%s)\n",
+		out("✓ %s credentials detected (%s)\n",
 			provider.DisplayName(providerID), sourceToLabel(source))
 
-		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: "Re-authenticate?",
+		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title:       "Use detected credentials?",
+			Affirmative: "Yes",
+			Negative:    "No, enter manually",
+			Default:     true,
 		})
 		if err != nil {
 			return err
 		}
-		if !reauth {
+		if useExisting {
 			return nil
 		}
 	}

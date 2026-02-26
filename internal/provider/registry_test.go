@@ -145,6 +145,7 @@ func TestDisplayName_Empty(t *testing.T) {
 }
 
 func TestAvailableIDs_FiltersEnabledAndAvailable(t *testing.T) {
+	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	orig := registry
 	registry = map[string]Provider{}
 	defer func() { registry = orig }()
@@ -174,6 +175,8 @@ func TestAvailableIDs_FiltersEnabledAndAvailable(t *testing.T) {
 }
 
 func TestAvailableIDs_RespectsEnabledProviders(t *testing.T) {
+	testenv.ApplySameDir(t.Setenv, t.TempDir())
+
 	orig := registry
 	registry = map[string]Provider{}
 	defer func() { registry = orig }()
@@ -187,8 +190,8 @@ func TestAvailableIDs_RespectsEnabledProviders(t *testing.T) {
 		strategies: []fetch.Strategy{&stubStrategy{available: true}},
 	})
 
+	_ = config.WriteEnabledProviders([]string{"alpha"})
 	cfg := config.DefaultConfig()
-	cfg.EnabledProviders = []string{"alpha"}
 
 	got := AvailableIDs(cfg)
 	if len(got) != 1 {
@@ -200,6 +203,7 @@ func TestAvailableIDs_RespectsEnabledProviders(t *testing.T) {
 }
 
 func TestAvailableIDs_RespectsProviderDisabled(t *testing.T) {
+	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	orig := registry
 	registry = map[string]Provider{}
 	defer func() { registry = orig }()
@@ -226,6 +230,7 @@ func TestAvailableIDs_RespectsProviderDisabled(t *testing.T) {
 }
 
 func TestAvailableIDs_EmptyWhenNoneAvailable(t *testing.T) {
+	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	orig := registry
 	registry = map[string]Provider{}
 	defer func() { registry = orig }()
@@ -244,6 +249,7 @@ func TestAvailableIDs_EmptyWhenNoneAvailable(t *testing.T) {
 }
 
 func TestAvailableIDs_IsSorted(t *testing.T) {
+	testenv.ApplySameDir(t.Setenv, t.TempDir())
 	orig := registry
 	registry = map[string]Provider{}
 	defer func() { registry = orig }()
@@ -291,29 +297,5 @@ func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
 	}
 	if source != "provider_cli" {
 		t.Errorf("source = %q, want %q", source, "provider_cli")
-	}
-}
-
-func TestCheckCredentials_NoStrategyFallbackWhenReuseDisabled(t *testing.T) {
-	testenv.ApplySameDir(t.Setenv, t.TempDir())
-	cfg := config.DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	config.Override(t, cfg)
-
-	orig := registry
-	registry = map[string]Provider{}
-	defer func() { registry = orig }()
-
-	Register(&stubProvider{
-		id:         "alpha",
-		strategies: []fetch.Strategy{&stubStrategy{available: true}},
-	})
-
-	hasCreds, source := CheckCredentials("alpha")
-	if hasCreds {
-		t.Fatal("expected no credentials when reuse_provider_credentials=false")
-	}
-	if source != "" {
-		t.Errorf("source = %q, want empty", source)
 	}
 }

@@ -15,12 +15,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
-func noReuseConfig() config.Config {
-	cfg := config.DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	return cfg
-}
-
 func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	mock := &prompt.Mock{
 		InputFunc: func(cfg prompt.InputConfig) (string, error) {
@@ -47,7 +41,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 			return "sk-ant-" + "sid01-" + "test123", nil
 		},
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
-			return true, nil // re-auth if already configured
+			return false, nil // decline detected creds, enter new
 		},
 	}
 
@@ -60,7 +54,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("ANTHROPIC_API_KEY", "")
-	config.Override(t, noReuseConfig())
+	config.Override(t, config.DefaultConfig())
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -216,9 +210,14 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	_ = os.MkdirAll(credDir, 0o755)
 	_ = os.WriteFile(filepath.Join(credDir, "oauth.json"), []byte(`{"access_token":"test"}`), 0o600)
 
+	// Stub verify so it doesn't make real network calls
+	oldVerify := verifyCredentialsFn
+	verifyCredentialsFn = func(string) bool { return true }
+	defer func() { verifyCredentialsFn = oldVerify }()
+
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
-			return false, nil // user says no to re-auth
+			return true, nil // user says yes to use existing creds
 		},
 	}
 

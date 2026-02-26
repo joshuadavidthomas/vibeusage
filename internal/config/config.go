@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/BurntSushi/toml"
@@ -24,8 +23,7 @@ type FetchConfig struct {
 }
 
 type CredentialsConfig struct {
-	UseKeyring               bool `toml:"use_keyring" json:"use_keyring"`
-	ReuseProviderCredentials bool `toml:"reuse_provider_credentials" json:"reuse_provider_credentials"`
+	UseKeyring bool `toml:"use_keyring" json:"use_keyring"`
 }
 
 type ProviderConfig struct {
@@ -39,17 +37,15 @@ type RoleConfig struct {
 }
 
 type Config struct {
-	EnabledProviders []string                  `toml:"enabled_providers" json:"enabled_providers"`
-	Display          DisplayConfig             `toml:"display" json:"display"`
-	Fetch            FetchConfig               `toml:"fetch" json:"fetch"`
-	Credentials      CredentialsConfig         `toml:"credentials" json:"credentials"`
-	Providers        map[string]ProviderConfig `toml:"providers" json:"providers"`
-	Roles            map[string]RoleConfig     `toml:"roles" json:"roles"`
+	Display     DisplayConfig             `toml:"display" json:"display"`
+	Fetch       FetchConfig               `toml:"fetch" json:"fetch"`
+	Credentials CredentialsConfig         `toml:"credentials" json:"credentials"`
+	Providers   map[string]ProviderConfig `toml:"providers" json:"providers"`
+	Roles       map[string]RoleConfig     `toml:"roles" json:"roles"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		EnabledProviders: nil,
 		Display: DisplayConfig{
 			ShowRemaining: true,
 			PaceColors:    true,
@@ -61,8 +57,7 @@ func DefaultConfig() Config {
 			StaleThresholdMinutes: 60,
 		},
 		Credentials: CredentialsConfig{
-			UseKeyring:               false,
-			ReuseProviderCredentials: true,
+			UseKeyring: false,
 		},
 		Providers: make(map[string]ProviderConfig),
 		Roles:     make(map[string]RoleConfig),
@@ -96,16 +91,12 @@ func SeedDefaultRoles() bool {
 	if err := Save(cfg, ""); err != nil {
 		return false
 	}
-	set(cfg)
+	SetGlobal(cfg)
 	return true
 }
 
 func (c Config) clone() Config {
 	out := c
-	if c.EnabledProviders != nil {
-		out.EnabledProviders = make([]string, len(c.EnabledProviders))
-		copy(out.EnabledProviders, c.EnabledProviders)
-	}
 	out.Providers = make(map[string]ProviderConfig, len(c.Providers))
 	for k, v := range c.Providers {
 		out.Providers[k] = v
@@ -123,10 +114,11 @@ func (c Config) IsProviderEnabled(providerID string) bool {
 	if pc, ok := c.Providers[providerID]; ok && !pc.Enabled {
 		return false
 	}
-	if len(c.EnabledProviders) == 0 {
+	enabled := ReadEnabledProviders()
+	if len(enabled) == 0 {
 		return true
 	}
-	for _, id := range c.EnabledProviders {
+	for _, id := range enabled {
 		if id == providerID {
 			return true
 		}
@@ -174,9 +166,9 @@ func Init() (Config, error) {
 	return c.clone(), err
 }
 
-// set replaces the global config value. Used by Init, SeedDefaultRoles,
-// and Override.
-func set(cfg Config) {
+// SetGlobal replaces the global config value. Use after persisting config
+// changes to disk so in-process reads reflect the update.
+func SetGlobal(cfg Config) {
 	configMu.Lock()
 	defer configMu.Unlock()
 	globalConfig = &cfg
@@ -262,17 +254,6 @@ func legacyConfigFilePath(path string) string {
 }
 
 func applyEnvOverrides(cfg Config) Config {
-	if v := os.Getenv("VIBEUSAGE_ENABLED_PROVIDERS"); v != "" {
-		parts := strings.Split(v, ",")
-		var providers []string
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				providers = append(providers, p)
-			}
-		}
-		cfg.EnabledProviders = providers
-	}
 	if os.Getenv("VIBEUSAGE_NO_COLOR") != "" {
 		cfg.Display.PaceColors = false
 	}

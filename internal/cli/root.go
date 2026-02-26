@@ -77,7 +77,6 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(cacheCmd)
 	rootCmd.AddCommand(keyCmd)
-	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(routeCmd)
 	rootCmd.AddCommand(updateCmd)
 
@@ -104,7 +103,7 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if provider.IsFirstRun() && !jsonOutput && !quiet {
+	if len(config.ReadEnabledProviders()) == 0 && !jsonOutput && !quiet {
 		showFirstRunMessage()
 		return nil
 	}
@@ -179,7 +178,8 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 	for _, pid := range ids {
 		outcome := outcomes[pid]
 		if !outcome.Success || outcome.Snapshot == nil {
-			if outcome.Error != "" {
+			// Skip unconfigured providers — only show real fetch errors.
+			if outcome.Error != "" && outcome.Error != "No strategies available" {
 				errors = append(errors, providerError{pid, outcome.Error})
 			}
 		}
@@ -202,8 +202,8 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 					outln(display.RenderProviderError(e.id, e.err))
 				}
 			} else {
-				outln("\nConfigure credentials with:")
-				outln("  vibeusage key <provider> set")
+				outln("\nSet up a provider with:")
+				outln("  vibeusage auth <provider>")
 			}
 		}
 		for _, e := range errors {
@@ -347,25 +347,10 @@ func orchestratorConfigFromConfig(cfg config.Config) fetch.OrchestratorConfig {
 
 func showFirstRunMessage() {
 	outln()
-	outln("  ✨ Welcome to vibeusage!")
+	outln("Welcome to vibeusage!")
+	outln("Track your usage across AI providers in one place.")
 	outln()
-	outln("  No providers are configured yet.")
-	outln("  Track your usage across AI providers in one place.")
-	outln()
-	outln("  Quick start:")
-	outln("    vibeusage init        - Run the setup wizard")
-	outln("    vibeusage init --quick - Quick setup with Claude")
-	outln()
-	outln("  Or set up a provider directly:")
-
-	ids := provider.ListIDs()
-	sort.Strings(ids)
-	count := 3
-	if len(ids) < count {
-		count = len(ids)
-	}
-	for _, id := range ids[:count] {
-		out("    vibeusage auth %s\n", id)
-	}
+	outln("Get started with:")
+	outln("  vibeusage auth")
 	outln()
 }

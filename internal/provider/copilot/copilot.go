@@ -1,6 +1,7 @@
 package copilot
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -205,28 +207,37 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		interval = 5
 	}
 
-	// Display instructions
-	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n🔐 GitHub Device Flow Authentication")
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "  1. Open %s\n", verificationURI)
-		if len(userCode) == 8 {
-			_, _ = fmt.Fprintf(w, "  2. Enter code: %s-%s\n", userCode[:4], userCode[4:])
-		} else {
-			_, _ = fmt.Fprintf(w, "  2. Enter code: %s\n", userCode)
-		}
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintln(w, "  Waiting for authorization...")
-	} else {
-		_, _ = fmt.Fprintln(w, verificationURI)
-		_, _ = fmt.Fprintf(w, "Code: %s\n", userCode)
+	// Format the user code with a dash for readability (GitHub uses 8-char codes).
+	displayCode := userCode
+	if len(userCode) == 8 {
+		displayCode = userCode[:4] + "-" + userCode[4:]
 	}
 
+	// Display instructions — GitHub requires entering the code manually,
+	// so show it and wait for the user to press Enter before opening the browser.
+	if !quiet {
+		_, _ = fmt.Fprintf(w, "Copy this code: %s\n", displayCode)
+		_, _ = fmt.Fprintf(w, "Press Enter to open %s", verificationURI)
+		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
+		deviceflow.WriteOpening(w, verificationURI)
+		deviceflow.WriteWaiting(w)
+	} else {
+		_, _ = fmt.Fprintln(w, verificationURI)
+		_, _ = fmt.Fprintf(w, "Code: %s\n", displayCode)
+	}
+
+	ctx, cancel := deviceflow.PollContext()
+	defer cancel()
+
 	// Poll for token
-	for attempt := 0; attempt < 60; attempt++ {
-		if attempt > 0 {
-			time.Sleep(time.Duration(interval) * time.Second)
+	first := true
+	for {
+		if !first {
+			if !deviceflow.PollWait(ctx, interval) {
+				break
+			}
 		}
+		first = false
 
 		var tokenResp TokenResponse
 		pollResp, err := client.PostForm(tokenURL,
@@ -239,10 +250,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			httpclient.WithHeader("Accept", "application/json"),
 		)
 		if err != nil {
-			if attempt < 3 {
-				continue
-			}
-			return false, fmt.Errorf("network error: %w", err)
+			continue
 		}
 		if pollResp.JSONErr != nil {
 			continue
@@ -253,7 +261,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
+				deviceflow.WriteSuccess(w)
 			}
 			return true, nil
 		}
@@ -266,12 +274,12 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			continue
 		case "expired_token":
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✗ Device code expired.")
+				deviceflow.WriteExpired(w)
 			}
 			return false, nil
 		case "access_denied":
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✗ Authorization denied by user.")
+				deviceflow.WriteDenied(w)
 			}
 			return false, nil
 		default:
@@ -284,7 +292,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	}
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
+		deviceflow.WriteTimeout(w)
 	}
 	return false, nil
 }

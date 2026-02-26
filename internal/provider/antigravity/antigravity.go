@@ -82,9 +82,6 @@ func (s *OAuthStrategy) IsAvailable() bool {
 			return true
 		}
 	}
-	if !provider.ExternalCredentialReuseEnabled() {
-		return false
-	}
 	// Check if Antigravity's VS Code state database exists
 	if _, err := os.Stat(vscdbPath()); err == nil {
 		return true
@@ -170,10 +167,6 @@ func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
 		if err := json.Unmarshal(data, &oauthCreds); err == nil && oauthCreds.AccessToken != "" {
 			return &oauthCreds
 		}
-	}
-
-	if !provider.ExternalCredentialReuseEnabled() {
-		return nil
 	}
 
 	// Try reading from Antigravity's VS Code state database

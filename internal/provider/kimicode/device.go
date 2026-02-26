@@ -6,15 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 const (
@@ -49,12 +46,7 @@ func (s *DeviceFlowStrategy) IsAvailable() bool {
 }
 
 func (s *DeviceFlowStrategy) credentialPaths() []string {
-	// kimi-cli stores credentials at ~/.kimi/credentials/kimi-code.json
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return provider.CredentialSearchPaths("kimicode", "oauth")
-	}
-	return provider.CredentialSearchPaths("kimicode", "oauth", filepath.Join(home, ".kimi", "credentials", "kimi-code.json"))
+	return []string{config.CredentialPath("kimicode", "oauth")}
 }
 
 func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -172,25 +164,28 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 
 	// Display instructions
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n🔐 Kimi Device Flow Authentication")
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "  1. Open %s\n", verificationURI)
-		_, _ = fmt.Fprintf(w, "  2. Confirm code: %s\n", userCode)
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintln(w, "  Waiting for authorization...")
+		deviceflow.WriteOpening(w, verificationURI)
+		deviceflow.WriteWaiting(w)
 	} else {
 		_, _ = fmt.Fprintln(w, verificationURI)
 		_, _ = fmt.Fprintf(w, "Code: %s\n", userCode)
 	}
 
 	// Try to open browser
-	openBrowser(verificationURI)
+	deviceflow.OpenBrowser(verificationURI)
+
+	ctx, cancel := deviceflow.PollContext()
+	defer cancel()
 
 	// Poll for token
-	for attempt := 0; attempt < 120; attempt++ {
-		if attempt > 0 {
-			time.Sleep(time.Duration(interval) * time.Second)
+	first := true
+	for {
+		if !first {
+			if !deviceflow.PollWait(ctx, interval) {
+				break
+			}
 		}
+		first = false
 
 		var tokenResp TokenResponse
 		pollResp, err := client.PostFormCtx(context.Background(), oauthBaseURL()+tokenPath,
@@ -203,10 +198,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			opts...,
 		)
 		if err != nil {
-			if attempt < 3 {
-				continue
-			}
-			return false, fmt.Errorf("network error: %w", err)
+			continue
 		}
 		if pollResp.JSONErr != nil {
 			continue
@@ -223,7 +215,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("kimicode", "oauth"), content)
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
+				deviceflow.WriteSuccess(w)
 			}
 			return true, nil
 		}
@@ -236,12 +228,12 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			continue
 		case "expired_token":
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✗ Device code expired.")
+				deviceflow.WriteExpired(w)
 			}
 			return false, nil
 		case "access_denied":
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✗ Authorization denied by user.")
+				deviceflow.WriteDenied(w)
 			}
 			return false, nil
 		default:
@@ -256,23 +248,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	}
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
+		deviceflow.WriteTimeout(w)
 	}
 	return false, nil
-}
-
-// openBrowser tries to open a URL in the default browser.
-func openBrowser(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		return
-	}
-	_ = cmd.Start()
 }

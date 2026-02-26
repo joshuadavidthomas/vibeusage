@@ -47,7 +47,22 @@ go build -o vibeusage ./cmd/vibeusage
 
 ## Quick Start
 
-If you already use AI coding tools (Claude Code, Codex CLI, Gemini CLI, Copilot, etc.), vibeusage auto-detects their credentials. Just run:
+Set up the providers you use:
+
+```bash
+$ vibeusage auth
+┃ Choose providers to set up
+┃ Space to select, Enter to confirm
+┃ > claude — Anthropic's Claude AI assistant (claude.ai) [detected: provider CLI]
+┃   codex — OpenAI's Codex/ChatGPT (platform.openai.com) [detected: provider CLI]
+┃   copilot — GitHub Copilot (github.com)
+┃   cursor — Cursor AI code editor (cursor.com)
+┃   ...
+```
+
+Providers with existing CLI credentials are detected automatically — just select them and hit Enter. For others, vibeusage walks you through authentication (API keys, device flows, or browser tokens).
+
+Then check your usage:
 
 ```bash
 $ vibeusage
@@ -68,7 +83,7 @@ $ vibeusage
 
 Bars are pace-colored: green (on track), yellow (slightly over pace), red (well over pace).
 
-For providers that need manual setup (API keys, browser tokens), see [Providers](#providers) below. You can also run `vibeusage init` for a guided setup wizard.
+Only providers you explicitly enable via `vibeusage auth` are tracked. Run it again anytime to add, remove, or re-authenticate providers.
 
 ## Smart routing
 
@@ -119,10 +134,12 @@ Role-based model groups are configured in `config.toml` under `[roles.<name>]` (
 ## Core Commands
 
 ```bash
-vibeusage                 # Usage for all configured providers
+vibeusage                 # Usage for all enabled providers
 vibeusage <provider>      # Usage for one provider
 vibeusage --json          # JSON output
 vibeusage --refresh       # Bypass cache fallback
+vibeusage auth            # Enable/manage providers interactively
+vibeusage auth <provider> # Auth a specific provider
 vibeusage auth --status   # Credential/auth status
 vibeusage key             # Credential sources and state
 vibeusage route <model>   # Best provider for a model
@@ -130,7 +147,7 @@ vibeusage route <model>   # Best provider for a model
 
 ## Providers
 
-vibeusage checks for existing credentials first — CLI/app state files, then environment variables — so most providers work automatically if you already use their tools. Manual auth is there as a fallback.
+Run `vibeusage auth` to enable providers interactively, or `vibeusage auth <provider>` for a specific one. For providers with existing CLI credentials (Claude Code, Codex CLI, Gemini CLI, etc.), vibeusage detects them and offers to reuse them. Otherwise, it walks you through the appropriate auth flow.
 
 ### Amp
 
@@ -214,13 +231,13 @@ This opens a browser-based GitHub authorization flow — you'll get a device cod
 
 [kimi.com](https://www.kimi.com) — Moonshot AI coding assistant. Reports weekly usage and per-window quotas.
 
-If you have the [kimi-cli](https://github.com/MoonshotAI/kimi-cli) installed, vibeusage reads its credentials from `~/.kimi/credentials/kimi-code.json` automatically — including token refresh. It also picks up `KIMI_CODE_API_KEY` if set.
-
-Otherwise, authenticate via device flow:
+Authenticate via device flow:
 
 ```bash
 vibeusage auth kimicode
 ```
+
+Also picks up `KIMI_CODE_API_KEY` if set.
 
 ### Minimax
 
@@ -370,7 +387,6 @@ Configuration is stored in:
 
 ```toml
 [credentials]
-reuse_provider_credentials = true  # Auto-detect CLI credentials
 use_keyring = false                # Use system keyring
 
 [display]
@@ -417,7 +433,6 @@ vibeusage route --role coding
 | `VIBEUSAGE_CACHE_DIR` | Override cache directory |
 | `VIBEUSAGE_CONFIG_DIR` | Override config directory |
 | `VIBEUSAGE_DATA_DIR` | Override data directory (credentials storage) |
-| `VIBEUSAGE_ENABLED_PROVIDERS` | Comma-separated provider list |
 | `VIBEUSAGE_NO_COLOR` | Disable colored output |
 | `VIBEUSAGE_UPDATE_GITHUB_TOKEN` | Optional GitHub token used by `vibeusage update` (helps avoid rate limits) |
 | `WARP_API_KEY` | Warp API key |

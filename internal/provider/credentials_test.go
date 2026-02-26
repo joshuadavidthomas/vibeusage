@@ -124,10 +124,7 @@ func TestFindCredential_CLIPaths(t *testing.T) {
 		creds: CredentialInfo{CLIPaths: []string{cliFile}},
 	})
 
-	// Enable reuse of provider credentials
-	cfg := config.DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = true
-	config.Override(t, cfg)
+	config.Override(t, config.DefaultConfig())
 
 	found, source, _ := FindCredential("testprov")
 	if !found {

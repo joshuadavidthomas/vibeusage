@@ -7,11 +7,10 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
@@ -81,21 +80,18 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 	)
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n🔐 Antigravity OAuth Authentication")
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintln(w, "  Opening browser for Google sign-in...")
-		_, _ = fmt.Fprintln(w, "  If it doesn't open, visit:")
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "    %s\n", authURL)
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintln(w, "  Waiting for authorization...")
+		deviceflow.WriteOpening(w, authURL)
+		deviceflow.WriteWaiting(w)
 	} else {
 		_, _ = fmt.Fprintln(w, authURL)
 	}
 
-	openBrowser(authURL)
+	deviceflow.OpenBrowser(authURL)
 
-	// Wait for the callback (with timeout).
+	ctx, cancel := deviceflow.PollContext()
+	defer cancel()
+
+	// Wait for the callback or timeout/interrupt.
 	select {
 	case result := <-resultCh:
 		if result.err != nil {
@@ -105,9 +101,9 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 			return false, nil
 		}
 		return exchangeCode(w, result.code, redirectURI, quiet)
-	case <-time.After(5 * time.Minute):
+	case <-ctx.Done():
 		if !quiet {
-			_, _ = fmt.Fprintln(w, "\n  ⏱ Timeout waiting for authorization.")
+			deviceflow.WriteTimeout(w)
 		}
 		return false, nil
 	}
@@ -155,27 +151,11 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 	}
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
+		deviceflow.WriteSuccess(w)
 		if tokenResp.RefreshToken != "" {
 			_, _ = fmt.Fprintln(w, "  Token will refresh automatically — no need to open the IDE.")
 		}
 	}
 
 	return true, nil
-}
-
-// openBrowser tries to open a URL in the default browser.
-func openBrowser(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	default:
-		return
-	}
-	_ = cmd.Start()
 }

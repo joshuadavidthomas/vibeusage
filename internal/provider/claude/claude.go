@@ -43,17 +43,9 @@ func (c Claude) FetchStatus(ctx context.Context) models.ProviderStatus {
 }
 
 // Auth returns a manual credential flow for Claude.
-//
-// Accepted inputs:
-// - claude.ai sessionKey cookie (sk-ant-sid01-...) as web fallback
 func (c Claude) Auth() provider.AuthFlow {
 	return provider.ManualKeyAuthFlow{
-		Instructions: "Provide one of the following credentials:\n" +
-			"\n" +
-			"Option A (recommended): Claude CLI OAuth\n" +
-			"  Run `claude auth login` and vibeusage will auto-detect it.\n" +
-			"\n" +
-			"Option B (fallback): claude.ai session key\n" +
+		Instructions: "Paste your claude.ai session key:\n" +
 			"  1. Open https://claude.ai in your browser\n" +
 			"  2. Open DevTools (F12 or Cmd+Option+I)\n" +
 			"  3. Go to Application → Cookies → https://claude.ai\n" +

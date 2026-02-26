@@ -28,8 +28,6 @@ func expandPath(p string) string {
 // envVars are environment variable names to check.
 // Returns (found, source, path).
 func FindProviderCredential(providerID string, cliPaths []string, envVars []string) (bool, string, string) {
-	cfg := Get()
-
 	// Check vibeusage storage first
 	for _, credType := range []string{"oauth", "session", "apikey"} {
 		p := CredentialPath(providerID, credType)
@@ -43,12 +41,10 @@ func FindProviderCredential(providerID string, cliPaths []string, envVars []stri
 	}
 
 	// Check provider CLI credentials
-	if cfg.Credentials.ReuseProviderCredentials {
-		for _, raw := range cliPaths {
-			p := expandPath(raw)
-			if fileExists(p) {
-				return true, "provider_cli", p
-			}
+	for _, raw := range cliPaths {
+		p := expandPath(raw)
+		if fileExists(p) {
+			return true, "provider_cli", p
 		}
 	}
 

@@ -2,44 +2,10 @@ package kimicode
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
-
-func TestDeviceFlowStrategy_CredentialPaths_RespectsReuseProviderCredentials(t *testing.T) {
-	dir := t.TempDir()
-	testenv.ApplyVibeusage(t.Setenv, dir)
-	t.Setenv("HOME", filepath.Join(dir, "home"))
-
-	cfg := config.DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	config.Override(t, cfg)
-
-	externalPath := filepath.Join(dir, "home", ".kimi", "credentials", "kimi-code.json")
-	if err := os.MkdirAll(filepath.Dir(externalPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	if err := os.WriteFile(externalPath, []byte(`{"access_token":"tok"}`), 0o600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	s := &DeviceFlowStrategy{}
-	paths := s.credentialPaths()
-	if len(paths) != 1 {
-		t.Fatalf("len(paths) = %d, want 1", len(paths))
-	}
-	if paths[0] != config.CredentialPath("kimicode", "oauth") {
-		t.Errorf("paths[0] = %q, want %q", paths[0], config.CredentialPath("kimicode", "oauth"))
-	}
-	if s.IsAvailable() {
-		t.Fatal("IsAvailable() = true, want false when only provider CLI credentials exist")
-	}
-}
 
 func TestAPIKeyStrategy_IsAvailable_EnvVar(t *testing.T) {
 	t.Setenv("KIMI_CODE_API_KEY", "test-key")

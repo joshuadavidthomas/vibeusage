@@ -15,9 +15,19 @@ Run these after implementing to get immediate feedback:
 - Lint: `just lint`
 - Format: `just fmt`
 
+## Sandbox
+
+Development uses a local sandbox via `.env` / `.envrc` (loaded by direnv):
+
+- `VIBEUSAGE_CONFIG_DIR=.sandbox/vibeusage/config`
+- `VIBEUSAGE_DATA_DIR=.sandbox/vibeusage/data`
+- `VIBEUSAGE_CACHE_DIR=.sandbox/vibeusage/cache`
+
+The `vibeusage` shell alias runs `go run ./cmd/vibeusage` with these env vars. When testing CLI behavior manually, use the alias or set these env vars. Check `.sandbox/vibeusage/config/config.toml` for the active sandbox config — it may differ from defaults.
+
 ## Operational Notes
 
-- CLI entry point: `go run . [OPTIONS] COMMAND [ARGS]`
+- CLI entry point: `go run ./cmd/vibeusage [OPTIONS] COMMAND [ARGS]`
 - Module: `github.com/joshuadavidthomas/vibeusage`
 - Uses cobra for CLI, charmbracelet libs for TUI (huh, lipgloss, bubbletea, log)
 

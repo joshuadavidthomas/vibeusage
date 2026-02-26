@@ -27,8 +27,7 @@ func (k KimiCode) Meta() provider.Metadata {
 
 func (k KimiCode) CredentialSources() provider.CredentialInfo {
 	return provider.CredentialInfo{
-		CLIPaths: []string{"~/.kimi/credentials/kimi-code.json"},
-		EnvVars:  []string{"KIMI_CODE_API_KEY"},
+		EnvVars: []string{"KIMI_CODE_API_KEY"},
 	}
 }
 

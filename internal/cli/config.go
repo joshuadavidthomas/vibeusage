@@ -32,15 +32,13 @@ var configShowCmd = &cobra.Command{
 					StaleThresholdMinutes: cfg.Fetch.StaleThresholdMinutes,
 					MaxConcurrent:         cfg.Fetch.MaxConcurrent,
 				},
-				EnabledProviders: cfg.EnabledProviders,
 				Display: display.ConfigDisplayJSON{
 					ShowRemaining: cfg.Display.ShowRemaining,
 					PaceColors:    cfg.Display.PaceColors,
 					ResetFormat:   cfg.Display.ResetFormat,
 				},
 				Credentials: display.ConfigCredentialsJSON{
-					UseKeyring:               cfg.Credentials.UseKeyring,
-					ReuseProviderCredentials: cfg.Credentials.ReuseProviderCredentials,
+					UseKeyring: cfg.Credentials.UseKeyring,
 				},
 				Roles: cfg.Roles,
 				Path:  cfgPath,

@@ -31,9 +31,9 @@ func setupTempDir(t *testing.T) string {
 	return dir
 }
 
-// setupTempDirWithCredentialIsolation sets up temp dirs AND writes a config
-// that disables ReuseProviderCredentials and clears all provider env vars.
-// This prevents tests from detecting real CLI credentials on the developer machine.
+// setupTempDirWithCredentialIsolation sets up temp dirs and clears all
+// provider env vars. This prevents tests from detecting real CLI
+// credentials on the developer machine.
 func setupTempDirWithCredentialIsolation(t *testing.T) string {
 	t.Helper()
 	dir := setupTempDir(t)
@@ -45,14 +45,6 @@ func setupTempDirWithCredentialIsolation(t *testing.T) string {
 		"KIMI_CODE_API_KEY", "MINIMAX_API_KEY", "ZAI_API_KEY",
 	} {
 		t.Setenv(envVar, "")
-	}
-
-	// Write a config that disables CLI credential reuse
-	cfg := DefaultConfig()
-	cfg.Credentials.ReuseProviderCredentials = false
-	configPath := filepath.Join(dir, "config", "config.toml")
-	if err := Save(cfg, configPath); err != nil {
-		t.Fatalf("failed to write test config: %v", err)
 	}
 
 	// Reset global config again so it picks up the new file
@@ -78,9 +70,6 @@ func writeTestFile(t *testing.T, path string, content []byte) {
 func TestDefaultConfig_Values(t *testing.T) {
 	cfg := DefaultConfig()
 
-	if cfg.EnabledProviders != nil {
-		t.Error("EnabledProviders should be nil (all enabled)")
-	}
 	if !cfg.Display.ShowRemaining {
 		t.Error("Display.ShowRemaining should default to true")
 	}
@@ -102,9 +91,6 @@ func TestDefaultConfig_Values(t *testing.T) {
 	if cfg.Credentials.UseKeyring {
 		t.Error("Credentials.UseKeyring should default to false")
 	}
-	if !cfg.Credentials.ReuseProviderCredentials {
-		t.Error("Credentials.ReuseProviderCredentials should default to true")
-	}
 	if cfg.Providers == nil {
 		t.Error("Providers map should be initialized (non-nil)")
 	}
@@ -118,27 +104,22 @@ func TestDefaultConfig_Values(t *testing.T) {
 func TestIsProviderEnabled(t *testing.T) {
 	tests := []struct {
 		name             string
-		enabledProviders []string
+		enabledProviders []string // nil means no file, empty means empty file
+		writeFile        bool
 		providers        map[string]ProviderConfig
 		providerID       string
 		want             bool
 	}{
 		{
-			name:             "all enabled when EnabledProviders is nil",
-			enabledProviders: nil,
-			providers:        map[string]ProviderConfig{},
-			providerID:       "claude",
-			want:             true,
-		},
-		{
-			name:             "all enabled when EnabledProviders is empty",
-			enabledProviders: []string{},
-			providers:        map[string]ProviderConfig{},
-			providerID:       "claude",
-			want:             true,
+			name:       "all enabled when no enabled file exists",
+			writeFile:  false,
+			providers:  map[string]ProviderConfig{},
+			providerID: "claude",
+			want:       true,
 		},
 		{
 			name:             "provider in allowlist is enabled",
+			writeFile:        true,
 			enabledProviders: []string{"claude", "copilot"},
 			providers:        map[string]ProviderConfig{},
 			providerID:       "claude",
@@ -146,6 +127,7 @@ func TestIsProviderEnabled(t *testing.T) {
 		},
 		{
 			name:             "provider not in allowlist is disabled",
+			writeFile:        true,
 			enabledProviders: []string{"claude", "copilot"},
 			providers:        map[string]ProviderConfig{},
 			providerID:       "gemini",
@@ -153,6 +135,7 @@ func TestIsProviderEnabled(t *testing.T) {
 		},
 		{
 			name:             "explicit Enabled:false overrides allowlist",
+			writeFile:        true,
 			enabledProviders: []string{"claude", "copilot"},
 			providers: map[string]ProviderConfig{
 				"claude": {Enabled: false},
@@ -161,35 +144,10 @@ func TestIsProviderEnabled(t *testing.T) {
 			want:       false,
 		},
 		{
-			name:             "explicit Enabled:false overrides nil EnabledProviders",
-			enabledProviders: nil,
+			name:      "explicit Enabled:false overrides no file",
+			writeFile: false,
 			providers: map[string]ProviderConfig{
 				"claude": {Enabled: false},
-			},
-			providerID: "claude",
-			want:       false,
-		},
-		{
-			name:             "explicit Enabled:true with nil EnabledProviders is enabled",
-			enabledProviders: nil,
-			providers: map[string]ProviderConfig{
-				"claude": {Enabled: true},
-			},
-			providerID: "claude",
-			want:       true,
-		},
-		{
-			name:             "provider not in Providers map and not in allowlist",
-			enabledProviders: []string{"copilot"},
-			providers:        map[string]ProviderConfig{},
-			providerID:       "claude",
-			want:             false,
-		},
-		{
-			name:             "Enabled:true does NOT override allowlist exclusion",
-			enabledProviders: []string{"copilot"},
-			providers: map[string]ProviderConfig{
-				"claude": {Enabled: true},
 			},
 			providerID: "claude",
 			want:       false,
@@ -197,9 +155,13 @@ func TestIsProviderEnabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			dir := setupTempDir(t)
+			_ = dir
+			if tt.writeFile {
+				_ = WriteEnabledProviders(tt.enabledProviders)
+			}
 			cfg := Config{
-				EnabledProviders: tt.enabledProviders,
-				Providers:        tt.providers,
+				Providers: tt.providers,
 			}
 			got := cfg.IsProviderEnabled(tt.providerID)
 			if got != tt.want {
@@ -332,7 +294,6 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 
 	original := DefaultConfig()
 	original.Fetch.Timeout = 99.0
-	original.EnabledProviders = []string{"claude", "copilot"}
 	original.Display.PaceColors = false
 	original.Display.ResetFormat = "relative"
 	original.Providers["claude"] = ProviderConfig{
@@ -351,12 +312,6 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 
 	if loaded.Fetch.Timeout != 99.0 {
 		t.Errorf("Fetch.Timeout = %v, want 99.0", loaded.Fetch.Timeout)
-	}
-	if len(loaded.EnabledProviders) != 2 {
-		t.Fatalf("EnabledProviders len = %d, want 2", len(loaded.EnabledProviders))
-	}
-	if loaded.EnabledProviders[0] != "claude" || loaded.EnabledProviders[1] != "copilot" {
-		t.Errorf("EnabledProviders = %v, want [claude copilot]", loaded.EnabledProviders)
 	}
 	if loaded.Display.PaceColors {
 		t.Error("Display.PaceColors should be false after roundtrip")
@@ -378,57 +333,6 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 
 // applyEnvOverrides
 
-func TestApplyEnvOverrides_EnabledProviders(t *testing.T) {
-	tests := []struct {
-		name    string
-		envVal  string
-		wantLen int
-		wantIDs []string
-	}{
-		{
-			name:    "single provider",
-			envVal:  "claude",
-			wantLen: 1,
-			wantIDs: []string{"claude"},
-		},
-		{
-			name:    "multiple providers",
-			envVal:  "claude,copilot,gemini",
-			wantLen: 3,
-			wantIDs: []string{"claude", "copilot", "gemini"},
-		},
-		{
-			name:    "trims whitespace",
-			envVal:  " claude , copilot , gemini ",
-			wantLen: 3,
-			wantIDs: []string{"claude", "copilot", "gemini"},
-		},
-		{
-			name:    "filters empty parts",
-			envVal:  "claude,,copilot, ,",
-			wantLen: 2,
-			wantIDs: []string{"claude", "copilot"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", tt.envVal)
-			cfg := applyEnvOverrides(DefaultConfig())
-			if len(cfg.EnabledProviders) != tt.wantLen {
-				t.Errorf("EnabledProviders len = %d, want %d", len(cfg.EnabledProviders), tt.wantLen)
-			}
-			for i, want := range tt.wantIDs {
-				if i >= len(cfg.EnabledProviders) {
-					break
-				}
-				if cfg.EnabledProviders[i] != want {
-					t.Errorf("EnabledProviders[%d] = %q, want %q", i, cfg.EnabledProviders[i], want)
-				}
-			}
-		})
-	}
-}
-
 func TestApplyEnvOverrides_NoColor(t *testing.T) {
 	t.Run("set disables pace colors", func(t *testing.T) {
 		t.Setenv("VIBEUSAGE_NO_COLOR", "1")
@@ -449,34 +353,11 @@ func TestApplyEnvOverrides_NoColor(t *testing.T) {
 }
 
 func TestApplyEnvOverrides_NotSet_LeavesDefaults(t *testing.T) {
-	// Clear both env vars explicitly.
-	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "")
 	t.Setenv("VIBEUSAGE_NO_COLOR", "")
 
 	cfg := applyEnvOverrides(DefaultConfig())
-	if cfg.EnabledProviders != nil {
-		t.Error("EnabledProviders should remain nil when env is empty")
-	}
 	if !cfg.Display.PaceColors {
 		t.Error("PaceColors should remain true when env is empty")
-	}
-}
-
-func TestLoad_RespectsEnvOverrides(t *testing.T) {
-	dir := setupTempDir(t)
-	path := filepath.Join(dir, "config.toml")
-	writeTestFile(t, path, []byte(`
-enabled_providers = ["claude", "copilot", "gemini"]
-`))
-
-	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "cursor")
-
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	if len(cfg.EnabledProviders) != 1 || cfg.EnabledProviders[0] != "cursor" {
-		t.Errorf("Env override should take precedence. Got EnabledProviders = %v", cfg.EnabledProviders)
 	}
 }
 
@@ -519,20 +400,6 @@ func TestGet_ReturnsCopy(t *testing.T) {
 		t.Error("Get() should return a copy: Providers map mutation leaked")
 	}
 
-	// Slice isolation: mutating EnabledProviders must not affect another copy
-	cfgWithProviders := DefaultConfig()
-	cfgWithProviders.EnabledProviders = []string{"claude", "copilot"}
-	set(cfgWithProviders)
-
-	cfg5 := Get()
-	if len(cfg5.EnabledProviders) != 2 {
-		t.Fatalf("expected 2 enabled providers, got %d", len(cfg5.EnabledProviders))
-	}
-	cfg5.EnabledProviders[0] = "MUTATED"
-	cfg6 := Get()
-	if cfg6.EnabledProviders[0] == "MUTATED" {
-		t.Error("Get() should return a copy: EnabledProviders slice mutation leaked")
-	}
 }
 
 func TestInit_ReturnsCurrentConfig(t *testing.T) {
@@ -1793,9 +1660,6 @@ func TestSeedDefaultRoles_PreservesExistingConfigWhenCacheIsStale(t *testing.T) 
 	}
 	if loaded.Display.ResetFormat != "absolute" {
 		t.Errorf("display.reset_format = %q, want %q", loaded.Display.ResetFormat, "absolute")
-	}
-	if loaded.Credentials.ReuseProviderCredentials {
-		t.Error("credentials.reuse_provider_credentials was overwritten; want false preserved")
 	}
 	if len(loaded.Roles) == 0 {
 		t.Error("expected default roles to be seeded")

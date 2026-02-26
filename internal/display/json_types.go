@@ -31,16 +31,16 @@ type StatusEntryJSON struct {
 type AuthStatusEntryJSON struct {
 	Authenticated bool   `json:"authenticated"`
 	Source        string `json:"source"`
+	Enabled       bool   `json:"enabled"`
 }
 
 // ConfigShowJSON represents the config show JSON output.
 type ConfigShowJSON struct {
-	Fetch            ConfigFetchJSON       `json:"fetch"`
-	EnabledProviders []string              `json:"enabled_providers"`
-	Display          ConfigDisplayJSON     `json:"display"`
-	Credentials      ConfigCredentialsJSON `json:"credentials"`
-	Roles            any                   `json:"roles"`
-	Path             string                `json:"path"`
+	Fetch       ConfigFetchJSON       `json:"fetch"`
+	Display     ConfigDisplayJSON     `json:"display"`
+	Credentials ConfigCredentialsJSON `json:"credentials"`
+	Roles       any                   `json:"roles"`
+	Path        string                `json:"path"`
 }
 
 // ConfigFetchJSON represents the fetch section of config.
@@ -59,8 +59,7 @@ type ConfigDisplayJSON struct {
 
 // ConfigCredentialsJSON represents the credentials section of config.
 type ConfigCredentialsJSON struct {
-	UseKeyring               bool `json:"use_keyring"`
-	ReuseProviderCredentials bool `json:"reuse_provider_credentials"`
+	UseKeyring bool `json:"use_keyring"`
 }
 
 // ActionResultJSON is a generic success/message response used by
@@ -84,13 +83,6 @@ type KeyDetailJSON struct {
 	Configured bool   `json:"configured"`
 	Source     string `json:"source"`
 	Path       string `json:"path"`
-}
-
-// InitStatusJSON represents the init command JSON output.
-type InitStatusJSON struct {
-	FirstRun            bool     `json:"first_run"`
-	ConfiguredProviders int      `json:"configured_providers"`
-	AvailableProviders  []string `json:"available_providers"`
 }
 
 // UpdateStatusJSON represents update check/apply output.

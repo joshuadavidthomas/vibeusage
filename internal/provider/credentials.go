@@ -40,21 +40,10 @@ func (s APIKeySource) Load() string {
 	return ""
 }
 
-// ExternalCredentialReuseEnabled reports whether provider strategies should
-// consider credentials managed outside vibeusage storage (CLI files, keychains,
-// editor state DBs, etc.).
-func ExternalCredentialReuseEnabled() bool {
-	return config.Get().Credentials.ReuseProviderCredentials
-}
-
 // CredentialSearchPaths returns the canonical vibeusage credential path first,
-// followed by external credential paths when reuse is enabled.
+// followed by external credential paths (provider CLI files, etc.).
 func CredentialSearchPaths(providerID, credType string, external ...string) []string {
-	paths := []string{config.CredentialPath(providerID, credType)}
-	if !ExternalCredentialReuseEnabled() {
-		return paths
-	}
-	return append(paths, external...)
+	return append([]string{config.CredentialPath(providerID, credType)}, external...)
 }
 
 // FindCredential checks for credentials for the given provider in
@@ -75,10 +64,6 @@ func CheckCredentials(providerID string) (bool, string) {
 	found, source, _ := FindCredential(providerID)
 	if found {
 		return true, source
-	}
-
-	if !ExternalCredentialReuseEnabled() {
-		return false, ""
 	}
 
 	p, ok := Get(providerID)

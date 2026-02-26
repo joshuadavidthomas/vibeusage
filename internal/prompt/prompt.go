@@ -17,12 +17,14 @@ type ConfirmConfig struct {
 	Description string
 	Affirmative string
 	Negative    string
+	Default     bool
 }
 
 // SelectOption represents a single option in a multi-select.
 type SelectOption struct {
-	Label string
-	Value string
+	Label    string
+	Value    string
+	Selected bool
 }
 
 // MultiSelectConfig holds configuration for a multi-select prompt.
@@ -30,6 +32,7 @@ type MultiSelectConfig struct {
 	Title       string
 	Description string
 	Options     []SelectOption
+	Validate    func([]string) error
 }
 
 // Prompter defines the interface for interactive user prompts.
@@ -70,7 +73,7 @@ func (h *Huh) Input(cfg InputConfig) (string, error) {
 }
 
 func (h *Huh) Confirm(cfg ConfirmConfig) (bool, error) {
-	var value bool
+	value := cfg.Default
 	confirm := huh.NewConfirm().
 		Title(cfg.Title).
 		Value(&value)
@@ -91,6 +94,12 @@ func (h *Huh) Confirm(cfg ConfirmConfig) (bool, error) {
 
 func (h *Huh) MultiSelect(cfg MultiSelectConfig) ([]string, error) {
 	var selected []string
+	for _, opt := range cfg.Options {
+		if opt.Selected {
+			selected = append(selected, opt.Value)
+		}
+	}
+
 	options := make([]huh.Option[string], len(cfg.Options))
 	for i, opt := range cfg.Options {
 		options[i] = huh.NewOption(opt.Label, opt.Value)
@@ -103,6 +112,12 @@ func (h *Huh) MultiSelect(cfg MultiSelectConfig) ([]string, error) {
 
 	if cfg.Description != "" {
 		ms.Description(cfg.Description)
+	}
+	if cfg.Validate != nil {
+		validate := cfg.Validate
+		ms.Validate(func(v []string) error {
+			return validate(v)
+		})
 	}
 
 	err := huh.NewForm(huh.NewGroup(ms)).Run()
