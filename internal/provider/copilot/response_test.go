@@ -204,8 +204,43 @@ func TestTokenResponse_Unmarshal(t *testing.T) {
 	if resp.AccessToken != "gho_xxxx" {
 		t.Errorf("access_token = %q, want %q", resp.AccessToken, "gho_xxxx")
 	}
+	if resp.RefreshToken != "" {
+		t.Errorf("refresh_token = %q, want empty", resp.RefreshToken)
+	}
+	if resp.ExpiresIn != 0 {
+		t.Errorf("expires_in = %v, want 0", resp.ExpiresIn)
+	}
 	if resp.Error != "" {
 		t.Errorf("error = %q, want empty", resp.Error)
+	}
+}
+
+func TestTokenResponse_UnmarshalWithRefresh(t *testing.T) {
+	raw := `{
+		"access_token": "ghu_xxxx",
+		"refresh_token": "ghr_xxxx",
+		"expires_in": 28800,
+		"refresh_token_expires_in": 15897600,
+		"token_type": "bearer",
+		"scope": "read:user"
+	}`
+
+	var resp TokenResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.AccessToken != "ghu_xxxx" {
+		t.Errorf("access_token = %q, want %q", resp.AccessToken, "ghu_xxxx")
+	}
+	if resp.RefreshToken != "ghr_xxxx" {
+		t.Errorf("refresh_token = %q, want %q", resp.RefreshToken, "ghr_xxxx")
+	}
+	if resp.ExpiresIn != 28800 {
+		t.Errorf("expires_in = %v, want 28800", resp.ExpiresIn)
+	}
+	if resp.RefreshTokenExpiresIn != 15897600 {
+		t.Errorf("refresh_token_expires_in = %v, want 15897600", resp.RefreshTokenExpiresIn)
 	}
 }
 
@@ -231,7 +266,8 @@ func TestTokenResponse_UnmarshalError(t *testing.T) {
 	}
 }
 
-func TestOAuthCredentials_Unmarshal(t *testing.T) {
+func TestOAuthCredentials_UnmarshalLegacy(t *testing.T) {
+	// Legacy format: only access_token, no refresh or expiry
 	raw := `{"access_token": "gho_xxxx"}`
 
 	var creds OAuthCredentials
@@ -242,10 +278,47 @@ func TestOAuthCredentials_Unmarshal(t *testing.T) {
 	if creds.AccessToken != "gho_xxxx" {
 		t.Errorf("access_token = %q, want %q", creds.AccessToken, "gho_xxxx")
 	}
+	if creds.RefreshToken != "" {
+		t.Errorf("refresh_token = %q, want empty", creds.RefreshToken)
+	}
+	if creds.ExpiresAt != "" {
+		t.Errorf("expires_at = %q, want empty", creds.ExpiresAt)
+	}
+	// Legacy tokens with no ExpiresAt should never trigger refresh
+	if creds.NeedsRefresh() {
+		t.Error("legacy credentials with no expiry should not need refresh")
+	}
+}
+
+func TestOAuthCredentials_UnmarshalFull(t *testing.T) {
+	raw := `{
+		"access_token": "ghu_xxxx",
+		"refresh_token": "ghr_xxxx",
+		"expires_at": "2025-02-20T06:00:00Z"
+	}`
+
+	var creds OAuthCredentials
+	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if creds.AccessToken != "ghu_xxxx" {
+		t.Errorf("access_token = %q, want %q", creds.AccessToken, "ghu_xxxx")
+	}
+	if creds.RefreshToken != "ghr_xxxx" {
+		t.Errorf("refresh_token = %q, want %q", creds.RefreshToken, "ghr_xxxx")
+	}
+	if creds.ExpiresAt != "2025-02-20T06:00:00Z" {
+		t.Errorf("expires_at = %q, want %q", creds.ExpiresAt, "2025-02-20T06:00:00Z")
+	}
 }
 
 func TestOAuthCredentials_Roundtrip(t *testing.T) {
-	original := OAuthCredentials{AccessToken: "gho_xxxx"}
+	original := OAuthCredentials{
+		AccessToken:  "ghu_xxxx",
+		RefreshToken: "ghr_xxxx",
+		ExpiresAt:    "2025-02-20T06:00:00Z",
+	}
 
 	data, err := json.Marshal(original)
 	if err != nil {
@@ -257,7 +330,7 @@ func TestOAuthCredentials_Roundtrip(t *testing.T) {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if decoded.AccessToken != original.AccessToken {
-		t.Errorf("roundtrip mismatch: got %q, want %q", decoded.AccessToken, original.AccessToken)
+	if decoded != original {
+		t.Errorf("roundtrip mismatch: got %+v, want %+v", decoded, original)
 	}
 }

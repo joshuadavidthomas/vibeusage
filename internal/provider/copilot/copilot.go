@@ -14,6 +14,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -82,6 +83,15 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
+	if creds.NeedsRefresh() {
+		refreshed := s.refreshToken(ctx, creds)
+		if refreshed != nil {
+			creds = refreshed
+		}
+		// If refresh fails, try the existing token anyway — it might still
+		// work (e.g. non-expiring token with empty ExpiresAt from a parse error).
+	}
+
 	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	var userResp UserResponse
 	resp, err := client.GetJSONCtx(ctx, usageURL, &userResp,
@@ -93,6 +103,22 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 	}
 
 	if resp.StatusCode == 401 {
+		// If we have a refresh token, try once more before giving up
+		if creds.RefreshToken != "" {
+			refreshed := s.refreshToken(ctx, creds)
+			if refreshed != nil {
+				resp, err = client.GetJSONCtx(ctx, usageURL, &userResp,
+					httpclient.WithBearer(refreshed.AccessToken),
+					httpclient.WithHeader("Accept", "application/json"),
+				)
+				if err == nil && resp.StatusCode == 200 && resp.JSONErr == nil {
+					snapshot := s.parseTypedUsageResponse(userResp)
+					if snapshot != nil {
+						return fetch.ResultOK(*snapshot), nil
+					}
+				}
+			}
+		}
 		return fetch.ResultFatal("OAuth token expired. Run `vibeusage auth copilot` to re-authenticate."), nil
 	}
 	if resp.StatusCode == 403 {
@@ -129,6 +155,16 @@ func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
 		return nil
 	}
 	return &creds
+}
+
+func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
+	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
+		TokenURL:    tokenURL,
+		FormFields:  map[string]string{"client_id": clientID},
+		Headers:     []httpclient.RequestOption{httpclient.WithHeader("Accept", "application/json")},
+		ProviderID:  "copilot",
+		HTTPTimeout: s.HTTPTimeout,
+	})
 }
 
 func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.UsageSnapshot {
@@ -257,11 +293,20 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 		}
 
 		if tokenResp.AccessToken != "" {
-			creds := OAuthCredentials{AccessToken: tokenResp.AccessToken}
+			creds := OAuthCredentials{
+				AccessToken:  tokenResp.AccessToken,
+				RefreshToken: tokenResp.RefreshToken,
+			}
+			if tokenResp.ExpiresIn > 0 {
+				creds.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
+			}
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
 			if !quiet {
 				deviceflow.WriteSuccess(w)
+				if tokenResp.RefreshToken != "" {
+					_, _ = fmt.Fprintln(w, "  Token will refresh automatically.")
+				}
 			}
 			return true, nil
 		}
