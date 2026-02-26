@@ -105,5 +105,3 @@ func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCrede
 		HTTPTimeout: s.HTTPTimeout,
 	})
 }
-
-

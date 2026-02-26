@@ -234,5 +234,3 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 		Source:    "device_flow",
 	}
 }
-
-
