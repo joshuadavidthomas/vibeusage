@@ -1,10 +1,12 @@
 package kimicode
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 // UsageResponse represents the response from the Kimi usage API endpoint.
@@ -140,20 +142,36 @@ type TokenResponse struct {
 	ErrorDesc    string `json:"error_description,omitempty"`
 }
 
-// OAuthCredentials represents stored OAuth credentials for Kimi.
-type OAuthCredentials struct {
+// OAuthCredentials is an alias for the shared OAuth credential type.
+type OAuthCredentials = oauth.Credentials
+
+// legacyOAuthCredentials represents the old Kimi credential format with a
+// float64 Unix timestamp for ExpiresAt.
+type legacyOAuthCredentials struct {
 	AccessToken  string  `json:"access_token"`
 	RefreshToken string  `json:"refresh_token,omitempty"`
-	ExpiresAt    float64 `json:"expires_at,omitempty"` // Unix timestamp (matches kimi-cli format)
+	ExpiresAt    float64 `json:"expires_at,omitempty"`
 }
 
-// NeedsRefresh reports whether the credentials need refreshing.
-// Kimi tokens expire in ~15 minutes. We refresh 2 minutes early.
-func (c OAuthCredentials) NeedsRefresh() bool {
-	if c.ExpiresAt == 0 {
-		return false
+// migrateCredentials converts legacy float64-timestamp credentials to RFC3339.
+// Returns nil if the data doesn't match the legacy format.
+func migrateCredentials(data []byte) *OAuthCredentials {
+	var legacy legacyOAuthCredentials
+	if err := json.Unmarshal(data, &legacy); err != nil || legacy.AccessToken == "" {
+		return nil
 	}
-	return time.Now().UTC().Unix() >= int64(c.ExpiresAt)-120
+	// If ExpiresAt parses as a large number (Unix timestamp), it's the legacy format.
+	// RFC3339 strings would have ExpiresAt == 0 after float64 unmarshal.
+	if legacy.ExpiresAt == 0 {
+		return nil
+	}
+	creds := &OAuthCredentials{
+		AccessToken:  legacy.AccessToken,
+		RefreshToken: legacy.RefreshToken,
+	}
+	t := time.Unix(int64(legacy.ExpiresAt), 0).UTC()
+	creds.ExpiresAt = t.Format(time.RFC3339)
+	return creds
 }
 
 // PlanName returns a human-readable plan name from the membership level.

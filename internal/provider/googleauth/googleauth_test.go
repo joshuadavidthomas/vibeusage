@@ -3,6 +3,7 @@ package googleauth
 import (
 	"encoding/json"
 	"testing"
+	"time"
 )
 
 func TestTokenResponse_Unmarshal(t *testing.T) {
@@ -70,6 +71,22 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 			name:  "invalid",
 			creds: OAuthCredentials{AccessToken: "tok", ExpiresAt: "garbage"},
 			want:  true,
+		},
+		{
+			name: "within buffer",
+			creds: OAuthCredentials{
+				AccessToken: "tok",
+				ExpiresAt:   time.Now().UTC().Add(2 * time.Minute).Format(time.RFC3339),
+			},
+			want: true,
+		},
+		{
+			name: "outside buffer",
+			creds: OAuthCredentials{
+				AccessToken: "tok",
+				ExpiresAt:   time.Now().UTC().Add(10 * time.Minute).Format(time.RFC3339),
+			},
+			want: false,
 		},
 	}
 

@@ -3,6 +3,7 @@ package kimicode
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
@@ -378,13 +379,23 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 		},
 		{
 			name: "far future",
-			c:    OAuthCredentials{AccessToken: "tok", ExpiresAt: float64(9999999999)},
+			c:    OAuthCredentials{AccessToken: "tok", ExpiresAt: "2099-01-01T00:00:00Z"},
 			want: false,
 		},
 		{
 			name: "already expired",
-			c:    OAuthCredentials{AccessToken: "tok", ExpiresAt: float64(1000000000)},
+			c:    OAuthCredentials{AccessToken: "tok", ExpiresAt: "2020-01-01T00:00:00Z"},
 			want: true,
+		},
+		{
+			name: "within buffer",
+			c:    OAuthCredentials{AccessToken: "tok", ExpiresAt: time.Now().UTC().Add(2 * time.Minute).Format(time.RFC3339)},
+			want: true,
+		},
+		{
+			name: "outside buffer",
+			c:    OAuthCredentials{AccessToken: "tok", ExpiresAt: time.Now().UTC().Add(10 * time.Minute).Format(time.RFC3339)},
+			want: false,
 		},
 	}
 
@@ -402,7 +413,7 @@ func TestOAuthCredentials_Roundtrip(t *testing.T) {
 	original := OAuthCredentials{
 		AccessToken:  "tok",
 		RefreshToken: "rt",
-		ExpiresAt:    1740000000.0,
+		ExpiresAt:    "2025-02-19T21:20:00Z",
 	}
 
 	data, err := json.Marshal(original)
@@ -422,6 +433,65 @@ func TestOAuthCredentials_Roundtrip(t *testing.T) {
 		t.Errorf("RefreshToken = %q, want %q", decoded.RefreshToken, original.RefreshToken)
 	}
 	if decoded.ExpiresAt != original.ExpiresAt {
-		t.Errorf("ExpiresAt = %v, want %v", decoded.ExpiresAt, original.ExpiresAt)
+		t.Errorf("ExpiresAt = %q, want %q", decoded.ExpiresAt, original.ExpiresAt)
+	}
+}
+
+func TestMigrateCredentials(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    string
+		wantNil bool
+		wantAt  string
+	}{
+		{
+			name:   "legacy float64 timestamp",
+			data:   `{"access_token":"tok","refresh_token":"rt","expires_at":1740000000}`,
+			wantAt: "2025-02-19T21:20:00Z",
+		},
+		{
+			name:    "already RFC3339",
+			data:    `{"access_token":"tok","refresh_token":"rt","expires_at":"2025-02-19T21:20:00Z"}`,
+			wantNil: true,
+		},
+		{
+			name:    "no access token",
+			data:    `{"refresh_token":"rt","expires_at":1740000000}`,
+			wantNil: true,
+		},
+		{
+			name:    "no expires_at",
+			data:    `{"access_token":"tok","refresh_token":"rt"}`,
+			wantNil: true,
+		},
+		{
+			name:    "invalid json",
+			data:    `not json`,
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := migrateCredentials([]byte(tt.data))
+			if tt.wantNil {
+				if got != nil {
+					t.Errorf("migrateCredentials() = %+v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("migrateCredentials() = nil, want non-nil")
+			}
+			if got.ExpiresAt != tt.wantAt {
+				t.Errorf("ExpiresAt = %q, want %q", got.ExpiresAt, tt.wantAt)
+			}
+			if got.AccessToken != "tok" {
+				t.Errorf("AccessToken = %q, want %q", got.AccessToken, "tok")
+			}
+			if got.RefreshToken != "rt" {
+				t.Errorf("RefreshToken = %q, want %q", got.RefreshToken, "rt")
+			}
+		})
 	}
 }

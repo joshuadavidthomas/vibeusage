@@ -15,6 +15,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/keychain"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -207,48 +208,12 @@ func codexHomeDir() string {
 }
 
 func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *Credentials {
-	if creds.RefreshToken == "" {
-		return nil
-	}
-
-	client := httpclient.NewFromConfig(s.HTTPTimeout)
-	var tokenResp TokenResponse
-	resp, err := client.PostFormCtx(ctx, codexTokenURL,
-		map[string]string{
-			"grant_type":    "refresh_token",
-			"refresh_token": creds.RefreshToken,
-			"client_id":     codexClientID,
-		},
-		&tokenResp,
-	)
-	if err != nil {
-		return nil
-	}
-	if resp.StatusCode != 200 {
-		return nil
-	}
-	if resp.JSONErr != nil {
-		return nil
-	}
-
-	updated := &Credentials{
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-	}
-
-	if tokenResp.ExpiresIn > 0 {
-		updated.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
-	}
-
-	// Preserve refresh token if the server didn't issue a new one
-	if updated.RefreshToken == "" {
-		updated.RefreshToken = creds.RefreshToken
-	}
-
-	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(config.CredentialPath("codex", "oauth"), content)
-
-	return updated
+	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
+		TokenURL:    codexTokenURL,
+		FormFields:  map[string]string{"client_id": codexClientID},
+		ProviderID:  "codex",
+		HTTPTimeout: s.HTTPTimeout,
+	})
 }
 
 func (s *OAuthStrategy) getUsageURL() string {

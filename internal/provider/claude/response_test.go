@@ -171,49 +171,6 @@ func TestExtraUsageResponse_Disabled(t *testing.T) {
 	}
 }
 
-func TestOAuthTokenResponse_Unmarshal(t *testing.T) {
-	raw := `{
-		"access_token": "new-access-token",
-		"refresh_token": "new-refresh-token",
-		"token_type": "Bearer",
-		"expires_in": 3600
-	}`
-
-	var resp OAuthTokenResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if resp.AccessToken != "new-access-token" {
-		t.Errorf("access_token = %q, want %q", resp.AccessToken, "new-access-token")
-	}
-	if resp.RefreshToken != "new-refresh-token" {
-		t.Errorf("refresh_token = %q, want %q", resp.RefreshToken, "new-refresh-token")
-	}
-	if resp.TokenType != "Bearer" {
-		t.Errorf("token_type = %q, want %q", resp.TokenType, "Bearer")
-	}
-	if resp.ExpiresIn != 3600 {
-		t.Errorf("expires_in = %v, want 3600", resp.ExpiresIn)
-	}
-}
-
-func TestOAuthTokenResponse_UnmarshalMinimal(t *testing.T) {
-	raw := `{"access_token": "tok"}`
-
-	var resp OAuthTokenResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if resp.AccessToken != "tok" {
-		t.Errorf("access_token = %q, want %q", resp.AccessToken, "tok")
-	}
-	if resp.ExpiresIn != 0 {
-		t.Errorf("expires_in = %v, want 0", resp.ExpiresIn)
-	}
-}
-
 func TestOAuthCredentials_Unmarshal(t *testing.T) {
 	raw := `{
 		"access_token": "my-access-token",

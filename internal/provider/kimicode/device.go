@@ -12,6 +12,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 const (
@@ -76,60 +77,37 @@ func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
 		if err != nil || data == nil {
 			continue
 		}
+
+		// Try current RFC3339 format first
 		var creds OAuthCredentials
-		if err := json.Unmarshal(data, &creds); err != nil {
-			continue
+		if err := json.Unmarshal(data, &creds); err == nil && creds.AccessToken != "" {
+			// If ExpiresAt looks like a number string, it might be a
+			// partially-migrated legacy credential; skip to migration.
+			if _, parseErr := time.Parse(time.RFC3339, creds.ExpiresAt); creds.ExpiresAt == "" || parseErr == nil {
+				return &creds
+			}
 		}
-		if creds.AccessToken != "" {
-			return &creds
+
+		// Try legacy float64 timestamp format and migrate
+		if migrated := migrateCredentials(data); migrated != nil {
+			// Write back in the new format so future loads are fast
+			if content, err := json.Marshal(migrated); err == nil {
+				_ = config.WriteCredential(path, content)
+			}
+			return migrated
 		}
 	}
 	return nil
 }
 
 func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
-	if creds.RefreshToken == "" {
-		return nil
-	}
-
-	client := httpclient.NewFromConfig(s.HTTPTimeout)
-	opts := commonHeaders()
-
-	var tokenResp TokenResponse
-	resp, err := client.PostFormCtx(ctx, oauthBaseURL()+tokenPath,
-		map[string]string{
-			"client_id":     clientID,
-			"grant_type":    refreshGrant,
-			"refresh_token": creds.RefreshToken,
-		},
-		&tokenResp,
-		opts...,
-	)
-	if err != nil {
-		return nil
-	}
-	if resp.StatusCode != 200 || resp.JSONErr != nil {
-		return nil
-	}
-	if tokenResp.AccessToken == "" {
-		return nil
-	}
-
-	updated := &OAuthCredentials{
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-	}
-	if tokenResp.ExpiresIn > 0 {
-		updated.ExpiresAt = float64(time.Now().UTC().Unix() + int64(tokenResp.ExpiresIn))
-	}
-	if updated.RefreshToken == "" {
-		updated.RefreshToken = creds.RefreshToken
-	}
-
-	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(config.CredentialPath("kimicode", "oauth"), content)
-
-	return updated
+	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
+		TokenURL:    oauthBaseURL() + tokenPath,
+		FormFields:  map[string]string{"client_id": clientID},
+		Headers:     commonHeaders(),
+		ProviderID:  "kimicode",
+		HTTPTimeout: s.HTTPTimeout,
+	})
 }
 
 // RunDeviceFlow runs the interactive Kimi device flow for auth.
@@ -210,7 +188,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 				RefreshToken: tokenResp.RefreshToken,
 			}
 			if tokenResp.ExpiresIn > 0 {
-				creds.ExpiresAt = float64(time.Now().UTC().Unix() + int64(tokenResp.ExpiresIn))
+				creds.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
 			}
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("kimicode", "oauth"), content)
