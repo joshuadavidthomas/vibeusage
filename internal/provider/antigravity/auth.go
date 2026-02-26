@@ -81,14 +81,8 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 	)
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n🔐 Antigravity OAuth Authentication")
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintln(w, "  Opening browser for Google sign-in...")
-		_, _ = fmt.Fprintln(w, "  If it doesn't open, visit:")
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintf(w, "    %s\n", authURL)
-		_, _ = fmt.Fprintln(w)
-		_, _ = fmt.Fprintln(w, "  Waiting for authorization...")
+		_, _ = fmt.Fprintf(w, "Opening %s\n", authURL)
+		_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
 	} else {
 		_, _ = fmt.Fprintln(w, authURL)
 	}

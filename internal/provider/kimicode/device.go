@@ -165,6 +165,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 
 	// Display instructions
 	if !quiet {
+		_, _ = fmt.Fprintf(w, "Opening %s\n", verificationURI)
 		_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
 	} else {
 		_, _ = fmt.Fprintln(w, verificationURI)
