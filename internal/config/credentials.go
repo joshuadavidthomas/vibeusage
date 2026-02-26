@@ -136,12 +136,6 @@ func legacyCredentialPath(path string) string {
 	return legacyPath
 }
 
-// CredentialStatus reports whether a provider has credentials and their source.
-type CredentialStatus struct {
-	HasCredentials bool
-	Source         string
-}
-
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

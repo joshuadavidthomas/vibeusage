@@ -71,20 +71,6 @@ type ActionResultJSON struct {
 	Provider string `json:"provider,omitempty"`
 }
 
-// KeyStatusEntryJSON represents a single provider's key status.
-type KeyStatusEntryJSON struct {
-	Configured bool   `json:"configured"`
-	Source     string `json:"source"`
-}
-
-// KeyDetailJSON represents a single provider's key detail.
-type KeyDetailJSON struct {
-	Provider   string `json:"provider"`
-	Configured bool   `json:"configured"`
-	Source     string `json:"source"`
-	Path       string `json:"path"`
-}
-
 // UpdateStatusJSON represents update check/apply output.
 type UpdateStatusJSON struct {
 	CurrentVersion  string `json:"current_version"`

@@ -20,13 +20,20 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- Added `vibeusage auth <provider> --delete` to remove credentials and disable a provider.
+- Added `vibeusage auth <provider> --token <value>` for non-interactive credential setup (useful for scripting and CI).
+
 ### Changed
 
 - **Breaking:** `--json` output now serializes usage snapshots directly from the model types. Removed `remaining`, `cached` fields; added `fetched_at`, `is_enabled`, `source` fields. `resets_at` uses Go's default time format. Identity fields with empty values are now omitted.
 - Reordered Claude fetch strategy flow to prefer OAuth first and keep web session usage as the last-resort fallback.
+- Providers without a dedicated auth flow now prompt for credentials inline instead of telling users to run a separate command.
 
 ### Removed
 
+- **Breaking:** Removed `vibeusage key` command. All credential management is now handled through `vibeusage auth`. Use `vibeusage auth --status` instead of `vibeusage key` for credential status, `vibeusage auth <provider> --token <value>` instead of `vibeusage key <provider> set`, and `vibeusage auth <provider> --delete` instead of `vibeusage key <provider> delete`.
 - Removed Anthropic API key (`sk-ant-api...` / `sk-ant-admin-...`) support from Claude provider. Regular API keys cannot access consumer plan usage data — they live in a separate billing system with no access to Pro/Max rate limit information. Future Admin API key support tracked in [#97](https://github.com/joshuadavidthomas/vibeusage/issues/97). `vibeusage auth claude` now only accepts `sessionKey` cookies (`sk-ant-sid01-...`).
 - Removed `ANTHROPIC_API_KEY` environment variable support from the Claude provider.
 

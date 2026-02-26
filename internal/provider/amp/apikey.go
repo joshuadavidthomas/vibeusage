@@ -26,7 +26,7 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	token := ampAPIKey.Load()
 	if token == "" {
-		return fetch.ResultFail("No API key found. Set AMP_API_KEY or use 'vibeusage key amp set'"), nil
+		return fetch.ResultFail("No API key found. Set AMP_API_KEY or use 'vibeusage auth amp'"), nil
 	}
 	return fetchBalance(ctx, token, "api_key", s.HTTPTimeout)
 }

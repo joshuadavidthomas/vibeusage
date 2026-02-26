@@ -80,21 +80,6 @@ func CheckCredentials(providerID string) (bool, string) {
 	return false, ""
 }
 
-// GetAllCredentialStatus returns the credential status for every
-// registered provider.
-func GetAllCredentialStatus() map[string]config.CredentialStatus {
-	all := All()
-	status := make(map[string]config.CredentialStatus, len(all))
-	for id := range all {
-		hasCreds, source := CheckCredentials(id)
-		status[id] = config.CredentialStatus{
-			HasCredentials: hasCreds,
-			Source:         source,
-		}
-	}
-	return status
-}
-
 // IsFirstRun returns true if no registered provider has credentials.
 func IsFirstRun() bool {
 	for id := range All() {
