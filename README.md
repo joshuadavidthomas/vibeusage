@@ -2,7 +2,7 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-As an OSS contributor, I’ve had free GitHub Copilot Pro access for a while, but I kept forgetting to use it and leaving free usage on the table. vibeusage keeps that visible across providers and gives you one place to see account usage, pace, and remaining headroom across your configured providers.
+I get free access to GitHub Copilot Pro for my OSS contributions (thanks GitHub!), but I consistently forget to use it and every month leave free usage on the table. vibeusage keeps that visible across providers and gives you one place to see account usage, pace, and remaining headroom across your configured providers.
 
 ## Installation
 
@@ -86,11 +86,42 @@ vibeusage
 ╰──────────────────────────────────────────────────────────────────────╯
 ```
 
-Bars are pace-colored: green (on track), yellow (slightly over pace), red (well over pace).
+Bars are pace-colored by burn rate: **green** (on track or within 15% of expected), **yellow** (15–30% over expected pace), **red** (well over pace or near exhaustion). Pace compares your actual usage percentage to the fraction of time elapsed in the period.
 
 Only providers you explicitly enable via `vibeusage auth` are tracked. Run it again anytime to add, remove, or re-authenticate providers.
 
-## Smart routing
+## Viewing Usage
+
+Check all enabled providers:
+
+```bash
+vibeusage
+```
+
+Check a specific provider:
+
+```bash
+vibeusage usage claude
+vibeusage usage copilot
+```
+
+Output as JSON for scripting or automation:
+
+```bash
+vibeusage --json
+vibeusage usage codex --json
+```
+
+Skip cache and fail fast if APIs are unreachable:
+
+```bash
+vibeusage --no-cache
+```
+
+> [!NOTE]
+> Provider-specific commands moved from `vibeusage <provider>` to `vibeusage usage <provider>` in v0.3.0. The old commands still work but show a deprecation message. They will be removed in v0.4.0.
+
+## Smart Routing
 
 Inspired by OpenRouter-style routing, `vibeusage route` picks the best provider for a model based on real usage headroom from your own connected accounts.
 
@@ -142,29 +173,71 @@ If a model name is close but not exact, vibeusage suggests likely matches.
 
 Role-based model groups are configured in `config.toml` under `[roles.<name>]` (see [Routing Roles](#routing-roles)).
 
-## Core Commands
+## Managing Providers
 
-```bash
-vibeusage                      # Usage for all enabled providers
-vibeusage usage <provider>     # Usage for one provider
-vibeusage --json               # JSON output
-vibeusage --no-cache           # Disable cache fallback on API failure
-vibeusage auth                 # Enable/manage providers interactively
-vibeusage auth <provider>      # Auth a specific provider
-vibeusage auth --status        # Credential/auth status
-vibeusage auth <provider> --delete         # Remove credentials
-vibeusage auth <provider> --token <value>  # Set credential non-interactively
-vibeusage route <model>        # Best provider for a model
-```
-
-> [!NOTE]
-> Provider-specific commands moved from `vibeusage <provider>` to `vibeusage usage <provider>` in v0.3.0. The old commands still work but show a deprecation message. They will be removed in v0.4.0.
-
-## Providers
+### Authentication
 
 Run `vibeusage auth` to enable providers interactively, or `vibeusage auth <provider>` for a specific one. For providers with existing CLI credentials (Claude Code, Codex CLI, Gemini CLI, etc.), vibeusage detects them and offers to reuse them. Otherwise, it walks you through the appropriate auth flow.
 
-### Amp
+Enable or reconfigure providers interactively:
+
+```bash
+vibeusage auth                 # Select from all providers
+vibeusage auth claude          # Configure specific provider
+```
+
+Check what's configured and credential status:
+
+```bash
+vibeusage auth --status
+```
+
+Remove credentials for a provider:
+
+```bash
+vibeusage auth claude --delete
+```
+
+Set credentials non-interactively (useful for CI or dotfiles):
+
+```bash
+vibeusage auth openrouter --token sk-or-...
+```
+
+Providers with existing CLI credentials (Claude Code, Codex CLI, Gemini CLI, etc.) are detected automatically and offered for reuse.
+
+### Status
+
+Check the operational status of all providers:
+
+```bash
+vibeusage status
+```
+
+```bash
+╭─────────────┬─────────────────────────┬─────────────────────────┬─────────────────────────╮
+│ Provider    │ Status                  │ Description             │ Updated                 │
+├─────────────┼─────────────────────────┼─────────────────────────┼─────────────────────────┤
+│ amp         │ ●                       │ All Systems Operational │ just now                │
+│ antigravity │ ●                       │ All systems operational │ just now                │
+│ claude      │ ◐                       │ Minor Service Outage    │ just now                │
+│ codex       │ ●                       │ All Systems Operational │ just now                │
+│ copilot     │ ●                       │ All Systems Operational │ just now                │
+│ cursor      │ ●                       │ All Systems Operational │ just now                │
+│ gemini      │ ●                       │ All systems operational │ just now                │
+│ kimicode    │ ●                       │ All Systems Operational │ just now                │
+│ minimax     │ ?                       │                         │ unknown                 │
+│ openrouter  │ ●                       │ All systems operational │ just now                │
+│ warp        │ ●                       │ All Systems Operational │ just now                │
+│ zai         │ ?                       │                         │ unknown                 │
+╰─────────────┴─────────────────────────┴─────────────────────────┴─────────────────────────╯
+```
+
+Status fetches the current operational status from each provider's API status page (where available). ● indicates all systems operational, ◐ indicates a service disruption, and ? means status could not be determined. Use this to check if a provider is experiencing outages before troubleshooting credential issues.
+
+### Provider list
+
+#### Amp
 
 [ampcode.com](https://ampcode.com) — Amp coding assistant. Reports Amp Free daily quota usage and credit balance.
 
@@ -174,7 +247,7 @@ If you have the Amp CLI installed, vibeusage reads credentials from `~/.local/sh
 vibeusage auth amp
 ```
 
-### Claude Code Pro/Max
+#### Claude Code Pro/Max
 
 > [!IMPORTANT]
 > **On Terms of Service:** Anthropic's [Consumer Terms of Service](https://www.anthropic.com/legal/terms) broadly restrict automated access to their services, and their [Claude Code legal docs](https://code.claude.com/docs/en/legal-and-compliance) (updated February 2026) state that using OAuth tokens in third-party tools is not permitted. vibeusage makes **zero inference requests** — it only reads a usage percentage, the equivalent of checking your data plan on your carrier's website. We believe this is defensible, but want to be transparent: under a strict reading of the TOS, this tool may technically be in violation. We'd happily switch to a sanctioned API if Anthropic ever provides one (a read-only usage endpoint on regular API keys would be perfect 🙏).
@@ -194,7 +267,7 @@ This prompts you to copy the `sessionKey` cookie from https://claude.ai (DevTool
 > [!NOTE]
 > **On Anthropic API keys:** Regular API keys (`sk-ant-api03-*`) from the [Anthropic console](https://platform.claude.com/settings/keys) **cannot** access Pro/Max plan usage data. They live in a completely separate billing system (pay-per-token) with no connection to consumer plan rate limits. This is why vibeusage uses OAuth credentials or session cookies instead.
 
-### Cursor
+#### Cursor
 
 [cursor.com](https://cursor.com) — AI-powered code editor. Reports monthly premium request usage and on-demand spend. Shows your membership type.
 
@@ -206,13 +279,13 @@ vibeusage auth cursor
 
 The prompt walks you through extracting your session cookie from https://cursor.com (DevTools → Application → Cookies). You can also set it directly with `vibeusage auth cursor --token <value>`.
 
-### Google Antigravity
+#### Google Antigravity
 
 [antigravity.google](https://antigravity.google) — Google's AI IDE. Reports per-model usage quotas. Shows your subscription tier.
 
 vibeusage reads credentials from the local Antigravity IDE state automatically. Just sign into Antigravity and it should work — no manual setup needed.
 
-### Google Gemini CLI
+#### Google Gemini CLI
 
 [gemini.google.com](https://gemini.google.com) — Google Gemini AI. Reports daily per-model request quotas. Shows your user tier.
 
@@ -230,7 +303,7 @@ vibeusage auth gemini
 
 The API key path reports rate-limit-based usage (requests per minute/day) rather than quota percentages.
 
-### GitHub Copilot
+#### GitHub Copilot
 
 [github.com/features/copilot](https://github.com/features/copilot) — GitHub's AI pair programmer. Reports monthly usage across premium interactions, chat, and completions quotas. [Smart routing](#smart-routing) takes into account the multiplier Copilot applies to model requests when considering the Copilot provider.
 
@@ -242,7 +315,7 @@ vibeusage auth copilot
 
 This opens a browser-based GitHub authorization flow — you'll get a device code to enter at github.com/login/device.
 
-### Kimi Code
+#### Kimi Code
 
 [kimi.com](https://www.kimi.com) — Moonshot AI coding assistant. Reports weekly usage and per-window quotas.
 
@@ -254,7 +327,7 @@ vibeusage auth kimicode
 
 Also picks up `KIMI_CODE_API_KEY` if set.
 
-### Minimax
+#### Minimax
 
 [minimax.io](https://www.minimax.io) — Minimax AI coding assistant. Reports per-model usage against your coding plan limits.
 
@@ -266,7 +339,7 @@ Set `MINIMAX_API_KEY` in your environment, or store one with:
 vibeusage auth minimax
 ```
 
-### OpenAI Codex
+#### OpenAI Codex
 
 [chatgpt.com](https://chatgpt.com) — OpenAI's ChatGPT and Codex. Reports session and weekly usage periods. Shows your subscription tier (Plus, Pro, etc.).
 
@@ -282,7 +355,7 @@ vibeusage usage codex
 
 As a fallback, `vibeusage auth codex` lets you paste a bearer token manually, though those don't auto-refresh.
 
-### OpenRouter
+#### OpenRouter
 
 [openrouter.ai](https://openrouter.ai) — Unified model gateway. Reports credit usage (dollars spent vs. total credits).
 
@@ -292,7 +365,7 @@ Requires an API key. Set `OPENROUTER_API_KEY` in your environment, or store one 
 vibeusage auth openrouter
 ```
 
-### Warp
+#### Warp
 
 [warp.dev](https://warp.dev) — Warp terminal AI. Reports monthly credit usage and bonus credits.
 
@@ -302,7 +375,7 @@ Requires an API key. Set `WARP_API_KEY` in your environment (also accepts `WARP_
 vibeusage auth warp
 ```
 
-### Z.ai
+#### Z.ai
 
 [z.ai](https://z.ai) — Zhipu AI coding assistant. Reports token quotas and tool usage across session, daily, and monthly windows. Shows your plan tier (Lite, Pro, Max).
 
@@ -312,23 +385,9 @@ Requires an API key. Get one from https://z.ai/manage-apikey/apikey-list. Set `Z
 vibeusage auth zai
 ```
 
-## Additional Commands
+## Global Options
 
-```bash
-# Inspect provider/credential state
-vibeusage status
-vibeusage auth --status
-
-# Config
-vibeusage config show
-vibeusage config path
-
-# Route discovery
-vibeusage route --list
-vibeusage route --list-roles
-```
-
-Global options:
+The following arguments are available globally for every command:
 
 | Option | Short | Description |
 |--------|-------|-------------|
@@ -337,6 +396,70 @@ Global options:
 | `--verbose` | `-v` | Show detailed output |
 | `--quiet` | `-q` | Minimal output |
 | `--no-cache` | | Disable cache fallback on API failure |
+
+## Configuration
+
+### Config file location
+
+Configuration is stored in:
+- **Linux**: `~/.config/vibeusage/config.toml`
+- **macOS**: `~/.config/vibeusage/config.toml` (preferred), `~/Library/Application Support/vibeusage/config.toml` (fallback)
+- **Windows**: `%APPDATA%\vibeusage\config.toml`
+
+### Default configuration
+
+```toml
+[credentials]
+use_keyring = false                # Use system keyring
+
+[display]
+pace_colors = true                 # Use pace-based coloring
+reset_format = "countdown"         # "countdown" or "absolute"
+show_remaining = true              # Show remaining % instead of used %
+
+[fetch]
+max_concurrent = 5                 # Max concurrent provider fetches
+timeout = 30                       # Fetch timeout in seconds
+```
+
+### Routing roles
+
+Define model groups for `vibeusage route --role <name>`:
+
+```toml
+[roles.coding]
+models = ["claude-opus-4-6", "gpt-5.3-codex", "gemini-3.1-pro-preview"]
+
+[roles.fast]
+models = ["claude-haiku-4-5", "gemini-3-flash-preview"]
+```
+
+Then route by role:
+
+```bash
+vibeusage route --role coding
+```
+
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `AMP_API_KEY` | Amp API key |
+| `GEMINI_API_KEY` | Gemini API key |
+| `GITHUB_TOKEN` | GitHub token for Copilot |
+| `KIMI_API_KEY` | Kimi API key fallback |
+| `KIMI_CODE_API_KEY` | Kimi API key |
+| `MINIMAX_API_KEY` | Minimax Coding Plan API key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `OPENROUTER_API_KEY` | OpenRouter API key |
+| `VIBEUSAGE_CACHE_DIR` | Override cache directory |
+| `VIBEUSAGE_CONFIG_DIR` | Override config directory |
+| `VIBEUSAGE_DATA_DIR` | Override data directory (credentials storage) |
+| `VIBEUSAGE_NO_COLOR` | Disable colored output |
+| `VIBEUSAGE_UPDATE_GITHUB_TOKEN` | Optional GitHub token used by `vibeusage update` (helps avoid rate limits) |
+| `WARP_API_KEY` | Warp API key |
+| `WARP_TOKEN` | Warp token fallback |
+| `ZAI_API_KEY` | Z.ai API key |
 
 ## Troubleshooting
 
@@ -396,70 +519,6 @@ If you installed with `go install`, rerun:
 go install github.com/joshuadavidthomas/vibeusage@latest
 ```
 
-## Configuration
-
-### Config File Location
-
-Configuration is stored in:
-- **Linux**: `~/.config/vibeusage/config.toml`
-- **macOS**: `~/.config/vibeusage/config.toml` (preferred), `~/Library/Application Support/vibeusage/config.toml` (fallback)
-- **Windows**: `%APPDATA%\vibeusage\config.toml`
-
-### Default Configuration
-
-```toml
-[credentials]
-use_keyring = false                # Use system keyring
-
-[display]
-pace_colors = true                 # Use pace-based coloring
-reset_format = "countdown"         # "countdown" or "absolute"
-show_remaining = true              # Show remaining % instead of used %
-
-[fetch]
-max_concurrent = 5                 # Max concurrent provider fetches
-timeout = 30                       # Fetch timeout in seconds
-```
-
-### Routing Roles
-
-Define model groups for `vibeusage route --role <name>`:
-
-```toml
-[roles.coding]
-models = ["claude-opus-4-6", "gpt-5.3-codex", "gemini-3.1-pro-preview"]
-
-[roles.fast]
-models = ["claude-haiku-4-5", "gemini-3-flash-preview"]
-```
-
-Then route by role:
-
-```bash
-vibeusage route --role coding
-```
-
-### Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `AMP_API_KEY` | Amp API key |
-| `GEMINI_API_KEY` | Gemini API key |
-| `GITHUB_TOKEN` | GitHub token for Copilot |
-| `KIMI_API_KEY` | Kimi API key fallback |
-| `KIMI_CODE_API_KEY` | Kimi API key |
-| `MINIMAX_API_KEY` | Minimax Coding Plan API key |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `OPENROUTER_API_KEY` | OpenRouter API key |
-| `VIBEUSAGE_CACHE_DIR` | Override cache directory |
-| `VIBEUSAGE_CONFIG_DIR` | Override config directory |
-| `VIBEUSAGE_DATA_DIR` | Override data directory (credentials storage) |
-| `VIBEUSAGE_NO_COLOR` | Disable colored output |
-| `VIBEUSAGE_UPDATE_GITHUB_TOKEN` | Optional GitHub token used by `vibeusage update` (helps avoid rate limits) |
-| `WARP_API_KEY` | Warp API key |
-| `WARP_TOKEN` | Warp token fallback |
-| `ZAI_API_KEY` | Z.ai API key |
-
 ## Development
 
 ### Setup
@@ -470,7 +529,7 @@ cd vibeusage
 go mod download
 ```
 
-### Run Tests
+### Run tests
 
 ```bash
 go test ./...
