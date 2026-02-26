@@ -7,6 +7,16 @@ import (
 	"io"
 	"os/exec"
 	"runtime"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	green  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	red    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	yellow = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	dim    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	bold   = lipgloss.NewStyle().Bold(true)
 )
 
 // OpenBrowser tries to open a URL in the default browser.
@@ -27,31 +37,31 @@ func OpenBrowser(url string) {
 
 // WriteSuccess writes the standard authentication success message.
 func WriteSuccess(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "✓ Authentication successful!")
+	_, _ = fmt.Fprintln(w, green.Render("✓ Authentication successful!"))
 }
 
 // WriteTimeout writes the standard timeout message.
 func WriteTimeout(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "⏱ Timeout waiting for authorization.")
+	_, _ = fmt.Fprintln(w, yellow.Render("⏱ Timeout waiting for authorization."))
 }
 
 // WriteDenied writes the standard authorization denied message.
 func WriteDenied(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "✗ Authorization denied by user.")
+	_, _ = fmt.Fprintln(w, red.Render("✗ Authorization denied by user."))
 }
 
 // WriteExpired writes the standard device code expired message.
 func WriteExpired(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "✗ Device code expired.")
+	_, _ = fmt.Fprintln(w, red.Render("✗ Device code expired."))
 }
 
 // WriteWaiting writes the standard "waiting for browser" message.
 func WriteWaiting(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Waiting for browser authorization...")
+	_, _ = fmt.Fprintln(w, dim.Render("Waiting for browser authorization..."))
 }
 
 // WriteOpening writes the "Opening <url>" message and opens the browser.
 func WriteOpening(w io.Writer, url string) {
-	_, _ = fmt.Fprintf(w, "Opening %s\n", url)
+	_, _ = fmt.Fprintf(w, "Opening %s\n", bold.Render(url))
 	OpenBrowser(url)
 }
