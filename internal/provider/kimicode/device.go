@@ -7,14 +7,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 const (
@@ -49,12 +47,7 @@ func (s *DeviceFlowStrategy) IsAvailable() bool {
 }
 
 func (s *DeviceFlowStrategy) credentialPaths() []string {
-	// kimi-cli stores credentials at ~/.kimi/credentials/kimi-code.json
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return provider.CredentialSearchPaths("kimicode", "oauth")
-	}
-	return provider.CredentialSearchPaths("kimicode", "oauth", filepath.Join(home, ".kimi", "credentials", "kimi-code.json"))
+	return []string{config.CredentialPath("kimicode", "oauth")}
 }
 
 func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
