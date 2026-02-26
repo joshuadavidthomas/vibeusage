@@ -5,26 +5,34 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 )
 
-// AuthFlow describes how a provider authenticates.
-// Providers return nil from Auth() if they don't support interactive auth.
+// AuthFlow is a marker interface for provider auth flow types.
+// Use a type switch to determine the concrete type:
+//   - DeviceAuthFlow: standard OAuth device code flow (configured via deviceflow.Config)
+//   - ManualKeyAuthFlow: user pastes a credential (API key, session token, etc.)
+//   - CustomAuthFlow: provider-specific flow that doesn't fit the standard patterns
 type AuthFlow interface {
-	// Authenticate runs the auth flow, writing output to w.
-	// Returns true on success, false on user cancellation.
-	Authenticate(w io.Writer, quiet bool) (bool, error)
+	authFlow()
 }
 
-// DeviceAuthFlow wraps an OAuth/device-code flow provided by the
-// provider package (e.g. copilot.RunDeviceFlow, kimicode.RunDeviceFlow).
+// DeviceAuthFlow describes an OAuth device code flow.
+// The deviceflow package handles the entire lifecycle using the Config.
 type DeviceAuthFlow struct {
+	Config deviceflow.Config
+}
+
+func (DeviceAuthFlow) authFlow() {}
+
+// CustomAuthFlow wraps a provider-specific auth function that doesn't fit
+// the standard device code or manual key patterns (e.g. localhost OAuth redirect).
+type CustomAuthFlow struct {
 	RunFlow func(w io.Writer, quiet bool) (bool, error)
 }
 
-// Authenticate delegates to the provider's flow function.
-func (d DeviceAuthFlow) Authenticate(w io.Writer, quiet bool) (bool, error) {
-	return d.RunFlow(w, quiet)
-}
+func (CustomAuthFlow) authFlow() {}
 
 // ManualKeyAuthFlow describes an auth flow where the user manually
 // provides a credential (session key, API key, etc.).
@@ -44,13 +52,7 @@ type ManualKeyAuthFlow struct {
 	Save func(value string) error
 }
 
-// Authenticate is not directly called — the cmd layer uses the fields
-// to build the interactive prompt. This satisfies the interface for type safety.
-func (m ManualKeyAuthFlow) Authenticate(w io.Writer, quiet bool) (bool, error) {
-	// Manual key flows are driven by the cmd layer using the fields above.
-	// This method exists to satisfy the AuthFlow interface.
-	return false, nil
-}
+func (ManualKeyAuthFlow) authFlow() {}
 
 // Authenticator is an optional interface that providers can implement
 // to declare their auth flow. Providers that don't implement this

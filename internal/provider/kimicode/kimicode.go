@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -45,7 +46,22 @@ func (k KimiCode) FetchStatus(_ context.Context) models.ProviderStatus {
 
 // Auth returns the Kimi Code device flow.
 func (k KimiCode) Auth() provider.AuthFlow {
-	return provider.DeviceAuthFlow{RunFlow: RunDeviceFlow}
+	return provider.DeviceAuthFlow{
+		Config: deviceflow.Config{
+			DeviceCodeURL: oauthBaseURL() + deviceCodePath,
+			DeviceCodeParams: map[string]string{
+				"client_id": clientID,
+			},
+			TokenURL: oauthBaseURL() + tokenPath,
+			TokenParams: map[string]string{
+				"client_id":  clientID,
+				"grant_type": deviceFlowGrant,
+			},
+			HTTPOptions:    commonHeaders(),
+			HTTPTimeout:    config.Get().Fetch.Timeout,
+			CredentialPath: config.CredentialPath("kimicode", "oauth"),
+		},
+	}
 }
 
 func init() {

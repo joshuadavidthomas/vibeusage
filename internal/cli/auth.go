@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
@@ -276,10 +277,39 @@ func authProvider(providerID string, p provider.Provider) error {
 		return authGeneric(providerID)
 	}
 
+	// Show provider heading.
+	if !quiet {
+		bold := lipgloss.NewStyle().Bold(true)
+		out("%s\n\n", bold.Render(provider.DisplayName(providerID)))
+	}
+
+	// Offer to reuse existing credentials before running the flow.
+	// Device/custom flows verify tokens (they can expire); manual key flows accept as-is.
+	_, isDevice := flow.(provider.DeviceAuthFlow)
+	_, isCustom := flow.(provider.CustomAuthFlow)
+	verify := isDevice || isCustom
+	if skip, err := offerExistingCredentials(providerID, verify); err != nil {
+		return err
+	} else if skip {
+		enableProvider(providerID)
+		return nil
+	}
+
+	// Run the flow.
 	var err error
 	switch f := flow.(type) {
 	case provider.DeviceAuthFlow:
-		err = authDeviceFlow(providerID, f)
+		var success bool
+		success, err = deviceflow.Run(outWriter, quiet, f.Config)
+		if err == nil && !success {
+			err = fmt.Errorf("authentication failed")
+		}
+	case provider.CustomAuthFlow:
+		var success bool
+		success, err = f.RunFlow(outWriter, quiet)
+		if err == nil && !success {
+			err = fmt.Errorf("authentication failed")
+		}
 	case provider.ManualKeyAuthFlow:
 		err = authManualKey(providerID, f)
 	default:
@@ -290,6 +320,45 @@ func authProvider(providerID string, p provider.Provider) error {
 		enableProvider(providerID)
 	}
 	return err
+}
+
+// offerExistingCredentials checks for detected credentials and asks the user
+// whether to reuse them. When verify is true, credentials are tested via a
+// real fetch before accepting. Returns (true, nil) if the caller should skip
+// the auth flow.
+func offerExistingCredentials(providerID string, verify bool) (bool, error) {
+	hasCreds, source := provider.CheckCredentials(providerID)
+	if !hasCreds || quiet {
+		return false, nil
+	}
+
+	out("✓ %s credentials detected (%s)\n",
+		provider.DisplayName(providerID), sourceToLabel(source))
+
+	useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+		Title:       "Use detected credentials?",
+		Affirmative: "Yes",
+		Negative:    "No, enter manually",
+		Default:     true,
+	})
+	if err != nil {
+		return false, err
+	}
+	if !useExisting {
+		return false, nil
+	}
+
+	if verify {
+		if verifyCredentialsFn(providerID) {
+			return true, nil
+		}
+		if !quiet {
+			out("✗ Detected credentials are expired or invalid, re-authenticating...\n")
+		}
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // enableProvider adds a provider to the enabled list in the data directory,
@@ -303,43 +372,6 @@ func removeProviderCredentials(providerID string) {
 	for _, credType := range []string{"oauth", "session", "apikey"} {
 		config.DeleteCredential(config.CredentialPath(providerID, credType))
 	}
-}
-
-// authDeviceFlow runs an OAuth/device-code flow with detected-credential check.
-func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
-	hasCreds, source := provider.CheckCredentials(providerID)
-	if hasCreds && !quiet {
-		out("✓ %s credentials detected (%s)\n",
-			provider.DisplayName(providerID), sourceToLabel(source))
-
-		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title:       "Use detected credentials?",
-			Affirmative: "Yes",
-			Negative:    "No, enter manually",
-			Default:     true,
-		})
-		if err != nil {
-			return err
-		}
-		if useExisting {
-			// Verify the detected credentials actually work.
-			if verifyCredentialsFn(providerID) {
-				return nil
-			}
-			if !quiet {
-				out("✗ Detected credentials are expired or invalid, re-authenticating...\n")
-			}
-		}
-	}
-
-	success, err := flow.Authenticate(outWriter, quiet)
-	if err != nil {
-		return err
-	}
-	if !success {
-		return fmt.Errorf("authentication failed")
-	}
-	return nil
 }
 
 // HACK: package-level var to allow test stubbing. This should be replaced
@@ -369,27 +401,7 @@ func verifyCredentialsDefault(providerID string) bool {
 
 // authManualKey runs an interactive manual-key input flow.
 func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
-	hasCreds, source := provider.CheckCredentials(providerID)
-	if hasCreds && !quiet {
-		out("✓ %s credentials detected (%s)\n",
-			provider.DisplayName(providerID), sourceToLabel(source))
-
-		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title:       "Use detected credentials?",
-			Affirmative: "Yes",
-			Negative:    "No, enter manually",
-			Default:     true,
-		})
-		if err != nil {
-			return err
-		}
-		if useExisting {
-			return nil
-		}
-	}
-
 	if !quiet {
-		out("%s Authentication\n\n", provider.DisplayName(providerID))
 		outln(flow.Instructions)
 		outln()
 	}
@@ -441,7 +453,8 @@ func authGeneric(providerID string) error {
 		return fmt.Errorf("no auth flow for %s; set credentials with --token or an environment variable", providerID)
 	}
 
-	out("%s Authentication\n\n", provider.DisplayName(providerID))
+	bold := lipgloss.NewStyle().Bold(true)
+	out("%s\n\n", bold.Render(provider.DisplayName(providerID)))
 
 	value, err := prompt.Default.Input(prompt.InputConfig{
 		Title:       fmt.Sprintf("%s credential", provider.DisplayName(providerID)),

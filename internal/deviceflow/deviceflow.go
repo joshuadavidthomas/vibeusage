@@ -3,6 +3,7 @@
 package deviceflow
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -79,6 +80,26 @@ func PollContext() (context.Context, context.CancelFunc) {
 	sigCtx, sigCancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	ctx, cancel := context.WithTimeout(sigCtx, PollTimeout)
 	return ctx, func() { cancel(); sigCancel() }
+}
+
+// WaitForEnter blocks until the user presses Enter or SIGINT is received.
+// Returns nil on Enter, or a context.Canceled error on interrupt.
+func WaitForEnter() error {
+	sigCtx, sigCancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer sigCancel()
+
+	done := make(chan struct{}, 1)
+	go func() {
+		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-sigCtx.Done():
+		return context.Canceled
+	case <-done:
+		return nil
+	}
 }
 
 // PollWait sleeps for the given interval or until the context is cancelled.
