@@ -212,7 +212,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("kimicode", "oauth"), content)
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
+				_, _ = fmt.Fprintln(w, "✓ Authentication successful!")
 			}
 			return true, nil
 		}

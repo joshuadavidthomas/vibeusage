@@ -149,7 +149,7 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 	}
 
 	if !quiet {
-		_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
+		_, _ = fmt.Fprintln(w, "✓ Authentication successful!")
 		if tokenResp.RefreshToken != "" {
 			_, _ = fmt.Fprintln(w, "  Token will refresh automatically — no need to open the IDE.")
 		}

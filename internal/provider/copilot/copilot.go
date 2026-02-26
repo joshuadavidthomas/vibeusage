@@ -217,7 +217,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	// Display instructions — GitHub requires entering the code manually,
 	// so show it and wait for the user to press Enter before opening the browser.
 	if !quiet {
-		_, _ = fmt.Fprintf(w, "Your code: %s\n", displayCode)
+		_, _ = fmt.Fprintf(w, "Copy this code: %s\n", displayCode)
 		_, _ = fmt.Fprintf(w, "Press Enter to open %s", verificationURI)
 		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 		_, _ = fmt.Fprintf(w, "Opening %s\n", verificationURI)
@@ -259,7 +259,7 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 			content, _ := json.Marshal(creds)
 			_ = config.WriteCredential(config.CredentialPath("copilot", "oauth"), content)
 			if !quiet {
-				_, _ = fmt.Fprintln(w, "\n  ✓ Authentication successful!")
+				_, _ = fmt.Fprintln(w, "✓ Authentication successful!")
 			}
 			return true, nil
 		}
