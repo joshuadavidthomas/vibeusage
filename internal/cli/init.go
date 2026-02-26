@@ -67,10 +67,25 @@ func quickSetup() error {
 		return nil
 	}
 
-	outln("To set up Claude, run:")
-	outln("  vibeusage auth claude")
+	p, ok := provider.Get("claude")
+	if !ok {
+		outln("Claude provider not available.")
+		return nil
+	}
+
+	if err := authProvider("claude", p); err != nil {
+		out("✗ Claude setup failed: %v\n", err)
+		outln("  Retry with: vibeusage auth claude")
+		return nil
+	}
+
+	// Save claude as an enabled provider.
+	saveEnabledProviders([]string{"claude"})
+
 	outln()
-	outln("After setup, run 'vibeusage' to see your usage.")
+	outln("✓ Claude is ready!")
+	outln("Run 'vibeusage' to see your usage.")
+	outln("Add more providers with: vibeusage init")
 	return nil
 }
 
@@ -116,30 +131,71 @@ func interactiveWizard() error {
 
 	if len(selected) == 0 {
 		outln("\nNo providers selected. You can set up providers later:")
-		for _, pid := range allProviders {
-			out("  vibeusage auth %s\n", pid)
-		}
+		outln("  vibeusage init")
 		return nil
 	}
 
-	out("\nSet up %d provider(s):\n\n", len(selected))
+	// Save selected providers as the enabled set.
+	saveEnabledProviders(selected)
 
+	// Authenticate each selected provider inline.
+	outln()
+	var succeeded, failed, skipped []string
 	for _, pid := range selected {
+		p, ok := provider.Get(pid)
+		if !ok {
+			continue
+		}
+
 		hasCreds, _ := provider.CheckCredentials(pid)
 		if hasCreds {
 			out("  ✓ %s already configured\n", pid)
+			skipped = append(skipped, pid)
+			continue
+		}
+
+		outln()
+		if err := authProvider(pid, p); err != nil {
+			out("  ✗ %s: %v\n", pid, err)
+			failed = append(failed, pid)
 		} else {
-			out("  → %s: vibeusage auth %s\n", pid, pid)
+			succeeded = append(succeeded, pid)
 		}
 	}
 
 	// Seed default roles if none exist.
 	seedDefaultRoles()
 
+	// Print summary.
 	outln()
-	outln("Run the commands above to authenticate each provider.")
-	outln("After setup, run 'vibeusage' to see your usage.")
+	if len(succeeded) > 0 {
+		out("  ✓ Authenticated: %s\n", strings.Join(succeeded, ", "))
+	}
+	if len(skipped) > 0 {
+		out("  ✓ Already configured: %s\n", strings.Join(skipped, ", "))
+	}
+	if len(failed) > 0 {
+		out("  ✗ Failed: %s\n", strings.Join(failed, ", "))
+		outln("    Retry with: vibeusage init")
+	}
+	outln()
+	outln("  Run 'vibeusage' to see your usage.")
 	return nil
+}
+
+// saveEnabledProviders persists the selected provider IDs into config so only
+// those providers are tracked. This makes provider tracking opt-in.
+func saveEnabledProviders(providerIDs []string) {
+	cfg, err := config.Load("")
+	if err != nil {
+		return
+	}
+	sort.Strings(providerIDs)
+	cfg.EnabledProviders = providerIDs
+	if err := config.Save(cfg, ""); err != nil {
+		return
+	}
+	config.SetGlobal(cfg)
 }
 
 func seedDefaultRoles() {

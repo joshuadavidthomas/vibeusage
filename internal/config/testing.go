@@ -11,7 +11,7 @@ func Override(t testing.TB, cfg Config) {
 	prev := globalConfig
 	configMu.RUnlock()
 
-	set(cfg)
+	SetGlobal(cfg)
 	t.Cleanup(func() {
 		configMu.Lock()
 		defer configMu.Unlock()

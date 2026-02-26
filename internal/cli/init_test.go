@@ -13,6 +13,11 @@ import (
 )
 
 func TestInteractiveWizard_UsesMultiSelect(t *testing.T) {
+	// Use temp dir so credential writes and config saves don't affect the host.
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
 	mock := &prompt.Mock{
 		MultiSelectFunc: func(cfg prompt.MultiSelectConfig) ([]string, error) {
 			if cfg.Title == "" {
@@ -21,7 +26,13 @@ func TestInteractiveWizard_UsesMultiSelect(t *testing.T) {
 			if len(cfg.Options) == 0 {
 				t.Error("MultiSelect should have provider options")
 			}
-			return []string{"claude", "gemini"}, nil
+			// Select providers that use manual key auth so the wizard
+			// can drive them inline via the Input prompt.
+			return []string{"gemini", "openrouter"}, nil
+		},
+		InputFunc: func(cfg prompt.InputConfig) (string, error) {
+			// Return a dummy credential for each provider auth prompt.
+			return "test-key-value", nil
 		},
 	}
 
@@ -49,6 +60,17 @@ func TestInteractiveWizard_UsesMultiSelect(t *testing.T) {
 	if len(opts) < 3 {
 		t.Errorf("expected at least 3 provider options, got %d", len(opts))
 	}
+
+	// Auth should have been called inline for each selected provider.
+	if len(mock.InputCalls) != 2 {
+		t.Errorf("expected 2 Input calls (one per selected provider), got %d", len(mock.InputCalls))
+	}
+
+	// Summary should report success.
+	output := buf.String()
+	if !bytes.Contains([]byte(output), []byte("Authenticated")) {
+		t.Errorf("expected success summary in output, got:\n%s", output)
+	}
 }
 
 func TestInteractiveWizard_NoSelection(t *testing.T) {
@@ -72,7 +94,7 @@ func TestInteractiveWizard_NoSelection(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !bytes.Contains([]byte(output), []byte("vibeusage auth")) {
+	if !bytes.Contains([]byte(output), []byte("vibeusage init")) {
 		t.Error("expected fallback instructions when no providers selected")
 	}
 }
@@ -172,6 +194,43 @@ func TestInitCommand_QuickFlag_DoesNotPanicWhenConfigMissing(t *testing.T) {
 
 	if err := rootCmd.Execute(); err != nil {
 		t.Fatalf("init --quick should execute without panic or error: %v", err)
+	}
+}
+
+func TestInteractiveWizard_SavesEnabledProviders(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	mock := &prompt.Mock{
+		MultiSelectFunc: func(cfg prompt.MultiSelectConfig) ([]string, error) {
+			return []string{"gemini", "openrouter"}, nil
+		},
+		InputFunc: func(cfg prompt.InputConfig) (string, error) {
+			return "test-key-value", nil
+		},
+	}
+
+	old := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(old)
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	if err := interactiveWizard(); err != nil {
+		t.Fatalf("interactiveWizard() error: %v", err)
+	}
+
+	// The selected providers should now be the enabled set.
+	cfg := config.Get()
+	if len(cfg.EnabledProviders) != 2 {
+		t.Fatalf("expected 2 enabled providers, got %d", len(cfg.EnabledProviders))
+	}
+	// Providers are sorted before saving.
+	if cfg.EnabledProviders[0] != "gemini" || cfg.EnabledProviders[1] != "openrouter" {
+		t.Errorf("expected [gemini openrouter], got %v", cfg.EnabledProviders)
 	}
 }
 

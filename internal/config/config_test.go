@@ -522,7 +522,7 @@ func TestGet_ReturnsCopy(t *testing.T) {
 	// Slice isolation: mutating EnabledProviders must not affect another copy
 	cfgWithProviders := DefaultConfig()
 	cfgWithProviders.EnabledProviders = []string{"claude", "copilot"}
-	set(cfgWithProviders)
+	SetGlobal(cfgWithProviders)
 
 	cfg5 := Get()
 	if len(cfg5.EnabledProviders) != 2 {

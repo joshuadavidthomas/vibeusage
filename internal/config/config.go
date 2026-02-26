@@ -96,7 +96,7 @@ func SeedDefaultRoles() bool {
 	if err := Save(cfg, ""); err != nil {
 		return false
 	}
-	set(cfg)
+	SetGlobal(cfg)
 	return true
 }
 
@@ -174,9 +174,9 @@ func Init() (Config, error) {
 	return c.clone(), err
 }
 
-// set replaces the global config value. Used by Init, SeedDefaultRoles,
-// and Override.
-func set(cfg Config) {
+// SetGlobal replaces the global config value. Use after persisting config
+// changes to disk so in-process reads reflect the update.
+func SetGlobal(cfg Config) {
 	configMu.Lock()
 	defer configMu.Unlock()
 	globalConfig = &cfg
