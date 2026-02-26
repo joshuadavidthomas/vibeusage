@@ -156,6 +156,12 @@ vibeusage auth claude
 
 This prompts you to copy the `sessionKey` cookie from https://claude.ai (DevTools → Application → Cookies). Session keys don't auto-refresh, so you'll need to re-auth when they expire.
 
+> [!NOTE]
+> **On Anthropic API keys:** Regular API keys (`sk-ant-api03-*`) from the [Anthropic console](https://platform.claude.com/settings/keys) **cannot** access Pro/Max plan usage data. They live in a completely separate billing system (pay-per-token) with no connection to consumer plan rate limits. This is why vibeusage uses OAuth credentials or session cookies instead.
+
+> [!IMPORTANT]
+> **On Terms of Service:** Anthropic's [Consumer Terms of Service](https://www.anthropic.com/legal/terms) broadly restrict automated access to their services, and their [Claude Code legal docs](https://code.claude.com/docs/en/legal-and-compliance) (updated February 2026) state that using OAuth tokens in third-party tools is not permitted. vibeusage makes **zero inference requests** — it only reads a usage percentage, the equivalent of checking your data plan on your carrier's website. We believe this is defensible, but want to be transparent: under a strict reading of the TOS, this tool may technically be in violation. We'd happily switch to a sanctioned API if Anthropic ever provides one (a read-only usage endpoint on regular API keys would be perfect 🙏).
+
 ### Cursor
 
 [cursor.com](https://cursor.com) — AI-powered code editor. Reports monthly premium request usage and on-demand spend. Shows your membership type.
