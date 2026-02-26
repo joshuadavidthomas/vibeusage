@@ -46,12 +46,12 @@ func CacheDir() string {
 }
 
 func EnabledProvidersFile() string { return filepath.Join(DataDir(), "enabled_providers.json") }
-func CredentialsDir() string      { return filepath.Join(DataDir(), "credentials") }
-func SnapshotsDir() string    { return filepath.Join(CacheDir(), "snapshots") }
-func OrgIDsDir() string       { return filepath.Join(CacheDir(), "org-ids") }
-func ModelsFile() string      { return filepath.Join(CacheDir(), "models.json") }
-func MultipliersFile() string { return filepath.Join(CacheDir(), "multipliers.json") }
-func ConfigFile() string      { return filepath.Join(ConfigDir(), "config.toml") }
+func CredentialsDir() string       { return filepath.Join(DataDir(), "credentials") }
+func SnapshotsDir() string         { return filepath.Join(CacheDir(), "snapshots") }
+func OrgIDsDir() string            { return filepath.Join(CacheDir(), "org-ids") }
+func ModelsFile() string           { return filepath.Join(CacheDir(), "models.json") }
+func MultipliersFile() string      { return filepath.Join(CacheDir(), "multipliers.json") }
+func ConfigFile() string           { return filepath.Join(ConfigDir(), "config.toml") }
 
 // TODO(v0.3.0): remove legacy config path helpers after the v0.2.0 migration window.
 func legacyConfigDir() string {

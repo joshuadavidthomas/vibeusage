@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
-	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 )
 
 const (
@@ -252,4 +252,3 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	}
 	return false, nil
 }
-

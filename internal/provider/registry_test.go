@@ -299,4 +299,3 @@ func TestCheckCredentials_FallsBackToAvailableStrategy(t *testing.T) {
 		t.Errorf("source = %q, want %q", source, "provider_cli")
 	}
 }
-

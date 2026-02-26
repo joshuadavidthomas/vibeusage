@@ -36,11 +36,11 @@ type AuthStatusEntryJSON struct {
 
 // ConfigShowJSON represents the config show JSON output.
 type ConfigShowJSON struct {
-	Fetch   ConfigFetchJSON   `json:"fetch"`
-	Display ConfigDisplayJSON `json:"display"`
-	Credentials      ConfigCredentialsJSON `json:"credentials"`
-	Roles            any                   `json:"roles"`
-	Path             string                `json:"path"`
+	Fetch       ConfigFetchJSON       `json:"fetch"`
+	Display     ConfigDisplayJSON     `json:"display"`
+	Credentials ConfigCredentialsJSON `json:"credentials"`
+	Roles       any                   `json:"roles"`
+	Path        string                `json:"path"`
 }
 
 // ConfigFetchJSON represents the fetch section of config.
@@ -59,8 +59,7 @@ type ConfigDisplayJSON struct {
 
 // ConfigCredentialsJSON represents the credentials section of config.
 type ConfigCredentialsJSON struct {
-	UseKeyring               bool `json:"use_keyring"`
-
+	UseKeyring bool `json:"use_keyring"`
 }
 
 // ActionResultJSON is a generic success/message response used by

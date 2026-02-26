@@ -37,11 +37,11 @@ type RoleConfig struct {
 }
 
 type Config struct {
-	Display DisplayConfig `toml:"display" json:"display"`
-	Fetch            FetchConfig               `toml:"fetch" json:"fetch"`
-	Credentials      CredentialsConfig         `toml:"credentials" json:"credentials"`
-	Providers        map[string]ProviderConfig `toml:"providers" json:"providers"`
-	Roles            map[string]RoleConfig     `toml:"roles" json:"roles"`
+	Display     DisplayConfig             `toml:"display" json:"display"`
+	Fetch       FetchConfig               `toml:"fetch" json:"fetch"`
+	Credentials CredentialsConfig         `toml:"credentials" json:"credentials"`
+	Providers   map[string]ProviderConfig `toml:"providers" json:"providers"`
+	Roles       map[string]RoleConfig     `toml:"roles" json:"roles"`
 }
 
 func DefaultConfig() Config {

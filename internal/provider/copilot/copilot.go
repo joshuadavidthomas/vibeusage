@@ -1,20 +1,20 @@
 package copilot
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
-	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 )
 
 type Copilot struct{}

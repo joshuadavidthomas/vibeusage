@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
-	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
@@ -159,4 +159,3 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 
 	return true, nil
 }
-
