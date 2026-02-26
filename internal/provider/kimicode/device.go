@@ -174,10 +174,17 @@ func RunDeviceFlow(w io.Writer, quiet bool) (bool, error) {
 	// Try to open browser
 	deviceflow.OpenBrowser(verificationURI)
 
+	ctx, cancel := deviceflow.InterruptContext()
+	defer cancel()
+
 	// Poll for token
 	for attempt := 0; attempt < 120; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(interval) * time.Second)
+			select {
+			case <-ctx.Done():
+				return false, nil
+			case <-time.After(time.Duration(interval) * time.Second):
+			}
 		}
 
 		var tokenResp TokenResponse

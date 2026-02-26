@@ -3,9 +3,12 @@
 package deviceflow
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 
 	"github.com/charmbracelet/lipgloss"
@@ -64,4 +67,11 @@ func WriteWaiting(w io.Writer) {
 func WriteOpening(w io.Writer, url string) {
 	_, _ = fmt.Fprintf(w, "Opening %s\n", bold.Render(url))
 	OpenBrowser(url)
+}
+
+// InterruptContext returns a context that is cancelled on SIGINT/SIGTERM.
+// Call the returned cancel function to clean up signal handling.
+func InterruptContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	return ctx, cancel
 }

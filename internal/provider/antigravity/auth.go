@@ -88,7 +88,10 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 
 	deviceflow.OpenBrowser(authURL)
 
-	// Wait for the callback (with timeout).
+	ctx, cancel := deviceflow.InterruptContext()
+	defer cancel()
+
+	// Wait for the callback (with timeout or interrupt).
 	select {
 	case result := <-resultCh:
 		if result.err != nil {
@@ -102,6 +105,8 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 		if !quiet {
 			deviceflow.WriteTimeout(w)
 		}
+		return false, nil
+	case <-ctx.Done():
 		return false, nil
 	}
 }
