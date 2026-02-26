@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/adrg/xdg"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -186,27 +185,6 @@ func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
 	}
 	if cfg.Providers == nil {
 		t.Error("Providers map should be initialized even on missing file")
-	}
-}
-
-func TestLoad_DefaultPathFallsBackToLegacyConfigFile(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", "")
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "legacy-base"))
-
-	oldConfigHome := xdg.ConfigHome
-	xdg.ConfigHome = filepath.Join(dir, "primary-base")
-	t.Cleanup(func() { xdg.ConfigHome = oldConfigHome })
-
-	legacyPath := legacyConfigFile()
-	writeTestFile(t, legacyPath, []byte("[fetch]\ntimeout = 12.5\n"))
-
-	cfg, err := Load("")
-	if err != nil {
-		t.Fatalf("Load() error = %v, want nil", err)
-	}
-	if cfg.Fetch.Timeout != 12.5 {
-		t.Errorf("Fetch.Timeout = %v, want 12.5 from legacy config", cfg.Fetch.Timeout)
 	}
 }
 
@@ -700,33 +678,6 @@ func TestSubdirectoryPaths(t *testing.T) {
 	}
 }
 
-func TestSave_DualWritesLegacyConfigPath(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", "")
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "legacy-base"))
-
-	oldConfigHome := xdg.ConfigHome
-	xdg.ConfigHome = filepath.Join(dir, "primary-base")
-	t.Cleanup(func() { xdg.ConfigHome = oldConfigHome })
-
-	cfg := DefaultConfig()
-	if err := Save(cfg, ""); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-
-	primary := ConfigFile()
-	legacy := legacyConfigFile()
-	if primary == legacy {
-		t.Fatalf("expected distinct primary and legacy paths, got %q", primary)
-	}
-	if _, err := os.Stat(primary); err != nil {
-		t.Fatalf("primary config file should exist: %v", err)
-	}
-	if _, err := os.Stat(legacy); err != nil {
-		t.Fatalf("legacy config file should exist: %v", err)
-	}
-}
-
 // Cache: Snapshots
 
 func TestCacheSnapshot_LoadCachedSnapshot_Roundtrip(t *testing.T) {
@@ -1102,30 +1053,6 @@ func TestWriteCredential_ReadCredential_Roundtrip(t *testing.T) {
 	}
 }
 
-func TestWriteCredential_DualWritesLegacyPath(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
-	t.Setenv("VIBEUSAGE_DATA_DIR", filepath.Join(dir, "data"))
-
-	path := CredentialPath("claude", "oauth")
-	content := []byte(`{"token":"dual-write"}`)
-
-	if err := WriteCredential(path, content); err != nil {
-		t.Fatalf("WriteCredential() error: %v", err)
-	}
-
-	legacy := legacyCredentialPath(path)
-	if legacy == "" {
-		t.Fatal("expected legacy credential path")
-	}
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("primary credential should exist: %v", err)
-	}
-	if _, err := os.Stat(legacy); err != nil {
-		t.Fatalf("legacy credential should exist: %v", err)
-	}
-}
-
 func TestWriteCredential_FilePermissions(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cred.json")
@@ -1181,29 +1108,6 @@ func TestReadCredential_MissingFile_ReturnsNilNil(t *testing.T) {
 	}
 }
 
-func TestReadCredential_LegacyPathFallback(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
-	t.Setenv("VIBEUSAGE_DATA_DIR", filepath.Join(dir, "data"))
-
-	content := []byte(`{"token":"legacy"}`)
-	legacyPath := filepath.Join(legacyCredentialsDir(), "claude", "oauth.json")
-	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	if err := os.WriteFile(legacyPath, content, 0o600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	got, err := ReadCredential(CredentialPath("claude", "oauth"))
-	if err != nil {
-		t.Fatalf("ReadCredential() error: %v", err)
-	}
-	if string(got) != string(content) {
-		t.Errorf("ReadCredential() = %q, want %q", got, content)
-	}
-}
-
 func TestDeleteCredential_ExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cred.json")
@@ -1216,27 +1120,6 @@ func TestDeleteCredential_ExistingFile(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Error("file should be deleted")
-	}
-}
-
-func TestDeleteCredential_LegacyPathFallback(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
-	t.Setenv("VIBEUSAGE_DATA_DIR", filepath.Join(dir, "data"))
-
-	legacyPath := filepath.Join(legacyCredentialsDir(), "claude", "session.json")
-	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	if err := os.WriteFile(legacyPath, []byte("legacy"), 0o600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	if !DeleteCredential(CredentialPath("claude", "session")) {
-		t.Error("DeleteCredential() should return true when legacy credential exists")
-	}
-	if _, err := os.Stat(legacyPath); !os.IsNotExist(err) {
-		t.Error("legacy credential file should be deleted")
 	}
 }
 
@@ -1285,29 +1168,6 @@ func TestFindProviderCredential_VibeusageStorage(t *testing.T) {
 	}
 	if path != credPath {
 		t.Errorf("path = %q, want %q", path, credPath)
-	}
-}
-
-func TestFindProviderCredential_LegacyVibeusageStorage(t *testing.T) {
-	setupTempDirWithCredentialIsolation(t)
-
-	legacyPath := filepath.Join(legacyCredentialsDir(), "claude", "oauth.json")
-	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	if err := os.WriteFile(legacyPath, []byte(`{"token":"legacy"}`), 0o600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	found, source, path := FindProviderCredential("claude", nil, nil)
-	if !found {
-		t.Error("should find credential in legacy vibeusage storage")
-	}
-	if source != "vibeusage" {
-		t.Errorf("source = %q, want %q", source, "vibeusage")
-	}
-	if path != legacyPath {
-		t.Errorf("path = %q, want %q", path, legacyPath)
 	}
 }
 
