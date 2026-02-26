@@ -135,6 +135,8 @@ func authSetup() error {
 	for _, pid := range config.ReadEnabledProviders() {
 		if selectedSet[pid] {
 			kept = append(kept, pid)
+		} else {
+			removeProviderCredentials(pid)
 		}
 	}
 	_ = config.WriteEnabledProviders(kept)
@@ -265,6 +267,13 @@ func authProvider(providerID string, p provider.Provider) error {
 // making provider tracking opt-in via the auth command.
 func enableProvider(providerID string) {
 	config.AddEnabledProvider(providerID)
+}
+
+// removeProviderCredentials deletes all vibeusage-stored credentials for a provider.
+func removeProviderCredentials(providerID string) {
+	for _, credType := range []string{"oauth", "session", "apikey"} {
+		config.DeleteCredential(config.CredentialPath(providerID, credType))
+	}
 }
 
 // authDeviceFlow runs an OAuth/device-code flow with detected-credential check.
