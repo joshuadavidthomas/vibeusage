@@ -1,5 +1,7 @@
 package copilot
 
+import "github.com/joshuadavidthomas/vibeusage/internal/oauth"
+
 // UserResponse represents the response from the Copilot user API endpoint.
 type UserResponse struct {
 	QuotaResetDateUTC string          `json:"quota_reset_date_utc,omitempty"`
@@ -48,16 +50,21 @@ type DeviceCodeResponse struct {
 }
 
 // TokenResponse represents the response from the GitHub OAuth token endpoint.
-// It can contain either a successful token or an error.
+// It can contain either a successful token or an error. When the GitHub App
+// has expiring tokens enabled, the response also includes a refresh token and
+// expiration info.
 type TokenResponse struct {
-	AccessToken      string `json:"access_token,omitempty"`
-	TokenType        string `json:"token_type,omitempty"`
-	Scope            string `json:"scope,omitempty"`
-	Error            string `json:"error,omitempty"`
-	ErrorDescription string `json:"error_description,omitempty"`
+	AccessToken           string  `json:"access_token,omitempty"`
+	RefreshToken          string  `json:"refresh_token,omitempty"`
+	ExpiresIn             float64 `json:"expires_in,omitempty"`
+	RefreshTokenExpiresIn float64 `json:"refresh_token_expires_in,omitempty"`
+	TokenType             string  `json:"token_type,omitempty"`
+	Scope                 string  `json:"scope,omitempty"`
+	Error                 string  `json:"error,omitempty"`
+	ErrorDescription      string  `json:"error_description,omitempty"`
 }
 
-// OAuthCredentials represents stored OAuth credentials for Copilot.
-type OAuthCredentials struct {
-	AccessToken string `json:"access_token"`
-}
+// OAuthCredentials is an alias for the shared OAuth credential type.
+// Legacy credentials with only access_token (no refresh_token/expires_at)
+// are a valid subset and load transparently.
+type OAuthCredentials = oauth.Credentials

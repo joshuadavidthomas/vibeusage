@@ -277,7 +277,7 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 			want:  false,
 		},
 		{
-			name: "not expired",
+			name: "not expired and outside buffer",
 			creds: OAuthCredentials{
 				AccessToken: "tok",
 				ExpiresAt:   time.Now().UTC().Add(1 * time.Hour).Format(time.RFC3339),
@@ -289,6 +289,14 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 			creds: OAuthCredentials{
 				AccessToken: "tok",
 				ExpiresAt:   time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
+			},
+			want: true,
+		},
+		{
+			name: "within refresh buffer",
+			creds: OAuthCredentials{
+				AccessToken: "tok",
+				ExpiresAt:   time.Now().UTC().Add(2 * time.Minute).Format(time.RFC3339),
 			},
 			want: true,
 		},

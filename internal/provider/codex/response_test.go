@@ -199,45 +199,6 @@ func TestRateWindow_EffectiveResetTimestamp(t *testing.T) {
 	}
 }
 
-func TestTokenResponse_Unmarshal(t *testing.T) {
-	raw := `{
-		"access_token": "new-token",
-		"refresh_token": "new-refresh",
-		"expires_in": 3600
-	}`
-
-	var resp TokenResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if resp.AccessToken != "new-token" {
-		t.Errorf("access_token = %q, want %q", resp.AccessToken, "new-token")
-	}
-	if resp.RefreshToken != "new-refresh" {
-		t.Errorf("refresh_token = %q, want %q", resp.RefreshToken, "new-refresh")
-	}
-	if resp.ExpiresIn != 3600 {
-		t.Errorf("expires_in = %v, want 3600", resp.ExpiresIn)
-	}
-}
-
-func TestTokenResponse_UnmarshalMinimal(t *testing.T) {
-	raw := `{"access_token": "tok"}`
-
-	var resp TokenResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if resp.AccessToken != "tok" {
-		t.Errorf("access_token = %q, want %q", resp.AccessToken, "tok")
-	}
-	if resp.ExpiresIn != 0 {
-		t.Errorf("expires_in = %v, want 0", resp.ExpiresIn)
-	}
-}
-
 func TestCredentials_Unmarshal(t *testing.T) {
 	raw := `{
 		"access_token": "my-token",
@@ -291,6 +252,8 @@ func TestCredentials_NeedsRefresh(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Credentials is an alias for oauth.Credentials, which uses a
+			// 5-minute refresh buffer (shared across all providers).
 			got := tt.creds.NeedsRefresh()
 			if got != tt.want {
 				t.Errorf("NeedsRefresh() = %v, want %v", got, tt.want)

@@ -3,7 +3,8 @@ package codex
 import (
 	"encoding/json"
 	"strconv"
-	"time"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 // UsageResponse represents the response from the Codex/ChatGPT usage endpoint.
@@ -90,33 +91,8 @@ func (c *Credits) Balance() float64 {
 	return 0
 }
 
-// TokenResponse represents the response from the OAuth token refresh endpoint.
-type TokenResponse struct {
-	AccessToken  string  `json:"access_token"`
-	RefreshToken string  `json:"refresh_token,omitempty"`
-	ExpiresIn    float64 `json:"expires_in,omitempty"`
-}
-
-// Credentials represents stored OAuth credentials for Codex.
-type Credentials struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresAt    string `json:"expires_at,omitempty"`
-}
-
-// NeedsRefresh reports whether the credentials need refreshing.
-// Returns true if expires_at is in the past or within 8 days, or if it's unparseable.
-func (c Credentials) NeedsRefresh() bool {
-	if c.ExpiresAt == "" {
-		return false
-	}
-	expiry, err := time.Parse(time.RFC3339, c.ExpiresAt)
-	if err != nil {
-		return true
-	}
-	threshold := time.Now().UTC().AddDate(0, 0, 8)
-	return threshold.After(expiry)
-}
+// Credentials is an alias for the shared OAuth credential type.
+type Credentials = oauth.Credentials
 
 // CLICredentials represents the Codex CLI credential file format,
 // which may nest tokens under a "tokens" key or be flat.

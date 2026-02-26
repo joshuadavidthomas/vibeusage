@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 // UsagePeriodResponse represents a single usage period from the Claude OAuth API.
@@ -34,20 +35,8 @@ type OAuthUsageResponse struct {
 	BillingType    string               `json:"billing_type,omitempty"`
 }
 
-// OAuthTokenResponse represents the response from /oauth/token.
-type OAuthTokenResponse struct {
-	AccessToken  string  `json:"access_token"`
-	RefreshToken string  `json:"refresh_token,omitempty"`
-	TokenType    string  `json:"token_type,omitempty"`
-	ExpiresIn    float64 `json:"expires_in,omitempty"`
-}
-
-// OAuthCredentials represents stored OAuth credentials (vibeusage format).
-type OAuthCredentials struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresAt    string `json:"expires_at,omitempty"`
-}
+// OAuthCredentials is an alias for the shared OAuth credential type.
+type OAuthCredentials = oauth.Credentials
 
 // ClaudeCLIOAuth represents the nested OAuth data inside Claude CLI credentials.
 type ClaudeCLIOAuth struct {
@@ -67,18 +56,6 @@ func (c *ClaudeCLIOAuth) ToOAuthCredentials() OAuthCredentials {
 		creds.ExpiresAt = t.UTC().Format(time.RFC3339)
 	}
 	return creds
-}
-
-// NeedsRefresh reports whether the credentials have expired or have an unparseable expiry.
-func (c OAuthCredentials) NeedsRefresh() bool {
-	if c.ExpiresAt == "" {
-		return false
-	}
-	expiry, err := time.Parse(time.RFC3339, c.ExpiresAt)
-	if err != nil {
-		return true
-	}
-	return time.Now().UTC().After(expiry)
 }
 
 // ClaudeCLICredentials represents the Claude CLI credentials file format.

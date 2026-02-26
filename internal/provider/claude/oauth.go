@@ -15,6 +15,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/keychain"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -140,49 +141,12 @@ func (s *OAuthStrategy) loadKeychainCredentials() *OAuthCredentials {
 }
 
 func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
-	if creds.RefreshToken == "" {
-		return nil
-	}
-
-	client := httpclient.NewFromConfig(s.HTTPTimeout)
-	var tokenResp OAuthTokenResponse
-	resp, err := client.PostFormCtx(ctx, oauthTokenURL,
-		map[string]string{
-			"grant_type":    "refresh_token",
-			"refresh_token": creds.RefreshToken,
-		},
-		&tokenResp,
-		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
-	)
-	if err != nil {
-		return nil
-	}
-	if resp.StatusCode != 200 {
-		return nil
-	}
-	if resp.JSONErr != nil {
-		return nil
-	}
-
-	updated := &OAuthCredentials{
-		AccessToken:  tokenResp.AccessToken,
-		RefreshToken: tokenResp.RefreshToken,
-	}
-
-	if tokenResp.ExpiresIn > 0 {
-		expiresAt := time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
-		updated.ExpiresAt = expiresAt.Format(time.RFC3339)
-	}
-
-	// Preserve refresh token if the server didn't issue a new one
-	if updated.RefreshToken == "" {
-		updated.RefreshToken = creds.RefreshToken
-	}
-
-	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(config.CredentialPath("claude", "oauth"), content)
-
-	return updated
+	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
+		TokenURL:    oauthTokenURL,
+		Headers:     []httpclient.RequestOption{httpclient.WithHeader("anthropic-beta", anthropicBetaTag)},
+		ProviderID:  "claude",
+		HTTPTimeout: s.HTTPTimeout,
+	})
 }
 
 // tryRefreshViaCLI attempts to refresh the OAuth token by running Claude CLI
