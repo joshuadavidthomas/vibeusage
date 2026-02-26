@@ -45,7 +45,7 @@ func collectCommandPaths(cmd *cobra.Command, prefix []string) [][]string {
 // Root command tests
 
 func TestRootCmd_HasExpectedSubcommands(t *testing.T) {
-	expected := []string{"auth", "status", "config", "cache", "key", "init", "update"}
+	expected := []string{"auth", "status", "config", "cache", "key", "update"}
 	for _, name := range expected {
 		found := false
 		for _, cmd := range rootCmd.Commands() {
@@ -656,7 +656,7 @@ func TestDisplayMultipleSnapshots_NoDataNoErrors_ShowsConfigureHint(t *testing.T
 	if !strings.Contains(got, "No usage data available") {
 		t.Fatalf("expected no-data message, got %q", got)
 	}
-	if !strings.Contains(got, "Configure credentials with:") {
-		t.Errorf("expected configure hint, got %q", got)
+	if !strings.Contains(got, "vibeusage auth") {
+		t.Errorf("expected auth hint, got %q", got)
 	}
 }

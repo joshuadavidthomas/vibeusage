@@ -86,13 +86,6 @@ type KeyDetailJSON struct {
 	Path       string `json:"path"`
 }
 
-// InitStatusJSON represents the init command JSON output.
-type InitStatusJSON struct {
-	FirstRun            bool     `json:"first_run"`
-	ConfiguredProviders int      `json:"configured_providers"`
-	AvailableProviders  []string `json:"available_providers"`
-}
-
 // UpdateStatusJSON represents update check/apply output.
 type UpdateStatusJSON struct {
 	CurrentVersion  string `json:"current_version"`

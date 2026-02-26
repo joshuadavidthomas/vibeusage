@@ -96,7 +96,9 @@ func authStatusCommand() error {
 }
 
 // authProvider dispatches to the appropriate auth flow based on what the
-// provider declares via the Authenticator interface.
+// provider declares via the Authenticator interface. On success, the
+// provider is added to enabled_providers so only explicitly authed
+// providers are tracked.
 func authProvider(providerID string, p provider.Provider) error {
 	auth, ok := p.(provider.Authenticator)
 	if !ok {
@@ -108,14 +110,40 @@ func authProvider(providerID string, p provider.Provider) error {
 		return authGeneric(providerID)
 	}
 
+	var err error
 	switch f := flow.(type) {
 	case provider.DeviceAuthFlow:
-		return authDeviceFlow(providerID, f)
+		err = authDeviceFlow(providerID, f)
 	case provider.ManualKeyAuthFlow:
-		return authManualKey(providerID, f)
+		err = authManualKey(providerID, f)
 	default:
 		return authGeneric(providerID)
 	}
+
+	if err == nil {
+		enableProvider(providerID)
+	}
+	return err
+}
+
+// enableProvider adds a provider to the enabled_providers list in config,
+// making provider tracking opt-in via the auth command.
+func enableProvider(providerID string) {
+	cfg, err := config.Load("")
+	if err != nil {
+		return
+	}
+	for _, id := range cfg.EnabledProviders {
+		if id == providerID {
+			return
+		}
+	}
+	cfg.EnabledProviders = append(cfg.EnabledProviders, providerID)
+	sort.Strings(cfg.EnabledProviders)
+	if err := config.Save(cfg, ""); err != nil {
+		return
+	}
+	config.SetGlobal(cfg)
 }
 
 // authDeviceFlow runs an OAuth/device-code flow with detected-credential check.

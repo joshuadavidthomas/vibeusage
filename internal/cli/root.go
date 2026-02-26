@@ -77,7 +77,6 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(cacheCmd)
 	rootCmd.AddCommand(keyCmd)
-	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(routeCmd)
 	rootCmd.AddCommand(updateCmd)
 
@@ -202,8 +201,8 @@ func displayMultipleSnapshots(ctx context.Context, outcomes map[string]fetch.Fet
 					outln(display.RenderProviderError(e.id, e.err))
 				}
 			} else {
-				outln("\nConfigure credentials with:")
-				outln("  vibeusage key <provider> set")
+				outln("\nSet up a provider with:")
+				outln("  vibeusage auth <provider>")
 			}
 		}
 		for _, e := range errors {
@@ -352,11 +351,8 @@ func showFirstRunMessage() {
 	outln("  No providers are configured yet.")
 	outln("  Track your usage across AI providers in one place.")
 	outln()
-	outln("  Quick start:")
-	outln("    vibeusage init        - Run the setup wizard")
-	outln("    vibeusage init --quick - Quick setup with Claude")
-	outln()
-	outln("  Or set up a provider directly:")
+	outln("  Get started:")
+	outln("    vibeusage auth          - Show all providers")
 
 	ids := provider.ListIDs()
 	sort.Strings(ids)
@@ -365,7 +361,7 @@ func showFirstRunMessage() {
 		count = len(ids)
 	}
 	for _, id := range ids[:count] {
-		out("    vibeusage auth %s\n", id)
+		out("    vibeusage auth %-8s - Set up %s\n", id, provider.DisplayName(id))
 	}
 	outln()
 }
