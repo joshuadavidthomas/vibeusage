@@ -23,11 +23,16 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 ### Changed
 
 - **Breaking:** `--json` output now serializes usage snapshots directly from the model types. Removed `remaining`, `cached` fields; added `fetched_at`, `is_enabled`, `source` fields. `resets_at` uses Go's default time format. Identity fields with empty values are now omitted.
-- Updated `vibeusage auth claude` to accept either claude.ai `sessionKey` credentials (`sk-ant-sid01-...`) or Anthropic API keys (`sk-ant-api...` / `sk-ant-admin-...`).
 - Reordered Claude fetch strategy flow to prefer OAuth first and keep web session usage as the last-resort fallback.
+
+### Removed
+
+- Removed Anthropic API key (`sk-ant-api...` / `sk-ant-admin-...`) support from Claude provider. Regular API keys cannot access consumer plan usage data — they live in a separate billing system with no access to Pro/Max rate limit information. Future Admin API key support tracked in [#97](https://github.com/joshuadavidthomas/vibeusage/issues/97). `vibeusage auth claude` now only accepts `sessionKey` cookies (`sk-ant-sid01-...`).
+- Removed `ANTHROPIC_API_KEY` environment variable support from the Claude provider.
 
 ### Fixed
 
+- Fixed Claude web session strategy silently returning empty usage data. The `claude.ai` usage endpoint changed its response format to match the OAuth endpoint (`five_hour`/`seven_day`/per-model breakdowns instead of `usage_amount`/`usage_limit`), but the web strategy was still parsing the old format.
 - Fixed provider credential leakage when `credentials.reuse_provider_credentials = false` by making provider strategy availability/loading consistently honor the setting.
 - Fixed credential path coupling by removing `DataDir()` fallback to `VIBEUSAGE_CONFIG_DIR`; credentials now use the data path unless `VIBEUSAGE_DATA_DIR` is explicitly set.
 - Fixed no-data output to show provider-specific fetch errors when providers are configured but all strategies fail.
