@@ -118,20 +118,22 @@ func authProvider(providerID string, p provider.Provider) error {
 	}
 }
 
-// authDeviceFlow runs an OAuth/device-code flow with re-auth check.
+// authDeviceFlow runs an OAuth/device-code flow with detected-credential check.
 func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
-		out("✓ %s is already authenticated (%s)\n",
+		out("✓ %s credentials detected (%s)\n",
 			provider.DisplayName(providerID), sourceToLabel(source))
 
-		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: "Re-authenticate?",
+		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title:       "Use detected credentials?",
+			Affirmative: "Yes",
+			Negative:    "No, enter new",
 		})
 		if err != nil {
 			return err
 		}
-		if !reauth {
+		if useExisting {
 			return nil
 		}
 	}
@@ -150,16 +152,18 @@ func authDeviceFlow(providerID string, flow provider.DeviceAuthFlow) error {
 func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 	hasCreds, source := provider.CheckCredentials(providerID)
 	if hasCreds && !quiet {
-		out("✓ %s is already authenticated (%s)\n",
+		out("✓ %s credentials detected (%s)\n",
 			provider.DisplayName(providerID), sourceToLabel(source))
 
-		reauth, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: "Re-authenticate?",
+		useExisting, err := prompt.Default.Confirm(prompt.ConfirmConfig{
+			Title:       "Use detected credentials?",
+			Affirmative: "Yes",
+			Negative:    "No, enter new",
 		})
 		if err != nil {
 			return err
 		}
-		if !reauth {
+		if useExisting {
 			return nil
 		}
 	}

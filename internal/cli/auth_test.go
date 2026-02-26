@@ -47,7 +47,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 			return "sk-ant-" + "sid01-" + "test123", nil
 		},
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
-			return true, nil // re-auth if already configured
+			return false, nil // decline detected creds, enter new
 		},
 	}
 
@@ -218,7 +218,7 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
-			return false, nil // user says no to re-auth
+			return true, nil // user says yes to use existing creds
 		},
 	}
 
