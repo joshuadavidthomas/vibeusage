@@ -13,6 +13,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
@@ -85,7 +86,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
+func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
 		if err != nil || data == nil {

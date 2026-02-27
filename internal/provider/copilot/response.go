@@ -1,7 +1,5 @@
 package copilot
 
-import "github.com/joshuadavidthomas/vibeusage/internal/oauth"
-
 // UserResponse represents the response from the Copilot user API endpoint.
 type UserResponse struct {
 	QuotaResetDateUTC string          `json:"quota_reset_date_utc,omitempty"`
@@ -41,7 +39,5 @@ func (q *Quota) HasUsage() bool {
 	return q.Unlimited || q.Entitlement > 0
 }
 
-// OAuthCredentials is an alias for the shared OAuth credential type.
 // Legacy credentials with only access_token (no refresh_token/expires_at)
 // are a valid subset and load transparently.
-type OAuthCredentials = oauth.Credentials

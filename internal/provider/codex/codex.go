@@ -140,7 +140,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	return s.fetchUsage(ctx, client, usageURL, creds)
 }
 
-func (s *OAuthStrategy) fetchUsage(ctx context.Context, client *httpclient.Client, usageURL string, creds *Credentials) (fetch.FetchResult, error) {
+func (s *OAuthStrategy) fetchUsage(ctx context.Context, client *httpclient.Client, usageURL string, creds *oauth.Credentials) (fetch.FetchResult, error) {
 	var usageResp UsageResponse
 	resp, err := client.GetJSONCtx(ctx, usageURL, &usageResp, httpclient.WithBearer(creds.AccessToken))
 	if err != nil {
@@ -173,7 +173,7 @@ func (s *OAuthStrategy) credentialPaths() []string {
 	return provider.CredentialSearchPaths("codex", "oauth", filepath.Join(home, ".codex", "auth.json"))
 }
 
-func (s *OAuthStrategy) loadCredentials() *Credentials {
+func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
 		if err != nil || data == nil {
@@ -190,7 +190,7 @@ func (s *OAuthStrategy) loadCredentials() *Credentials {
 	return s.loadKeychainCredentials()
 }
 
-func (s *OAuthStrategy) loadKeychainCredentials() *Credentials {
+func (s *OAuthStrategy) loadKeychainCredentials() *oauth.Credentials {
 	secret, err := readKeychainSecret(codexKeychainLabel, codexKeychainAccount())
 	if err != nil || secret == "" {
 		return nil
@@ -228,7 +228,7 @@ func codexHomeDir() string {
 	return filepath.Join(home, ".codex")
 }
 
-func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *Credentials {
+func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL:    codexTokenURL,
 		FormFields:  map[string]string{"client_id": codexClientID},

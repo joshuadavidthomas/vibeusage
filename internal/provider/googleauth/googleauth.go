@@ -15,9 +15,6 @@ const TokenURL = "https://oauth2.googleapis.com/token"
 // TokenResponse represents the response from the Google OAuth token refresh endpoint.
 type TokenResponse = oauth.TokenResponse
 
-// OAuthCredentials represents stored Google OAuth credentials.
-type OAuthCredentials = oauth.Credentials
-
 // RefreshConfig contains the provider-specific parameters for token refresh.
 type RefreshConfig struct {
 	ClientID     string
@@ -28,7 +25,7 @@ type RefreshConfig struct {
 
 // RefreshToken refreshes an expired Google OAuth token and saves the updated
 // credentials to disk. Returns nil if the refresh fails.
-func RefreshToken(ctx context.Context, creds *OAuthCredentials, cfg RefreshConfig) *OAuthCredentials {
+func RefreshToken(ctx context.Context, creds *oauth.Credentials, cfg RefreshConfig) *oauth.Credentials {
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL: TokenURL,
 		FormFields: map[string]string{

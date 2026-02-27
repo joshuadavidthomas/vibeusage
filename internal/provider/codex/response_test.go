@@ -3,6 +3,8 @@ package codex
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 func TestUsageResponse_UnmarshalWithRateLimit(t *testing.T) {
@@ -206,7 +208,7 @@ func TestCredentials_Unmarshal(t *testing.T) {
 		"expires_at": "2025-02-19T22:00:00Z"
 	}`
 
-	var creds Credentials
+	var creds oauth.Credentials
 	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
@@ -225,34 +227,34 @@ func TestCredentials_Unmarshal(t *testing.T) {
 func TestCredentials_NeedsRefresh(t *testing.T) {
 	tests := []struct {
 		name  string
-		creds Credentials
+		creds oauth.Credentials
 		want  bool
 	}{
 		{
 			name:  "no expiry",
-			creds: Credentials{AccessToken: "tok"},
+			creds: oauth.Credentials{AccessToken: "tok"},
 			want:  false,
 		},
 		{
 			name:  "expired",
-			creds: Credentials{AccessToken: "tok", ExpiresAt: "2020-01-01T00:00:00Z"},
+			creds: oauth.Credentials{AccessToken: "tok", ExpiresAt: "2020-01-01T00:00:00Z"},
 			want:  true,
 		},
 		{
 			name:  "far future",
-			creds: Credentials{AccessToken: "tok", ExpiresAt: "2099-01-01T00:00:00Z"},
+			creds: oauth.Credentials{AccessToken: "tok", ExpiresAt: "2099-01-01T00:00:00Z"},
 			want:  false,
 		},
 		{
 			name:  "invalid date",
-			creds: Credentials{AccessToken: "tok", ExpiresAt: "garbage"},
+			creds: oauth.Credentials{AccessToken: "tok", ExpiresAt: "garbage"},
 			want:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Credentials is an alias for oauth.Credentials, which uses a
+			// oauth.Credentials uses a
 			// 5-minute refresh buffer (shared across all providers).
 			got := tt.creds.NeedsRefresh()
 			if got != tt.want {
@@ -353,7 +355,7 @@ func TestCLICredentials_EffectiveCredentials(t *testing.T) {
 }
 
 func TestCredentials_Roundtrip(t *testing.T) {
-	original := Credentials{
+	original := oauth.Credentials{
 		AccessToken:  "my-token",
 		RefreshToken: "my-refresh",
 		ExpiresAt:    "2025-02-19T22:00:00Z",
@@ -364,7 +366,7 @@ func TestCredentials_Roundtrip(t *testing.T) {
 		t.Fatalf("marshal failed: %v", err)
 	}
 
-	var decoded Credentials
+	var decoded oauth.Credentials
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}

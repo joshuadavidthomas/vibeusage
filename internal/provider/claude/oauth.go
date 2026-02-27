@@ -147,7 +147,7 @@ func (s *OAuthStrategy) credentialPaths() []string {
 	return provider.CredentialSearchPaths("claude", "oauth", filepath.Join(home, ".claude", ".credentials.json"))
 }
 
-func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
+func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
 		if err != nil || data == nil {
@@ -162,7 +162,7 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 		}
 
 		// Standard vibeusage format
-		var creds OAuthCredentials
+		var creds oauth.Credentials
 		if err := json.Unmarshal(data, &creds); err != nil {
 			continue
 		}
@@ -173,7 +173,7 @@ func (s *OAuthStrategy) loadCredentials() *OAuthCredentials {
 	return s.loadKeychainCredentials()
 }
 
-func (s *OAuthStrategy) loadKeychainCredentials() *OAuthCredentials {
+func (s *OAuthStrategy) loadKeychainCredentials() *oauth.Credentials {
 	secret, err := readKeychainSecret(claudeKeychainSecret, "")
 	if err != nil || secret == "" {
 		return nil
@@ -191,7 +191,7 @@ func (s *OAuthStrategy) loadKeychainCredentials() *OAuthCredentials {
 	return &creds
 }
 
-func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
+func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL:    oauthTokenURL,
 		Headers:     []httpclient.RequestOption{httpclient.WithHeader("anthropic-beta", anthropicBetaTag)},

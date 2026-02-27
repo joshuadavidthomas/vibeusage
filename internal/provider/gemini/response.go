@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
@@ -60,7 +61,7 @@ type GeminiCLIInstalled struct {
 }
 
 // ToOAuthCredentials converts the CLI installed format to OAuthCredentials.
-func (g *GeminiCLIInstalled) ToOAuthCredentials() *googleauth.OAuthCredentials {
+func (g *GeminiCLIInstalled) ToOAuthCredentials() *oauth.Credentials {
 	accessToken := g.Token
 	if accessToken == "" {
 		accessToken = g.AccessToken
@@ -68,7 +69,7 @@ func (g *GeminiCLIInstalled) ToOAuthCredentials() *googleauth.OAuthCredentials {
 	if accessToken == "" {
 		return nil
 	}
-	creds := &googleauth.OAuthCredentials{
+	creds := &oauth.Credentials{
 		AccessToken:  accessToken,
 		RefreshToken: g.RefreshToken,
 	}
@@ -77,14 +78,14 @@ func (g *GeminiCLIInstalled) ToOAuthCredentials() *googleauth.OAuthCredentials {
 }
 
 // EffectiveCredentials returns OAuthCredentials from whichever format is present.
-func (g *GeminiCLICredentials) EffectiveCredentials() *googleauth.OAuthCredentials {
+func (g *GeminiCLICredentials) EffectiveCredentials() *oauth.Credentials {
 	// Try "installed" nested format first
 	if g.Installed != nil {
 		return g.Installed.ToOAuthCredentials()
 	}
 	// Try "token" + "refresh_token" format
 	if g.Token != "" {
-		creds := &googleauth.OAuthCredentials{
+		creds := &oauth.Credentials{
 			AccessToken:  g.Token,
 			RefreshToken: g.RefreshToken,
 		}
@@ -93,7 +94,7 @@ func (g *GeminiCLICredentials) EffectiveCredentials() *googleauth.OAuthCredentia
 	}
 	// Try "access_token" format
 	if g.AccessToken != "" {
-		return &googleauth.OAuthCredentials{
+		return &oauth.Credentials{
 			AccessToken:  g.AccessToken,
 			RefreshToken: g.RefreshToken,
 			ExpiresAt:    g.ExpiresAt,

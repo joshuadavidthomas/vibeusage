@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 	"google.golang.org/protobuf/encoding/protowire"
 )
@@ -99,7 +100,7 @@ type AntigravityCredentials struct {
 }
 
 // ToOAuthCredentials converts the Antigravity credential format to OAuthCredentials.
-func (a *AntigravityCredentials) ToOAuthCredentials() *googleauth.OAuthCredentials {
+func (a *AntigravityCredentials) ToOAuthCredentials() *oauth.Credentials {
 	accessToken := a.AccessToken
 	if accessToken == "" {
 		accessToken = a.Token
@@ -107,7 +108,7 @@ func (a *AntigravityCredentials) ToOAuthCredentials() *googleauth.OAuthCredentia
 	if accessToken == "" {
 		return nil
 	}
-	creds := &googleauth.OAuthCredentials{
+	creds := &oauth.Credentials{
 		AccessToken:  accessToken,
 		RefreshToken: a.RefreshToken,
 		ExpiresAt:    a.ExpiresAt,
