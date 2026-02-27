@@ -83,6 +83,7 @@ var (
 	quotaPattern   = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)`)
 	hourlyPattern  = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*hour`)
 	creditsPattern = regexp.MustCompile(`(?i)(?:bonus\s+)?credits?:\s*\$([0-9]+(?:\.[0-9]+)?)`)
+	signedInPattern = regexp.MustCompile(`(?i)signed in as\s+(\S+@\S+)\s+\((\w+)\)`)
 )
 
 func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnapshot, error) {
@@ -161,5 +162,10 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 		Billing:   billing,
 		Source:    source,
 	}
+
+	if m := signedInPattern.FindStringSubmatch(text); len(m) == 3 {
+		snapshot.Identity = &models.ProviderIdentity{Email: m[1]}
+	}
+
 	return snapshot, nil
 }

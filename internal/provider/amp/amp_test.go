@@ -26,6 +26,35 @@ func TestParseDisplayBalance_FreeTier(t *testing.T) {
 	}
 }
 
+func TestParseDisplayBalance_MultilineWithIdentity(t *testing.T) {
+	result := balanceResult{
+		DisplayText: "Signed in as user@example.com (testuser)\nAmp Free: $10/$10 remaining (replenishes +$0.42/hour) - https://ampcode.com/settings#amp-free\nIndividual credits: $0 remaining - https://ampcode.com/settings",
+	}
+
+	snapshot, err := parseDisplayBalance(result, "provider_cli")
+	if err != nil {
+		t.Fatalf("parseDisplayBalance() error = %v", err)
+	}
+	if snapshot.Identity == nil {
+		t.Fatal("expected identity from 'Signed in as' line")
+	}
+	if snapshot.Identity.Email != "user@example.com" {
+		t.Errorf("email = %q, want %q", snapshot.Identity.Email, "user@example.com")
+	}
+	if len(snapshot.Periods) != 1 {
+		t.Fatalf("period count = %d, want 1", len(snapshot.Periods))
+	}
+	if snapshot.Periods[0].Utilization != 0 {
+		t.Errorf("utilization = %d, want 0", snapshot.Periods[0].Utilization)
+	}
+	if snapshot.Billing == nil || snapshot.Billing.Balance == nil {
+		t.Fatal("expected billing info for credits")
+	}
+	if *snapshot.Billing.Balance != 0 {
+		t.Errorf("credit balance = %.2f, want 0", *snapshot.Billing.Balance)
+	}
+}
+
 func TestParseDisplayBalance_CreditsOnly(t *testing.T) {
 	result := balanceResult{DisplayText: "Credits: $12.34"}
 
