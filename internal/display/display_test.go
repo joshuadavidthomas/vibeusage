@@ -918,6 +918,31 @@ func TestRenderSingleProvider_WithIdentity(t *testing.T) {
 	}
 }
 
+func TestRenderSingleProvider_WithSource(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+		Source:   "oauth",
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "(via oauth)") {
+		t.Errorf("expected source indicator '(via oauth)', got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_NoSourceWhenEmpty(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if strings.Contains(result, "via") {
+		t.Errorf("should not show source when empty, got: %q", result)
+	}
+}
+
 func TestRenderSingleProvider_StatusBetweenTitleAndPanel(t *testing.T) {
 	now := time.Now()
 	snap := models.UsageSnapshot{

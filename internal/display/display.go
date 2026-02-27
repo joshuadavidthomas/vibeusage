@@ -138,6 +138,9 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, opts Detai
 			providerTitle += dimStyle.Render("  " + parts)
 		}
 	}
+	if snapshot.Source != "" {
+		providerTitle += dimStyle.Render("  (via " + snapshot.Source + ")")
+	}
 	out.WriteString(providerTitle)
 	out.WriteByte('\n')
 
