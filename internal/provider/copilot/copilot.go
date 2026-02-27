@@ -221,8 +221,8 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 	}
 
 	var identity *models.ProviderIdentity
-	if resp.CopilotPlan != "" {
-		identity = &models.ProviderIdentity{Plan: resp.CopilotPlan}
+	if resp.CopilotPlan != "" || resp.Login != "" {
+		identity = &models.ProviderIdentity{Plan: resp.CopilotPlan, Email: resp.Login}
 	}
 
 	now := time.Now().UTC()

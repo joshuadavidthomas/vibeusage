@@ -9,13 +9,61 @@ import (
 
 func TestUserResponse_UnmarshalFullResponse(t *testing.T) {
 	raw := `{
-		"quota_reset_date_utc": "2025-03-01T00:00:00Z",
+		"login": "testuser",
+		"access_type_sku": "free_engaged_oss_quota",
+		"analytics_tracking_id": "abc123",
+		"assigned_date": "2022-06-21T14:59:45-05:00",
+		"can_signup_for_limited": false,
+		"chat_enabled": true,
+		"copilotignore_enabled": false,
 		"copilot_plan": "pro",
+		"is_mcp_enabled": true,
+		"organization_login_list": [],
+		"organization_list": [],
+		"restricted_telemetry": true,
+		"endpoints": {
+			"api": "https://api.individual.githubcopilot.com",
+			"origin-tracker": "https://origin-tracker.individual.githubcopilot.com",
+			"proxy": "https://proxy.individual.githubcopilot.com",
+			"telemetry": "https://telemetry.individual.githubcopilot.com"
+		},
+		"quota_reset_date": "2025-03-01",
 		"quota_snapshots": {
-			"premium_interactions": {"entitlement": 100, "remaining": 60, "unlimited": false},
-			"chat": {"entitlement": 500, "remaining": 300, "unlimited": false},
-			"completions": {"entitlement": 0, "remaining": 0, "unlimited": true}
-		}
+			"premium_interactions": {
+				"entitlement": 100,
+				"overage_count": 0,
+				"overage_permitted": false,
+				"percent_remaining": 60.0,
+				"quota_id": "premium_interactions",
+				"quota_remaining": 60.0,
+				"remaining": 60,
+				"unlimited": false,
+				"timestamp_utc": "2025-02-20T12:00:00.000Z"
+			},
+			"chat": {
+				"entitlement": 500,
+				"overage_count": 0,
+				"overage_permitted": false,
+				"percent_remaining": 60.0,
+				"quota_id": "chat",
+				"quota_remaining": 300.0,
+				"remaining": 300,
+				"unlimited": false,
+				"timestamp_utc": "2025-02-20T12:00:00.000Z"
+			},
+			"completions": {
+				"entitlement": 0,
+				"overage_count": 0,
+				"overage_permitted": false,
+				"percent_remaining": 100.0,
+				"quota_id": "completions",
+				"quota_remaining": 0.0,
+				"remaining": 0,
+				"unlimited": true,
+				"timestamp_utc": "2025-02-20T12:00:00.000Z"
+			}
+		},
+		"quota_reset_date_utc": "2025-03-01T00:00:00Z"
 	}`
 
 	var resp UserResponse
@@ -23,12 +71,62 @@ func TestUserResponse_UnmarshalFullResponse(t *testing.T) {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
+	// Top-level fields
+	if resp.Login != "testuser" {
+		t.Errorf("login = %q, want %q", resp.Login, "testuser")
+	}
+	if resp.AccessTypeSku != "free_engaged_oss_quota" {
+		t.Errorf("access_type_sku = %q, want %q", resp.AccessTypeSku, "free_engaged_oss_quota")
+	}
+	if resp.AnalyticsTrackingID != "abc123" {
+		t.Errorf("analytics_tracking_id = %q, want %q", resp.AnalyticsTrackingID, "abc123")
+	}
+	if resp.AssignedDate != "2022-06-21T14:59:45-05:00" {
+		t.Errorf("assigned_date = %q, want %q", resp.AssignedDate, "2022-06-21T14:59:45-05:00")
+	}
+	if resp.CanSignupForLimited {
+		t.Error("expected can_signup_for_limited to be false")
+	}
+	if !resp.ChatEnabled {
+		t.Error("expected chat_enabled to be true")
+	}
+	if resp.CopilotignoreEnabled {
+		t.Error("expected copilotignore_enabled to be false")
+	}
+	if !resp.IsMcpEnabled {
+		t.Error("expected is_mcp_enabled to be true")
+	}
+	if !resp.RestrictedTelemetry {
+		t.Error("expected restricted_telemetry to be true")
+	}
 	if resp.QuotaResetDateUTC != "2025-03-01T00:00:00Z" {
 		t.Errorf("quota_reset_date_utc = %q, want %q", resp.QuotaResetDateUTC, "2025-03-01T00:00:00Z")
+	}
+	if resp.QuotaResetDate != "2025-03-01" {
+		t.Errorf("quota_reset_date = %q, want %q", resp.QuotaResetDate, "2025-03-01")
 	}
 	if resp.CopilotPlan != "pro" {
 		t.Errorf("copilot_plan = %q, want %q", resp.CopilotPlan, "pro")
 	}
+
+	// Endpoints
+	if resp.Endpoints == nil {
+		t.Fatal("expected endpoints")
+	}
+	if resp.Endpoints.API != "https://api.individual.githubcopilot.com" {
+		t.Errorf("endpoints.api = %q, want %q", resp.Endpoints.API, "https://api.individual.githubcopilot.com")
+	}
+	if resp.Endpoints.OriginTracker != "https://origin-tracker.individual.githubcopilot.com" {
+		t.Errorf("endpoints.origin-tracker = %q, want %q", resp.Endpoints.OriginTracker, "https://origin-tracker.individual.githubcopilot.com")
+	}
+	if resp.Endpoints.Proxy != "https://proxy.individual.githubcopilot.com" {
+		t.Errorf("endpoints.proxy = %q, want %q", resp.Endpoints.Proxy, "https://proxy.individual.githubcopilot.com")
+	}
+	if resp.Endpoints.Telemetry != "https://telemetry.individual.githubcopilot.com" {
+		t.Errorf("endpoints.telemetry = %q, want %q", resp.Endpoints.Telemetry, "https://telemetry.individual.githubcopilot.com")
+	}
+
+	// Quota snapshots
 	if resp.QuotaSnapshots == nil {
 		t.Fatal("expected quota_snapshots")
 	}
@@ -43,6 +141,24 @@ func TestUserResponse_UnmarshalFullResponse(t *testing.T) {
 	}
 	if resp.QuotaSnapshots.PremiumInteractions.Unlimited {
 		t.Error("expected premium unlimited to be false")
+	}
+	if resp.QuotaSnapshots.PremiumInteractions.OverageCount != 0 {
+		t.Errorf("premium overage_count = %d, want 0", resp.QuotaSnapshots.PremiumInteractions.OverageCount)
+	}
+	if resp.QuotaSnapshots.PremiumInteractions.OveragePermitted {
+		t.Error("expected premium overage_permitted to be false")
+	}
+	if resp.QuotaSnapshots.PremiumInteractions.PercentRemaining != 60.0 {
+		t.Errorf("premium percent_remaining = %v, want 60.0", resp.QuotaSnapshots.PremiumInteractions.PercentRemaining)
+	}
+	if resp.QuotaSnapshots.PremiumInteractions.QuotaID != "premium_interactions" {
+		t.Errorf("premium quota_id = %q, want %q", resp.QuotaSnapshots.PremiumInteractions.QuotaID, "premium_interactions")
+	}
+	if resp.QuotaSnapshots.PremiumInteractions.QuotaRemaining != 60.0 {
+		t.Errorf("premium quota_remaining = %v, want 60.0", resp.QuotaSnapshots.PremiumInteractions.QuotaRemaining)
+	}
+	if resp.QuotaSnapshots.PremiumInteractions.TimestampUTC != "2025-02-20T12:00:00.000Z" {
+		t.Errorf("premium timestamp_utc = %q, want %q", resp.QuotaSnapshots.PremiumInteractions.TimestampUTC, "2025-02-20T12:00:00.000Z")
 	}
 
 	if resp.QuotaSnapshots.Chat == nil {
