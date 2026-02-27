@@ -38,6 +38,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Fixed
 
+- Fixed Codex OAuth tokens silently expiring without automatic refresh. The Codex CLI stores credentials without `expires_at`, so vibeusage couldn't detect expiry upfront. Now retries token refresh (both standard OAuth and CLI fallback) when the API returns 401, instead of immediately failing.
 - Fixed inconsistent panel widths in the dashboard view where providers without reset times (e.g., Amp) rendered narrower boxes than providers with reset countdowns.
 - Fixed confusing overage display when the API returns a null monthly spend limit.
 
