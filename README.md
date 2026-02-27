@@ -102,7 +102,23 @@ Check a specific provider:
 
 ```bash
 vibeusage usage claude
-vibeusage usage copilot
+```
+
+```bash
+Claude
+Auth OAuth
+
+● All Systems Operational  just now
+
+╭─Usage──────────────────────────────────────────────────────╮
+│ Session (5h)  ██░░░░░░░░░░░░░░░░░░ 10%    resets in 2h 22m │
+│                                                            │
+│ Weekly                                                     │
+│   All Models  ░░░░░░░░░░░░░░░░░░░░  2%    resets in 6d 21h │
+│   Sonnet      ░░░░░░░░░░░░░░░░░░░░  0%                     │
+│                                                            │
+│ Extra Usage: $73.72 USD (Unlimited)                        │
+╰────────────────────────────────────────────────────────────╯
 ```
 
 Output as JSON for scripting or automation:
