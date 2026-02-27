@@ -372,7 +372,7 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	}
 	for _, p := range weekly {
 		if p.Model == "" {
-			if !strings.Contains(p.Name, "(") {
+			if isGenericPeriodName(p.Name) {
 				p.Name = "Weekly"
 			}
 			out = append(out, p)
@@ -380,7 +380,7 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	}
 	for _, p := range daily {
 		if p.Model == "" {
-			if !strings.Contains(p.Name, "(") {
+			if isGenericPeriodName(p.Name) {
 				p.Name = "Daily"
 			}
 			out = append(out, p)
@@ -392,6 +392,27 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 		}
 	}
 	return out
+}
+
+// isGenericPeriodName reports whether a period name looks like a raw/generic
+// label that should be normalised to "Daily", "Weekly", etc. in the compact
+// panel view. Names with parenthesized qualifiers (e.g. "Monthly (Premium)")
+// or provider-branded names (e.g. "Amp Free") are preserved as-is.
+func isGenericPeriodName(name string) bool {
+	if strings.Contains(name, "(") {
+		return false
+	}
+	lower := strings.ToLower(name)
+	for _, generic := range []string{"daily", "weekly", "monthly", "session"} {
+		if strings.Contains(lower, generic) {
+			return true
+		}
+	}
+	// Names that are purely snake_case or single words look generic
+	if !strings.Contains(name, " ") {
+		return true
+	}
+	return false
 }
 
 // detailColWidths computes column widths for the single-provider detail view

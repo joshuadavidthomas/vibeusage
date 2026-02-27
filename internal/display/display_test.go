@@ -471,6 +471,23 @@ func TestRenderProviderPanel_RenamesWeeklyDaily(t *testing.T) {
 	}
 }
 
+func TestRenderProviderPanel_PreservesBrandedName(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Periods: []models.UsagePeriod{
+			{Name: "Amp Free", Utilization: 40, PeriodType: models.PeriodDaily},
+		},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+	if !strings.Contains(result, "Amp Free") {
+		t.Errorf("expected branded name 'Amp Free' preserved, got: %q", result)
+	}
+	if strings.Contains(result, "Daily") {
+		t.Errorf("branded name should not be normalized to 'Daily', got: %q", result)
+	}
+}
+
 func TestRenderProviderPanel_WithOverage(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider: "claude",
