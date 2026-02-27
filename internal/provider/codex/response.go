@@ -10,10 +10,23 @@ import (
 // UsageResponse represents the response from the Codex/ChatGPT usage endpoint.
 // The API uses alternate key names: "rate_limit" vs "rate_limits".
 type UsageResponse struct {
-	RateLimit  *RateLimits `json:"rate_limit,omitempty"`
-	RateLimits *RateLimits `json:"rate_limits,omitempty"`
-	Credits    *Credits    `json:"credits,omitempty"`
-	PlanType   string      `json:"plan_type,omitempty"`
+	UserID               string                `json:"user_id,omitempty"`
+	AccountID            string                `json:"account_id,omitempty"`
+	Email                string                `json:"email,omitempty"`
+	PlanType             string                `json:"plan_type,omitempty"`
+	RateLimit            *RateLimits           `json:"rate_limit,omitempty"`
+	RateLimits           *RateLimits           `json:"rate_limits,omitempty"`
+	CodeReviewRateLimit  *RateLimits           `json:"code_review_rate_limit,omitempty"`
+	AdditionalRateLimits []AdditionalRateLimit `json:"additional_rate_limits,omitempty"`
+	Credits              *Credits              `json:"credits,omitempty"`
+	Promo                json.RawMessage       `json:"promo,omitempty"`
+}
+
+// AdditionalRateLimit represents a named, model-specific rate limit entry.
+type AdditionalRateLimit struct {
+	LimitName      string      `json:"limit_name,omitempty"`
+	MeteredFeature string      `json:"metered_feature,omitempty"`
+	RateLimit      *RateLimits `json:"rate_limit,omitempty"`
 }
 
 // EffectiveRateLimits returns whichever rate limits field is populated.
@@ -24,10 +37,12 @@ func (r *UsageResponse) EffectiveRateLimits() *RateLimits {
 	return r.RateLimits
 }
 
-// RateLimits contains primary and secondary rate windows.
+// RateLimits contains primary and secondary rate windows plus limit status flags.
 // The API uses alternate key names: "primary_window" vs "primary",
 // "secondary_window" vs "secondary".
 type RateLimits struct {
+	Allowed         bool        `json:"allowed,omitempty"`
+	LimitReached    bool        `json:"limit_reached,omitempty"`
 	PrimaryWindow   *RateWindow `json:"primary_window,omitempty"`
 	Primary         *RateWindow `json:"primary,omitempty"`
 	SecondaryWindow *RateWindow `json:"secondary_window,omitempty"`
@@ -53,9 +68,11 @@ func (r *RateLimits) EffectiveSecondary() *RateWindow {
 // RateWindow represents a single rate limit window with usage percentage and reset time.
 // The API uses alternate key names: "reset_at" vs "reset_timestamp".
 type RateWindow struct {
-	UsedPercent    float64 `json:"used_percent"`
-	ResetAt        float64 `json:"reset_at,omitempty"`
-	ResetTimestamp float64 `json:"reset_timestamp,omitempty"`
+	UsedPercent        float64 `json:"used_percent"`
+	LimitWindowSeconds float64 `json:"limit_window_seconds,omitempty"`
+	ResetAfterSeconds  float64 `json:"reset_after_seconds,omitempty"`
+	ResetAt            float64 `json:"reset_at,omitempty"`
+	ResetTimestamp     float64 `json:"reset_timestamp,omitempty"`
 }
 
 // EffectiveResetTimestamp returns whichever reset timestamp field is populated.
@@ -69,8 +86,11 @@ func (w *RateWindow) EffectiveResetTimestamp() float64 {
 // Credits represents available credits on the account.
 // Balance can be a number or string in the API response.
 type Credits struct {
-	HasCredits bool            `json:"has_credits"`
-	RawBalance json.RawMessage `json:"balance"`
+	HasCredits          bool            `json:"has_credits"`
+	Unlimited           bool            `json:"unlimited,omitempty"`
+	RawBalance          json.RawMessage `json:"balance"`
+	ApproxLocalMessages json.RawMessage `json:"approx_local_messages,omitempty"`
+	ApproxCloudMessages json.RawMessage `json:"approx_cloud_messages,omitempty"`
 }
 
 // Balance parses the balance field, handling both number and string representations.
