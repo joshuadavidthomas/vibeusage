@@ -350,7 +350,7 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	status := <-statusCh
 	opts := display.DetailOptions{Status: &status}
 
-	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached, opts))
+	_, _ = fmt.Fprintln(outWriter, display.RenderSingleProvider(snap, outcome.Cached, opts))
 	return nil
 }
 
