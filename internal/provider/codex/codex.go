@@ -237,8 +237,6 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *C
 	})
 }
 
-
-
 func (s *OAuthStrategy) getUsageURL() string {
 	// Check for custom URL in codex config
 	home, _ := os.UserHomeDir()

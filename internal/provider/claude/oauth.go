@@ -200,8 +200,6 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredential
 	})
 }
 
-
-
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {
 	return parseUsageResponse(resp, "oauth", nil)
 }
