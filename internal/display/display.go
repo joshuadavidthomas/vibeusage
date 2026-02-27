@@ -115,6 +115,19 @@ func formatOverageLine(o *models.OverageUsage, label string) string {
 	return fmt.Sprintf("%s: %s%.2f %s (Unlimited)", label, sym, o.Used, o.Currency)
 }
 
+// formatBalance renders a standalone balance line from billing detail.
+// Returns empty string when no balance is available.
+func formatBalance(billing *models.BillingDetail) string {
+	if billing == nil || billing.Balance == nil {
+		return ""
+	}
+	bal := *billing.Balance
+	if bal < 0 {
+		return fmt.Sprintf("Balance: -$%.2f", -bal)
+	}
+	return fmt.Sprintf("Balance: $%.2f", bal)
+}
+
 // formatBillingDetail renders a compact sub-line with supplemental billing
 // info (reset date, prepaid balance, auto-reload). Returns empty string when
 // no billing details are available.
@@ -246,6 +259,8 @@ func formatSourceName(source string) string {
 		return "API Key"
 	case "device_flow":
 		return "Device Flow"
+	case "provider_cli":
+		return "CLI"
 	default:
 		return source
 	}
@@ -307,6 +322,11 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 			b.WriteByte('\n')
 			b.WriteString(detail)
 		}
+	} else if bal := formatBalance(snapshot.Billing); bal != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(bal)
 	}
 
 	return renderTitledPanel(titleStyle.Render("Usage"), b.String(), 0)
@@ -421,6 +441,11 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodCo
 	if snapshot.Overage != nil && snapshot.Overage.IsEnabled {
 		b.WriteByte('\n')
 		b.WriteString(formatOverageLine(snapshot.Overage, "Extra"))
+	} else if bal := formatBalance(snapshot.Billing); bal != "" {
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(bal)
 	}
 
 	title := titleStyle.Render(provider.DisplayName(snapshot.Provider))

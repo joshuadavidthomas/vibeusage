@@ -33,11 +33,17 @@ func TestParseDisplayBalance_CreditsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseDisplayBalance() error = %v", err)
 	}
-	if snapshot.Overage == nil {
-		t.Fatal("expected overage info for credits")
+	if snapshot.Billing == nil || snapshot.Billing.Balance == nil {
+		t.Fatal("expected billing info for credits")
 	}
-	if snapshot.Overage.Limit != 12.34 {
-		t.Errorf("credit limit = %.2f, want 12.34", snapshot.Overage.Limit)
+	if *snapshot.Billing.Balance != 12.34 {
+		t.Errorf("credit balance = %.2f, want 12.34", *snapshot.Billing.Balance)
+	}
+	if snapshot.Overage != nil {
+		t.Error("credits should not be stored as overage")
+	}
+	if len(snapshot.Periods) != 0 {
+		t.Errorf("credits-only should have no periods, got %d", len(snapshot.Periods))
 	}
 }
 
@@ -50,6 +56,15 @@ func TestParseDisplayBalance_BonusText(t *testing.T) {
 	}
 	if snapshot.Periods[0].Utilization != 75 {
 		t.Errorf("utilization = %d, want 75", snapshot.Periods[0].Utilization)
+	}
+	if snapshot.Billing == nil || snapshot.Billing.Balance == nil {
+		t.Fatal("expected billing info for bonus credits")
+	}
+	if *snapshot.Billing.Balance != 8.00 {
+		t.Errorf("credit balance = %.2f, want 8.00", *snapshot.Billing.Balance)
+	}
+	if snapshot.Overage != nil {
+		t.Error("credits should not be stored as overage")
 	}
 }
 

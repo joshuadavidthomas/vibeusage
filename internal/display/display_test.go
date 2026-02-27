@@ -689,6 +689,116 @@ func TestRenderProviderPanel_OverageZeroLimit(t *testing.T) {
 	}
 }
 
+// formatBalance tests
+
+func TestFormatBalance_NilBilling(t *testing.T) {
+	got := formatBalance(nil)
+	if got != "" {
+		t.Errorf("formatBalance(nil) = %q, want empty", got)
+	}
+}
+
+func TestFormatBalance_NilBalance(t *testing.T) {
+	got := formatBalance(&models.BillingDetail{})
+	if got != "" {
+		t.Errorf("formatBalance(nil balance) = %q, want empty", got)
+	}
+}
+
+func TestFormatBalance_Positive(t *testing.T) {
+	bal := 12.34
+	got := formatBalance(&models.BillingDetail{Balance: &bal})
+	if got != "Balance: $12.34" {
+		t.Errorf("formatBalance = %q, want %q", got, "Balance: $12.34")
+	}
+}
+
+func TestFormatBalance_Zero(t *testing.T) {
+	bal := 0.0
+	got := formatBalance(&models.BillingDetail{Balance: &bal})
+	if got != "Balance: $0.00" {
+		t.Errorf("formatBalance = %q, want %q", got, "Balance: $0.00")
+	}
+}
+
+func TestFormatBalance_Negative(t *testing.T) {
+	bal := -5.50
+	got := formatBalance(&models.BillingDetail{Balance: &bal})
+	if got != "Balance: -$5.50" {
+		t.Errorf("formatBalance = %q, want %q", got, "Balance: -$5.50")
+	}
+}
+
+// Standalone billing balance in detail view
+
+func TestRenderSingleProvider_BillingBalanceNoOverage(t *testing.T) {
+	bal := 12.34
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Periods:  []models.UsagePeriod{{Name: "Daily Free Quota", Utilization: 40, PeriodType: models.PeriodDaily}},
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Balance: $12.34") {
+		t.Errorf("expected standalone balance line, got: %q", result)
+	}
+	if strings.Contains(result, "Extra Usage") {
+		t.Errorf("should not show Extra Usage when no overage, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_BillingBalanceOnlyNoPeriods(t *testing.T) {
+	bal := 5.00
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Balance: $5.00") {
+		t.Errorf("expected balance line for credits-only snapshot, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_OverageSuppressesBillingBalance(t *testing.T) {
+	bal := 42.00
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage:  &models.OverageUsage{Used: 5.50, Limit: 100.00, Currency: "USD", IsEnabled: true},
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Extra Usage") {
+		t.Errorf("expected Extra Usage for overage, got: %q", result)
+	}
+	// Balance should appear in the billing sub-line under overage, not as standalone
+	if !strings.Contains(result, "Balance: $42.00") {
+		t.Errorf("expected balance in billing detail sub-line, got: %q", result)
+	}
+}
+
+// Standalone billing balance in panel view
+
+func TestRenderProviderPanel_BillingBalanceNoOverage(t *testing.T) {
+	bal := 8.00
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Periods:  []models.UsagePeriod{{Name: "Daily Free Quota", Utilization: 40, PeriodType: models.PeriodDaily}},
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+	if !strings.Contains(result, "Balance: $8.00") {
+		t.Errorf("expected balance line in panel, got: %q", result)
+	}
+	if strings.Contains(result, "Extra") {
+		t.Errorf("should not show Extra when no overage, got: %q", result)
+	}
+}
+
 // formatSubPeriodName tests
 
 func TestFormatSubPeriodName_ModelPeriod(t *testing.T) {
@@ -1073,6 +1183,7 @@ func TestFormatSourceName(t *testing.T) {
 		{"web", "Web Session"},
 		{"api_key", "API Key"},
 		{"device_flow", "Device Flow"},
+		{"provider_cli", "CLI"},
 		{"unknown", "unknown"},
 	}
 

@@ -140,41 +140,26 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 		periods = append(periods, period)
 	}
 
-	var overage *models.OverageUsage
+	var billing *models.BillingDetail
 	creditMatch := creditsPattern.FindStringSubmatch(text)
 	if len(creditMatch) == 2 {
 		credits, err := strconv.ParseFloat(creditMatch[1], 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse credits amount: %w", err)
 		}
-		overage = &models.OverageUsage{
-			Used:      0,
-			Limit:     credits,
-			Currency:  "USD",
-			IsEnabled: true,
-		}
+		billing = &models.BillingDetail{Balance: &credits}
 	}
 
-	if len(periods) == 0 {
-		if overage == nil {
-			return nil, fmt.Errorf("unrecognized displayText format: %q", text)
-		}
-		periods = append(periods, models.UsagePeriod{
-			Name:        "Credits Balance",
-			Utilization: 0,
-			PeriodType:  models.PeriodMonthly,
-		})
+	if len(periods) == 0 && billing == nil {
+		return nil, fmt.Errorf("unrecognized displayText format: %q", text)
 	}
 
 	snapshot := &models.UsageSnapshot{
 		Provider:  "amp",
 		FetchedAt: time.Now().UTC(),
 		Periods:   periods,
-		Overage:   overage,
+		Billing:   billing,
 		Source:    source,
-	}
-	if overage != nil {
-		snapshot.Identity = &models.ProviderIdentity{Organization: fmt.Sprintf("Credits: $%.2f", overage.Limit)}
 	}
 	return snapshot, nil
 }
