@@ -626,11 +626,12 @@ func TestFormatOverageLine_WithLimit(t *testing.T) {
 func TestFormatOverageLine_ZeroLimit(t *testing.T) {
 	o := &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true}
 	got := formatOverageLine(o, "Extra Usage")
-	if got != "Extra Usage: $73.72 USD" {
-		t.Errorf("formatOverageLine with zero limit = %q, want %q", got, "Extra Usage: $73.72 USD")
+	want := "Extra Usage: $73.72 USD (Unlimited)"
+	if got != want {
+		t.Errorf("formatOverageLine with zero limit = %q, want %q", got, want)
 	}
 	if strings.Contains(got, "/ $0.00") {
-		t.Error("zero limit should omit the limit portion, but found '/ $0.00'")
+		t.Error("zero limit should not show '/ $0.00'")
 	}
 }
 
@@ -665,6 +666,9 @@ func TestRenderSingleProvider_OverageZeroLimit(t *testing.T) {
 	if !strings.Contains(result, "$73.72") {
 		t.Errorf("should show used amount '$73.72', got: %q", result)
 	}
+	if !strings.Contains(result, "Unlimited") {
+		t.Errorf("should show 'Unlimited' for zero limit, got: %q", result)
+	}
 }
 
 func TestRenderProviderPanel_OverageZeroLimit(t *testing.T) {
@@ -679,6 +683,9 @@ func TestRenderProviderPanel_OverageZeroLimit(t *testing.T) {
 	}
 	if !strings.Contains(result, "$73.72") {
 		t.Errorf("should show used amount '$73.72', got: %q", result)
+	}
+	if !strings.Contains(result, "Unlimited") {
+		t.Errorf("should show 'Unlimited' for zero limit, got: %q", result)
 	}
 }
 

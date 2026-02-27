@@ -103,8 +103,8 @@ func formatSubPeriodName(p *models.UsagePeriod, sectionHeader string) string {
 }
 
 // formatOverageLine formats an overage usage line with the given label prefix.
-// When the limit is zero (no hard limit set), the limit portion is omitted to
-// avoid confusing output like "$73.72 / $0.00".
+// When the limit is zero (no hard limit set), shows "Unlimited" to match
+// the provider's web UI.
 func formatOverageLine(o *models.OverageUsage, label string) string {
 	sym := ""
 	if o.Currency == "USD" {
@@ -113,7 +113,7 @@ func formatOverageLine(o *models.OverageUsage, label string) string {
 	if o.Limit > 0 {
 		return fmt.Sprintf("%s: %s%.2f / %s%.2f %s", label, sym, o.Used, sym, o.Limit, o.Currency)
 	}
-	return fmt.Sprintf("%s: %s%.2f %s", label, sym, o.Used, o.Currency)
+	return fmt.Sprintf("%s: %s%.2f %s (Unlimited)", label, sym, o.Used, o.Currency)
 }
 
 // DetailOptions configures the single-provider detail view.
