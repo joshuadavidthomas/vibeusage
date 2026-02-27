@@ -24,11 +24,13 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Added `vibeusage statusline` command for condensed usage output suitable for status bars.
 - Added provider status, identity metadata, and auth source to single-provider detail view.
+- Added CLI fallback for Codex OAuth token refresh. When the standard refresh fails, vibeusage now spawns the Codex CLI in the background to refresh credentials automatically, matching the existing Claude Code behavior.
 
 ### Changed
 
 - Polished single-provider detail view to match the multi-provider overview panel style.
 - Overage with no spend limit now shows "(Unlimited)" instead of "$0.00".
+- Improved Codex error messages to suggest `codex login` when token refresh fails or credentials are invalid.
 
 ### Removed
 
