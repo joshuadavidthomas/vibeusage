@@ -81,3 +81,26 @@ type UpdateStatusJSON struct {
 	Applied         bool   `json:"applied,omitempty"`
 	Pending         bool   `json:"pending,omitempty"`
 }
+
+// StatuslineJSON represents a single provider's condensed usage data.
+type StatuslineJSON struct {
+	Provider string               `json:"provider"`
+	Periods  []StatuslinePeriodJSON `json:"periods"`
+	Overage  *StatuslineOverageJSON `json:"overage,omitempty"`
+	Error    string               `json:"error,omitempty"`
+}
+
+// StatuslinePeriodJSON represents a single period's condensed data.
+type StatuslinePeriodJSON struct {
+	Name        string `json:"name"`
+	Utilization int    `json:"utilization"`
+	PeriodType  string `json:"period_type"`
+}
+
+// StatuslineOverageJSON represents condensed overage data.
+type StatuslineOverageJSON struct {
+	Used        float64 `json:"used"`
+	Limit       float64 `json:"limit"`
+	Currency    string  `json:"currency"`
+	Utilization int     `json:"utilization"`
+}
