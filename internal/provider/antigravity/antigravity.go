@@ -15,6 +15,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
@@ -146,7 +147,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
+func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 	// Try JSON credential files first
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
@@ -163,7 +164,7 @@ func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
 		}
 
 		// Try direct OAuth credentials format
-		var oauthCreds googleauth.OAuthCredentials
+		var oauthCreds oauth.Credentials
 		if err := json.Unmarshal(data, &oauthCreds); err == nil && oauthCreds.AccessToken != "" {
 			return &oauthCreds
 		}
@@ -180,7 +181,7 @@ func (s *OAuthStrategy) loadCredentials() *googleauth.OAuthCredentials {
 
 // vscdbResult holds credentials and subscription info read from the vscdb.
 type vscdbResult struct {
-	creds        *googleauth.OAuthCredentials
+	creds        *oauth.Credentials
 	subscription *SubscriptionInfo
 	email        string
 }
@@ -217,7 +218,7 @@ func loadFromVSCDB() *vscdbResult {
 	}
 
 	result := &vscdbResult{
-		creds: &googleauth.OAuthCredentials{
+		creds: &oauth.Credentials{
 			AccessToken: authStatus.APIKey,
 			// No refresh token available from the vscdb — the Antigravity
 			// IDE manages token refresh internally.

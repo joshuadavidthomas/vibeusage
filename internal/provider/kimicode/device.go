@@ -67,7 +67,7 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 	return fetchUsage(ctx, creds.AccessToken, "device_flow", s.HTTPTimeout)
 }
 
-func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
+func (s *DeviceFlowStrategy) loadCredentials() *oauth.Credentials {
 	for _, path := range s.credentialPaths() {
 		data, err := config.ReadCredential(path)
 		if err != nil || data == nil {
@@ -75,7 +75,7 @@ func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
 		}
 
 		// Try current RFC3339 format first
-		var creds OAuthCredentials
+		var creds oauth.Credentials
 		if err := json.Unmarshal(data, &creds); err == nil && creds.AccessToken != "" {
 			// If ExpiresAt looks like a number string, it might be a
 			// partially-migrated legacy credential; skip to migration.
@@ -96,7 +96,7 @@ func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
 	return nil
 }
 
-func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
+func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL:    oauthBaseURL() + tokenPath,
 		FormFields:  map[string]string{"client_id": clientID},

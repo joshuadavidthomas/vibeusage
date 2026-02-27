@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 func floatPtr(f float64) *float64 { return &f }
@@ -345,17 +346,17 @@ func TestParseOAuthUsageResponse_NullMonthlyLimit(t *testing.T) {
 func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 	tests := []struct {
 		name  string
-		creds OAuthCredentials
+		creds oauth.Credentials
 		want  bool
 	}{
 		{
 			name:  "no expiry",
-			creds: OAuthCredentials{AccessToken: "tok"},
+			creds: oauth.Credentials{AccessToken: "tok"},
 			want:  false,
 		},
 		{
 			name: "not expired and outside buffer",
-			creds: OAuthCredentials{
+			creds: oauth.Credentials{
 				AccessToken: "tok",
 				ExpiresAt:   time.Now().UTC().Add(1 * time.Hour).Format(time.RFC3339),
 			},
@@ -363,7 +364,7 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 		},
 		{
 			name: "expired",
-			creds: OAuthCredentials{
+			creds: oauth.Credentials{
 				AccessToken: "tok",
 				ExpiresAt:   time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
 			},
@@ -371,7 +372,7 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 		},
 		{
 			name: "within refresh buffer",
-			creds: OAuthCredentials{
+			creds: oauth.Credentials{
 				AccessToken: "tok",
 				ExpiresAt:   time.Now().UTC().Add(2 * time.Minute).Format(time.RFC3339),
 			},
@@ -379,7 +380,7 @@ func TestOAuthCredentials_NeedsRefresh(t *testing.T) {
 		},
 		{
 			name: "invalid date",
-			creds: OAuthCredentials{
+			creds: oauth.Credentials{
 				AccessToken: "tok",
 				ExpiresAt:   "garbage",
 			},

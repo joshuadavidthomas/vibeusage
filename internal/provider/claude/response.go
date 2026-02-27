@@ -41,9 +41,6 @@ type OAuthUsageResponse struct {
 	BillingType       string               `json:"billing_type,omitempty"`
 }
 
-// OAuthCredentials is an alias for the shared OAuth credential type.
-type OAuthCredentials = oauth.Credentials
-
 // ClaudeCLIOAuth represents the nested OAuth data inside Claude CLI credentials.
 type ClaudeCLIOAuth struct {
 	AccessToken  string  `json:"accessToken"`
@@ -51,9 +48,9 @@ type ClaudeCLIOAuth struct {
 	ExpiresAt    float64 `json:"expiresAt,omitempty"` // millisecond timestamp
 }
 
-// ToOAuthCredentials converts Claude CLI format to standard OAuthCredentials.
-func (c *ClaudeCLIOAuth) ToOAuthCredentials() OAuthCredentials {
-	creds := OAuthCredentials{
+// ToOAuthCredentials converts Claude CLI format to standard oauth.Credentials.
+func (c *ClaudeCLIOAuth) ToOAuthCredentials() oauth.Credentials {
+	creds := oauth.Credentials{
 		AccessToken:  c.AccessToken,
 		RefreshToken: c.RefreshToken,
 	}

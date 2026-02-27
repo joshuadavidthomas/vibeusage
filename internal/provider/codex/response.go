@@ -92,25 +92,24 @@ func (c *Credits) Balance() float64 {
 }
 
 // Credentials is an alias for the shared OAuth credential type.
-type Credentials = oauth.Credentials
 
 // CLICredentials represents the Codex CLI credential file format,
 // which may nest tokens under a "tokens" key or be flat.
 type CLICredentials struct {
-	Tokens       *Credentials `json:"tokens,omitempty"`
-	AccessToken  string       `json:"access_token,omitempty"`
-	RefreshToken string       `json:"refresh_token,omitempty"`
-	ExpiresAt    string       `json:"expires_at,omitempty"`
+	Tokens       *oauth.Credentials `json:"tokens,omitempty"`
+	AccessToken  string             `json:"access_token,omitempty"`
+	RefreshToken string             `json:"refresh_token,omitempty"`
+	ExpiresAt    string             `json:"expires_at,omitempty"`
 }
 
 // EffectiveCredentials returns the credentials from whichever format is present.
 // Returns nil if no access token is found.
-func (c *CLICredentials) EffectiveCredentials() *Credentials {
+func (c *CLICredentials) EffectiveCredentials() *oauth.Credentials {
 	if c.Tokens != nil && c.Tokens.AccessToken != "" {
 		return c.Tokens
 	}
 	if c.AccessToken != "" {
-		return &Credentials{
+		return &oauth.Credentials{
 			AccessToken:  c.AccessToken,
 			RefreshToken: c.RefreshToken,
 			ExpiresAt:    c.ExpiresAt,

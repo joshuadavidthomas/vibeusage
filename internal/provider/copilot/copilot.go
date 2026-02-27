@@ -164,12 +164,12 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
+func (s *DeviceFlowStrategy) loadCredentials() *oauth.Credentials {
 	data, err := config.ReadCredential(config.CredentialPath("copilot", "oauth"))
 	if err != nil || data == nil {
 		return nil
 	}
-	var creds OAuthCredentials
+	var creds oauth.Credentials
 	if err := json.Unmarshal(data, &creds); err != nil {
 		return nil
 	}
@@ -179,7 +179,7 @@ func (s *DeviceFlowStrategy) loadCredentials() *OAuthCredentials {
 	return &creds
 }
 
-func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *OAuthCredentials) *OAuthCredentials {
+func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL:    tokenURL,
 		FormFields:  map[string]string{"client_id": clientID},

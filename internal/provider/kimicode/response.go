@@ -122,9 +122,6 @@ func (w Window) DisplayName() string {
 	}
 }
 
-// OAuthCredentials is an alias for the shared OAuth credential type.
-type OAuthCredentials = oauth.Credentials
-
 // legacyOAuthCredentials represents the old Kimi credential format with a
 // float64 Unix timestamp for ExpiresAt.
 type legacyOAuthCredentials struct {
@@ -135,7 +132,7 @@ type legacyOAuthCredentials struct {
 
 // migrateCredentials converts legacy float64-timestamp credentials to RFC3339.
 // Returns nil if the data doesn't match the legacy format.
-func migrateCredentials(data []byte) *OAuthCredentials {
+func migrateCredentials(data []byte) *oauth.Credentials {
 	var legacy legacyOAuthCredentials
 	if err := json.Unmarshal(data, &legacy); err != nil || legacy.AccessToken == "" {
 		return nil
@@ -145,7 +142,7 @@ func migrateCredentials(data []byte) *OAuthCredentials {
 	if legacy.ExpiresAt == 0 {
 		return nil
 	}
-	creds := &OAuthCredentials{
+	creds := &oauth.Credentials{
 		AccessToken:  legacy.AccessToken,
 		RefreshToken: legacy.RefreshToken,
 	}

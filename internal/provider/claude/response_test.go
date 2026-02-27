@@ -3,6 +3,8 @@ package claude
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
@@ -277,7 +279,7 @@ func TestOAuthCredentials_Unmarshal(t *testing.T) {
 		"expires_at": "2025-02-19T22:00:00Z"
 	}`
 
-	var creds OAuthCredentials
+	var creds oauth.Credentials
 	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
@@ -296,7 +298,7 @@ func TestOAuthCredentials_Unmarshal(t *testing.T) {
 func TestOAuthCredentials_UnmarshalMinimal(t *testing.T) {
 	raw := `{"access_token": "tok"}`
 
-	var creds OAuthCredentials
+	var creds oauth.Credentials
 	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
@@ -386,7 +388,7 @@ func TestClaudeCLIOAuth_ToOAuthCredentials_ZeroExpiresAt(t *testing.T) {
 }
 
 func TestOAuthCredentials_Roundtrip(t *testing.T) {
-	original := OAuthCredentials{
+	original := oauth.Credentials{
 		AccessToken:  "my-token",
 		RefreshToken: "my-refresh",
 		ExpiresAt:    "2025-02-19T22:00:00Z",
@@ -397,7 +399,7 @@ func TestOAuthCredentials_Roundtrip(t *testing.T) {
 		t.Fatalf("marshal failed: %v", err)
 	}
 
-	var decoded OAuthCredentials
+	var decoded oauth.Credentials
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}

@@ -3,6 +3,8 @@ package copilot
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 func TestUserResponse_UnmarshalFullResponse(t *testing.T) {
@@ -153,7 +155,7 @@ func TestOAuthCredentials_UnmarshalLegacy(t *testing.T) {
 	// Legacy format: only access_token, no refresh or expiry
 	raw := `{"access_token": "gho_xxxx"}`
 
-	var creds OAuthCredentials
+	var creds oauth.Credentials
 	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
@@ -180,7 +182,7 @@ func TestOAuthCredentials_UnmarshalFull(t *testing.T) {
 		"expires_at": "2025-02-20T06:00:00Z"
 	}`
 
-	var creds OAuthCredentials
+	var creds oauth.Credentials
 	if err := json.Unmarshal([]byte(raw), &creds); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
@@ -197,7 +199,7 @@ func TestOAuthCredentials_UnmarshalFull(t *testing.T) {
 }
 
 func TestOAuthCredentials_Roundtrip(t *testing.T) {
-	original := OAuthCredentials{
+	original := oauth.Credentials{
 		AccessToken:  "ghu_xxxx",
 		RefreshToken: "ghr_xxxx",
 		ExpiresAt:    "2025-02-20T06:00:00Z",
@@ -208,7 +210,7 @@ func TestOAuthCredentials_Roundtrip(t *testing.T) {
 		t.Fatalf("marshal failed: %v", err)
 	}
 
-	var decoded OAuthCredentials
+	var decoded oauth.Credentials
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
