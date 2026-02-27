@@ -127,24 +127,21 @@ type DetailOptions struct {
 func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, opts DetailOptions) string {
 	var out strings.Builder
 
-	// Provider title above the card
+	// Provider title
 	providerTitle := titleStyle.Render(provider.DisplayName(snapshot.Provider))
 	if cached {
 		providerTitle += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
-	if snapshot.Identity != nil {
-		parts := identitySummary(snapshot.Identity)
-		if parts != "" {
-			providerTitle += dimStyle.Render("  " + parts)
-		}
-	}
-	if snapshot.Source != "" {
-		providerTitle += dimStyle.Render("  (via " + snapshot.Source + ")")
-	}
 	out.WriteString(providerTitle)
 	out.WriteByte('\n')
 
-	// Status line between title and usage card
+	// Labeled metadata line
+	if meta := renderMetaLine(snapshot); meta != "" {
+		out.WriteString(meta)
+		out.WriteByte('\n')
+	}
+
+	// Status line between metadata and usage card
 	if opts.Status != nil {
 		out.WriteString(renderStatusLine(*opts.Status))
 		out.WriteByte('\n')
@@ -156,19 +153,56 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, opts Detai
 	return out.String()
 }
 
-// identitySummary returns a compact string from provider identity fields.
-func identitySummary(id *models.ProviderIdentity) string {
-	var parts []string
-	if id.Plan != "" {
-		parts = append(parts, id.Plan)
+// renderMetaLine builds a labeled metadata line from identity and source fields.
+func renderMetaLine(snapshot models.UsageSnapshot) string {
+	type labeledField struct {
+		label string
+		value string
 	}
-	if id.Organization != "" {
-		parts = append(parts, id.Organization)
+
+	var fields []labeledField
+
+	if snapshot.Identity != nil {
+		if snapshot.Identity.Plan != "" {
+			fields = append(fields, labeledField{"Plan", snapshot.Identity.Plan})
+		}
+		if snapshot.Identity.Organization != "" {
+			fields = append(fields, labeledField{"Org", snapshot.Identity.Organization})
+		}
+		if snapshot.Identity.Email != "" {
+			fields = append(fields, labeledField{"Account", snapshot.Identity.Email})
+		}
 	}
-	if id.Email != "" {
-		parts = append(parts, id.Email)
+
+	if snapshot.Source != "" {
+		fields = append(fields, labeledField{"Auth", formatSourceName(snapshot.Source)})
 	}
-	return strings.Join(parts, " · ")
+
+	if len(fields) == 0 {
+		return ""
+	}
+
+	parts := make([]string, len(fields))
+	for i, f := range fields {
+		parts[i] = dimStyle.Render(f.label) + " " + f.value
+	}
+	return strings.Join(parts, dimStyle.Render("  ·  "))
+}
+
+// formatSourceName returns a human-readable name for a fetch source.
+func formatSourceName(source string) string {
+	switch source {
+	case "oauth":
+		return "OAuth"
+	case "web":
+		return "Web Session"
+	case "api_key":
+		return "API Key"
+	case "device_flow":
+		return "Device Flow"
+	default:
+		return source
+	}
 }
 
 // renderStatusLine renders a compact status indicator line.

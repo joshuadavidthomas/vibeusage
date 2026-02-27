@@ -910,11 +910,11 @@ func TestRenderSingleProvider_WithIdentity(t *testing.T) {
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
-	if !strings.Contains(result, "pro") {
-		t.Errorf("expected plan in identity, got: %q", result)
+	if !strings.Contains(result, "Plan pro") {
+		t.Errorf("expected labeled plan, got: %q", result)
 	}
-	if !strings.Contains(result, "user@example.com") {
-		t.Errorf("expected email in identity, got: %q", result)
+	if !strings.Contains(result, "Account user@example.com") {
+		t.Errorf("expected labeled email, got: %q", result)
 	}
 }
 
@@ -926,20 +926,20 @@ func TestRenderSingleProvider_WithSource(t *testing.T) {
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
-	if !strings.Contains(result, "(via oauth)") {
-		t.Errorf("expected source indicator '(via oauth)', got: %q", result)
+	if !strings.Contains(result, "Auth OAuth") {
+		t.Errorf("expected labeled source 'Auth OAuth', got: %q", result)
 	}
 }
 
-func TestRenderSingleProvider_NoSourceWhenEmpty(t *testing.T) {
+func TestRenderSingleProvider_NoMetaWhenEmpty(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider: "claude",
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
-	if strings.Contains(result, "via") {
-		t.Errorf("should not show source when empty, got: %q", result)
+	if strings.Contains(result, "Auth") || strings.Contains(result, "Plan") {
+		t.Errorf("should not show metadata when empty, got: %q", result)
 	}
 }
 
@@ -979,24 +979,79 @@ func TestRenderSingleProvider_StatusBetweenTitleAndPanel(t *testing.T) {
 
 // identitySummary tests
 
-func TestIdentitySummary(t *testing.T) {
+func TestRenderMetaLine(t *testing.T) {
 	tests := []struct {
-		name string
-		id   *models.ProviderIdentity
-		want string
+		name     string
+		snapshot models.UsageSnapshot
+		contains []string
+		empty    bool
 	}{
-		{"plan only", &models.ProviderIdentity{Plan: "pro"}, "pro"},
-		{"email only", &models.ProviderIdentity{Email: "user@example.com"}, "user@example.com"},
-		{"plan and email", &models.ProviderIdentity{Plan: "pro", Email: "user@example.com"}, "pro · user@example.com"},
-		{"all fields", &models.ProviderIdentity{Plan: "pro", Organization: "Acme", Email: "user@example.com"}, "pro · Acme · user@example.com"},
-		{"empty", &models.ProviderIdentity{}, ""},
+		{
+			"plan and source",
+			models.UsageSnapshot{
+				Identity: &models.ProviderIdentity{Plan: "Pro"},
+				Source:   "oauth",
+			},
+			[]string{"Plan", "Pro", "Auth", "OAuth"},
+			false,
+		},
+		{
+			"all identity fields",
+			models.UsageSnapshot{
+				Identity: &models.ProviderIdentity{Plan: "Pro", Organization: "Acme", Email: "user@example.com"},
+			},
+			[]string{"Plan", "Pro", "Org", "Acme", "Account", "user@example.com"},
+			false,
+		},
+		{
+			"source only",
+			models.UsageSnapshot{Source: "api_key"},
+			[]string{"Auth", "API Key"},
+			false,
+		},
+		{
+			"empty",
+			models.UsageSnapshot{},
+			nil,
+			true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := identitySummary(tt.id)
+			got := stripANSI(renderMetaLine(tt.snapshot))
+			if tt.empty {
+				if got != "" {
+					t.Errorf("renderMetaLine() = %q, want empty", got)
+				}
+				return
+			}
+			for _, s := range tt.contains {
+				if !strings.Contains(got, s) {
+					t.Errorf("renderMetaLine() = %q, missing %q", got, s)
+				}
+			}
+		})
+	}
+}
+
+func TestFormatSourceName(t *testing.T) {
+	tests := []struct {
+		source string
+		want   string
+	}{
+		{"oauth", "OAuth"},
+		{"web", "Web Session"},
+		{"api_key", "API Key"},
+		{"device_flow", "Device Flow"},
+		{"unknown", "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.source, func(t *testing.T) {
+			got := formatSourceName(tt.source)
 			if got != tt.want {
-				t.Errorf("identitySummary() = %q, want %q", got, tt.want)
+				t.Errorf("formatSourceName(%q) = %q, want %q", tt.source, got, tt.want)
 			}
 		})
 	}
