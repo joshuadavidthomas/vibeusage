@@ -958,22 +958,20 @@ func TestRenderSingleProvider_StatusBetweenTitleAndPanel(t *testing.T) {
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, opts))
-	lines := strings.Split(result, "\n")
 
-	// Line 0: provider title
-	// Line 1: status line
-	// Line 2+: Usage panel
-	if len(lines) < 4 {
-		t.Fatalf("expected at least 4 lines (title + status + panel), got %d", len(lines))
+	// Verify ordering: title before status before panel
+	titleIdx := strings.Index(result, "Claude")
+	statusIdx := strings.Index(result, "Operational")
+	panelIdx := strings.Index(result, "╭")
+
+	if titleIdx == -1 || statusIdx == -1 || panelIdx == -1 {
+		t.Fatalf("missing expected sections in output:\n%s", result)
 	}
-	if !strings.Contains(lines[0], "Claude") {
-		t.Errorf("line 0 should be provider title, got: %q", lines[0])
+	if titleIdx >= statusIdx {
+		t.Error("title should appear before status")
 	}
-	if !strings.Contains(lines[1], "●") && !strings.Contains(lines[1], "Operational") {
-		t.Errorf("line 1 should be status line, got: %q", lines[1])
-	}
-	if !strings.HasPrefix(lines[2], "╭") {
-		t.Errorf("line 2 should start Usage panel, got: %q", lines[2])
+	if statusIdx >= panelIdx {
+		t.Error("status should appear before panel")
 	}
 }
 

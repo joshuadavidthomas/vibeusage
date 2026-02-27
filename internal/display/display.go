@@ -135,19 +135,21 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, opts Detai
 	out.WriteString(providerTitle)
 	out.WriteByte('\n')
 
-	// Labeled metadata line
+	// Labeled metadata
 	if meta := renderMetaLine(snapshot); meta != "" {
 		out.WriteString(meta)
 		out.WriteByte('\n')
 	}
 
-	// Status line between metadata and usage card
+	// Status line
 	if opts.Status != nil {
+		out.WriteByte('\n')
 		out.WriteString(renderStatusLine(*opts.Status))
 		out.WriteByte('\n')
 	}
 
 	// Usage panel
+	out.WriteByte('\n')
 	out.WriteString(renderUsagePanel(snapshot))
 
 	return out.String()
