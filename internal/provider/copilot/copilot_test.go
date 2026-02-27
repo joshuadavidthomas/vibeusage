@@ -9,6 +9,7 @@ import (
 
 func TestParseTypedUsageResponse_FullResponse(t *testing.T) {
 	resp := UserResponse{
+		Login:             "testuser",
 		QuotaResetDateUTC: "2025-03-01T00:00:00Z",
 		CopilotPlan:       "pro",
 		QuotaSnapshots: &QuotaSnapshots{
@@ -75,6 +76,9 @@ func TestParseTypedUsageResponse_FullResponse(t *testing.T) {
 	if snapshot.Identity.Plan != "pro" {
 		t.Errorf("plan = %q, want %q", snapshot.Identity.Plan, "pro")
 	}
+	if snapshot.Identity.Email != "testuser" {
+		t.Errorf("email = %q, want %q", snapshot.Identity.Email, "testuser")
+	}
 }
 
 func TestParseTypedUsageResponse_NoQuotas(t *testing.T) {
@@ -140,7 +144,32 @@ func TestParseTypedUsageResponse_NoPlan(t *testing.T) {
 		t.Fatal("expected non-nil snapshot")
 	}
 	if snapshot.Identity != nil {
-		t.Error("expected nil identity when no plan")
+		t.Error("expected nil identity when no plan or login")
+	}
+}
+
+func TestParseTypedUsageResponse_LoginOnly(t *testing.T) {
+	resp := UserResponse{
+		Login: "testuser",
+		QuotaSnapshots: &QuotaSnapshots{
+			Chat: &Quota{Entitlement: 100, Remaining: 50, Unlimited: false},
+		},
+	}
+
+	s := DeviceFlowStrategy{}
+	snapshot := s.parseTypedUsageResponse(resp)
+
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
+	if snapshot.Identity == nil {
+		t.Fatal("expected identity when login is present")
+	}
+	if snapshot.Identity.Email != "testuser" {
+		t.Errorf("email = %q, want %q", snapshot.Identity.Email, "testuser")
+	}
+	if snapshot.Identity.Plan != "" {
+		t.Errorf("plan = %q, want empty", snapshot.Identity.Plan)
 	}
 }
 
