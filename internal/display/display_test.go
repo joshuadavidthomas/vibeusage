@@ -133,97 +133,6 @@ func TestRenderBar_ColorDoesNotAffectContent(t *testing.T) {
 	}
 }
 
-// FormatPeriodLine tests
-
-func TestFormatPeriodLine_ContainsName(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Monthly",
-		Utilization: 42,
-		PeriodType:  models.PeriodMonthly,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "Monthly") {
-		t.Errorf("expected period name in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_ContainsPercentage(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Daily",
-		Utilization: 75,
-		PeriodType:  models.PeriodDaily,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "75%") {
-		t.Errorf("expected '75%%' in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_ContainsBar(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Session",
-		Utilization: 50,
-		PeriodType:  models.PeriodSession,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "█") {
-		t.Errorf("expected filled bar character in output, got: %q", result)
-	}
-	if !strings.Contains(result, "░") {
-		t.Errorf("expected empty bar character in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_TruncatesLongName(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "VeryLongPeriodNameThatExceedsWidth",
-		Utilization: 10,
-		PeriodType:  models.PeriodDaily,
-	}
-
-	result := FormatPeriodLine(period, 10)
-	// The full original name should NOT appear
-	if strings.Contains(result, "VeryLongPeriodNameThatExceedsWidth") {
-		t.Errorf("expected name to be truncated, got: %q", result)
-	}
-	// But the truncated portion should
-	if !strings.Contains(result, "VeryLongPe") {
-		t.Errorf("expected truncated name 'VeryLongPe' in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_IncludesResetCountdown(t *testing.T) {
-	reset := time.Now().Add(3 * time.Hour)
-	period := models.UsagePeriod{
-		Name:        "Daily",
-		Utilization: 60,
-		PeriodType:  models.PeriodDaily,
-		ResetsAt:    &reset,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "resets in") {
-		t.Errorf("expected 'resets in' countdown, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_NoResetWhenNil(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Monthly",
-		Utilization: 30,
-		PeriodType:  models.PeriodMonthly,
-		ResetsAt:    nil,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if strings.Contains(result, "resets in") {
-		t.Errorf("should not contain 'resets in' when ResetsAt is nil, got: %q", result)
-	}
-}
-
 // FormatStatusUpdated tests
 
 func TestFormatStatusUpdated(t *testing.T) {
@@ -471,6 +380,23 @@ func TestRenderProviderPanel_RenamesWeeklyDaily(t *testing.T) {
 	}
 }
 
+func TestRenderProviderPanel_PreservesBrandedName(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Periods: []models.UsagePeriod{
+			{Name: "Amp Free", Utilization: 40, PeriodType: models.PeriodDaily},
+		},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+	if !strings.Contains(result, "Amp Free") {
+		t.Errorf("expected branded name 'Amp Free' preserved, got: %q", result)
+	}
+	if strings.Contains(result, "Daily") {
+		t.Errorf("branded name should not be normalized to 'Daily', got: %q", result)
+	}
+}
+
 func TestRenderProviderPanel_WithOverage(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider: "claude",
@@ -686,6 +612,116 @@ func TestRenderProviderPanel_OverageZeroLimit(t *testing.T) {
 	}
 	if !strings.Contains(result, "Unlimited") {
 		t.Errorf("should show 'Unlimited' for zero limit, got: %q", result)
+	}
+}
+
+// formatBalance tests
+
+func TestFormatBalance_NilBilling(t *testing.T) {
+	got := formatBalance(nil)
+	if got != "" {
+		t.Errorf("formatBalance(nil) = %q, want empty", got)
+	}
+}
+
+func TestFormatBalance_NilBalance(t *testing.T) {
+	got := formatBalance(&models.BillingDetail{})
+	if got != "" {
+		t.Errorf("formatBalance(nil balance) = %q, want empty", got)
+	}
+}
+
+func TestFormatBalance_Positive(t *testing.T) {
+	bal := 12.34
+	got := formatBalance(&models.BillingDetail{Balance: &bal})
+	if got != "Balance: $12.34" {
+		t.Errorf("formatBalance = %q, want %q", got, "Balance: $12.34")
+	}
+}
+
+func TestFormatBalance_Zero(t *testing.T) {
+	bal := 0.0
+	got := formatBalance(&models.BillingDetail{Balance: &bal})
+	if got != "Balance: $0.00" {
+		t.Errorf("formatBalance = %q, want %q", got, "Balance: $0.00")
+	}
+}
+
+func TestFormatBalance_Negative(t *testing.T) {
+	bal := -5.50
+	got := formatBalance(&models.BillingDetail{Balance: &bal})
+	if got != "Balance: -$5.50" {
+		t.Errorf("formatBalance = %q, want %q", got, "Balance: -$5.50")
+	}
+}
+
+// Standalone billing balance in detail view
+
+func TestRenderSingleProvider_BillingBalanceNoOverage(t *testing.T) {
+	bal := 12.34
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Periods:  []models.UsagePeriod{{Name: "Daily Free Quota", Utilization: 40, PeriodType: models.PeriodDaily}},
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Balance: $12.34") {
+		t.Errorf("expected standalone balance line, got: %q", result)
+	}
+	if strings.Contains(result, "Extra Usage") {
+		t.Errorf("should not show Extra Usage when no overage, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_BillingBalanceOnlyNoPeriods(t *testing.T) {
+	bal := 5.00
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Balance: $5.00") {
+		t.Errorf("expected balance line for credits-only snapshot, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_OverageSuppressesBillingBalance(t *testing.T) {
+	bal := 42.00
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage:  &models.OverageUsage{Used: 5.50, Limit: 100.00, Currency: "USD", IsEnabled: true},
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Extra Usage") {
+		t.Errorf("expected Extra Usage for overage, got: %q", result)
+	}
+	// Balance should appear in the billing sub-line under overage, not as standalone
+	if !strings.Contains(result, "Balance: $42.00") {
+		t.Errorf("expected balance in billing detail sub-line, got: %q", result)
+	}
+}
+
+// Standalone billing balance in panel view
+
+func TestRenderProviderPanel_BillingBalanceNoOverage(t *testing.T) {
+	bal := 8.00
+	snap := models.UsageSnapshot{
+		Provider: "amp",
+		Periods:  []models.UsagePeriod{{Name: "Daily Free Quota", Utilization: 40, PeriodType: models.PeriodDaily}},
+		Billing:  &models.BillingDetail{Balance: &bal},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+	if !strings.Contains(result, "Balance: $8.00") {
+		t.Errorf("expected balance line in panel, got: %q", result)
+	}
+	if strings.Contains(result, "Extra") {
+		t.Errorf("should not show Extra when no overage, got: %q", result)
 	}
 }
 
@@ -1073,6 +1109,7 @@ func TestFormatSourceName(t *testing.T) {
 		{"web", "Web Session"},
 		{"api_key", "API Key"},
 		{"device_flow", "Device Flow"},
+		{"provider_cli", "CLI"},
 		{"unknown", "unknown"},
 	}
 

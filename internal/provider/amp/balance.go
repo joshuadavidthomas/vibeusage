@@ -80,9 +80,10 @@ func fetchBalance(ctx context.Context, token string, source string, httpTimeout 
 }
 
 var (
-	quotaPattern   = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)`)
-	hourlyPattern  = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*hour`)
-	creditsPattern = regexp.MustCompile(`(?i)(?:bonus\s+)?credits?:\s*\$([0-9]+(?:\.[0-9]+)?)`)
+	quotaPattern    = regexp.MustCompile(`(?i)(?:([A-Za-z][A-Za-z ]*?):\s*)?\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)`)
+	hourlyPattern   = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*hour`)
+	creditsPattern  = regexp.MustCompile(`(?i)(?:bonus\s+)?credits?:\s*\$([0-9]+(?:\.[0-9]+)?)`)
+	signedInPattern = regexp.MustCompile(`(?i)signed in as\s+(\S+@\S+)\s+\((\w+)\)`)
 )
 
 func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnapshot, error) {
@@ -94,12 +95,12 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 	periods := make([]models.UsagePeriod, 0, 1)
 
 	quotaMatch := quotaPattern.FindStringSubmatch(text)
-	if len(quotaMatch) == 3 {
-		remaining, err := strconv.ParseFloat(quotaMatch[1], 64)
+	if len(quotaMatch) == 4 {
+		remaining, err := strconv.ParseFloat(quotaMatch[2], 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse remaining quota: %w", err)
 		}
-		total, err := strconv.ParseFloat(quotaMatch[2], 64)
+		total, err := strconv.ParseFloat(quotaMatch[3], 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse total quota: %w", err)
 		}
@@ -119,8 +120,13 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 			}
 		}
 
+		name := strings.TrimSpace(quotaMatch[1])
+		if name == "" {
+			name = "Daily Free Quota"
+		}
+
 		period := models.UsagePeriod{
-			Name:        "Daily Free Quota",
+			Name:        name,
 			Utilization: utilization,
 			PeriodType:  models.PeriodDaily,
 		}
@@ -140,41 +146,31 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 		periods = append(periods, period)
 	}
 
-	var overage *models.OverageUsage
+	var billing *models.BillingDetail
 	creditMatch := creditsPattern.FindStringSubmatch(text)
 	if len(creditMatch) == 2 {
 		credits, err := strconv.ParseFloat(creditMatch[1], 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse credits amount: %w", err)
 		}
-		overage = &models.OverageUsage{
-			Used:      0,
-			Limit:     credits,
-			Currency:  "USD",
-			IsEnabled: true,
-		}
+		billing = &models.BillingDetail{Balance: &credits}
 	}
 
-	if len(periods) == 0 {
-		if overage == nil {
-			return nil, fmt.Errorf("unrecognized displayText format: %q", text)
-		}
-		periods = append(periods, models.UsagePeriod{
-			Name:        "Credits Balance",
-			Utilization: 0,
-			PeriodType:  models.PeriodMonthly,
-		})
+	if len(periods) == 0 && billing == nil {
+		return nil, fmt.Errorf("unrecognized displayText format: %q", text)
 	}
 
 	snapshot := &models.UsageSnapshot{
 		Provider:  "amp",
 		FetchedAt: time.Now().UTC(),
 		Periods:   periods,
-		Overage:   overage,
+		Billing:   billing,
 		Source:    source,
 	}
-	if overage != nil {
-		snapshot.Identity = &models.ProviderIdentity{Organization: fmt.Sprintf("Credits: $%.2f", overage.Limit)}
+
+	if m := signedInPattern.FindStringSubmatch(text); len(m) == 3 {
+		snapshot.Identity = &models.ProviderIdentity{Email: m[1]}
 	}
+
 	return snapshot, nil
 }

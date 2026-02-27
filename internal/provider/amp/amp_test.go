@@ -18,11 +18,46 @@ func TestParseDisplayBalance_FreeTier(t *testing.T) {
 	if len(snapshot.Periods) != 1 {
 		t.Fatalf("period count = %d, want 1", len(snapshot.Periods))
 	}
+	if snapshot.Periods[0].Name != "Free quota" {
+		t.Errorf("name = %q, want %q", snapshot.Periods[0].Name, "Free quota")
+	}
 	if snapshot.Periods[0].Utilization != 40 {
 		t.Errorf("utilization = %d, want 40", snapshot.Periods[0].Utilization)
 	}
 	if snapshot.Periods[0].ResetsAt == nil {
 		t.Error("expected resetsAt estimate from replenish rate")
+	}
+}
+
+func TestParseDisplayBalance_MultilineWithIdentity(t *testing.T) {
+	result := balanceResult{
+		DisplayText: "Signed in as user@example.com (testuser)\nAmp Free: $10/$10 remaining (replenishes +$0.42/hour) - https://ampcode.com/settings#amp-free\nIndividual credits: $0 remaining - https://ampcode.com/settings",
+	}
+
+	snapshot, err := parseDisplayBalance(result, "provider_cli")
+	if err != nil {
+		t.Fatalf("parseDisplayBalance() error = %v", err)
+	}
+	if snapshot.Identity == nil {
+		t.Fatal("expected identity from 'Signed in as' line")
+	}
+	if snapshot.Identity.Email != "user@example.com" {
+		t.Errorf("email = %q, want %q", snapshot.Identity.Email, "user@example.com")
+	}
+	if len(snapshot.Periods) != 1 {
+		t.Fatalf("period count = %d, want 1", len(snapshot.Periods))
+	}
+	if snapshot.Periods[0].Name != "Amp Free" {
+		t.Errorf("name = %q, want %q", snapshot.Periods[0].Name, "Amp Free")
+	}
+	if snapshot.Periods[0].Utilization != 0 {
+		t.Errorf("utilization = %d, want 0", snapshot.Periods[0].Utilization)
+	}
+	if snapshot.Billing == nil || snapshot.Billing.Balance == nil {
+		t.Fatal("expected billing info for credits")
+	}
+	if *snapshot.Billing.Balance != 0 {
+		t.Errorf("credit balance = %.2f, want 0", *snapshot.Billing.Balance)
 	}
 }
 
@@ -33,11 +68,17 @@ func TestParseDisplayBalance_CreditsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseDisplayBalance() error = %v", err)
 	}
-	if snapshot.Overage == nil {
-		t.Fatal("expected overage info for credits")
+	if snapshot.Billing == nil || snapshot.Billing.Balance == nil {
+		t.Fatal("expected billing info for credits")
 	}
-	if snapshot.Overage.Limit != 12.34 {
-		t.Errorf("credit limit = %.2f, want 12.34", snapshot.Overage.Limit)
+	if *snapshot.Billing.Balance != 12.34 {
+		t.Errorf("credit balance = %.2f, want 12.34", *snapshot.Billing.Balance)
+	}
+	if snapshot.Overage != nil {
+		t.Error("credits should not be stored as overage")
+	}
+	if len(snapshot.Periods) != 0 {
+		t.Errorf("credits-only should have no periods, got %d", len(snapshot.Periods))
 	}
 }
 
@@ -48,8 +89,32 @@ func TestParseDisplayBalance_BonusText(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseDisplayBalance() error = %v", err)
 	}
+	if snapshot.Periods[0].Name != "Free quota" {
+		t.Errorf("name = %q, want %q", snapshot.Periods[0].Name, "Free quota")
+	}
 	if snapshot.Periods[0].Utilization != 75 {
 		t.Errorf("utilization = %d, want 75", snapshot.Periods[0].Utilization)
+	}
+	if snapshot.Billing == nil || snapshot.Billing.Balance == nil {
+		t.Fatal("expected billing info for bonus credits")
+	}
+	if *snapshot.Billing.Balance != 8.00 {
+		t.Errorf("credit balance = %.2f, want 8.00", *snapshot.Billing.Balance)
+	}
+	if snapshot.Overage != nil {
+		t.Error("credits should not be stored as overage")
+	}
+}
+
+func TestParseDisplayBalance_NoLabel(t *testing.T) {
+	result := balanceResult{DisplayText: "$5.00 / $10.00"}
+
+	snapshot, err := parseDisplayBalance(result, "provider_cli")
+	if err != nil {
+		t.Fatalf("parseDisplayBalance() error = %v", err)
+	}
+	if snapshot.Periods[0].Name != "Daily Free Quota" {
+		t.Errorf("name = %q, want fallback %q", snapshot.Periods[0].Name, "Daily Free Quota")
 	}
 }
 

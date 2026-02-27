@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -38,49 +39,75 @@ func RenderBar(utilization int, width int, color string) string {
 	return colorStyle(color).Render(bar)
 }
 
-func FormatPeriodLine(period models.UsagePeriod, nameWidth int) string {
-	paceRatio := period.PaceRatio()
-	color := PaceToColor(paceRatio, period.Utilization)
-
-	bar := RenderBar(period.Utilization, 20, color)
-
-	pctText := fmt.Sprintf("%d%%", period.Utilization)
-	pctStyled := colorStyle(color).Render(pctText)
-	pctPad := strings.Repeat(" ", max(0, 4-len(pctText)))
-
-	name := period.Name
-	if len(name) > nameWidth {
-		name = name[:nameWidth]
-	}
-	namePad := strings.Repeat(" ", max(0, nameWidth-len(name)))
-
-	reset := ""
-	if d := period.TimeUntilReset(); d != nil {
-		reset = dimStyle.Render("resets in " + FormatResetCountdown(d))
-	}
-
-	return name + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset
+// periodTableRow represents one period entry for the table builder.
+// The displayName allows overriding the name shown (e.g. indented sub-periods).
+type periodTableRow struct {
+	displayName string
+	period      models.UsagePeriod
 }
 
-// renderPeriodRow renders a single period as an aligned row using the provided
-// column widths. The displayName allows the caller to override the name shown
-// (e.g. for indented sub-period names).
-func renderPeriodRow(p models.UsagePeriod, displayName string, cw PeriodColWidths) string {
-	color := PaceToColor(p.PaceRatio(), p.Utilization)
-	pctRaw := fmt.Sprintf("%d%%", p.Utilization)
-
-	resetRaw := ""
-	if d := p.TimeUntilReset(); d != nil {
-		resetRaw = "resets in " + FormatResetCountdown(d)
+// buildPeriodTable renders period rows as borderless lipgloss tables.
+// Each period is its own single-row table. When a period has detail
+// (e.g. dollar amounts), it's placed in the same cell as the percentage
+// separated by a newline so alignment is handled by the table.
+func buildPeriodTable(rows []periodTableRow) string {
+	if len(rows) == 0 {
+		return ""
 	}
 
-	namePad := strings.Repeat(" ", max(0, cw.Name-len(displayName)))
-	pctPad := strings.Repeat(" ", max(0, cw.Pct-len(pctRaw)))
+	nameWidth := 0
+	for _, r := range rows {
+		nameWidth = max(nameWidth, len(r.displayName))
+	}
 
-	return displayName + namePad +
-		"  " + RenderBar(p.Utilization, 20, color) +
-		" " + pctPad + colorStyle(color).Render(pctRaw) +
-		"    " + dimStyle.Render(resetRaw)
+	styleFunc := func(_ int, col int) lipgloss.Style {
+		switch col {
+		case 0:
+			return lipgloss.NewStyle().Width(nameWidth)
+		case 2:
+			return lipgloss.NewStyle().Align(lipgloss.Right)
+		case 3:
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+		}
+		return lipgloss.NewStyle()
+	}
+
+	var lines []string
+	for _, r := range rows {
+		p := r.period
+		color := PaceToColor(p.PaceRatio(), p.Utilization)
+		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
+		bar := RenderBar(p.Utilization, 20, color)
+
+		reset := ""
+		if d := p.TimeUntilReset(); d != nil {
+			reset = "resets in " + FormatResetCountdown(d)
+		}
+
+		t := table.New().
+			Border(lipgloss.HiddenBorder()).
+			StyleFunc(styleFunc).
+			Row(r.displayName, bar, pct, reset)
+		lines = append(lines, cleanPeriodTableOutput(t.Render()))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// cleanPeriodTableOutput strips the single leading border space and trailing
+// whitespace from each line of rendered table output, and removes empty lines.
+func cleanPeriodTableOutput(rendered string) string {
+	lines := strings.Split(rendered, "\n")
+	var cleaned []string
+	for _, line := range lines {
+		// Remove exactly one leading space (the hidden border left edge).
+		line = strings.TrimPrefix(line, " ")
+		line = strings.TrimRight(line, " ")
+		if line != "" {
+			cleaned = append(cleaned, line)
+		}
+	}
+	return strings.Join(cleaned, "\n")
 }
 
 // formatSubPeriodName returns the display name for a period within a section
@@ -113,6 +140,19 @@ func formatOverageLine(o *models.OverageUsage, label string) string {
 		return fmt.Sprintf("%s: %s%.2f / %s%.2f %s", label, sym, o.Used, sym, o.Limit, o.Currency)
 	}
 	return fmt.Sprintf("%s: %s%.2f %s (Unlimited)", label, sym, o.Used, o.Currency)
+}
+
+// formatBalance renders a standalone balance line from billing detail.
+// Returns empty string when no balance is available.
+func formatBalance(billing *models.BillingDetail) string {
+	if billing == nil || billing.Balance == nil {
+		return ""
+	}
+	bal := *billing.Balance
+	if bal < 0 {
+		return fmt.Sprintf("Balance: -$%.2f", -bal)
+	}
+	return fmt.Sprintf("Balance: $%.2f", bal)
 }
 
 // formatBillingDetail renders a compact sub-line with supplemental billing
@@ -246,6 +286,8 @@ func formatSourceName(source string) string {
 		return "API Key"
 	case "device_flow":
 		return "Device Flow"
+	case "provider_cli":
+		return "CLI"
 	default:
 		return source
 	}
@@ -273,15 +315,13 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 	session, weekly, daily, monthly := groupPeriods(snapshot.Periods)
 	longer := pickLonger(weekly, daily, monthly)
 
-	// Compute column widths across all displayed periods
-	cw := detailColWidths(session, longer)
-
 	// Session periods
-	for i, p := range session {
-		if i > 0 {
-			b.WriteByte('\n')
+	if len(session) > 0 {
+		var rows []periodTableRow
+		for _, p := range session {
+			rows = append(rows, periodTableRow{p.Name, p})
 		}
-		b.WriteString(renderPeriodRow(p, p.Name, cw))
+		b.WriteString(buildPeriodTable(rows))
 	}
 
 	// Longer periods with per-model breakdowns
@@ -292,11 +332,13 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 	if len(longer.periods) > 0 {
 		b.WriteString(longer.header)
 
+		var rows []periodTableRow
 		for _, p := range longer.periods {
 			name := formatSubPeriodName(&p, longer.header)
-			b.WriteByte('\n')
-			b.WriteString(renderPeriodRow(p, name, cw))
+			rows = append(rows, periodTableRow{name, p})
 		}
+		b.WriteByte('\n')
+		b.WriteString(buildPeriodTable(rows))
 	}
 
 	// Overage and billing details
@@ -307,21 +349,26 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 			b.WriteByte('\n')
 			b.WriteString(detail)
 		}
+	} else if bal := formatBalance(snapshot.Billing); bal != "" {
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString(bal)
 	}
 
 	return renderTitledPanel(titleStyle.Render("Usage"), b.String(), 0)
 }
 
-// PeriodColWidths holds pre-computed column widths for renderPeriodTable.
-// Compute once across all panels with GlobalPeriodColWidths so every provider
-// box shares the same column widths and renders at the same total width.
+// PeriodColWidths holds pre-computed column widths used to ensure consistent
+// panel sizing across all providers in the dashboard view.
 type PeriodColWidths struct{ Name, Pct, Reset int }
 
-// RowWidth returns the total visible width of a fully-populated period row.
-// This is the minimum body width needed for consistent panel sizing.
+// RowWidth returns the total visible width of a fully-populated period row
+// as rendered by a borderless lipgloss table. Each column is separated by
+// one hidden-border space, plus left and right border spaces.
 func (cw PeriodColWidths) RowWidth() int {
-	// name + "  " + bar(20) + " " + pct + "    " + reset
-	return cw.Name + 2 + 20 + 1 + cw.Pct + 4 + cw.Reset
+	// 4 columns: name, bar(20), pct, reset + 3 separators + 2 outer borders
+	return cw.Name + 20 + cw.Pct + cw.Reset + 5
 }
 
 // GlobalPeriodColWidths computes the widest values for each column across all
@@ -352,7 +399,7 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	}
 	for _, p := range weekly {
 		if p.Model == "" {
-			if !strings.Contains(p.Name, "(") {
+			if isGenericPeriodName(p.Name) {
 				p.Name = "Weekly"
 			}
 			out = append(out, p)
@@ -360,7 +407,7 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	}
 	for _, p := range daily {
 		if p.Model == "" {
-			if !strings.Contains(p.Name, "(") {
+			if isGenericPeriodName(p.Name) {
 				p.Name = "Daily"
 			}
 			out = append(out, p)
@@ -374,40 +421,79 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	return out
 }
 
-// detailColWidths computes column widths for the single-provider detail view
-// across both session periods and the longer period group (including sub-periods).
-func detailColWidths(session []models.UsagePeriod, longer longerPeriods) PeriodColWidths {
-	var cw PeriodColWidths
-
-	for _, p := range session {
-		cw.Name = max(cw.Name, len(p.Name))
-		cw.Pct = max(cw.Pct, len(fmt.Sprintf("%d%%", p.Utilization)))
-		if d := p.TimeUntilReset(); d != nil {
-			cw.Reset = max(cw.Reset, len("resets in "+FormatResetCountdown(d)))
+// isGenericPeriodName reports whether a period name looks like a raw/generic
+// label that should be normalised to "Daily", "Weekly", etc. in the compact
+// panel view. Names with parenthesized qualifiers (e.g. "Monthly (Premium)")
+// or provider-branded names (e.g. "Amp Free") are preserved as-is.
+func isGenericPeriodName(name string) bool {
+	if strings.Contains(name, "(") {
+		return false
+	}
+	lower := strings.ToLower(name)
+	for _, generic := range []string{"daily", "weekly", "monthly", "session"} {
+		if strings.Contains(lower, generic) {
+			return true
 		}
 	}
-
-	for i := range longer.periods {
-		p := &longer.periods[i]
-		name := formatSubPeriodName(p, longer.header)
-		cw.Name = max(cw.Name, len(name))
-		cw.Pct = max(cw.Pct, len(fmt.Sprintf("%d%%", p.Utilization)))
-		if d := p.TimeUntilReset(); d != nil {
-			cw.Reset = max(cw.Reset, len("resets in "+FormatResetCountdown(d)))
-		}
+	// Names that are purely snake_case or single words look generic
+	if !strings.Contains(name, " ") {
+		return true
 	}
-
-	return cw
+	return false
 }
 
-// renderPeriodTable renders a slice of periods as aligned rows using the
-// provided column widths.  No characters are hand-counted: the caller supplies
-// widths computed from the full dataset so every panel lines up identically.
+// renderPeriodTable renders a slice of periods as a borderless table,
+// using shared column widths for consistent cross-panel alignment.
 func renderPeriodTable(periods []models.UsagePeriod, cw PeriodColWidths) string {
-	lines := make([]string, 0, len(periods))
+	var rows []periodTableRow
 	for _, p := range periods {
-		lines = append(lines, renderPeriodRow(p, p.Name, cw))
+		rows = append(rows, periodTableRow{p.Name, p})
 	}
+	return buildPeriodTableWithWidths(rows, cw)
+}
+
+// buildPeriodTableWithWidths builds a period table with explicit column widths
+// for cross-panel alignment in the dashboard view. Each period is rendered as
+// a one-row table so detail sub-lines can be inserted between periods without
+// inflating the pct column width for all panels.
+func buildPeriodTableWithWidths(rows []periodTableRow, cw PeriodColWidths) string {
+	if len(rows) == 0 {
+		return ""
+	}
+
+	styleFunc := func(_ int, col int) lipgloss.Style {
+		switch col {
+		case 0:
+			return lipgloss.NewStyle().Width(cw.Name)
+		case 1:
+			return lipgloss.NewStyle().Width(20)
+		case 2:
+			return lipgloss.NewStyle().Align(lipgloss.Right).Width(cw.Pct)
+		case 3:
+			return lipgloss.NewStyle().Width(cw.Reset).Foreground(lipgloss.Color("240"))
+		}
+		return lipgloss.NewStyle()
+	}
+
+	var lines []string
+	for _, r := range rows {
+		p := r.period
+		color := PaceToColor(p.PaceRatio(), p.Utilization)
+		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
+		bar := RenderBar(p.Utilization, 20, color)
+
+		reset := ""
+		if d := p.TimeUntilReset(); d != nil {
+			reset = "resets in " + FormatResetCountdown(d)
+		}
+
+		t := table.New().
+			Border(lipgloss.HiddenBorder()).
+			StyleFunc(styleFunc).
+			Row(r.displayName, bar, pct, reset)
+		lines = append(lines, cleanPeriodTableOutput(t.Render()))
+	}
+
 	return strings.Join(lines, "\n")
 }
 
@@ -421,6 +507,11 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodCo
 	if snapshot.Overage != nil && snapshot.Overage.IsEnabled {
 		b.WriteByte('\n')
 		b.WriteString(formatOverageLine(snapshot.Overage, "Extra"))
+	} else if bal := formatBalance(snapshot.Billing); bal != "" {
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(bal)
 	}
 
 	title := titleStyle.Render(provider.DisplayName(snapshot.Provider))
