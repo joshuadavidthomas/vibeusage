@@ -217,15 +217,6 @@ func stopCommand(cmd *exec.Cmd) {
 	}
 }
 
-// inferClaudePlan returns the plan tier when it can be reliably determined
-// from the usage response. The API does not include an explicit plan field,
-// so we only return a value when plan/billing_type is present in the
-// response — we no longer guess from feature availability since that
-// can't distinguish Pro from Max tiers.
-func inferClaudePlan(resp OAuthUsageResponse) string {
-	return ""
-}
-
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {
 	return parseUsageResponse(resp, "oauth", nil)
 }

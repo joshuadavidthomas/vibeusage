@@ -91,10 +91,6 @@ func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride 
 	if plan == "" && resp.BillingType != "" {
 		plan = resp.BillingType
 	}
-	if plan == "" {
-		plan = inferClaudePlan(resp)
-	}
-
 	var identity *models.ProviderIdentity
 	if plan != "" {
 		identity = &models.ProviderIdentity{Plan: plan}
