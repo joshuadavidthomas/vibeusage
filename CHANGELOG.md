@@ -22,7 +22,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Added
 
-- Added `vibeusage statusline` command for condensed usage output suitable for status bars and scripting.
+- Added `vibeusage statusline` command for condensed usage output suitable for status bars.
 
 ## [0.3.0]
 
