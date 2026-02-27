@@ -222,9 +222,15 @@ func renderMetaLine(snapshot models.UsageSnapshot) string {
 		return ""
 	}
 
+	maxLabel := 0
+	for _, f := range fields {
+		maxLabel = max(maxLabel, len(f.label))
+	}
+
 	lines := make([]string, len(fields))
 	for i, f := range fields {
-		lines[i] = dimStyle.Render(f.label) + " " + f.value
+		pad := strings.Repeat(" ", maxLabel-len(f.label))
+		lines[i] = dimStyle.Render(f.label) + pad + "  " + f.value
 	}
 	return strings.Join(lines, "\n")
 }
