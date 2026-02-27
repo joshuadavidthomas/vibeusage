@@ -4,11 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
@@ -190,71 +187,24 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredential
 }
 
 // tryRefreshViaCLI attempts to refresh the OAuth token by running Claude CLI
-// print mode, which has been observed to refresh credentials as a side effect.
-// We prefer haiku to minimize refresh cost.
+// print mode, which refreshes credentials as a side effect. Uses haiku to
+// minimize cost.
 func (s *OAuthStrategy) tryRefreshViaCLI(ctx context.Context) *OAuthCredentials {
-	claudePath, err := exec.LookPath("claude")
-	if err != nil {
-		return nil
-	}
-
-	tctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(tctx, claudePath,
-		"-p", "ok",
-		"--model", "haiku",
-		"--output-format", "json",
-		"--no-session-persistence",
-		"--permission-mode", "plan",
-		"--allowed-tools", "",
-		"--max-budget-usd", "0.001",
-	)
-	cmd.Stdin = nil
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-
-	if err := cmd.Start(); err != nil {
-		return nil
-	}
-
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	ticker := time.NewTicker(25 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		if creds := s.loadCredentials(); creds != nil && !creds.NeedsRefresh() {
-			stopCommand(cmd)
-			return creds
-		}
-
-		select {
-		case <-done:
-			creds := s.loadCredentials()
-			if creds == nil || creds.NeedsRefresh() {
-				return nil
-			}
-			return creds
-		case <-tctx.Done():
-			stopCommand(cmd)
-			creds := s.loadCredentials()
-			if creds == nil || creds.NeedsRefresh() {
-				return nil
-			}
-			return creds
-		case <-ticker.C:
-		}
-	}
-}
-
-func stopCommand(cmd *exec.Cmd) {
-	if cmd != nil && cmd.Process != nil {
-		_ = cmd.Process.Kill()
-	}
+	return oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
+		BinaryName: "claude",
+		Args: []string{
+			"-p", "ok",
+			"--model", "haiku",
+			"--output-format", "json",
+			"--no-session-persistence",
+			"--permission-mode", "plan",
+			"--allowed-tools", "",
+			"--max-budget-usd", "0.001",
+		},
+		LoadCredentials: func() *oauth.Credentials {
+			return s.loadCredentials()
+		},
+	})
 }
 
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {
