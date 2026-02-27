@@ -80,7 +80,7 @@ func TestParseUsageResponse_InlineExtraUsageTakesPrecedence(t *testing.T) {
 		ExtraUsage: &ExtraUsageResponse{
 			IsEnabled:    true,
 			UsedCredits:  1000,
-			MonthlyLimit: 5000,
+			MonthlyLimit: floatPtr(5000),
 		},
 	}
 	overrideOverage := &models.OverageUsage{

@@ -49,6 +49,9 @@ func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride 
 		{resp.SevenDaySonnet, "Sonnet"},
 		{resp.SevenDayOpus, "Opus"},
 		{resp.SevenDayHaiku, "Haiku"},
+		{resp.SevenDayOAuthApps, "OAuth Apps"},
+		{resp.SevenDayCowork, "Cowork"},
+		{resp.IguanaNecktie, "Iguana Necktie"},
 	}
 
 	for _, mp := range modelPeriods {
@@ -59,7 +62,7 @@ func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride 
 			Name:        mp.modelName,
 			Utilization: int(mp.data.Utilization),
 			PeriodType:  models.PeriodWeekly,
-			Model:       strings.ToLower(mp.modelName),
+			Model:       strings.ToLower(strings.ReplaceAll(mp.modelName, " ", "_")),
 		}
 		p.ResetsAt = models.ParseRFC3339Ptr(mp.data.ResetsAt)
 		periods = append(periods, p)
@@ -69,9 +72,13 @@ func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride 
 	// override provided by the caller (e.g. from a separate endpoint).
 	var overage *models.OverageUsage
 	if resp.ExtraUsage != nil && resp.ExtraUsage.IsEnabled {
+		var limit float64
+		if resp.ExtraUsage.MonthlyLimit != nil {
+			limit = *resp.ExtraUsage.MonthlyLimit / 100.0
+		}
 		overage = &models.OverageUsage{
 			Used:      resp.ExtraUsage.UsedCredits / 100.0,
-			Limit:     resp.ExtraUsage.MonthlyLimit / 100.0,
+			Limit:     limit,
 			Currency:  "USD",
 			IsEnabled: true,
 		}
