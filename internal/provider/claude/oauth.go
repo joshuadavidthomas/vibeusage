@@ -53,7 +53,21 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	if creds.NeedsRefresh() {
 		refreshed := s.refreshToken(ctx, creds)
 		if refreshed == nil {
-			refreshed = s.tryRefreshViaCLI(ctx)
+			refreshed = oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
+				BinaryName: "claude",
+				Args: []string{
+					"-p", "ok",
+					"--model", "haiku",
+					"--output-format", "json",
+					"--no-session-persistence",
+					"--permission-mode", "plan",
+					"--allowed-tools", "",
+					"--max-budget-usd", "0.001",
+				},
+				LoadCredentials: func() *oauth.Credentials {
+					return s.loadCredentials()
+				},
+			})
 		}
 		if refreshed == nil {
 			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with the Claude CLI."), nil
@@ -186,26 +200,7 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *OAuthCredential
 	})
 }
 
-// tryRefreshViaCLI attempts to refresh the OAuth token by running Claude CLI
-// print mode, which refreshes credentials as a side effect. Uses haiku to
-// minimize cost.
-func (s *OAuthStrategy) tryRefreshViaCLI(ctx context.Context) *OAuthCredentials {
-	return oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
-		BinaryName: "claude",
-		Args: []string{
-			"-p", "ok",
-			"--model", "haiku",
-			"--output-format", "json",
-			"--no-session-persistence",
-			"--permission-mode", "plan",
-			"--allowed-tools", "",
-			"--max-budget-usd", "0.001",
-		},
-		LoadCredentials: func() *oauth.Credentials {
-			return s.loadCredentials()
-		},
-	})
-}
+
 
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {
 	return parseUsageResponse(resp, "oauth", nil)

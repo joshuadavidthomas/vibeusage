@@ -116,7 +116,17 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	if creds.NeedsRefresh() || (creds.ExpiresAt == "" && creds.RefreshToken != "") {
 		refreshed := s.refreshToken(ctx, creds)
 		if refreshed == nil {
-			refreshed = s.tryRefreshViaCLI(ctx)
+			refreshed = oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
+				BinaryName: "codex",
+				Args: []string{
+					"exec", "say ok",
+					"--skip-git-repo-check",
+					"--sandbox", "read-only",
+				},
+				LoadCredentials: func() *oauth.Credentials {
+					return s.loadCredentials()
+				},
+			})
 		}
 		if refreshed == nil {
 			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with `codex login`."), nil
@@ -227,21 +237,7 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *C
 	})
 }
 
-// tryRefreshViaCLI attempts to refresh the OAuth token by running the Codex CLI
-// in exec mode, which refreshes credentials as a side effect on startup.
-func (s *OAuthStrategy) tryRefreshViaCLI(ctx context.Context) *Credentials {
-	return oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
-		BinaryName: "codex",
-		Args: []string{
-			"exec", "say ok",
-			"--skip-git-repo-check",
-			"--sandbox", "read-only",
-		},
-		LoadCredentials: func() *oauth.Credentials {
-			return s.loadCredentials()
-		},
-	})
-}
+
 
 func (s *OAuthStrategy) getUsageURL() string {
 	// Check for custom URL in codex config
