@@ -6,12 +6,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/device"
 )
 
 // AuthFlow is a marker interface for provider auth flow types.
 // Use a type switch to determine the concrete type:
-//   - DeviceAuthFlow: standard OAuth device code flow (configured via deviceflow.Config)
+//   - DeviceAuthFlow: standard OAuth device code flow (configured via device.Config)
 //   - ManualKeyAuthFlow: user pastes a credential (API key, session token, etc.)
 //   - CustomAuthFlow: provider-specific flow that doesn't fit the standard patterns
 type AuthFlow interface {
@@ -21,7 +21,7 @@ type AuthFlow interface {
 // DeviceAuthFlow describes an OAuth device code flow.
 // The deviceflow package handles the entire lifecycle using the Config.
 type DeviceAuthFlow struct {
-	Config deviceflow.Config
+	Config device.Config
 }
 
 func (DeviceAuthFlow) authFlow() {}

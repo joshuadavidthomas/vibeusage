@@ -1,11 +1,11 @@
-package googleauth
+package google
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 )
 
 func TestTokenResponse_Unmarshal(t *testing.T) {

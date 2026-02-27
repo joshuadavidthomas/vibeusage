@@ -1,6 +1,6 @@
 // Package deviceflow provides shared utilities for OAuth device flow
 // authentication across providers.
-package deviceflow
+package device
 
 import (
 	"bufio"

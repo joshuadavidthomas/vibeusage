@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 )
 
 func TestUsageResponse_UnmarshalWithRateLimit(t *testing.T) {

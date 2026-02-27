@@ -3,9 +3,9 @@ package gemini
 import (
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/google"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
 // QuotaResponse represents the response from the Gemini quota endpoint.
@@ -73,7 +73,7 @@ func (g *GeminiCLIInstalled) ToOAuthCredentials() *oauth.Credentials {
 		AccessToken:  accessToken,
 		RefreshToken: g.RefreshToken,
 	}
-	creds.ExpiresAt = googleauth.ParseExpiryDate(g.ExpiryDate)
+	creds.ExpiresAt = google.ParseExpiryDate(g.ExpiryDate)
 	return creds
 }
 
@@ -89,7 +89,7 @@ func (g *GeminiCLICredentials) EffectiveCredentials() *oauth.Credentials {
 			AccessToken:  g.Token,
 			RefreshToken: g.RefreshToken,
 		}
-		creds.ExpiresAt = googleauth.ParseExpiryDate(g.ExpiryDate)
+		creds.ExpiresAt = google.ParseExpiryDate(g.ExpiryDate)
 		return creds
 	}
 	// Try "access_token" format
