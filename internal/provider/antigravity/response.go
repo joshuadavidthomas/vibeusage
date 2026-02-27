@@ -45,32 +45,32 @@ type DeprecatedModelEntry struct {
 
 // ModelInfo represents a single model's info from the fetchAvailableModels response.
 type ModelInfo struct {
-	DisplayName   string            `json:"displayName,omitempty"`
-	QuotaInfo     *QuotaInfo        `json:"quotaInfo,omitempty"`
-	Recommended   bool              `json:"recommended,omitempty"`
-	Model         string            `json:"model,omitempty"`
-	APIProvider   string            `json:"apiProvider,omitempty"`
-	ModelProvider string            `json:"modelProvider,omitempty"`
-	TagTitle      string            `json:"tagTitle,omitempty"`
-	TokenizerType string            `json:"tokenizerType,omitempty"`
-	MaxTokens     int               `json:"maxTokens,omitempty"`
-	MaxOutputTokens  int            `json:"maxOutputTokens,omitempty"`
-	ThinkingBudget   int            `json:"thinkingBudget,omitempty"`
-	MinThinkingBudget int           `json:"minThinkingBudget,omitempty"`
-	SupportsImages   bool           `json:"supportsImages,omitempty"`
-	SupportsThinking bool           `json:"supportsThinking,omitempty"`
-	SupportsVideo    bool           `json:"supportsVideo,omitempty"`
-	IsInternal       bool           `json:"isInternal,omitempty"`
-	SupportedMimeTypes              map[string]bool `json:"supportedMimeTypes,omitempty"`
-	SupportsCumulativeContext       bool            `json:"supportsCumulativeContext,omitempty"`
-	SupportsEstimateTokenCounter    bool            `json:"supportsEstimateTokenCounter,omitempty"`
-	ToolFormatterType               string          `json:"toolFormatterType,omitempty"`
-	PromptTemplaterType             string          `json:"promptTemplaterType,omitempty"`
-	RequiresLeadInGeneration        bool            `json:"requiresLeadInGeneration,omitempty"`
-	RequiresNoXmlToolExamples       bool            `json:"requiresNoXmlToolExamples,omitempty"`
-	RequiresImageOutputOutsideFunctionResponses bool `json:"requiresImageOutputOutsideFunctionResponses,omitempty"`
-	AddCursorToFindReplaceTarget    bool            `json:"addCursorToFindReplaceTarget,omitempty"`
-	TabJumpPrintLineRange           bool            `json:"tabJumpPrintLineRange,omitempty"`
+	DisplayName                                 string          `json:"displayName,omitempty"`
+	QuotaInfo                                   *QuotaInfo      `json:"quotaInfo,omitempty"`
+	Recommended                                 bool            `json:"recommended,omitempty"`
+	Model                                       string          `json:"model,omitempty"`
+	APIProvider                                 string          `json:"apiProvider,omitempty"`
+	ModelProvider                               string          `json:"modelProvider,omitempty"`
+	TagTitle                                    string          `json:"tagTitle,omitempty"`
+	TokenizerType                               string          `json:"tokenizerType,omitempty"`
+	MaxTokens                                   int             `json:"maxTokens,omitempty"`
+	MaxOutputTokens                             int             `json:"maxOutputTokens,omitempty"`
+	ThinkingBudget                              int             `json:"thinkingBudget,omitempty"`
+	MinThinkingBudget                           int             `json:"minThinkingBudget,omitempty"`
+	SupportsImages                              bool            `json:"supportsImages,omitempty"`
+	SupportsThinking                            bool            `json:"supportsThinking,omitempty"`
+	SupportsVideo                               bool            `json:"supportsVideo,omitempty"`
+	IsInternal                                  bool            `json:"isInternal,omitempty"`
+	SupportedMimeTypes                          map[string]bool `json:"supportedMimeTypes,omitempty"`
+	SupportsCumulativeContext                   bool            `json:"supportsCumulativeContext,omitempty"`
+	SupportsEstimateTokenCounter                bool            `json:"supportsEstimateTokenCounter,omitempty"`
+	ToolFormatterType                           string          `json:"toolFormatterType,omitempty"`
+	PromptTemplaterType                         string          `json:"promptTemplaterType,omitempty"`
+	RequiresLeadInGeneration                    bool            `json:"requiresLeadInGeneration,omitempty"`
+	RequiresNoXmlToolExamples                   bool            `json:"requiresNoXmlToolExamples,omitempty"`
+	RequiresImageOutputOutsideFunctionResponses bool            `json:"requiresImageOutputOutsideFunctionResponses,omitempty"`
+	AddCursorToFindReplaceTarget                bool            `json:"addCursorToFindReplaceTarget,omitempty"`
+	TabJumpPrintLineRange                       bool            `json:"tabJumpPrintLineRange,omitempty"`
 }
 
 // QuotaInfo contains the remaining fraction and reset time for a model.
@@ -115,16 +115,16 @@ type CodeAssistResponse struct {
 
 // TierInfo represents subscription tier information.
 type TierInfo struct {
-	ID                                 string        `json:"id,omitempty"`
-	Name                               string        `json:"name,omitempty"`
-	Description                        string        `json:"description,omitempty"`
+	ID                                 string         `json:"id,omitempty"`
+	Name                               string         `json:"name,omitempty"`
+	Description                        string         `json:"description,omitempty"`
 	PrivacyNotice                      *PrivacyNotice `json:"privacyNotice,omitempty"`
-	UpgradeSubscriptionURI             string        `json:"upgradeSubscriptionUri,omitempty"`
-	UpgradeSubscriptionText            string        `json:"upgradeSubscriptionText,omitempty"`
-	UpgradeSubscriptionType            string        `json:"upgradeSubscriptionType,omitempty"`
-	IsDefault                          bool          `json:"isDefault,omitempty"`
-	UserDefinedCloudAICompanionProject bool          `json:"userDefinedCloudaicompanionProject,omitempty"`
-	UsesGCPTOS                         bool          `json:"usesGcpTos,omitempty"`
+	UpgradeSubscriptionURI             string         `json:"upgradeSubscriptionUri,omitempty"`
+	UpgradeSubscriptionText            string         `json:"upgradeSubscriptionText,omitempty"`
+	UpgradeSubscriptionType            string         `json:"upgradeSubscriptionType,omitempty"`
+	IsDefault                          bool           `json:"isDefault,omitempty"`
+	UserDefinedCloudAICompanionProject bool           `json:"userDefinedCloudaicompanionProject,omitempty"`
+	UsesGCPTOS                         bool           `json:"usesGcpTos,omitempty"`
 }
 
 // PrivacyNotice contains the privacy notice configuration for a tier.
