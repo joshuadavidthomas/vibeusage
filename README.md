@@ -153,10 +153,25 @@ JSON for scripting:
 vibeusage statusline --json
 ```
 
-Filter to specific providers:
+Filter to specific providers (single provider omits the label):
 
 ```bash
-vibeusage statusline -p claude           # Single provider
+vibeusage statusline -p claude
+```
+
+```bash
+5h █░░░░░░░░░ 12%  2h  7d █░░░░░░░░░ 11% 5d12h
+```
+
+```bash
+vibeusage statusline -p claude --short
+```
+
+```bash
+5h 12%  2h  7d 11% 5d12h
+```
+
+```bash
 vibeusage statusline -p claude -p codex  # Multiple providers
 vibeusage statusline --limit 1           # Only the most urgent period per provider
 ```
