@@ -289,6 +289,12 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 
 	start := time.Now()
 
+	// Fetch status concurrently with usage — best-effort, don't block on failure.
+	statusCh := make(chan models.ProviderStatus, 1)
+	go func() {
+		statusCh <- p.FetchStatus(ctx)
+	}()
+
 	strategies := p.FetchStrategies()
 	pipeCfg := pipelineConfigFromConfig(config.Get())
 
@@ -341,7 +347,10 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	}
 	logger.Debug("fetch complete", logFields...)
 
-	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached))
+	status := <-statusCh
+	opts := display.DetailOptions{Status: &status}
+
+	_, _ = fmt.Fprint(outWriter, display.RenderSingleProvider(snap, outcome.Cached, opts))
 	return nil
 }
 

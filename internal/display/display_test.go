@@ -287,7 +287,7 @@ func TestRenderSingleProvider_ContainsProviderName(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "Claude") {
 		t.Errorf("expected title-cased provider name 'Claude', got: %q", result)
 	}
@@ -299,7 +299,7 @@ func TestRenderSingleProvider_HasPanelBorder(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "╭") || !strings.Contains(result, "╰") {
 		t.Errorf("expected panel border characters, got: %q", result)
 	}
@@ -314,7 +314,7 @@ func TestRenderSingleProvider_SessionAndLongerPeriods(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "80%") {
 		t.Errorf("expected session utilization '80%%', got: %q", result)
 	}
@@ -338,7 +338,7 @@ func TestRenderSingleProvider_WithOverage(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "Extra Usage") {
 		t.Errorf("expected 'Extra Usage' for overage, got: %q", result)
 	}
@@ -362,7 +362,7 @@ func TestRenderSingleProvider_NoOverageWhenDisabled(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if strings.Contains(result, "Extra Usage") {
 		t.Errorf("should not show overage when disabled, got: %q", result)
 	}
@@ -374,7 +374,7 @@ func TestRenderSingleProvider_NoPeriods(t *testing.T) {
 		Periods:  nil,
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "Empty") {
 		t.Errorf("expected title-cased provider name, got: %q", result)
 	}
@@ -387,7 +387,7 @@ func TestRenderSingleProvider_CachedIndicator(t *testing.T) {
 		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, true)
+	result := RenderSingleProvider(snap, true, DetailOptions{})
 	if !strings.Contains(result, "2h ago") {
 		t.Errorf("expected '2h ago' age indicator for stale data, got: %q", result)
 	}
@@ -400,7 +400,7 @@ func TestRenderSingleProvider_NoAgeIndicatorWhenFresh(t *testing.T) {
 		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if strings.Contains(result, "ago") {
 		t.Errorf("should not show age indicator for fresh data, got: %q", result)
 	}
@@ -658,7 +658,7 @@ func TestRenderSingleProvider_OverageZeroLimit(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
 		Overage:  &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true},
 	}
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if strings.Contains(result, "/ $0.00") {
 		t.Errorf("should not show '/ $0.00' for zero limit overage, got: %q", result)
 	}
@@ -738,30 +738,36 @@ func TestRenderSingleProvider_DetailLayout(t *testing.T) {
 		Overage: &models.OverageUsage{Used: 5.50, Limit: 100.00, Currency: "USD", IsEnabled: true},
 	}
 
-	result := stripANSI(RenderSingleProvider(snap, false))
-
-	// Verify panel structure
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
 	lines := strings.Split(result, "\n")
-	if len(lines) < 3 {
-		t.Fatalf("expected at least 3 lines (top border + content + bottom border), got %d", len(lines))
-	}
 
-	// Top border contains title
+	// First line is the provider title above the panel
 	if !strings.Contains(lines[0], "Claude") {
-		t.Errorf("top border should contain provider name, got: %q", lines[0])
-	}
-	if !strings.HasPrefix(lines[0], "╭─") {
-		t.Errorf("top border should start with ╭─, got: %q", lines[0])
+		t.Errorf("first line should be provider title containing 'Claude', got: %q", lines[0])
 	}
 
-	// Bottom border
-	lastLine := lines[len(lines)-1]
-	if !strings.HasPrefix(lastLine, "╰") {
-		t.Errorf("bottom border should start with ╰, got: %q", lastLine)
+	// Find the Usage panel borders
+	panelStart := -1
+	panelEnd := -1
+	for i, line := range lines {
+		if strings.HasPrefix(line, "╭─") {
+			panelStart = i
+		}
+		if strings.HasPrefix(line, "╰") {
+			panelEnd = i
+		}
+	}
+	if panelStart == -1 || panelEnd == -1 {
+		t.Fatalf("expected panel borders (╭/╰), got:\n%s", result)
 	}
 
-	// Content lines should have │ borders
-	for _, line := range lines[1 : len(lines)-1] {
+	// Panel title should be "Usage"
+	if !strings.Contains(lines[panelStart], "Usage") {
+		t.Errorf("panel border should contain 'Usage' title, got: %q", lines[panelStart])
+	}
+
+	// Content lines inside the panel should have │ borders
+	for _, line := range lines[panelStart+1 : panelEnd] {
 		if !strings.HasPrefix(line, "│") || !strings.HasSuffix(line, "│") {
 			t.Errorf("content line should be bordered with │, got: %q", line)
 		}
@@ -800,15 +806,16 @@ func TestRenderSingleProvider_DetailLayout_NoPeriods(t *testing.T) {
 		Periods:  nil,
 	}
 
-	result := stripANSI(RenderSingleProvider(snap, false))
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
 	lines := strings.Split(result, "\n")
 
-	// Should still produce a valid panel (title border + empty body + bottom border)
-	if len(lines) < 2 {
-		t.Fatalf("expected at least 2 lines for empty panel, got %d", len(lines))
-	}
+	// First line is provider title
 	if !strings.Contains(lines[0], "Claude") {
-		t.Errorf("top border should contain provider name, got: %q", lines[0])
+		t.Errorf("first line should contain provider name, got: %q", lines[0])
+	}
+	// Should still have a Usage panel
+	if !strings.Contains(result, "Usage") {
+		t.Error("expected Usage panel title")
 	}
 }
 
@@ -852,7 +859,157 @@ func TestRenderProviderPanel_PanelLayout(t *testing.T) {
 	}
 }
 
-func TestRenderSingleProvider_ConsistentLineWidths(t *testing.T) {
+func TestRenderSingleProvider_WithStatus(t *testing.T) {
+	now := time.Now()
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+	opts := DetailOptions{
+		Status: &models.ProviderStatus{
+			Level:       models.StatusOperational,
+			Description: "All Systems Operational",
+			UpdatedAt:   &now,
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, opts))
+	if !strings.Contains(result, "All Systems Operational") {
+		t.Errorf("expected status description, got: %q", result)
+	}
+	if !strings.Contains(result, "●") {
+		t.Errorf("expected status symbol, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_WithStatusDegraded(t *testing.T) {
+	now := time.Now()
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+	opts := DetailOptions{
+		Status: &models.ProviderStatus{
+			Level:       models.StatusDegraded,
+			Description: "Elevated error rates",
+			UpdatedAt:   &now,
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, opts))
+	if !strings.Contains(result, "Elevated error rates") {
+		t.Errorf("expected degraded status description, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_WithIdentity(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+		Identity: &models.ProviderIdentity{Plan: "pro", Email: "user@example.com"},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "pro") {
+		t.Errorf("expected plan in identity, got: %q", result)
+	}
+	if !strings.Contains(result, "user@example.com") {
+		t.Errorf("expected email in identity, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_StatusBetweenTitleAndPanel(t *testing.T) {
+	now := time.Now()
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+	opts := DetailOptions{
+		Status: &models.ProviderStatus{
+			Level:       models.StatusOperational,
+			Description: "All Systems Operational",
+			UpdatedAt:   &now,
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, opts))
+	lines := strings.Split(result, "\n")
+
+	// Line 0: provider title
+	// Line 1: status line
+	// Line 2+: Usage panel
+	if len(lines) < 4 {
+		t.Fatalf("expected at least 4 lines (title + status + panel), got %d", len(lines))
+	}
+	if !strings.Contains(lines[0], "Claude") {
+		t.Errorf("line 0 should be provider title, got: %q", lines[0])
+	}
+	if !strings.Contains(lines[1], "●") && !strings.Contains(lines[1], "Operational") {
+		t.Errorf("line 1 should be status line, got: %q", lines[1])
+	}
+	if !strings.HasPrefix(lines[2], "╭") {
+		t.Errorf("line 2 should start Usage panel, got: %q", lines[2])
+	}
+}
+
+// identitySummary tests
+
+func TestIdentitySummary(t *testing.T) {
+	tests := []struct {
+		name string
+		id   *models.ProviderIdentity
+		want string
+	}{
+		{"plan only", &models.ProviderIdentity{Plan: "pro"}, "pro"},
+		{"email only", &models.ProviderIdentity{Email: "user@example.com"}, "user@example.com"},
+		{"plan and email", &models.ProviderIdentity{Plan: "pro", Email: "user@example.com"}, "pro · user@example.com"},
+		{"all fields", &models.ProviderIdentity{Plan: "pro", Organization: "Acme", Email: "user@example.com"}, "pro · Acme · user@example.com"},
+		{"empty", &models.ProviderIdentity{}, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := identitySummary(tt.id)
+			if got != tt.want {
+				t.Errorf("identitySummary() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// renderStatusLine tests
+
+func TestRenderStatusLine_Operational(t *testing.T) {
+	now := time.Now()
+	status := models.ProviderStatus{
+		Level:       models.StatusOperational,
+		Description: "All Systems Operational",
+		UpdatedAt:   &now,
+	}
+	result := stripANSI(renderStatusLine(status))
+	if !strings.Contains(result, "●") {
+		t.Error("expected operational symbol ●")
+	}
+	if !strings.Contains(result, "All Systems Operational") {
+		t.Error("expected status description")
+	}
+	if !strings.Contains(result, "just now") {
+		t.Error("expected time indicator")
+	}
+}
+
+func TestRenderStatusLine_NoDescription(t *testing.T) {
+	status := models.ProviderStatus{
+		Level: models.StatusDegraded,
+	}
+	result := stripANSI(renderStatusLine(status))
+	// Should fall back to level name
+	if !strings.Contains(result, "degraded") {
+		t.Errorf("expected level name as fallback, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_ConsistentPanelLineWidths(t *testing.T) {
 	reset := time.Now().Add(3 * time.Hour)
 	snap := models.UsageSnapshot{
 		Provider: "claude",
@@ -863,11 +1020,28 @@ func TestRenderSingleProvider_ConsistentLineWidths(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	lines := strings.Split(result, "\n")
 
+	// Find panel lines (between ╭ and ╰ inclusive)
+	panelStart := -1
+	panelEnd := -1
+	for i, line := range lines {
+		stripped := stripANSI(line)
+		if strings.HasPrefix(stripped, "╭") {
+			panelStart = i
+		}
+		if strings.HasPrefix(stripped, "╰") {
+			panelEnd = i
+		}
+	}
+	if panelStart == -1 || panelEnd == -1 {
+		t.Fatal("expected panel borders")
+	}
+
+	// All panel lines should be the same visual width
 	widths := make(map[int]bool)
-	for _, line := range lines {
+	for _, line := range lines[panelStart : panelEnd+1] {
 		widths[lipgloss.Width(line)] = true
 	}
 	if len(widths) > 1 {

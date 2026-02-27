@@ -116,9 +116,74 @@ func formatOverageLine(o *models.OverageUsage, label string) string {
 	return fmt.Sprintf("%s: %s%.2f %s", label, sym, o.Used, o.Currency)
 }
 
-// RenderSingleProvider renders a single provider in expanded detail format,
-// wrapped in the same titled panel used by the multi-provider overview.
-func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
+// DetailOptions configures the single-provider detail view.
+type DetailOptions struct {
+	// Status is the provider's health status, fetched separately.
+	Status *models.ProviderStatus
+}
+
+// RenderSingleProvider renders a single provider in expanded detail format
+// with a provider title above a "Usage" panel, plus optional status info.
+func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, opts DetailOptions) string {
+	var out strings.Builder
+
+	// Provider title above the card
+	providerTitle := titleStyle.Render(provider.DisplayName(snapshot.Provider))
+	if cached {
+		providerTitle += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
+	}
+	if snapshot.Identity != nil {
+		parts := identitySummary(snapshot.Identity)
+		if parts != "" {
+			providerTitle += dimStyle.Render("  " + parts)
+		}
+	}
+	out.WriteString(providerTitle)
+	out.WriteByte('\n')
+
+	// Status line between title and usage card
+	if opts.Status != nil {
+		out.WriteString(renderStatusLine(*opts.Status))
+		out.WriteByte('\n')
+	}
+
+	// Usage panel
+	out.WriteString(renderUsagePanel(snapshot))
+
+	return out.String()
+}
+
+// identitySummary returns a compact string from provider identity fields.
+func identitySummary(id *models.ProviderIdentity) string {
+	var parts []string
+	if id.Plan != "" {
+		parts = append(parts, id.Plan)
+	}
+	if id.Organization != "" {
+		parts = append(parts, id.Organization)
+	}
+	if id.Email != "" {
+		parts = append(parts, id.Email)
+	}
+	return strings.Join(parts, " · ")
+}
+
+// renderStatusLine renders a compact status indicator line.
+func renderStatusLine(status models.ProviderStatus) string {
+	sym := StatusSymbol(status.Level, false)
+	desc := string(status.Level)
+	if status.Description != "" {
+		desc = status.Description
+	}
+	line := sym + " " + desc
+	if status.UpdatedAt != nil {
+		line += dimStyle.Render("  " + FormatStatusUpdated(status.UpdatedAt))
+	}
+	return line
+}
+
+// renderUsagePanel renders the usage data inside a titled "Usage" panel.
+func renderUsagePanel(snapshot models.UsageSnapshot) string {
 	var b strings.Builder
 
 	// Group periods
@@ -157,13 +222,7 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 		b.WriteString(formatOverageLine(snapshot.Overage, "Extra Usage"))
 	}
 
-	// Wrap in titled panel
-	title := titleStyle.Render(provider.DisplayName(snapshot.Provider))
-	if cached {
-		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
-	}
-
-	return renderTitledPanel(title, b.String())
+	return renderTitledPanel(titleStyle.Render("Usage"), b.String())
 }
 
 // PeriodColWidths holds pre-computed column widths for renderPeriodTable.
