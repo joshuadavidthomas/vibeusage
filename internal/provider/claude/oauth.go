@@ -21,6 +21,7 @@ import (
 
 const (
 	oauthUsageURL        = "https://api.anthropic.com/api/oauth/usage"
+	oauthAccountURL      = "https://api.anthropic.com/api/oauth/account"
 	oauthTokenURL        = "https://api.anthropic.com/oauth/token"
 	anthropicBetaTag     = "oauth-2025-04-20"
 	claudeKeychainSecret = "Claude Code-credentials"
@@ -64,29 +65,68 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	client := httpclient.NewFromConfig(s.HTTPTimeout)
-	var usageResp OAuthUsageResponse
-	resp, err := client.GetJSONCtx(ctx, oauthUsageURL, &usageResp,
+	authOpts := []httpclient.RequestOption{
 		httpclient.WithBearer(creds.AccessToken),
 		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
-	)
-	if err != nil {
-		return fetch.ResultFail("Request failed: " + err.Error()), nil
 	}
 
-	if resp.StatusCode == 401 {
+	// Fetch usage and account concurrently. Account enrichment is
+	// best-effort — failures are silently ignored.
+	type usageOutcome struct {
+		resp    OAuthUsageResponse
+		status  int
+		jsonErr error
+		err     error
+	}
+	type accountOutcome struct {
+		resp *OAuthAccountResponse
+	}
+
+	usageCh := make(chan usageOutcome, 1)
+	accountCh := make(chan accountOutcome, 1)
+
+	go func() {
+		var usageResp OAuthUsageResponse
+		resp, err := client.GetJSONCtx(ctx, oauthUsageURL, &usageResp, authOpts...)
+		if err != nil {
+			usageCh <- usageOutcome{err: err}
+			return
+		}
+		usageCh <- usageOutcome{resp: usageResp, status: resp.StatusCode, jsonErr: resp.JSONErr}
+	}()
+
+	go func() {
+		var acctResp OAuthAccountResponse
+		resp, err := client.GetJSONCtx(ctx, oauthAccountURL, &acctResp, authOpts...)
+		if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
+			accountCh <- accountOutcome{}
+			return
+		}
+		accountCh <- accountOutcome{resp: &acctResp}
+	}()
+
+	usage := <-usageCh
+	account := <-accountCh
+
+	if usage.err != nil {
+		return fetch.ResultFail("Request failed: " + usage.err.Error()), nil
+	}
+	if usage.status == 401 {
 		return fetch.ResultFatal("OAuth token expired or invalid. Re-authenticate with the Claude CLI."), nil
 	}
-	if resp.StatusCode == 403 {
+	if usage.status == 403 {
 		return fetch.ResultFatal("Not authorized to access usage."), nil
 	}
-	if resp.StatusCode != 200 {
-		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
+	if usage.status != 200 {
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", usage.status)), nil
 	}
-	if resp.JSONErr != nil {
-		return fetch.ResultFail(fmt.Sprintf("Invalid response from usage endpoint: %v", resp.JSONErr)), nil
+	if usage.jsonErr != nil {
+		return fetch.ResultFail(fmt.Sprintf("Invalid response from usage endpoint: %v", usage.jsonErr)), nil
 	}
 
-	snapshot := s.parseOAuthUsageResponse(usageResp)
+	snapshot := s.parseOAuthUsageResponse(usage.resp)
+
+	enrichWithAccount(snapshot, account.resp)
 
 	return fetch.ResultOK(*snapshot), nil
 }

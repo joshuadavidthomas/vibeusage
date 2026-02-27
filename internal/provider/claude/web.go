@@ -36,38 +36,80 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 	client := httpclient.NewFromConfig(s.HTTPTimeout)
 	sessionCookie := httpclient.WithCookie("sessionKey", sessionKey)
+	orgBase := webBaseURL + "/" + orgID
 
-	// Fetch usage — the web endpoint now returns the same format as
-	// the OAuth endpoint (five_hour, seven_day, per-model breakdowns).
-	usageURL := webBaseURL + "/" + orgID + "/usage"
-	var usageResp OAuthUsageResponse
-	resp, err := client.GetJSONCtx(ctx, usageURL, &usageResp, sessionCookie)
-	if err != nil {
-		return fetch.ResultFail("Request failed: " + err.Error()), nil
+	// Fetch usage, overage, and prepaid credits concurrently.
+	// Overage and credits are best-effort — failures are silently ignored.
+	type usageOutcome struct {
+		resp    OAuthUsageResponse
+		status  int
+		jsonErr error
+		err     error
+	}
+	type overageOutcome struct {
+		overage *models.OverageUsage
+	}
+	type creditsOutcome struct {
+		credits *WebPrepaidCreditsResponse
 	}
 
-	if resp.StatusCode == 401 {
+	usageCh := make(chan usageOutcome, 1)
+	overageCh := make(chan overageOutcome, 1)
+	creditsCh := make(chan creditsOutcome, 1)
+
+	go func() {
+		var usageResp OAuthUsageResponse
+		resp, err := client.GetJSONCtx(ctx, orgBase+"/usage", &usageResp, sessionCookie)
+		if err != nil {
+			usageCh <- usageOutcome{err: err}
+			return
+		}
+		usageCh <- usageOutcome{resp: usageResp, status: resp.StatusCode, jsonErr: resp.JSONErr}
+	}()
+
+	go func() {
+		var overageResp WebOverageResponse
+		resp, err := client.GetJSONCtx(ctx, orgBase+"/overage_spend_limit", &overageResp, sessionCookie)
+		if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
+			overageCh <- overageOutcome{}
+			return
+		}
+		overageCh <- overageOutcome{overage: overageResp.ToOverageUsage()}
+	}()
+
+	go func() {
+		var creditsResp WebPrepaidCreditsResponse
+		resp, err := client.GetJSONCtx(ctx, orgBase+"/prepaid/credits", &creditsResp, sessionCookie)
+		if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
+			creditsCh <- creditsOutcome{}
+			return
+		}
+		creditsCh <- creditsOutcome{credits: &creditsResp}
+	}()
+
+	usage := <-usageCh
+	overage := <-overageCh
+	credits := <-creditsCh
+
+	if usage.err != nil {
+		return fetch.ResultFail("Request failed: " + usage.err.Error()), nil
+	}
+	if usage.status == 401 {
 		return fetch.ResultFatal("Session key expired or invalid"), nil
 	}
-	if resp.StatusCode != 200 {
-		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
+	if usage.status != 200 {
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", usage.status)), nil
 	}
-	if resp.JSONErr != nil {
-		return fetch.ResultFail(fmt.Sprintf("Invalid usage response: %v", resp.JSONErr)), nil
-	}
-
-	// Fetch overage from separate endpoint as fallback — the web
-	// endpoint may return extra_usage as null even when the OAuth
-	// endpoint populates it.
-	var overage *models.OverageUsage
-	overageURL := webBaseURL + "/" + orgID + "/overage_spend_limit"
-	var overageResp WebOverageResponse
-	oResp, err := client.GetJSONCtx(ctx, overageURL, &overageResp, sessionCookie)
-	if err == nil && oResp.StatusCode == 200 && oResp.JSONErr == nil {
-		overage = overageResp.ToOverageUsage()
+	if usage.jsonErr != nil {
+		return fetch.ResultFail(fmt.Sprintf("Invalid usage response: %v", usage.jsonErr)), nil
 	}
 
-	snapshot := parseUsageResponse(usageResp, "web", overage)
+	snapshot := parseUsageResponse(usage.resp, "web", overage.overage)
+
+	if credits.credits != nil {
+		snapshot.Billing = credits.credits.ToBillingDetail()
+	}
+
 	return fetch.ResultOK(*snapshot), nil
 }
 

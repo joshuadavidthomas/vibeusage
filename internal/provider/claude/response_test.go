@@ -419,3 +419,164 @@ func TestClaudeCLICredentials_NilOAuth(t *testing.T) {
 		t.Error("expected claudeAiOauth to be nil")
 	}
 }
+
+func TestOAuthAccountResponse_UnmarshalFull(t *testing.T) {
+	raw := `{
+		"email_address": "user@example.com",
+		"memberships": [
+			{
+				"organization": {
+					"name": "Personal",
+					"rate_limit_tier": "default_claude_max_20x",
+					"capabilities": ["chat", "claude_max"],
+					"billing_type": "stripe_subscription"
+				}
+			}
+		]
+	}`
+
+	var resp OAuthAccountResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.EmailAddress != "user@example.com" {
+		t.Errorf("email_address = %q, want %q", resp.EmailAddress, "user@example.com")
+	}
+	if len(resp.Memberships) != 1 {
+		t.Fatalf("len(memberships) = %d, want 1", len(resp.Memberships))
+	}
+
+	org := resp.Memberships[0].Organization
+	if org.Name != "Personal" {
+		t.Errorf("org.name = %q, want %q", org.Name, "Personal")
+	}
+	if org.RateLimitTier != "default_claude_max_20x" {
+		t.Errorf("org.rate_limit_tier = %q, want %q", org.RateLimitTier, "default_claude_max_20x")
+	}
+	if len(org.Capabilities) != 2 {
+		t.Fatalf("len(org.capabilities) = %d, want 2", len(org.Capabilities))
+	}
+	if !org.HasCapability("claude_max") {
+		t.Error("expected org to have claude_max capability")
+	}
+	if org.BillingType != "stripe_subscription" {
+		t.Errorf("org.billing_type = %q, want %q", org.BillingType, "stripe_subscription")
+	}
+}
+
+func TestOAuthAccountResponse_UnmarshalMinimal(t *testing.T) {
+	raw := `{"email_address": "user@example.com", "memberships": []}`
+
+	var resp OAuthAccountResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.EmailAddress != "user@example.com" {
+		t.Errorf("email_address = %q, want %q", resp.EmailAddress, "user@example.com")
+	}
+	if len(resp.Memberships) != 0 {
+		t.Errorf("len(memberships) = %d, want 0", len(resp.Memberships))
+	}
+}
+
+func TestOAuthAccountOrganization_HasCapability(t *testing.T) {
+	org := OAuthAccountOrganization{
+		Capabilities: []string{"chat", "claude_max", "billing"},
+	}
+
+	if !org.HasCapability("chat") {
+		t.Error("expected HasCapability(chat) to be true")
+	}
+	if !org.HasCapability("claude_max") {
+		t.Error("expected HasCapability(claude_max) to be true")
+	}
+	if org.HasCapability("admin") {
+		t.Error("expected HasCapability(admin) to be false")
+	}
+}
+
+func TestWebPrepaidCreditsResponse_Unmarshal(t *testing.T) {
+	raw := `{"amount": -27, "currency": "USD", "auto_reload_settings": null}`
+
+	var resp WebPrepaidCreditsResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.Amount != -27 {
+		t.Errorf("amount = %d, want -27", resp.Amount)
+	}
+	if resp.Currency != "USD" {
+		t.Errorf("currency = %q, want %q", resp.Currency, "USD")
+	}
+	if resp.IsAutoReloadEnabled() {
+		t.Error("expected auto-reload to be disabled for null settings")
+	}
+}
+
+func TestWebPrepaidCreditsResponse_UnmarshalWithAutoReload(t *testing.T) {
+	raw := `{"amount": 500, "currency": "USD", "auto_reload_settings": {"threshold": 100}}`
+
+	var resp WebPrepaidCreditsResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.Amount != 500 {
+		t.Errorf("amount = %d, want 500", resp.Amount)
+	}
+	if !resp.IsAutoReloadEnabled() {
+		t.Error("expected auto-reload to be enabled for non-null settings")
+	}
+}
+
+func TestWebPrepaidCreditsResponse_ToBillingDetail(t *testing.T) {
+	tests := []struct {
+		name           string
+		resp           WebPrepaidCreditsResponse
+		wantBalance    float64
+		wantAutoReload bool
+	}{
+		{
+			name:           "negative balance no auto-reload",
+			resp:           WebPrepaidCreditsResponse{Amount: -27, Currency: "USD"},
+			wantBalance:    -0.27,
+			wantAutoReload: false,
+		},
+		{
+			name:           "positive balance with auto-reload",
+			resp:           WebPrepaidCreditsResponse{Amount: 500, Currency: "USD", AutoReloadSettings: []byte(`{"threshold": 100}`)},
+			wantBalance:    5.00,
+			wantAutoReload: true,
+		},
+		{
+			name:           "zero balance",
+			resp:           WebPrepaidCreditsResponse{Amount: 0, Currency: "USD"},
+			wantBalance:    0.0,
+			wantAutoReload: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detail := tt.resp.ToBillingDetail()
+			if detail == nil {
+				t.Fatal("ToBillingDetail() = nil, want non-nil")
+			}
+			if detail.Balance == nil {
+				t.Fatal("Balance = nil, want non-nil")
+			}
+			if *detail.Balance != tt.wantBalance {
+				t.Errorf("Balance = %v, want %v", *detail.Balance, tt.wantBalance)
+			}
+			if detail.AutoReload == nil {
+				t.Fatal("AutoReload = nil, want non-nil")
+			}
+			if *detail.AutoReload != tt.wantAutoReload {
+				t.Errorf("AutoReload = %v, want %v", *detail.AutoReload, tt.wantAutoReload)
+			}
+		})
+	}
+}

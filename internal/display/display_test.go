@@ -917,10 +917,10 @@ func TestRenderSingleProvider_WithIdentity(t *testing.T) {
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
-	if !strings.Contains(result, "Plan pro") {
+	if !strings.Contains(result, "Plan") || !strings.Contains(result, "pro") {
 		t.Errorf("expected labeled plan, got: %q", result)
 	}
-	if !strings.Contains(result, "Account user@example.com") {
+	if !strings.Contains(result, "Account") || !strings.Contains(result, "user@example.com") {
 		t.Errorf("expected labeled email, got: %q", result)
 	}
 }
@@ -933,7 +933,7 @@ func TestRenderSingleProvider_WithSource(t *testing.T) {
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
-	if !strings.Contains(result, "Auth OAuth") {
+	if !strings.Contains(result, "Auth") || !strings.Contains(result, "OAuth") {
 		t.Errorf("expected labeled source 'Auth OAuth', got: %q", result)
 	}
 }
@@ -1005,7 +1005,7 @@ func TestRenderMetaLine(t *testing.T) {
 			models.UsageSnapshot{
 				Identity: &models.ProviderIdentity{Plan: "Pro", Organization: "Acme", Email: "user@example.com"},
 			},
-			[]string{"Plan Pro\nOrg Acme\nAccount user@example.com"},
+			[]string{"Plan", "Pro", "Org", "Acme", "Account", "user@example.com"},
 			false,
 		},
 		{
@@ -1037,6 +1037,30 @@ func TestRenderMetaLine(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRenderMetaLine_ColumnAlignment(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Identity: &models.ProviderIdentity{Plan: "Pro", Organization: "Acme", Email: "user@example.com"},
+		Source:   "oauth",
+	}
+	got := stripANSI(renderMetaLine(snap))
+	lines := strings.Split(got, "\n")
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 lines, got %d: %q", len(lines), got)
+	}
+	// Longest label is "Account" (7) + 2 gap spaces = values start at column 9
+	values := []string{"Pro", "Acme", "user@example.com", "OAuth"}
+	for i, line := range lines {
+		idx := strings.Index(line, values[i])
+		if idx < 0 {
+			t.Errorf("line %d missing value %q: %q", i, values[i], line)
+			continue
+		}
+		if idx != 9 {
+			t.Errorf("line %d value %q at column %d, want 9:\n%s", i, values[i], idx, got)
+		}
 	}
 }
 

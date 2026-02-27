@@ -115,6 +115,45 @@ func formatOverageLine(o *models.OverageUsage, label string) string {
 	return fmt.Sprintf("%s: %s%.2f %s (Unlimited)", label, sym, o.Used, o.Currency)
 }
 
+// formatBillingDetail renders a compact sub-line with supplemental billing
+// info (reset date, prepaid balance, auto-reload). Returns empty string when
+// no billing details are available.
+func formatBillingDetail(snapshot models.UsageSnapshot) string {
+	var parts []string
+
+	// Reset date from the monthly period (billing cycle reset)
+	for _, p := range snapshot.Periods {
+		if p.PeriodType == models.PeriodMonthly && p.ResetsAt != nil {
+			parts = append(parts, "Resets "+p.ResetsAt.Format("Jan 2"))
+			break
+		}
+	}
+
+	if snapshot.Billing != nil {
+		if snapshot.Billing.Balance != nil {
+			sym := "$"
+			bal := *snapshot.Billing.Balance
+			if bal < 0 {
+				parts = append(parts, fmt.Sprintf("Balance: -%s%.2f", sym, -bal))
+			} else {
+				parts = append(parts, fmt.Sprintf("Balance: %s%.2f", sym, bal))
+			}
+		}
+		if snapshot.Billing.AutoReload != nil {
+			status := "Off"
+			if *snapshot.Billing.AutoReload {
+				status = "On"
+			}
+			parts = append(parts, "Auto-reload: "+status)
+		}
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return dimStyle.Render("  " + strings.Join(parts, " · "))
+}
+
 // DetailOptions configures the single-provider detail view.
 type DetailOptions struct {
 	// Status is the provider's health status, fetched separately.
@@ -183,9 +222,15 @@ func renderMetaLine(snapshot models.UsageSnapshot) string {
 		return ""
 	}
 
+	maxLabel := 0
+	for _, f := range fields {
+		maxLabel = max(maxLabel, len(f.label))
+	}
+
 	lines := make([]string, len(fields))
 	for i, f := range fields {
-		lines[i] = dimStyle.Render(f.label) + " " + f.value
+		pad := strings.Repeat(" ", maxLabel-len(f.label))
+		lines[i] = dimStyle.Render(f.label) + pad + "  " + f.value
 	}
 	return strings.Join(lines, "\n")
 }
@@ -254,10 +299,14 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 		}
 	}
 
-	// Overage
+	// Overage and billing details
 	if snapshot.Overage != nil && snapshot.Overage.IsEnabled {
 		b.WriteString("\n\n")
 		b.WriteString(formatOverageLine(snapshot.Overage, "Extra Usage"))
+		if detail := formatBillingDetail(snapshot); detail != "" {
+			b.WriteByte('\n')
+			b.WriteString(detail)
+		}
 	}
 
 	return renderTitledPanel(titleStyle.Render("Usage"), b.String(), 0)
