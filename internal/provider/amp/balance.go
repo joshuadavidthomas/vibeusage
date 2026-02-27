@@ -80,7 +80,7 @@ func fetchBalance(ctx context.Context, token string, source string, httpTimeout 
 }
 
 var (
-	quotaPattern   = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)`)
+	quotaPattern   = regexp.MustCompile(`(?i)(?:([A-Za-z][A-Za-z ]*?):\s*)?\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)`)
 	hourlyPattern  = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*hour`)
 	creditsPattern = regexp.MustCompile(`(?i)(?:bonus\s+)?credits?:\s*\$([0-9]+(?:\.[0-9]+)?)`)
 	signedInPattern = regexp.MustCompile(`(?i)signed in as\s+(\S+@\S+)\s+\((\w+)\)`)
@@ -95,12 +95,12 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 	periods := make([]models.UsagePeriod, 0, 1)
 
 	quotaMatch := quotaPattern.FindStringSubmatch(text)
-	if len(quotaMatch) == 3 {
-		remaining, err := strconv.ParseFloat(quotaMatch[1], 64)
+	if len(quotaMatch) == 4 {
+		remaining, err := strconv.ParseFloat(quotaMatch[2], 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse remaining quota: %w", err)
 		}
-		total, err := strconv.ParseFloat(quotaMatch[2], 64)
+		total, err := strconv.ParseFloat(quotaMatch[3], 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse total quota: %w", err)
 		}
@@ -120,8 +120,13 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 			}
 		}
 
+		name := strings.TrimSpace(quotaMatch[1])
+		if name == "" {
+			name = "Daily Free Quota"
+		}
+
 		period := models.UsagePeriod{
-			Name:        "Daily Free Quota",
+			Name:        name,
 			Utilization: utilization,
 			PeriodType:  models.PeriodDaily,
 		}

@@ -18,6 +18,9 @@ func TestParseDisplayBalance_FreeTier(t *testing.T) {
 	if len(snapshot.Periods) != 1 {
 		t.Fatalf("period count = %d, want 1", len(snapshot.Periods))
 	}
+	if snapshot.Periods[0].Name != "Free quota" {
+		t.Errorf("name = %q, want %q", snapshot.Periods[0].Name, "Free quota")
+	}
 	if snapshot.Periods[0].Utilization != 40 {
 		t.Errorf("utilization = %d, want 40", snapshot.Periods[0].Utilization)
 	}
@@ -43,6 +46,9 @@ func TestParseDisplayBalance_MultilineWithIdentity(t *testing.T) {
 	}
 	if len(snapshot.Periods) != 1 {
 		t.Fatalf("period count = %d, want 1", len(snapshot.Periods))
+	}
+	if snapshot.Periods[0].Name != "Amp Free" {
+		t.Errorf("name = %q, want %q", snapshot.Periods[0].Name, "Amp Free")
 	}
 	if snapshot.Periods[0].Utilization != 0 {
 		t.Errorf("utilization = %d, want 0", snapshot.Periods[0].Utilization)
@@ -83,6 +89,9 @@ func TestParseDisplayBalance_BonusText(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseDisplayBalance() error = %v", err)
 	}
+	if snapshot.Periods[0].Name != "Free quota" {
+		t.Errorf("name = %q, want %q", snapshot.Periods[0].Name, "Free quota")
+	}
 	if snapshot.Periods[0].Utilization != 75 {
 		t.Errorf("utilization = %d, want 75", snapshot.Periods[0].Utilization)
 	}
@@ -94,6 +103,18 @@ func TestParseDisplayBalance_BonusText(t *testing.T) {
 	}
 	if snapshot.Overage != nil {
 		t.Error("credits should not be stored as overage")
+	}
+}
+
+func TestParseDisplayBalance_NoLabel(t *testing.T) {
+	result := balanceResult{DisplayText: "$5.00 / $10.00"}
+
+	snapshot, err := parseDisplayBalance(result, "provider_cli")
+	if err != nil {
+		t.Fatalf("parseDisplayBalance() error = %v", err)
+	}
+	if snapshot.Periods[0].Name != "Daily Free Quota" {
+		t.Errorf("name = %q, want fallback %q", snapshot.Periods[0].Name, "Daily Free Quota")
 	}
 }
 
