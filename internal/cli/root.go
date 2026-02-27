@@ -301,9 +301,9 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	var outcome fetch.FetchOutcome
 
 	if display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
-		err := display.SpinnerRun([]string{providerID}, func(onComplete func(display.CompletionInfo)) {
+		err := display.SpinnerRun([]string{"fetching"}, func(onComplete func(display.CompletionInfo)) {
 			outcome = fetch.ExecutePipeline(ctx, providerID, strategies, !noCache, pipeCfg)
-			onComplete(outcomeToCompletion(outcome))
+			onComplete(display.CompletionInfo{ProviderID: "fetching", Success: outcome.Success, Error: outcome.Error})
 		})
 		if err != nil {
 			return fmt.Errorf("spinner error: %w", err)
