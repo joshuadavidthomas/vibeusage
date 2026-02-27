@@ -80,9 +80,9 @@ func fetchBalance(ctx context.Context, token string, source string, httpTimeout 
 }
 
 var (
-	quotaPattern   = regexp.MustCompile(`(?i)(?:([A-Za-z][A-Za-z ]*?):\s*)?\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)`)
-	hourlyPattern  = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*hour`)
-	creditsPattern = regexp.MustCompile(`(?i)(?:bonus\s+)?credits?:\s*\$([0-9]+(?:\.[0-9]+)?)`)
+	quotaPattern    = regexp.MustCompile(`(?i)(?:([A-Za-z][A-Za-z ]*?):\s*)?\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)`)
+	hourlyPattern   = regexp.MustCompile(`(?i)\$([0-9]+(?:\.[0-9]+)?)\s*/\s*hour`)
+	creditsPattern  = regexp.MustCompile(`(?i)(?:bonus\s+)?credits?:\s*\$([0-9]+(?:\.[0-9]+)?)`)
 	signedInPattern = regexp.MustCompile(`(?i)signed in as\s+(\S+@\S+)\s+\((\w+)\)`)
 )
 

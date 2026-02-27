@@ -380,7 +380,6 @@ func TestRenderProviderPanel_RenamesWeeklyDaily(t *testing.T) {
 	}
 }
 
-
 func TestRenderProviderPanel_PreservesBrandedName(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider: "amp",
