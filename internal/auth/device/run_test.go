@@ -1,4 +1,4 @@
-package deviceflow
+package device
 
 import (
 	"encoding/json"

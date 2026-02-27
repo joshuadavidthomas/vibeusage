@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/google"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
 const (
@@ -58,7 +58,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := googleauth.RefreshToken(ctx, creds, googleauth.RefreshConfig{
+		refreshed := google.RefreshToken(ctx, creds, google.RefreshConfig{
 			ClientID:     geminiClientID,
 			ClientSecret: geminiClientSecret,
 			ProviderID:   "gemini",
@@ -127,7 +127,7 @@ func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) 
 	} else if qResp.StatusCode == 401 || qResp.StatusCode == 403 {
 		quotaErr = fetchError{message: fmt.Sprintf("HTTP %d", qResp.StatusCode), authFailed: true}
 	} else if qResp.StatusCode != 200 {
-		quotaErr = fetchError{message: fmt.Sprintf("HTTP %d: %s", qResp.StatusCode, googleauth.ExtractAPIError(qResp.Body))}
+		quotaErr = fetchError{message: fmt.Sprintf("HTTP %d: %s", qResp.StatusCode, google.ExtractAPIError(qResp.Body))}
 	} else if qResp.JSONErr != nil {
 		quotaErr = fetchError{message: fmt.Sprintf("invalid response: %v", qResp.JSONErr)}
 	} else {

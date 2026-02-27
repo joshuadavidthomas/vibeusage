@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 func TestUsageResponse_UnmarshalFullResponse(t *testing.T) {

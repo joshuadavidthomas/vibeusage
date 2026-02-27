@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/google"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
 type Antigravity struct{}
@@ -119,7 +119,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := googleauth.RefreshToken(ctx, creds, googleauth.RefreshConfig{
+		refreshed := google.RefreshToken(ctx, creds, google.RefreshConfig{
 			ClientID:     antigravityClientID,
 			ClientSecret: antigravityClientSecret,
 			ProviderID:   "antigravity",
@@ -255,7 +255,7 @@ func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) 
 	} else if mResp.StatusCode == 401 || mResp.StatusCode == 403 {
 		modelsErr = fetchError{message: fmt.Sprintf("HTTP %d", mResp.StatusCode), authFailed: true}
 	} else if mResp.StatusCode != 200 {
-		modelsErr = fetchError{message: fmt.Sprintf("HTTP %d: %s", mResp.StatusCode, googleauth.ExtractAPIError(mResp.Body))}
+		modelsErr = fetchError{message: fmt.Sprintf("HTTP %d: %s", mResp.StatusCode, google.ExtractAPIError(mResp.Body))}
 	} else if mResp.JSONErr != nil {
 		modelsErr = fetchError{message: fmt.Sprintf("invalid response: %v", mResp.JSONErr)}
 	} else {

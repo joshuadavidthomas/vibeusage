@@ -13,8 +13,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/device"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
-	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/prompt"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
@@ -303,7 +303,7 @@ func authProvider(providerID string, p provider.Provider) error {
 	switch f := flow.(type) {
 	case provider.DeviceAuthFlow:
 		var success bool
-		success, err = deviceflow.Run(outWriter, quiet, f.Config)
+		success, err = device.Run(outWriter, quiet, f.Config)
 		if err == nil && !success {
 			err = fmt.Errorf("authentication failed")
 		}

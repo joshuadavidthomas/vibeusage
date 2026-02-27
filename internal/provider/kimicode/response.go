@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 // UsageResponse represents the response from the Kimi usage API endpoint.

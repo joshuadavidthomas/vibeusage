@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/device"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/google"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
-	"github.com/joshuadavidthomas/vibeusage/internal/deviceflow"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 )
 
 // Scopes needed for the Antigravity quota and user-info APIs.
@@ -81,15 +81,15 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 	)
 
 	if !quiet {
-		deviceflow.WriteOpening(w, authURL)
-		deviceflow.WriteWaiting(w)
+		device.WriteOpening(w, authURL)
+		device.WriteWaiting(w)
 	} else {
 		_, _ = fmt.Fprintln(w, authURL)
 	}
 
-	deviceflow.OpenBrowser(authURL)
+	device.OpenBrowser(authURL)
 
-	ctx, cancel := deviceflow.PollContext()
+	ctx, cancel := device.PollContext()
 	defer cancel()
 
 	// Wait for the callback or timeout/interrupt.
@@ -104,7 +104,7 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 		return exchangeCode(w, result.code, redirectURI, quiet)
 	case <-ctx.Done():
 		if !quiet {
-			deviceflow.WriteTimeout(w)
+			device.WriteTimeout(w)
 		}
 		return false, nil
 	}
@@ -114,8 +114,8 @@ func RunAuthFlow(w io.Writer, quiet bool) (bool, error) {
 func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, error) {
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 
-	var tokenResp googleauth.TokenResponse
-	resp, err := client.PostForm(googleauth.TokenURL,
+	var tokenResp google.TokenResponse
+	resp, err := client.PostForm(google.TokenURL,
 		map[string]string{
 			"grant_type":    "authorization_code",
 			"code":          code,
@@ -129,7 +129,7 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 		return false, fmt.Errorf("token exchange failed: %w", err)
 	}
 	if resp.StatusCode != 200 {
-		return false, fmt.Errorf("token exchange failed: HTTP %d: %s", resp.StatusCode, googleauth.ExtractAPIError(resp.Body))
+		return false, fmt.Errorf("token exchange failed: HTTP %d: %s", resp.StatusCode, google.ExtractAPIError(resp.Body))
 	}
 	if resp.JSONErr != nil {
 		return false, fmt.Errorf("invalid token response: %w", resp.JSONErr)
@@ -152,7 +152,7 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 	}
 
 	if !quiet {
-		deviceflow.WriteSuccess(w)
+		device.WriteSuccess(w)
 		if tokenResp.RefreshToken != "" {
 			_, _ = fmt.Fprintln(w, "  Token will refresh automatically — no need to open the IDE.")
 		}

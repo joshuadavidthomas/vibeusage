@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
 )
 
 const (

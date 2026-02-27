@@ -4,9 +4,9 @@ import (
 	"encoding/base64"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/google"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider/googleauth"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -114,7 +114,7 @@ func (a *AntigravityCredentials) ToOAuthCredentials() *oauth.Credentials {
 		ExpiresAt:    a.ExpiresAt,
 	}
 	if creds.ExpiresAt == "" {
-		creds.ExpiresAt = googleauth.ParseExpiryDate(a.ExpiryDate)
+		creds.ExpiresAt = google.ParseExpiryDate(a.ExpiryDate)
 	}
 	return creds
 }

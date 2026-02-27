@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 )
 
 // UsageResponse represents the response from the Codex/ChatGPT usage endpoint.

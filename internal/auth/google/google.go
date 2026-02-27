@@ -1,13 +1,13 @@
 // Package googleauth provides shared Google OAuth types and helpers
 // used by both the Gemini and Antigravity providers.
-package googleauth
+package google
 
 import (
 	"context"
 	"encoding/json"
 	"time"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 )
 
 const TokenURL = "https://oauth2.googleapis.com/token"
