@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -112,7 +114,10 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	if creds.NeedsRefresh() {
 		refreshed := s.refreshToken(ctx, creds)
 		if refreshed == nil {
-			return fetch.ResultFail("Failed to refresh token"), nil
+			refreshed = s.tryRefreshViaCLI(ctx)
+		}
+		if refreshed == nil {
+			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with `codex login`."), nil
 		}
 		creds = refreshed
 	}
@@ -127,7 +132,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if resp.StatusCode == 401 {
-		return fetch.ResultFatal("OAuth token expired or invalid"), nil
+		return fetch.ResultFatal("OAuth token expired or invalid. Re-authenticate with `codex login`."), nil
 	}
 	if resp.StatusCode == 403 {
 		return fetch.ResultFail("Not authorized. Account may not have ChatGPT Plus/Pro subscription."), nil
@@ -214,6 +219,69 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *Credentials) *C
 		ProviderID:  "codex",
 		HTTPTimeout: s.HTTPTimeout,
 	})
+}
+
+// tryRefreshViaCLI attempts to refresh the OAuth token by running the Codex CLI
+// in exec mode, which refreshes credentials as a side effect on startup.
+func (s *OAuthStrategy) tryRefreshViaCLI(ctx context.Context) *Credentials {
+	codexPath, err := exec.LookPath("codex")
+	if err != nil {
+		return nil
+	}
+
+	tctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(tctx, codexPath,
+		"exec", "say ok",
+		"--skip-git-repo-check",
+		"--sandbox", "read-only",
+	)
+	cmd.Stdin = nil
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+
+	if err := cmd.Start(); err != nil {
+		return nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if creds := s.loadCredentials(); creds != nil && !creds.NeedsRefresh() {
+			stopCommand(cmd)
+			return creds
+		}
+
+		select {
+		case <-done:
+			creds := s.loadCredentials()
+			if creds == nil || creds.NeedsRefresh() {
+				return nil
+			}
+			return creds
+		case <-tctx.Done():
+			stopCommand(cmd)
+			creds := s.loadCredentials()
+			if creds == nil || creds.NeedsRefresh() {
+				return nil
+			}
+			return creds
+		case <-ticker.C:
+		}
+	}
+}
+
+func stopCommand(cmd *exec.Cmd) {
+	if cmd != nil && cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
 }
 
 func (s *OAuthStrategy) getUsageURL() string {
