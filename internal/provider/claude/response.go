@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -118,4 +119,57 @@ func (o *WebOrganization) HasCapability(cap string) bool {
 // WebSessionCredentials represents stored web session credentials.
 type WebSessionCredentials struct {
 	SessionKey string `json:"session_key"`
+}
+
+// OAuthAccountResponse represents the response from /api/oauth/account.
+type OAuthAccountResponse struct {
+	EmailAddress string                   `json:"email_address"`
+	Memberships  []OAuthAccountMembership `json:"memberships"`
+}
+
+// OAuthAccountMembership represents a single membership in the account response.
+type OAuthAccountMembership struct {
+	Organization OAuthAccountOrganization `json:"organization"`
+}
+
+// OAuthAccountOrganization represents the organization data within an account membership.
+type OAuthAccountOrganization struct {
+	Name          string   `json:"name,omitempty"`
+	RateLimitTier string   `json:"rate_limit_tier,omitempty"`
+	Capabilities  []string `json:"capabilities,omitempty"`
+	BillingType   string   `json:"billing_type,omitempty"`
+}
+
+// HasCapability reports whether the organization has the given capability.
+func (o *OAuthAccountOrganization) HasCapability(cap string) bool {
+	for _, c := range o.Capabilities {
+		if c == cap {
+			return true
+		}
+	}
+	return false
+}
+
+// WebPrepaidCreditsResponse represents the response from
+// /api/organizations/{orgID}/prepaid/credits.
+type WebPrepaidCreditsResponse struct {
+	Amount             int             `json:"amount"`               // cents, can be negative
+	Currency           string          `json:"currency"`             // "USD"
+	AutoReloadSettings json.RawMessage `json:"auto_reload_settings"` // null = off
+}
+
+// IsAutoReloadEnabled reports whether auto-reload is configured.
+// A null or absent auto_reload_settings means auto-reload is off.
+func (r *WebPrepaidCreditsResponse) IsAutoReloadEnabled() bool {
+	return len(r.AutoReloadSettings) > 0 && string(r.AutoReloadSettings) != "null"
+}
+
+// ToBillingDetail converts the prepaid credits response to a models.BillingDetail.
+func (r *WebPrepaidCreditsResponse) ToBillingDetail() *models.BillingDetail {
+	balance := float64(r.Amount) / 100.0
+	autoReload := r.IsAutoReloadEnabled()
+	return &models.BillingDetail{
+		Balance:    &balance,
+		AutoReload: &autoReload,
+	}
 }

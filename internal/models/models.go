@@ -74,6 +74,13 @@ func (p UsagePeriod) TimeUntilReset() *time.Duration {
 	return &d
 }
 
+// BillingDetail holds supplemental billing information fetched from
+// provider-specific endpoints (e.g. prepaid credits, auto-reload status).
+type BillingDetail struct {
+	Balance    *float64 `json:"balance,omitempty"`     // prepaid balance in dollars (negative = overspent)
+	AutoReload *bool    `json:"auto_reload,omitempty"` // nil = unknown
+}
+
 type OverageUsage struct {
 	Used      float64 `json:"used"`
 	Limit     float64 `json:"limit"`
@@ -130,6 +137,7 @@ type UsageSnapshot struct {
 	FetchedAt time.Time         `json:"fetched_at"`
 	Periods   []UsagePeriod     `json:"periods"`
 	Overage   *OverageUsage     `json:"overage,omitempty"`
+	Billing   *BillingDetail    `json:"billing,omitempty"`
 	Identity  *ProviderIdentity `json:"identity,omitempty"`
 	Status    *ProviderStatus   `json:"status,omitempty"`
 	Source    string            `json:"source,omitempty"`
