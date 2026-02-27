@@ -78,7 +78,7 @@ func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
 	if resp.ExtraUsage.UsedCredits != 550 {
 		t.Errorf("extra_usage.used_credits = %v, want 550", resp.ExtraUsage.UsedCredits)
 	}
-	if resp.ExtraUsage.MonthlyLimit != 10000 {
+	if resp.ExtraUsage.MonthlyLimit == nil || *resp.ExtraUsage.MonthlyLimit != 10000 {
 		t.Errorf("extra_usage.monthly_limit = %v, want 10000", resp.ExtraUsage.MonthlyLimit)
 	}
 }
@@ -168,6 +168,105 @@ func TestExtraUsageResponse_Disabled(t *testing.T) {
 	}
 	if resp.UsedCredits != 0 {
 		t.Errorf("used_credits = %v, want 0", resp.UsedCredits)
+	}
+}
+
+func TestExtraUsageResponse_NullMonthlyLimit(t *testing.T) {
+	raw := `{"is_enabled": true, "used_credits": 7372, "monthly_limit": null, "utilization": null}`
+
+	var resp ExtraUsageResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if !resp.IsEnabled {
+		t.Error("expected is_enabled to be true")
+	}
+	if resp.UsedCredits != 7372 {
+		t.Errorf("used_credits = %v, want 7372", resp.UsedCredits)
+	}
+	if resp.MonthlyLimit != nil {
+		t.Errorf("monthly_limit should be nil for null, got %v", *resp.MonthlyLimit)
+	}
+	if resp.Utilization != nil {
+		t.Errorf("utilization should be nil for null, got %v", *resp.Utilization)
+	}
+}
+
+func TestExtraUsageResponse_WithUtilization(t *testing.T) {
+	raw := `{"is_enabled": true, "used_credits": 550, "monthly_limit": 10000, "utilization": 5.5}`
+
+	var resp ExtraUsageResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.MonthlyLimit == nil || *resp.MonthlyLimit != 10000 {
+		t.Errorf("monthly_limit = %v, want 10000", resp.MonthlyLimit)
+	}
+	if resp.Utilization == nil || *resp.Utilization != 5.5 {
+		t.Errorf("utilization = %v, want 5.5", resp.Utilization)
+	}
+}
+
+func TestOAuthUsageResponse_UnmarshalNewPeriodFields(t *testing.T) {
+	raw := `{
+		"five_hour": {"utilization": 9.0, "resets_at": "2026-02-27T19:00:00Z"},
+		"seven_day": {"utilization": 2.0, "resets_at": "2026-03-06T14:00:00Z"},
+		"seven_day_oauth_apps": {"utilization": 15.0, "resets_at": "2026-03-06T14:00:00Z"},
+		"seven_day_cowork": {"utilization": 30.0, "resets_at": "2026-03-06T14:00:00Z"},
+		"iguana_necktie": {"utilization": 5.0, "resets_at": "2026-03-06T14:00:00Z"},
+		"seven_day_sonnet": {"utilization": 0.0, "resets_at": null}
+	}`
+
+	var resp OAuthUsageResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.SevenDayOAuthApps == nil {
+		t.Fatal("expected seven_day_oauth_apps to be present")
+	}
+	if resp.SevenDayOAuthApps.Utilization != 15.0 {
+		t.Errorf("seven_day_oauth_apps utilization = %v, want 15.0", resp.SevenDayOAuthApps.Utilization)
+	}
+
+	if resp.SevenDayCowork == nil {
+		t.Fatal("expected seven_day_cowork to be present")
+	}
+	if resp.SevenDayCowork.Utilization != 30.0 {
+		t.Errorf("seven_day_cowork utilization = %v, want 30.0", resp.SevenDayCowork.Utilization)
+	}
+
+	if resp.IguanaNecktie == nil {
+		t.Fatal("expected iguana_necktie to be present")
+	}
+	if resp.IguanaNecktie.Utilization != 5.0 {
+		t.Errorf("iguana_necktie utilization = %v, want 5.0", resp.IguanaNecktie.Utilization)
+	}
+}
+
+func TestOAuthUsageResponse_NullNewFieldsAreNil(t *testing.T) {
+	raw := `{
+		"five_hour": {"utilization": 9.0},
+		"seven_day_oauth_apps": null,
+		"seven_day_cowork": null,
+		"iguana_necktie": null
+	}`
+
+	var resp OAuthUsageResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.SevenDayOAuthApps != nil {
+		t.Error("expected seven_day_oauth_apps to be nil")
+	}
+	if resp.SevenDayCowork != nil {
+		t.Error("expected seven_day_cowork to be nil")
+	}
+	if resp.IguanaNecktie != nil {
+		t.Error("expected iguana_necktie to be nil")
 	}
 }
 

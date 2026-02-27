@@ -23,6 +23,20 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 ### Added
 
 - Added `vibeusage statusline` command for condensed usage output suitable for status bars.
+- Added provider status, identity metadata, and auth source to single-provider detail view.
+
+### Changed
+
+- Polished single-provider detail view to match the multi-provider overview panel style.
+- Overage with no spend limit now shows "(Unlimited)" instead of "$0.00".
+
+### Removed
+
+- Removed unreliable Claude plan tier inference.
+
+### Fixed
+
+- Fixed confusing overage display when the API returns a null monthly spend limit.
 
 ## [0.3.0]
 

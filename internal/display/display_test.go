@@ -1,11 +1,13 @@
 package display
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -285,21 +287,21 @@ func TestRenderSingleProvider_ContainsProviderName(t *testing.T) {
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "Claude") {
 		t.Errorf("expected title-cased provider name 'Claude', got: %q", result)
 	}
 }
 
-func TestRenderSingleProvider_ContainsSeparator(t *testing.T) {
+func TestRenderSingleProvider_HasPanelBorder(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider: "claude",
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, false)
-	if !strings.Contains(result, "━") {
-		t.Errorf("expected separator in output, got: %q", result)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
+	if !strings.Contains(result, "╭") || !strings.Contains(result, "╰") {
+		t.Errorf("expected panel border characters, got: %q", result)
 	}
 }
 
@@ -312,7 +314,7 @@ func TestRenderSingleProvider_SessionAndLongerPeriods(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "80%") {
 		t.Errorf("expected session utilization '80%%', got: %q", result)
 	}
@@ -336,7 +338,7 @@ func TestRenderSingleProvider_WithOverage(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "Extra Usage") {
 		t.Errorf("expected 'Extra Usage' for overage, got: %q", result)
 	}
@@ -360,7 +362,7 @@ func TestRenderSingleProvider_NoOverageWhenDisabled(t *testing.T) {
 		},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if strings.Contains(result, "Extra Usage") {
 		t.Errorf("should not show overage when disabled, got: %q", result)
 	}
@@ -372,7 +374,7 @@ func TestRenderSingleProvider_NoPeriods(t *testing.T) {
 		Periods:  nil,
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if !strings.Contains(result, "Empty") {
 		t.Errorf("expected title-cased provider name, got: %q", result)
 	}
@@ -385,7 +387,7 @@ func TestRenderSingleProvider_CachedIndicator(t *testing.T) {
 		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, true)
+	result := RenderSingleProvider(snap, true, DetailOptions{})
 	if !strings.Contains(result, "2h ago") {
 		t.Errorf("expected '2h ago' age indicator for stale data, got: %q", result)
 	}
@@ -398,7 +400,7 @@ func TestRenderSingleProvider_NoAgeIndicatorWhenFresh(t *testing.T) {
 		Periods:   []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
-	result := RenderSingleProvider(snap, false)
+	result := RenderSingleProvider(snap, false, DetailOptions{})
 	if strings.Contains(result, "ago") {
 		t.Errorf("should not show age indicator for fresh data, got: %q", result)
 	}
@@ -608,5 +610,526 @@ func TestColorStyle_EmptyColor(t *testing.T) {
 	runeCount := utf8.RuneCountInString(rendered)
 	if runeCount < 4 {
 		t.Errorf("colorStyle('').Render('test') should have at least 4 runes, got %d", runeCount)
+	}
+}
+
+// Overage formatting tests
+
+func TestFormatOverageLine_WithLimit(t *testing.T) {
+	o := &models.OverageUsage{Used: 5.50, Limit: 100.00, Currency: "USD", IsEnabled: true}
+	got := formatOverageLine(o, "Extra Usage")
+	if got != "Extra Usage: $5.50 / $100.00 USD" {
+		t.Errorf("formatOverageLine with limit = %q, want %q", got, "Extra Usage: $5.50 / $100.00 USD")
+	}
+}
+
+func TestFormatOverageLine_ZeroLimit(t *testing.T) {
+	o := &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true}
+	got := formatOverageLine(o, "Extra Usage")
+	want := "Extra Usage: $73.72 USD (Unlimited)"
+	if got != want {
+		t.Errorf("formatOverageLine with zero limit = %q, want %q", got, want)
+	}
+	if strings.Contains(got, "/ $0.00") {
+		t.Error("zero limit should not show '/ $0.00'")
+	}
+}
+
+func TestFormatOverageLine_NonUSDCurrency(t *testing.T) {
+	o := &models.OverageUsage{Used: 10.00, Limit: 50.00, Currency: "EUR", IsEnabled: true}
+	got := formatOverageLine(o, "Extra")
+	if got != "Extra: 10.00 / 50.00 EUR" {
+		t.Errorf("formatOverageLine non-USD = %q, want %q", got, "Extra: 10.00 / 50.00 EUR")
+	}
+}
+
+func TestFormatOverageLine_ZeroUsed(t *testing.T) {
+	o := &models.OverageUsage{Used: 0.00, Limit: 100.00, Currency: "USD", IsEnabled: true}
+	got := formatOverageLine(o, "Extra")
+	if got != "Extra: $0.00 / $100.00 USD" {
+		t.Errorf("formatOverageLine zero used = %q, want %q", got, "Extra: $0.00 / $100.00 USD")
+	}
+}
+
+// Overage edge cases in rendered output
+
+func TestRenderSingleProvider_OverageZeroLimit(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage:  &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true},
+	}
+	result := RenderSingleProvider(snap, false, DetailOptions{})
+	if strings.Contains(result, "/ $0.00") {
+		t.Errorf("should not show '/ $0.00' for zero limit overage, got: %q", result)
+	}
+	if !strings.Contains(result, "$73.72") {
+		t.Errorf("should show used amount '$73.72', got: %q", result)
+	}
+	if !strings.Contains(result, "Unlimited") {
+		t.Errorf("should show 'Unlimited' for zero limit, got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_OverageZeroLimit(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage:  &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true},
+	}
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
+	if strings.Contains(result, "/ $0.00") {
+		t.Errorf("should not show '/ $0.00' for zero limit overage, got: %q", result)
+	}
+	if !strings.Contains(result, "$73.72") {
+		t.Errorf("should show used amount '$73.72', got: %q", result)
+	}
+	if !strings.Contains(result, "Unlimited") {
+		t.Errorf("should show 'Unlimited' for zero limit, got: %q", result)
+	}
+}
+
+// formatSubPeriodName tests
+
+func TestFormatSubPeriodName_ModelPeriod(t *testing.T) {
+	p := &models.UsagePeriod{Name: "Sonnet", Model: "sonnet"}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  Sonnet" {
+		t.Errorf("formatSubPeriodName model = %q, want %q", got, "  Sonnet")
+	}
+}
+
+func TestFormatSubPeriodName_Aggregate(t *testing.T) {
+	p := &models.UsagePeriod{Name: "All Models", Model: ""}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  All Models" {
+		t.Errorf("formatSubPeriodName aggregate = %q, want %q", got, "  All Models")
+	}
+}
+
+func TestFormatSubPeriodName_MatchesHeader(t *testing.T) {
+	p := &models.UsagePeriod{Name: "Weekly", Model: ""}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  All Models" {
+		t.Errorf("formatSubPeriodName matching header = %q, want %q", got, "  All Models")
+	}
+}
+
+func TestFormatSubPeriodName_Parenthesized(t *testing.T) {
+	p := &models.UsagePeriod{Name: "Weekly (Premium)", Model: ""}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  Premium" {
+		t.Errorf("formatSubPeriodName parenthesized = %q, want %q", got, "  Premium")
+	}
+}
+
+// Snapshot-style layout tests
+// These strip ANSI codes and verify the structural layout of rendered output.
+
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRegex.ReplaceAllString(s, "")
+}
+
+func TestRenderSingleProvider_DetailLayout(t *testing.T) {
+	reset := time.Now().Add(3 * time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods: []models.UsagePeriod{
+			{Name: "Session (5h)", Utilization: 25, PeriodType: models.PeriodSession, ResetsAt: &reset},
+			{Name: "All Models", Utilization: 60, PeriodType: models.PeriodWeekly, ResetsAt: &reset},
+			{Name: "Sonnet", Utilization: 80, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "sonnet"},
+			{Name: "Opus", Utilization: 10, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "opus"},
+		},
+		Overage: &models.OverageUsage{Used: 5.50, Limit: 100.00, Currency: "USD", IsEnabled: true},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	lines := strings.Split(result, "\n")
+
+	// First line is the provider title above the panel
+	if !strings.Contains(lines[0], "Claude") {
+		t.Errorf("first line should be provider title containing 'Claude', got: %q", lines[0])
+	}
+
+	// Find the Usage panel borders
+	panelStart := -1
+	panelEnd := -1
+	for i, line := range lines {
+		if strings.HasPrefix(line, "╭─") {
+			panelStart = i
+		}
+		if strings.HasPrefix(line, "╰") {
+			panelEnd = i
+		}
+	}
+	if panelStart == -1 || panelEnd == -1 {
+		t.Fatalf("expected panel borders (╭/╰), got:\n%s", result)
+	}
+
+	// Panel title should be "Usage"
+	if !strings.Contains(lines[panelStart], "Usage") {
+		t.Errorf("panel border should contain 'Usage' title, got: %q", lines[panelStart])
+	}
+
+	// Content lines inside the panel should have │ borders
+	for _, line := range lines[panelStart+1 : panelEnd] {
+		if !strings.HasPrefix(line, "│") || !strings.HasSuffix(line, "│") {
+			t.Errorf("content line should be bordered with │, got: %q", line)
+		}
+	}
+
+	// Verify content structure
+	if !strings.Contains(result, "Session (5h)") {
+		t.Error("expected session period")
+	}
+	if !strings.Contains(result, "Weekly") {
+		t.Error("expected Weekly section header")
+	}
+	if !strings.Contains(result, "All Models") {
+		t.Error("expected All Models sub-period")
+	}
+	if !strings.Contains(result, "Sonnet") {
+		t.Error("expected Sonnet sub-period")
+	}
+	if !strings.Contains(result, "Opus") {
+		t.Error("expected Opus sub-period")
+	}
+	if !strings.Contains(result, "Extra Usage: $5.50 / $100.00 USD") {
+		t.Error("expected overage line")
+	}
+	if !strings.Contains(result, "25%") {
+		t.Error("expected session utilization")
+	}
+	if !strings.Contains(result, "resets in") {
+		t.Error("expected reset countdown")
+	}
+}
+
+func TestRenderSingleProvider_DetailLayout_NoPeriods(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  nil,
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	lines := strings.Split(result, "\n")
+
+	// First line is provider title
+	if !strings.Contains(lines[0], "Claude") {
+		t.Errorf("first line should contain provider name, got: %q", lines[0])
+	}
+	// Should still have a Usage panel
+	if !strings.Contains(result, "Usage") {
+		t.Error("expected Usage panel title")
+	}
+}
+
+func TestRenderProviderPanel_PanelLayout(t *testing.T) {
+	reset := time.Now().Add(5*24*time.Hour + 3*time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods: []models.UsagePeriod{
+			{Name: "Session (5h)", Utilization: 25, PeriodType: models.PeriodSession, ResetsAt: &reset},
+			{Name: "All Models", Utilization: 60, PeriodType: models.PeriodWeekly, ResetsAt: &reset},
+			{Name: "Sonnet", Utilization: 80, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "sonnet"},
+		},
+		Overage: &models.OverageUsage{Used: 10.00, Limit: 50.00, Currency: "USD", IsEnabled: true},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+
+	lines := strings.Split(result, "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected at least 3 lines, got %d", len(lines))
+	}
+
+	// All content lines should be the same visual width
+	widths := make(map[int]bool)
+	for _, line := range lines {
+		widths[lipgloss.Width(line)] = true
+	}
+	if len(widths) > 1 {
+		t.Errorf("panel lines should all be the same width, got widths: %v", widths)
+	}
+
+	// Should contain aggregate periods but not model-specific
+	if !strings.Contains(result, "25%") {
+		t.Error("expected session utilization in panel")
+	}
+	if strings.Contains(result, "Sonnet") {
+		t.Error("panel should not contain model-specific period")
+	}
+	if !strings.Contains(result, "Extra:") {
+		t.Error("expected overage line in panel")
+	}
+}
+
+func TestRenderSingleProvider_WithStatus(t *testing.T) {
+	now := time.Now()
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+	opts := DetailOptions{
+		Status: &models.ProviderStatus{
+			Level:       models.StatusOperational,
+			Description: "All Systems Operational",
+			UpdatedAt:   &now,
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, opts))
+	if !strings.Contains(result, "All Systems Operational") {
+		t.Errorf("expected status description, got: %q", result)
+	}
+	if !strings.Contains(result, "●") {
+		t.Errorf("expected status symbol, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_WithStatusDegraded(t *testing.T) {
+	now := time.Now()
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+	opts := DetailOptions{
+		Status: &models.ProviderStatus{
+			Level:       models.StatusDegraded,
+			Description: "Elevated error rates",
+			UpdatedAt:   &now,
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, opts))
+	if !strings.Contains(result, "Elevated error rates") {
+		t.Errorf("expected degraded status description, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_WithIdentity(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+		Identity: &models.ProviderIdentity{Plan: "pro", Email: "user@example.com"},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Plan pro") {
+		t.Errorf("expected labeled plan, got: %q", result)
+	}
+	if !strings.Contains(result, "Account user@example.com") {
+		t.Errorf("expected labeled email, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_WithSource(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+		Source:   "oauth",
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if !strings.Contains(result, "Auth OAuth") {
+		t.Errorf("expected labeled source 'Auth OAuth', got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_NoMetaWhenEmpty(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if strings.Contains(result, "Auth") || strings.Contains(result, "Plan") {
+		t.Errorf("should not show metadata when empty, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_StatusBetweenTitleAndPanel(t *testing.T) {
+	now := time.Now()
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+	opts := DetailOptions{
+		Status: &models.ProviderStatus{
+			Level:       models.StatusOperational,
+			Description: "All Systems Operational",
+			UpdatedAt:   &now,
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, opts))
+
+	// Verify ordering: title before status before panel
+	titleIdx := strings.Index(result, "Claude")
+	statusIdx := strings.Index(result, "Operational")
+	panelIdx := strings.Index(result, "╭")
+
+	if titleIdx == -1 || statusIdx == -1 || panelIdx == -1 {
+		t.Fatalf("missing expected sections in output:\n%s", result)
+	}
+	if titleIdx >= statusIdx {
+		t.Error("title should appear before status")
+	}
+	if statusIdx >= panelIdx {
+		t.Error("status should appear before panel")
+	}
+}
+
+// identitySummary tests
+
+func TestRenderMetaLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		snapshot models.UsageSnapshot
+		contains []string
+		empty    bool
+	}{
+		{
+			"plan and source",
+			models.UsageSnapshot{
+				Identity: &models.ProviderIdentity{Plan: "Pro"},
+				Source:   "oauth",
+			},
+			[]string{"Plan", "Pro", "Auth", "OAuth"},
+			false,
+		},
+		{
+			"all identity fields on separate lines",
+			models.UsageSnapshot{
+				Identity: &models.ProviderIdentity{Plan: "Pro", Organization: "Acme", Email: "user@example.com"},
+			},
+			[]string{"Plan Pro\nOrg Acme\nAccount user@example.com"},
+			false,
+		},
+		{
+			"source only",
+			models.UsageSnapshot{Source: "api_key"},
+			[]string{"Auth", "API Key"},
+			false,
+		},
+		{
+			"empty",
+			models.UsageSnapshot{},
+			nil,
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripANSI(renderMetaLine(tt.snapshot))
+			if tt.empty {
+				if got != "" {
+					t.Errorf("renderMetaLine() = %q, want empty", got)
+				}
+				return
+			}
+			for _, s := range tt.contains {
+				if !strings.Contains(got, s) {
+					t.Errorf("renderMetaLine() = %q, missing %q", got, s)
+				}
+			}
+		})
+	}
+}
+
+func TestFormatSourceName(t *testing.T) {
+	tests := []struct {
+		source string
+		want   string
+	}{
+		{"oauth", "OAuth"},
+		{"web", "Web Session"},
+		{"api_key", "API Key"},
+		{"device_flow", "Device Flow"},
+		{"unknown", "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.source, func(t *testing.T) {
+			got := formatSourceName(tt.source)
+			if got != tt.want {
+				t.Errorf("formatSourceName(%q) = %q, want %q", tt.source, got, tt.want)
+			}
+		})
+	}
+}
+
+// renderStatusLine tests
+
+func TestRenderStatusLine_Operational(t *testing.T) {
+	now := time.Now()
+	status := models.ProviderStatus{
+		Level:       models.StatusOperational,
+		Description: "All Systems Operational",
+		UpdatedAt:   &now,
+	}
+	result := stripANSI(renderStatusLine(status))
+	if !strings.Contains(result, "●") {
+		t.Error("expected operational symbol ●")
+	}
+	if !strings.Contains(result, "All Systems Operational") {
+		t.Error("expected status description")
+	}
+	if !strings.Contains(result, "just now") {
+		t.Error("expected time indicator")
+	}
+}
+
+func TestRenderStatusLine_NoDescription(t *testing.T) {
+	status := models.ProviderStatus{
+		Level: models.StatusDegraded,
+	}
+	result := stripANSI(renderStatusLine(status))
+	// Should fall back to level name
+	if !strings.Contains(result, "degraded") {
+		t.Errorf("expected level name as fallback, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_ConsistentPanelLineWidths(t *testing.T) {
+	reset := time.Now().Add(3 * time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods: []models.UsagePeriod{
+			{Name: "Session (5h)", Utilization: 25, PeriodType: models.PeriodSession, ResetsAt: &reset},
+			{Name: "All Models", Utilization: 60, PeriodType: models.PeriodWeekly, ResetsAt: &reset},
+			{Name: "Sonnet", Utilization: 80, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "sonnet"},
+		},
+	}
+
+	result := RenderSingleProvider(snap, false, DetailOptions{})
+	lines := strings.Split(result, "\n")
+
+	// Find panel lines (between ╭ and ╰ inclusive)
+	panelStart := -1
+	panelEnd := -1
+	for i, line := range lines {
+		stripped := stripANSI(line)
+		if strings.HasPrefix(stripped, "╭") {
+			panelStart = i
+		}
+		if strings.HasPrefix(stripped, "╰") {
+			panelEnd = i
+		}
+	}
+	if panelStart == -1 || panelEnd == -1 {
+		t.Fatal("expected panel borders")
+	}
+
+	// All panel lines should be the same visual width
+	widths := make(map[int]bool)
+	for _, line := range lines[panelStart : panelEnd+1] {
+		widths[lipgloss.Width(line)] = true
+	}
+	if len(widths) > 1 {
+		t.Errorf("all panel lines should be the same visual width, got widths: %v", widths)
 	}
 }

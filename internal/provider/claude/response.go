@@ -14,25 +14,30 @@ type UsagePeriodResponse struct {
 }
 
 // ExtraUsageResponse represents overage/extra usage info from the Claude OAuth API.
+// MonthlyLimit is a pointer to distinguish null (no hard limit) from 0 (zero limit).
 type ExtraUsageResponse struct {
-	IsEnabled    bool    `json:"is_enabled"`
-	UsedCredits  float64 `json:"used_credits"`
-	MonthlyLimit float64 `json:"monthly_limit"`
+	IsEnabled    bool     `json:"is_enabled"`
+	UsedCredits  float64  `json:"used_credits"`
+	MonthlyLimit *float64 `json:"monthly_limit"`
+	Utilization  *float64 `json:"utilization"`
 }
 
 // OAuthUsageResponse represents the usage response returned by both the OAuth
 // endpoint (/api/oauth/usage) and the web session endpoint
 // (/api/organizations/{orgID}/usage).
 type OAuthUsageResponse struct {
-	FiveHour       *UsagePeriodResponse `json:"five_hour,omitempty"`
-	SevenDay       *UsagePeriodResponse `json:"seven_day,omitempty"`
-	Monthly        *UsagePeriodResponse `json:"monthly,omitempty"`
-	SevenDaySonnet *UsagePeriodResponse `json:"seven_day_sonnet,omitempty"`
-	SevenDayOpus   *UsagePeriodResponse `json:"seven_day_opus,omitempty"`
-	SevenDayHaiku  *UsagePeriodResponse `json:"seven_day_haiku,omitempty"`
-	ExtraUsage     *ExtraUsageResponse  `json:"extra_usage,omitempty"`
-	Plan           string               `json:"plan,omitempty"`
-	BillingType    string               `json:"billing_type,omitempty"`
+	FiveHour          *UsagePeriodResponse `json:"five_hour,omitempty"`
+	SevenDay          *UsagePeriodResponse `json:"seven_day,omitempty"`
+	Monthly           *UsagePeriodResponse `json:"monthly,omitempty"`
+	SevenDaySonnet    *UsagePeriodResponse `json:"seven_day_sonnet,omitempty"`
+	SevenDayOpus      *UsagePeriodResponse `json:"seven_day_opus,omitempty"`
+	SevenDayHaiku     *UsagePeriodResponse `json:"seven_day_haiku,omitempty"`
+	SevenDayOAuthApps *UsagePeriodResponse `json:"seven_day_oauth_apps,omitempty"`
+	SevenDayCowork    *UsagePeriodResponse `json:"seven_day_cowork,omitempty"`
+	IguanaNecktie     *UsagePeriodResponse `json:"iguana_necktie,omitempty"`
+	ExtraUsage        *ExtraUsageResponse  `json:"extra_usage,omitempty"`
+	Plan              string               `json:"plan,omitempty"`
+	BillingType       string               `json:"billing_type,omitempty"`
 }
 
 // OAuthCredentials is an alias for the shared OAuth credential type.

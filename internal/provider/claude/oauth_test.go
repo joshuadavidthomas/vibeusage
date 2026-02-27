@@ -8,6 +8,8 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
+func floatPtr(f float64) *float64 { return &f }
+
 func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 	resp := OAuthUsageResponse{
 		FiveHour: &UsagePeriodResponse{
@@ -37,7 +39,7 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 		ExtraUsage: &ExtraUsageResponse{
 			IsEnabled:    true,
 			UsedCredits:  550,
-			MonthlyLimit: 10000,
+			MonthlyLimit: floatPtr(10000),
 		},
 	}
 
@@ -199,7 +201,7 @@ func TestParseOAuthUsageResponse_OverageDisabled(t *testing.T) {
 		ExtraUsage: &ExtraUsageResponse{
 			IsEnabled:    false,
 			UsedCredits:  0,
-			MonthlyLimit: 0,
+			MonthlyLimit: floatPtr(0),
 		},
 	}
 
@@ -262,6 +264,81 @@ func TestParseOAuthUsageResponse_InvalidResetsAt(t *testing.T) {
 	// Utilization should still be parsed
 	if p.Utilization != 50 {
 		t.Errorf("utilization = %d, want 50", p.Utilization)
+	}
+}
+
+func TestParseOAuthUsageResponse_NewPeriodFields(t *testing.T) {
+	resp := OAuthUsageResponse{
+		FiveHour:          &UsagePeriodResponse{Utilization: 9.0},
+		SevenDay:          &UsagePeriodResponse{Utilization: 2.0},
+		SevenDayOAuthApps: &UsagePeriodResponse{Utilization: 15.0},
+		SevenDayCowork:    &UsagePeriodResponse{Utilization: 30.0},
+		IguanaNecktie:     &UsagePeriodResponse{Utilization: 5.0},
+	}
+
+	s := OAuthStrategy{}
+	snapshot := s.parseOAuthUsageResponse(resp)
+
+	periodByName := make(map[string]models.UsagePeriod)
+	for _, p := range snapshot.Periods {
+		periodByName[p.Name] = p
+	}
+
+	oauthApps, ok := periodByName["OAuth Apps"]
+	if !ok {
+		t.Fatal("missing OAuth Apps period")
+	}
+	if oauthApps.Utilization != 15 {
+		t.Errorf("OAuth Apps utilization = %d, want 15", oauthApps.Utilization)
+	}
+	if oauthApps.Model != "oauth_apps" {
+		t.Errorf("OAuth Apps model = %q, want %q", oauthApps.Model, "oauth_apps")
+	}
+
+	cowork, ok := periodByName["Cowork"]
+	if !ok {
+		t.Fatal("missing Cowork period")
+	}
+	if cowork.Utilization != 30 {
+		t.Errorf("Cowork utilization = %d, want 30", cowork.Utilization)
+	}
+	if cowork.Model != "cowork" {
+		t.Errorf("Cowork model = %q, want %q", cowork.Model, "cowork")
+	}
+
+	iguana, ok := periodByName["Iguana Necktie"]
+	if !ok {
+		t.Fatal("missing Iguana Necktie period")
+	}
+	if iguana.Utilization != 5 {
+		t.Errorf("Iguana Necktie utilization = %d, want 5", iguana.Utilization)
+	}
+	if iguana.Model != "iguana_necktie" {
+		t.Errorf("Iguana Necktie model = %q, want %q", iguana.Model, "iguana_necktie")
+	}
+}
+
+func TestParseOAuthUsageResponse_NullMonthlyLimit(t *testing.T) {
+	resp := OAuthUsageResponse{
+		FiveHour: &UsagePeriodResponse{Utilization: 9.0},
+		ExtraUsage: &ExtraUsageResponse{
+			IsEnabled:    true,
+			UsedCredits:  7372,
+			MonthlyLimit: nil,
+		},
+	}
+
+	s := OAuthStrategy{}
+	snapshot := s.parseOAuthUsageResponse(resp)
+
+	if snapshot.Overage == nil {
+		t.Fatal("expected overage to be present")
+	}
+	if snapshot.Overage.Used != 73.72 {
+		t.Errorf("overage used = %v, want 73.72", snapshot.Overage.Used)
+	}
+	if snapshot.Overage.Limit != 0 {
+		t.Errorf("overage limit = %v, want 0 (null means no limit)", snapshot.Overage.Limit)
 	}
 }
 

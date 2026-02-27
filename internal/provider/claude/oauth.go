@@ -217,17 +217,6 @@ func stopCommand(cmd *exec.Cmd) {
 	}
 }
 
-// inferClaudePlan guesses the plan tier from usage response features.
-func inferClaudePlan(resp OAuthUsageResponse) string {
-	if resp.ExtraUsage != nil && resp.ExtraUsage.IsEnabled {
-		return "Pro"
-	}
-	if resp.SevenDayOpus != nil {
-		return "Pro"
-	}
-	return ""
-}
-
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {
 	return parseUsageResponse(resp, "oauth", nil)
 }
