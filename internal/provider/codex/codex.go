@@ -265,31 +265,25 @@ func (s *OAuthStrategy) parseTypedUsageResponse(resp UsageResponse) *models.Usag
 
 	rl := resp.EffectiveRateLimits()
 	if rl != nil {
-		if primary := rl.EffectivePrimary(); primary != nil {
-			p := models.UsagePeriod{
-				Name:        "Session",
-				Utilization: int(primary.UsedPercent),
-				PeriodType:  models.PeriodSession,
-			}
-			if ts := primary.EffectiveResetTimestamp(); ts > 0 {
-				t := time.Unix(int64(ts), 0).UTC()
-				p.ResetsAt = &t
-			}
-			periods = append(periods, p)
-		}
+		periods = append(periods, rateLimitPeriods(rl, "", "Session", "Weekly")...)
+	}
 
-		if secondary := rl.EffectiveSecondary(); secondary != nil {
-			p := models.UsagePeriod{
-				Name:        "Weekly",
-				Utilization: int(secondary.UsedPercent),
-				PeriodType:  models.PeriodWeekly,
-			}
-			if ts := secondary.EffectiveResetTimestamp(); ts > 0 {
-				t := time.Unix(int64(ts), 0).UTC()
-				p.ResetsAt = &t
-			}
-			periods = append(periods, p)
+	// Code review rate limit as its own set of periods.
+	if cr := resp.CodeReviewRateLimit; cr != nil {
+		periods = append(periods, rateLimitPeriods(cr, "", "Code Review", "Code Review Weekly")...)
+	}
+
+	// Additional (model-specific) rate limits.
+	for _, arl := range resp.AdditionalRateLimits {
+		if arl.RateLimit == nil || arl.LimitName == "" {
+			continue
 		}
+		periods = append(periods, rateLimitPeriods(
+			arl.RateLimit,
+			arl.LimitName,
+			arl.LimitName,
+			arl.LimitName+" Weekly",
+		)...)
 	}
 
 	if len(periods) == 0 {
@@ -320,4 +314,40 @@ func (s *OAuthStrategy) parseTypedUsageResponse(resp UsageResponse) *models.Usag
 		Identity:  identity,
 		Source:    "oauth",
 	}
+}
+
+// rateLimitPeriods extracts UsagePeriod entries from a RateLimits struct.
+// model is set on the resulting periods for model-specific limits.
+func rateLimitPeriods(rl *RateLimits, model, primaryName, secondaryName string) []models.UsagePeriod {
+	var periods []models.UsagePeriod
+
+	if primary := rl.EffectivePrimary(); primary != nil {
+		p := models.UsagePeriod{
+			Name:        primaryName,
+			Utilization: int(primary.UsedPercent),
+			PeriodType:  models.PeriodSession,
+			Model:       model,
+		}
+		if ts := primary.EffectiveResetTimestamp(); ts > 0 {
+			t := time.Unix(int64(ts), 0).UTC()
+			p.ResetsAt = &t
+		}
+		periods = append(periods, p)
+	}
+
+	if secondary := rl.EffectiveSecondary(); secondary != nil {
+		p := models.UsagePeriod{
+			Name:        secondaryName,
+			Utilization: int(secondary.UsedPercent),
+			PeriodType:  models.PeriodWeekly,
+			Model:       model,
+		}
+		if ts := secondary.EffectiveResetTimestamp(); ts > 0 {
+			t := time.Unix(int64(ts), 0).UTC()
+			p.ResetsAt = &t
+		}
+		periods = append(periods, p)
+	}
+
+	return periods
 }
