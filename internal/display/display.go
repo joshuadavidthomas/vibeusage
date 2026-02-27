@@ -18,11 +18,6 @@ var (
 	greenStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	yellowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	redStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-
-	overageBorder = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("6")).
-			Padding(0, 1)
 )
 
 func colorStyle(color string) lipgloss.Style {
@@ -68,89 +63,107 @@ func FormatPeriodLine(period models.UsagePeriod, nameWidth int) string {
 	return boldStyle.Render(name) + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset
 }
 
-// RenderSingleProvider renders a single provider in expanded format.
+// renderPeriodRow renders a single period as an aligned row using the provided
+// column widths. The displayName allows the caller to override the name shown
+// (e.g. for indented sub-period names).
+func renderPeriodRow(p models.UsagePeriod, displayName string, cw PeriodColWidths) string {
+	color := PaceToColor(p.PaceRatio(), p.Utilization)
+	pctRaw := fmt.Sprintf("%d%%", p.Utilization)
+
+	resetRaw := ""
+	if d := p.TimeUntilReset(); d != nil {
+		resetRaw = "resets in " + FormatResetCountdown(d)
+	}
+
+	namePad := strings.Repeat(" ", max(0, cw.Name-len(displayName)))
+	pctPad := strings.Repeat(" ", max(0, cw.Pct-len(pctRaw)))
+
+	return boldStyle.Render(displayName) + namePad +
+		"  " + RenderBar(p.Utilization, 20, color) +
+		" " + pctPad + colorStyle(color).Render(pctRaw) +
+		"    " + dimStyle.Render(resetRaw)
+}
+
+// formatSubPeriodName returns the display name for a period within a section
+// group (e.g. "  All Models", "  Sonnet"). Names are indented with two spaces.
+func formatSubPeriodName(p *models.UsagePeriod, sectionHeader string) string {
+	name := p.Name
+	if p.Model == "" {
+		if strings.Contains(name, "(") && strings.Contains(name, ")") {
+			start := strings.Index(name, "(") + 1
+			end := strings.Index(name, ")")
+			return "  " + name[start:end]
+		}
+		if name == sectionHeader {
+			return "  All Models"
+		}
+		return "  " + name
+	}
+	return "  " + name
+}
+
+// formatOverageLine formats an overage usage line with the given label prefix.
+// When the limit is zero (no hard limit set), the limit portion is omitted to
+// avoid confusing output like "$73.72 / $0.00".
+func formatOverageLine(o *models.OverageUsage, label string) string {
+	sym := ""
+	if o.Currency == "USD" {
+		sym = "$"
+	}
+	if o.Limit > 0 {
+		return fmt.Sprintf("%s: %s%.2f / %s%.2f %s", label, sym, o.Used, sym, o.Limit, o.Currency)
+	}
+	return fmt.Sprintf("%s: %s%.2f %s", label, sym, o.Used, o.Currency)
+}
+
+// RenderSingleProvider renders a single provider in expanded detail format,
+// wrapped in the same titled panel used by the multi-provider overview.
 func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool) string {
 	var b strings.Builder
 
-	// Title
-	title := provider.DisplayName(snapshot.Provider)
-	if cached {
-		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
-	}
-	b.WriteString(titleStyle.Render(title))
-	b.WriteByte('\n')
-	b.WriteString(separatorStyle.Render(strings.Repeat("━", 60)))
-	b.WriteByte('\n')
-
 	// Group periods
 	session, weekly, daily, monthly := groupPeriods(snapshot.Periods)
+	longer := pickLonger(weekly, daily, monthly)
+
+	// Compute column widths across all displayed periods
+	cw := detailColWidths(session, longer)
 
 	// Session periods
-	for _, p := range session {
-		b.WriteString(FormatPeriodLine(p, 16))
-		b.WriteByte('\n')
+	for i, p := range session {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(renderPeriodRow(p, p.Name, cw))
 	}
 
-	// Longer periods
-	longer := pickLonger(weekly, daily, monthly)
+	// Longer periods with per-model breakdowns
 	if len(session) > 0 && len(longer.periods) > 0 {
-		b.WriteByte('\n')
+		b.WriteString("\n\n")
 	}
 
 	if len(longer.periods) > 0 {
 		b.WriteString(boldStyle.Render(longer.header))
-		b.WriteByte('\n')
 
 		for _, p := range longer.periods {
-			name := p.Name
-			if p.Model == "" {
-				if strings.Contains(name, "(") && strings.Contains(name, ")") {
-					start := strings.Index(name, "(") + 1
-					end := strings.Index(name, ")")
-					name = "  " + name[start:end]
-				} else if name == longer.header {
-					name = "  All Models"
-				} else {
-					name = "  " + name
-				}
-			} else {
-				name = "  " + name
-			}
-
-			paceRatio := p.PaceRatio()
-			color := PaceToColor(paceRatio, p.Utilization)
-			bar := RenderBar(p.Utilization, 20, color)
-
-			pctText := fmt.Sprintf("%d%%", p.Utilization)
-			pctStyled := colorStyle(color).Render(pctText)
-			pctPad := strings.Repeat(" ", max(0, 4-len(pctText)))
-
-			const subNameWidth = 18
-			namePad := strings.Repeat(" ", max(0, subNameWidth-len(name)))
-
-			reset := ""
-			if d := p.TimeUntilReset(); d != nil {
-				reset = dimStyle.Render("resets in " + FormatResetCountdown(d))
-			}
-
-			b.WriteString(boldStyle.Render(name) + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset + "\n")
+			name := formatSubPeriodName(&p, longer.header)
+			b.WriteByte('\n')
+			b.WriteString(renderPeriodRow(p, name, cw))
 		}
 	}
 
 	// Overage
 	if snapshot.Overage != nil && snapshot.Overage.IsEnabled {
-		o := snapshot.Overage
-		sym := ""
-		if o.Currency == "USD" {
-			sym = "$"
-		}
-		overageText := fmt.Sprintf("Extra Usage: %s%.2f / %s%.2f %s", sym, o.Used, sym, o.Limit, o.Currency)
-		b.WriteByte('\n')
-		b.WriteString(overageBorder.Render(overageText))
-		b.WriteByte('\n')
+		b.WriteString("\n\n")
+		b.WriteString(formatOverageLine(snapshot.Overage, "Extra Usage"))
 	}
 
-	return b.String()
+	// Wrap in titled panel
+	title := titleStyle.Render(provider.DisplayName(snapshot.Provider))
+	if cached {
+		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
+	}
+
+	return renderTitledPanel(title, b.String())
 }
 
 // PeriodColWidths holds pre-computed column widths for renderPeriodTable.
@@ -208,30 +221,39 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	return out
 }
 
+// detailColWidths computes column widths for the single-provider detail view
+// across both session periods and the longer period group (including sub-periods).
+func detailColWidths(session []models.UsagePeriod, longer longerPeriods) PeriodColWidths {
+	var cw PeriodColWidths
+
+	for _, p := range session {
+		cw.Name = max(cw.Name, len(p.Name))
+		cw.Pct = max(cw.Pct, len(fmt.Sprintf("%d%%", p.Utilization)))
+		if d := p.TimeUntilReset(); d != nil {
+			cw.Reset = max(cw.Reset, len("resets in "+FormatResetCountdown(d)))
+		}
+	}
+
+	for i := range longer.periods {
+		p := &longer.periods[i]
+		name := formatSubPeriodName(p, longer.header)
+		cw.Name = max(cw.Name, len(name))
+		cw.Pct = max(cw.Pct, len(fmt.Sprintf("%d%%", p.Utilization)))
+		if d := p.TimeUntilReset(); d != nil {
+			cw.Reset = max(cw.Reset, len("resets in "+FormatResetCountdown(d)))
+		}
+	}
+
+	return cw
+}
+
 // renderPeriodTable renders a slice of periods as aligned rows using the
 // provided column widths.  No characters are hand-counted: the caller supplies
 // widths computed from the full dataset so every panel lines up identically.
 func renderPeriodTable(periods []models.UsagePeriod, cw PeriodColWidths) string {
 	lines := make([]string, 0, len(periods))
 	for _, p := range periods {
-		color := PaceToColor(p.PaceRatio(), p.Utilization)
-		pctRaw := fmt.Sprintf("%d%%", p.Utilization)
-
-		resetRaw := ""
-		if d := p.TimeUntilReset(); d != nil {
-			resetRaw = "resets in " + FormatResetCountdown(d)
-		}
-
-		namePad := strings.Repeat(" ", max(0, cw.Name-len(p.Name)))
-		pctPad := strings.Repeat(" ", max(0, cw.Pct-len(pctRaw)))
-		resetPad := strings.Repeat(" ", max(0, cw.Reset-len(resetRaw)))
-
-		lines = append(lines,
-			p.Name+namePad+
-				"  "+RenderBar(p.Utilization, 20, color)+
-				" "+pctPad+colorStyle(color).Render(pctRaw)+
-				"    "+dimStyle.Render(resetRaw)+resetPad,
-		)
+		lines = append(lines, renderPeriodRow(p, p.Name, cw))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -244,13 +266,8 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodCo
 	b.WriteString(renderPeriodTable(collectDisplayPeriods(snapshot), cw))
 
 	if snapshot.Overage != nil && snapshot.Overage.IsEnabled {
-		o := snapshot.Overage
-		sym := ""
-		if o.Currency == "USD" {
-			sym = "$"
-		}
 		b.WriteByte('\n')
-		fmt.Fprintf(&b, "Extra: %s%.2f / %s%.2f %s", sym, o.Used, sym, o.Limit, o.Currency)
+		b.WriteString(formatOverageLine(snapshot.Overage, "Extra"))
 	}
 
 	title := titleStyle.Render(provider.DisplayName(snapshot.Provider))

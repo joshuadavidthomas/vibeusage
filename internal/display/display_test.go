@@ -1,11 +1,13 @@
 package display
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 	"unicode/utf8"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -291,15 +293,15 @@ func TestRenderSingleProvider_ContainsProviderName(t *testing.T) {
 	}
 }
 
-func TestRenderSingleProvider_ContainsSeparator(t *testing.T) {
+func TestRenderSingleProvider_HasPanelBorder(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider: "claude",
 		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
 	}
 
 	result := RenderSingleProvider(snap, false)
-	if !strings.Contains(result, "━") {
-		t.Errorf("expected separator in output, got: %q", result)
+	if !strings.Contains(result, "╭") || !strings.Contains(result, "╰") {
+		t.Errorf("expected panel border characters, got: %q", result)
 	}
 }
 
@@ -608,5 +610,267 @@ func TestColorStyle_EmptyColor(t *testing.T) {
 	runeCount := utf8.RuneCountInString(rendered)
 	if runeCount < 4 {
 		t.Errorf("colorStyle('').Render('test') should have at least 4 runes, got %d", runeCount)
+	}
+}
+
+// Overage formatting tests
+
+func TestFormatOverageLine_WithLimit(t *testing.T) {
+	o := &models.OverageUsage{Used: 5.50, Limit: 100.00, Currency: "USD", IsEnabled: true}
+	got := formatOverageLine(o, "Extra Usage")
+	if got != "Extra Usage: $5.50 / $100.00 USD" {
+		t.Errorf("formatOverageLine with limit = %q, want %q", got, "Extra Usage: $5.50 / $100.00 USD")
+	}
+}
+
+func TestFormatOverageLine_ZeroLimit(t *testing.T) {
+	o := &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true}
+	got := formatOverageLine(o, "Extra Usage")
+	if got != "Extra Usage: $73.72 USD" {
+		t.Errorf("formatOverageLine with zero limit = %q, want %q", got, "Extra Usage: $73.72 USD")
+	}
+	if strings.Contains(got, "/ $0.00") {
+		t.Error("zero limit should omit the limit portion, but found '/ $0.00'")
+	}
+}
+
+func TestFormatOverageLine_NonUSDCurrency(t *testing.T) {
+	o := &models.OverageUsage{Used: 10.00, Limit: 50.00, Currency: "EUR", IsEnabled: true}
+	got := formatOverageLine(o, "Extra")
+	if got != "Extra: 10.00 / 50.00 EUR" {
+		t.Errorf("formatOverageLine non-USD = %q, want %q", got, "Extra: 10.00 / 50.00 EUR")
+	}
+}
+
+func TestFormatOverageLine_ZeroUsed(t *testing.T) {
+	o := &models.OverageUsage{Used: 0.00, Limit: 100.00, Currency: "USD", IsEnabled: true}
+	got := formatOverageLine(o, "Extra")
+	if got != "Extra: $0.00 / $100.00 USD" {
+		t.Errorf("formatOverageLine zero used = %q, want %q", got, "Extra: $0.00 / $100.00 USD")
+	}
+}
+
+// Overage edge cases in rendered output
+
+func TestRenderSingleProvider_OverageZeroLimit(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage:  &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true},
+	}
+	result := RenderSingleProvider(snap, false)
+	if strings.Contains(result, "/ $0.00") {
+		t.Errorf("should not show '/ $0.00' for zero limit overage, got: %q", result)
+	}
+	if !strings.Contains(result, "$73.72") {
+		t.Errorf("should show used amount '$73.72', got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_OverageZeroLimit(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 90, PeriodType: models.PeriodMonthly}},
+		Overage:  &models.OverageUsage{Used: 73.72, Limit: 0.00, Currency: "USD", IsEnabled: true},
+	}
+	result := RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap}))
+	if strings.Contains(result, "/ $0.00") {
+		t.Errorf("should not show '/ $0.00' for zero limit overage, got: %q", result)
+	}
+	if !strings.Contains(result, "$73.72") {
+		t.Errorf("should show used amount '$73.72', got: %q", result)
+	}
+}
+
+// formatSubPeriodName tests
+
+func TestFormatSubPeriodName_ModelPeriod(t *testing.T) {
+	p := &models.UsagePeriod{Name: "Sonnet", Model: "sonnet"}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  Sonnet" {
+		t.Errorf("formatSubPeriodName model = %q, want %q", got, "  Sonnet")
+	}
+}
+
+func TestFormatSubPeriodName_Aggregate(t *testing.T) {
+	p := &models.UsagePeriod{Name: "All Models", Model: ""}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  All Models" {
+		t.Errorf("formatSubPeriodName aggregate = %q, want %q", got, "  All Models")
+	}
+}
+
+func TestFormatSubPeriodName_MatchesHeader(t *testing.T) {
+	p := &models.UsagePeriod{Name: "Weekly", Model: ""}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  All Models" {
+		t.Errorf("formatSubPeriodName matching header = %q, want %q", got, "  All Models")
+	}
+}
+
+func TestFormatSubPeriodName_Parenthesized(t *testing.T) {
+	p := &models.UsagePeriod{Name: "Weekly (Premium)", Model: ""}
+	got := formatSubPeriodName(p, "Weekly")
+	if got != "  Premium" {
+		t.Errorf("formatSubPeriodName parenthesized = %q, want %q", got, "  Premium")
+	}
+}
+
+// Snapshot-style layout tests
+// These strip ANSI codes and verify the structural layout of rendered output.
+
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRegex.ReplaceAllString(s, "")
+}
+
+func TestRenderSingleProvider_DetailLayout(t *testing.T) {
+	reset := time.Now().Add(3 * time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods: []models.UsagePeriod{
+			{Name: "Session (5h)", Utilization: 25, PeriodType: models.PeriodSession, ResetsAt: &reset},
+			{Name: "All Models", Utilization: 60, PeriodType: models.PeriodWeekly, ResetsAt: &reset},
+			{Name: "Sonnet", Utilization: 80, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "sonnet"},
+			{Name: "Opus", Utilization: 10, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "opus"},
+		},
+		Overage: &models.OverageUsage{Used: 5.50, Limit: 100.00, Currency: "USD", IsEnabled: true},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false))
+
+	// Verify panel structure
+	lines := strings.Split(result, "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected at least 3 lines (top border + content + bottom border), got %d", len(lines))
+	}
+
+	// Top border contains title
+	if !strings.Contains(lines[0], "Claude") {
+		t.Errorf("top border should contain provider name, got: %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[0], "╭─") {
+		t.Errorf("top border should start with ╭─, got: %q", lines[0])
+	}
+
+	// Bottom border
+	lastLine := lines[len(lines)-1]
+	if !strings.HasPrefix(lastLine, "╰") {
+		t.Errorf("bottom border should start with ╰, got: %q", lastLine)
+	}
+
+	// Content lines should have │ borders
+	for _, line := range lines[1 : len(lines)-1] {
+		if !strings.HasPrefix(line, "│") || !strings.HasSuffix(line, "│") {
+			t.Errorf("content line should be bordered with │, got: %q", line)
+		}
+	}
+
+	// Verify content structure
+	if !strings.Contains(result, "Session (5h)") {
+		t.Error("expected session period")
+	}
+	if !strings.Contains(result, "Weekly") {
+		t.Error("expected Weekly section header")
+	}
+	if !strings.Contains(result, "All Models") {
+		t.Error("expected All Models sub-period")
+	}
+	if !strings.Contains(result, "Sonnet") {
+		t.Error("expected Sonnet sub-period")
+	}
+	if !strings.Contains(result, "Opus") {
+		t.Error("expected Opus sub-period")
+	}
+	if !strings.Contains(result, "Extra Usage: $5.50 / $100.00 USD") {
+		t.Error("expected overage line")
+	}
+	if !strings.Contains(result, "25%") {
+		t.Error("expected session utilization")
+	}
+	if !strings.Contains(result, "resets in") {
+		t.Error("expected reset countdown")
+	}
+}
+
+func TestRenderSingleProvider_DetailLayout_NoPeriods(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  nil,
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false))
+	lines := strings.Split(result, "\n")
+
+	// Should still produce a valid panel (title border + empty body + bottom border)
+	if len(lines) < 2 {
+		t.Fatalf("expected at least 2 lines for empty panel, got %d", len(lines))
+	}
+	if !strings.Contains(lines[0], "Claude") {
+		t.Errorf("top border should contain provider name, got: %q", lines[0])
+	}
+}
+
+func TestRenderProviderPanel_PanelLayout(t *testing.T) {
+	reset := time.Now().Add(5*24*time.Hour + 3*time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods: []models.UsagePeriod{
+			{Name: "Session (5h)", Utilization: 25, PeriodType: models.PeriodSession, ResetsAt: &reset},
+			{Name: "All Models", Utilization: 60, PeriodType: models.PeriodWeekly, ResetsAt: &reset},
+			{Name: "Sonnet", Utilization: 80, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "sonnet"},
+		},
+		Overage: &models.OverageUsage{Used: 10.00, Limit: 50.00, Currency: "USD", IsEnabled: true},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+
+	lines := strings.Split(result, "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected at least 3 lines, got %d", len(lines))
+	}
+
+	// All content lines should be the same visual width
+	widths := make(map[int]bool)
+	for _, line := range lines {
+		widths[lipgloss.Width(line)] = true
+	}
+	if len(widths) > 1 {
+		t.Errorf("panel lines should all be the same width, got widths: %v", widths)
+	}
+
+	// Should contain aggregate periods but not model-specific
+	if !strings.Contains(result, "25%") {
+		t.Error("expected session utilization in panel")
+	}
+	if strings.Contains(result, "Sonnet") {
+		t.Error("panel should not contain model-specific period")
+	}
+	if !strings.Contains(result, "Extra:") {
+		t.Error("expected overage line in panel")
+	}
+}
+
+func TestRenderSingleProvider_ConsistentLineWidths(t *testing.T) {
+	reset := time.Now().Add(3 * time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods: []models.UsagePeriod{
+			{Name: "Session (5h)", Utilization: 25, PeriodType: models.PeriodSession, ResetsAt: &reset},
+			{Name: "All Models", Utilization: 60, PeriodType: models.PeriodWeekly, ResetsAt: &reset},
+			{Name: "Sonnet", Utilization: 80, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "sonnet"},
+		},
+	}
+
+	result := RenderSingleProvider(snap, false)
+	lines := strings.Split(result, "\n")
+
+	widths := make(map[int]bool)
+	for _, line := range lines {
+		widths[lipgloss.Width(line)] = true
+	}
+	if len(widths) > 1 {
+		t.Errorf("all panel lines should be the same visual width, got widths: %v", widths)
 	}
 }
