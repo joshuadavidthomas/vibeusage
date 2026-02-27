@@ -147,12 +147,6 @@ vibeusage statusline --short
 Copilot 30d  11% 4d1h
 ```
 
-JSON for scripting:
-
-```bash
-vibeusage statusline --json
-```
-
 Filter to specific providers (single provider omits the label):
 
 ```bash
