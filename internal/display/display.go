@@ -14,7 +14,6 @@ var (
 	titleStyle     = lipgloss.NewStyle().Bold(true)
 	separatorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	dimStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	boldStyle      = lipgloss.NewStyle().Bold(true)
 	greenStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	yellowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	redStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
@@ -60,7 +59,7 @@ func FormatPeriodLine(period models.UsagePeriod, nameWidth int) string {
 		reset = dimStyle.Render("resets in " + FormatResetCountdown(d))
 	}
 
-	return boldStyle.Render(name) + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset
+	return name + namePad + "  " + bar + " " + pctPad + pctStyled + "    " + reset
 }
 
 // renderPeriodRow renders a single period as an aligned row using the provided
@@ -78,7 +77,7 @@ func renderPeriodRow(p models.UsagePeriod, displayName string, cw PeriodColWidth
 	namePad := strings.Repeat(" ", max(0, cw.Name-len(displayName)))
 	pctPad := strings.Repeat(" ", max(0, cw.Pct-len(pctRaw)))
 
-	return boldStyle.Render(displayName) + namePad +
+	return displayName + namePad +
 		"  " + RenderBar(p.Utilization, 20, color) +
 		" " + pctPad + colorStyle(color).Render(pctRaw) +
 		"    " + dimStyle.Render(resetRaw)
@@ -246,7 +245,7 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 	}
 
 	if len(longer.periods) > 0 {
-		b.WriteString(boldStyle.Render(longer.header))
+		b.WriteString(longer.header)
 
 		for _, p := range longer.periods {
 			name := formatSubPeriodName(&p, longer.header)
