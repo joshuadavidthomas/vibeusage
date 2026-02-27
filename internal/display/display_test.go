@@ -996,11 +996,11 @@ func TestRenderMetaLine(t *testing.T) {
 			false,
 		},
 		{
-			"all identity fields",
+			"all identity fields on separate lines",
 			models.UsageSnapshot{
 				Identity: &models.ProviderIdentity{Plan: "Pro", Organization: "Acme", Email: "user@example.com"},
 			},
-			[]string{"Plan", "Pro", "Org", "Acme", "Account", "user@example.com"},
+			[]string{"Plan Pro\nOrg Acme\nAccount user@example.com"},
 			false,
 		},
 		{

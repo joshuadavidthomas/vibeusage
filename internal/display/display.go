@@ -182,11 +182,11 @@ func renderMetaLine(snapshot models.UsageSnapshot) string {
 		return ""
 	}
 
-	parts := make([]string, len(fields))
+	lines := make([]string, len(fields))
 	for i, f := range fields {
-		parts[i] = dimStyle.Render(f.label) + " " + f.value
+		lines[i] = dimStyle.Render(f.label) + " " + f.value
 	}
-	return strings.Join(parts, dimStyle.Render("  ·  "))
+	return strings.Join(lines, "\n")
 }
 
 // formatSourceName returns a human-readable name for a fetch source.
