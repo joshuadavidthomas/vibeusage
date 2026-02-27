@@ -79,6 +79,7 @@ func init() {
 	rootCmd.AddCommand(routeCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(usageCmd)
+	rootCmd.AddCommand(statuslineCmd)
 
 	// TODO(v0.4.0): Remove deprecated provider stubs
 	ids := provider.ListIDs()
