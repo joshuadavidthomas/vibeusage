@@ -260,13 +260,20 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 		b.WriteString(formatOverageLine(snapshot.Overage, "Extra Usage"))
 	}
 
-	return renderTitledPanel(titleStyle.Render("Usage"), b.String())
+	return renderTitledPanel(titleStyle.Render("Usage"), b.String(), 0)
 }
 
 // PeriodColWidths holds pre-computed column widths for renderPeriodTable.
 // Compute once across all panels with GlobalPeriodColWidths so every provider
 // box shares the same column widths and renders at the same total width.
 type PeriodColWidths struct{ Name, Pct, Reset int }
+
+// RowWidth returns the total visible width of a fully-populated period row.
+// This is the minimum body width needed for consistent panel sizing.
+func (cw PeriodColWidths) RowWidth() int {
+	// name + "  " + bar(20) + " " + pct + "    " + reset
+	return cw.Name + 2 + 20 + 1 + cw.Pct + 4 + cw.Reset
+}
 
 // GlobalPeriodColWidths computes the widest values for each column across all
 // provided snapshots, using the same name normalisations as RenderProviderPanel.
@@ -371,16 +378,16 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodCo
 	if cached {
 		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
-	return renderTitledPanel(title, b.String())
+	return renderTitledPanel(title, b.String(), cw.RowWidth())
 }
 
-func renderTitledPanel(title string, body string) string {
+func renderTitledPanel(title string, body string, minWidth int) string {
 	lines := strings.Split(body, "\n")
 	if len(lines) == 0 {
 		lines = []string{""}
 	}
 
-	bodyWidth := 0
+	bodyWidth := minWidth
 	for _, line := range lines {
 		bodyWidth = max(bodyWidth, lipgloss.Width(line))
 	}

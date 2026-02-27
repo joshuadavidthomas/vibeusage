@@ -36,6 +36,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Fixed
 
+- Fixed inconsistent panel widths in the dashboard view where providers without reset times (e.g., Amp) rendered narrower boxes than providers with reset countdowns.
 - Fixed confusing overage display when the API returns a null monthly spend limit.
 
 ## [0.3.0]
