@@ -84,10 +84,10 @@ type UpdateStatusJSON struct {
 
 // StatuslineJSON represents a single provider's condensed usage data.
 type StatuslineJSON struct {
-	Provider string               `json:"provider"`
+	Provider string                 `json:"provider"`
 	Periods  []StatuslinePeriodJSON `json:"periods"`
 	Overage  *StatuslineOverageJSON `json:"overage,omitempty"`
-	Error    string               `json:"error,omitempty"`
+	Error    string                 `json:"error,omitempty"`
 }
 
 // StatuslinePeriodJSON represents a single period's condensed data.

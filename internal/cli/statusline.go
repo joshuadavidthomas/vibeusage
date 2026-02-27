@@ -17,8 +17,7 @@ import (
 var statuslineCmd = &cobra.Command{
 	Use:   "statusline",
 	Short: "Show condensed usage for status widgets",
-	Long: `Display condensed usage statistics suitable for status bars, widgets,
-and terminal multiplexers like tmux, i3blocks, sketchybar, or waybar.
+	Long: `Display condensed usage statistics suitable for status bars and scripts.
 
 Output modes:
   (default)  Visual bars with utilization

@@ -121,6 +121,46 @@ vibeusage --no-cache
 > [!NOTE]
 > Provider-specific commands moved from `vibeusage <provider>` to `vibeusage usage <provider>` in v0.3.0. The old commands still work but show a deprecation message. They will be removed in v0.4.0.
 
+## Statusline
+
+For status bars and scripts, `vibeusage statusline` outputs condensed usage:
+
+```bash
+vibeusage statusline
+```
+
+```bash
+ Claude  5h ██████░░░░ 62%  1h   7d █████████░ 98% 16h
+  Codex  5h █░░░░░░░░░ 15% 15m   7d ██░░░░░░░░ 12% 6d9h
+Copilot 30d ██░░░░░░░░ 11% 4d1h
+```
+
+Compact text format for space-constrained widgets:
+
+```bash
+vibeusage statusline --short
+```
+
+```bash
+ Claude  5h  62%  1h   7d  98% 16h
+  Codex  5h  15% 15m   7d  12% 6d9h
+Copilot 30d  11% 4d1h
+```
+
+JSON for scripting:
+
+```bash
+vibeusage statusline --json
+```
+
+Filter to specific providers:
+
+```bash
+vibeusage statusline -p claude           # Single provider
+vibeusage statusline -p claude -p codex  # Multiple providers
+vibeusage statusline --limit 1           # Only the most urgent period per provider
+```
+
 ## Smart Routing
 
 Inspired by OpenRouter-style routing, `vibeusage route` picks the best provider for a model based on real usage headroom from your own connected accounts.

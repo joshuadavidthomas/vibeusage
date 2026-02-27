@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- Added `vibeusage statusline` command for condensed usage output suitable for status bars and scripting. Supports `--short` for compact text, `--json` for machine-readable output, `--provider/-p` to filter providers (repeatable), and `--limit/-n` to cap periods shown per provider.
+
 ## [0.3.0]
 
 ### Added
