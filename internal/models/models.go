@@ -35,6 +35,7 @@ type UsagePeriod struct {
 	PeriodType  PeriodType `json:"period_type"`
 	ResetsAt    *time.Time `json:"resets_at,omitempty"`
 	Model       string     `json:"model,omitempty"`
+
 }
 
 func (p UsagePeriod) Remaining() int {

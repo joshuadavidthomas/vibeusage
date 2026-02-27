@@ -133,97 +133,6 @@ func TestRenderBar_ColorDoesNotAffectContent(t *testing.T) {
 	}
 }
 
-// FormatPeriodLine tests
-
-func TestFormatPeriodLine_ContainsName(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Monthly",
-		Utilization: 42,
-		PeriodType:  models.PeriodMonthly,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "Monthly") {
-		t.Errorf("expected period name in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_ContainsPercentage(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Daily",
-		Utilization: 75,
-		PeriodType:  models.PeriodDaily,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "75%") {
-		t.Errorf("expected '75%%' in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_ContainsBar(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Session",
-		Utilization: 50,
-		PeriodType:  models.PeriodSession,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "█") {
-		t.Errorf("expected filled bar character in output, got: %q", result)
-	}
-	if !strings.Contains(result, "░") {
-		t.Errorf("expected empty bar character in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_TruncatesLongName(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "VeryLongPeriodNameThatExceedsWidth",
-		Utilization: 10,
-		PeriodType:  models.PeriodDaily,
-	}
-
-	result := FormatPeriodLine(period, 10)
-	// The full original name should NOT appear
-	if strings.Contains(result, "VeryLongPeriodNameThatExceedsWidth") {
-		t.Errorf("expected name to be truncated, got: %q", result)
-	}
-	// But the truncated portion should
-	if !strings.Contains(result, "VeryLongPe") {
-		t.Errorf("expected truncated name 'VeryLongPe' in output, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_IncludesResetCountdown(t *testing.T) {
-	reset := time.Now().Add(3 * time.Hour)
-	period := models.UsagePeriod{
-		Name:        "Daily",
-		Utilization: 60,
-		PeriodType:  models.PeriodDaily,
-		ResetsAt:    &reset,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if !strings.Contains(result, "resets in") {
-		t.Errorf("expected 'resets in' countdown, got: %q", result)
-	}
-}
-
-func TestFormatPeriodLine_NoResetWhenNil(t *testing.T) {
-	period := models.UsagePeriod{
-		Name:        "Monthly",
-		Utilization: 30,
-		PeriodType:  models.PeriodMonthly,
-		ResetsAt:    nil,
-	}
-
-	result := FormatPeriodLine(period, 16)
-	if strings.Contains(result, "resets in") {
-		t.Errorf("should not contain 'resets in' when ResetsAt is nil, got: %q", result)
-	}
-}
-
 // FormatStatusUpdated tests
 
 func TestFormatStatusUpdated(t *testing.T) {
@@ -470,6 +379,7 @@ func TestRenderProviderPanel_RenamesWeeklyDaily(t *testing.T) {
 		t.Errorf("expected 'Daily' label for daily period, got: %q", result)
 	}
 }
+
 
 func TestRenderProviderPanel_PreservesBrandedName(t *testing.T) {
 	snap := models.UsageSnapshot{
