@@ -21,7 +21,8 @@ func TestUsageResponse_UnmarshalFullResponse(t *testing.T) {
 		},
 		"usage": {
 			"limit": "100",
-			"remaining": "100",
+			"used": "9",
+			"remaining": "91",
 			"resetTime": "2026-02-25T04:01:38Z"
 		},
 		"limits": [
@@ -66,8 +67,11 @@ func TestUsageResponse_UnmarshalFullResponse(t *testing.T) {
 	if resp.Usage.Limit != "100" {
 		t.Errorf("usage.limit = %q, want %q", resp.Usage.Limit, "100")
 	}
-	if resp.Usage.Remaining != "100" {
-		t.Errorf("usage.remaining = %q, want %q", resp.Usage.Remaining, "100")
+	if resp.Usage.Used != "9" {
+		t.Errorf("usage.used = %q, want %q", resp.Usage.Used, "9")
+	}
+	if resp.Usage.Remaining != "91" {
+		t.Errorf("usage.remaining = %q, want %q", resp.Usage.Remaining, "91")
 	}
 	if resp.Usage.ResetTime != "2026-02-25T04:01:38Z" {
 		t.Errorf("usage.resetTime = %q, want %q", resp.Usage.ResetTime, "2026-02-25T04:01:38Z")
@@ -88,6 +92,40 @@ func TestUsageResponse_UnmarshalFullResponse(t *testing.T) {
 	}
 	if limit.Detail.Limit != "100" {
 		t.Errorf("detail.limit = %q, want %q", limit.Detail.Limit, "100")
+	}
+}
+
+func TestUsageResponse_UnmarshalUsedFieldOmitted(t *testing.T) {
+	// The "used" field appears in the top-level usage object but not in
+	// limits[].detail — verify both cases round-trip correctly.
+	raw := `{
+		"usage": {
+			"limit": "100",
+			"remaining": "100",
+			"resetTime": "2026-02-25T04:01:38Z"
+		},
+		"limits": [
+			{
+				"window": {"duration": 300, "timeUnit": "TIME_UNIT_MINUTE"},
+				"detail": {
+					"limit": "100",
+					"remaining": "100",
+					"resetTime": "2026-02-21T08:01:38Z"
+				}
+			}
+		]
+	}`
+
+	var resp UsageResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if resp.Usage.Used != "" {
+		t.Errorf("usage.used = %q, want empty when omitted", resp.Usage.Used)
+	}
+	if resp.Limits[0].Detail.Used != "" {
+		t.Errorf("limits[0].detail.used = %q, want empty when omitted", resp.Limits[0].Detail.Used)
 	}
 }
 
@@ -144,6 +182,31 @@ func TestUsageDetail_Utilization(t *testing.T) {
 		{
 			name: "remaining exceeds limit clamped to 0",
 			d:    &UsageDetail{Limit: "100", Remaining: "150"},
+			want: 0,
+		},
+		{
+			name: "explicit used field",
+			d:    &UsageDetail{Limit: "100", Used: "9", Remaining: "91"},
+			want: 9,
+		},
+		{
+			name: "explicit used field fully used",
+			d:    &UsageDetail{Limit: "100", Used: "100", Remaining: "0"},
+			want: 100,
+		},
+		{
+			name: "explicit used field zero",
+			d:    &UsageDetail{Limit: "100", Used: "0", Remaining: "100"},
+			want: 0,
+		},
+		{
+			name: "explicit used field preferred over remaining",
+			d:    &UsageDetail{Limit: "100", Used: "25", Remaining: "50"},
+			want: 25,
+		},
+		{
+			name: "explicit used invalid falls back to 0",
+			d:    &UsageDetail{Limit: "100", Used: "abc", Remaining: "50"},
 			want: 0,
 		},
 	}

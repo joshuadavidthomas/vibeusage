@@ -61,6 +61,7 @@ func TestParseUsageResponse_FullResponse(t *testing.T) {
 		},
 		Usage: &UsageDetail{
 			Limit:     "100",
+			Used:      "40",
 			Remaining: "60",
 			ResetTime: "2026-03-01T00:00:00Z",
 		},
