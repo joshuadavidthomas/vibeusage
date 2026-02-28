@@ -10,12 +10,17 @@ func ptrFloat64(f float64) *float64 { return &f }
 
 func TestParseTypedQuotaResponse_FullResponse(t *testing.T) {
 	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(0.75), ResetTime: "2025-02-20T00:00:00Z"},
-			{ModelID: "models/gemini-1.5-pro", RemainingFraction: ptrFloat64(0.5), ResetTime: "2025-02-20T00:00:00Z"},
+		Buckets: []QuotaBucket{
+			{ModelID: "gemini-2.0-flash", RemainingFraction: ptrFloat64(0.75), ResetTime: "2025-02-20T00:00:00Z", TokenType: "REQUESTS"},
+			{ModelID: "gemini-1.5-pro", RemainingFraction: ptrFloat64(0.5), ResetTime: "2025-02-20T00:00:00Z", TokenType: "REQUESTS"},
 		},
 	}
-	codeAssist := &CodeAssistResponse{UserTier: "premium"}
+	codeAssist := &CodeAssistResponse{
+		CurrentTier: &CodeAssistTier{
+			ID:   "standard-tier",
+			Name: "Gemini Code Assist",
+		},
+	}
 
 	s := OAuthStrategy{}
 	snapshot := s.parseTypedQuotaResponse(quota, codeAssist)
@@ -59,8 +64,8 @@ func TestParseTypedQuotaResponse_FullResponse(t *testing.T) {
 	if snapshot.Identity == nil {
 		t.Fatal("expected identity")
 	}
-	if snapshot.Identity.Plan != "premium" {
-		t.Errorf("plan = %q, want %q", snapshot.Identity.Plan, "premium")
+	if snapshot.Identity.Plan != "Gemini Code Assist" {
+		t.Errorf("plan = %q, want %q", snapshot.Identity.Plan, "Gemini Code Assist")
 	}
 }
 
@@ -84,10 +89,10 @@ func TestParseTypedQuotaResponse_EmptyBuckets(t *testing.T) {
 	}
 }
 
-func TestParseTypedQuotaResponse_NoUserTier(t *testing.T) {
+func TestParseTypedQuotaResponse_NoCodeAssist(t *testing.T) {
 	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
+		Buckets: []QuotaBucket{
+			{ModelID: "gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
 		},
 	}
 
@@ -102,10 +107,10 @@ func TestParseTypedQuotaResponse_NoUserTier(t *testing.T) {
 	}
 }
 
-func TestParseTypedQuotaResponse_EmptyUserTier(t *testing.T) {
+func TestParseTypedQuotaResponse_EmptyCurrentTier(t *testing.T) {
 	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
-			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
+		Buckets: []QuotaBucket{
+			{ModelID: "gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
 		},
 	}
 	codeAssist := &CodeAssistResponse{}
@@ -117,13 +122,58 @@ func TestParseTypedQuotaResponse_EmptyUserTier(t *testing.T) {
 		t.Fatal("expected non-nil snapshot")
 	}
 	if snapshot.Identity != nil {
-		t.Error("expected nil identity when user_tier is empty")
+		t.Error("expected nil identity when currentTier is nil")
+	}
+}
+
+func TestParseTypedQuotaResponse_EmptyTierName(t *testing.T) {
+	quota := QuotaResponse{
+		Buckets: []QuotaBucket{
+			{ModelID: "gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
+		},
+	}
+	codeAssist := &CodeAssistResponse{
+		CurrentTier: &CodeAssistTier{ID: "standard-tier"},
+	}
+
+	s := OAuthStrategy{}
+	snapshot := s.parseTypedQuotaResponse(quota, codeAssist)
+
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
+	if snapshot.Identity != nil {
+		t.Error("expected nil identity when tier name is empty")
 	}
 }
 
 func TestParseTypedQuotaResponse_ModelNameParsing(t *testing.T) {
 	quota := QuotaResponse{
-		QuotaBuckets: []QuotaBucket{
+		Buckets: []QuotaBucket{
+			{ModelID: "gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
+		},
+	}
+
+	s := OAuthStrategy{}
+	snapshot := s.parseTypedQuotaResponse(quota, nil)
+
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
+	p := snapshot.Periods[0]
+	if p.Model != "gemini-2.0-flash" {
+		t.Errorf("model = %q, want %q", p.Model, "gemini-2.0-flash")
+	}
+	if p.Name == "" {
+		t.Error("expected non-empty name")
+	}
+}
+
+func TestParseTypedQuotaResponse_ModelNameWithPrefix(t *testing.T) {
+	// The live API returns model IDs without the "models/" prefix,
+	// but the code still handles it gracefully if present.
+	quota := QuotaResponse{
+		Buckets: []QuotaBucket{
 			{ModelID: "models/gemini-2.0-flash", RemainingFraction: ptrFloat64(1.0)},
 		},
 	}
@@ -134,13 +184,35 @@ func TestParseTypedQuotaResponse_ModelNameParsing(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
 	}
-	// The display name should be title-cased
 	p := snapshot.Periods[0]
 	if p.Model != "gemini-2.0-flash" {
 		t.Errorf("model = %q, want %q", p.Model, "gemini-2.0-flash")
 	}
-	// Name should be the title-cased version
-	if p.Name == "" {
-		t.Error("expected non-empty name")
+}
+
+func TestParseTypedQuotaResponse_VertexSuffixModels(t *testing.T) {
+	// The live API returns vertex variants with _vertex suffix
+	quota := QuotaResponse{
+		Buckets: []QuotaBucket{
+			{ModelID: "gemini-2.5-flash", RemainingFraction: ptrFloat64(0.8), TokenType: "REQUESTS"},
+			{ModelID: "gemini-2.5-flash_vertex", RemainingFraction: ptrFloat64(0.9), TokenType: "REQUESTS"},
+		},
+	}
+
+	s := OAuthStrategy{}
+	snapshot := s.parseTypedQuotaResponse(quota, nil)
+
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
+	if len(snapshot.Periods) != 2 {
+		t.Fatalf("len(periods) = %d, want 2", len(snapshot.Periods))
+	}
+
+	if snapshot.Periods[0].Model != "gemini-2.5-flash" {
+		t.Errorf("period[0] model = %q, want %q", snapshot.Periods[0].Model, "gemini-2.5-flash")
+	}
+	if snapshot.Periods[1].Model != "gemini-2.5-flash_vertex" {
+		t.Errorf("period[1] model = %q, want %q", snapshot.Periods[1].Model, "gemini-2.5-flash_vertex")
 	}
 }

@@ -149,7 +149,7 @@ func (s *OAuthStrategy) fetchQuotaData(ctx context.Context, accessToken string) 
 func (s *OAuthStrategy) parseTypedQuotaResponse(quotaResp QuotaResponse, codeAssistResp *CodeAssistResponse) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	for _, bucket := range quotaResp.QuotaBuckets {
+	for _, bucket := range quotaResp.Buckets {
 		modelName := bucket.ModelID
 		if idx := strings.LastIndex(bucket.ModelID, "/"); idx >= 0 {
 			modelName = bucket.ModelID[idx+1:]
@@ -176,8 +176,8 @@ func (s *OAuthStrategy) parseTypedQuotaResponse(quotaResp QuotaResponse, codeAss
 	}
 
 	var identity *models.ProviderIdentity
-	if codeAssistResp != nil && codeAssistResp.UserTier != "" {
-		identity = &models.ProviderIdentity{Plan: codeAssistResp.UserTier}
+	if tier := codeAssistResp.UserTier(); tier != "" {
+		identity = &models.ProviderIdentity{Plan: tier}
 	}
 
 	now := time.Now().UTC()

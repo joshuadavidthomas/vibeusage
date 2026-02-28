@@ -10,14 +10,15 @@ import (
 
 // QuotaResponse represents the response from the Gemini quota endpoint.
 type QuotaResponse struct {
-	QuotaBuckets []QuotaBucket `json:"quota_buckets,omitempty"`
+	Buckets []QuotaBucket `json:"buckets,omitempty"`
 }
 
 // QuotaBucket represents a single quota bucket for a model.
 type QuotaBucket struct {
-	ModelID           string   `json:"model_id,omitempty"`
-	RemainingFraction *float64 `json:"remaining_fraction,omitempty"`
-	ResetTime         string   `json:"reset_time,omitempty"`
+	ResetTime         string   `json:"resetTime,omitempty"`
+	TokenType         string   `json:"tokenType,omitempty"`
+	ModelID           string   `json:"modelId,omitempty"`
+	RemainingFraction *float64 `json:"remainingFraction,omitempty"`
 }
 
 // Utilization returns the usage percentage, clamped to [0, 100].
@@ -38,7 +39,32 @@ func (b *QuotaBucket) ResetTimeUTC() *time.Time {
 
 // CodeAssistResponse represents the response from the Gemini code assist endpoint.
 type CodeAssistResponse struct {
-	UserTier string `json:"user_tier,omitempty"`
+	CurrentTier             *CodeAssistTier  `json:"currentTier,omitempty"`
+	AllowedTiers            []CodeAssistTier `json:"allowedTiers,omitempty"`
+	PaidTier                *CodeAssistTier  `json:"paidTier,omitempty"`
+	CloudAICompanionProject string           `json:"cloudaicompanionProject,omitempty"`
+	GCPManaged              bool             `json:"gcpManaged,omitempty"`
+	ManageSubscriptionURI   string           `json:"manageSubscriptionUri,omitempty"`
+}
+
+// CodeAssistTier represents a tier in the code assist response.
+type CodeAssistTier struct {
+	ID                                 string         `json:"id,omitempty"`
+	Name                               string         `json:"name,omitempty"`
+	Description                        string         `json:"description,omitempty"`
+	UserDefinedCloudAICompanionProject bool           `json:"userDefinedCloudaicompanionProject,omitempty"`
+	PrivacyNotice                      map[string]any `json:"privacyNotice,omitempty"`
+	IsDefault                          bool           `json:"isDefault,omitempty"`
+	UsesGCPTos                         bool           `json:"usesGcpTos,omitempty"`
+}
+
+// UserTier returns a display name for the current tier.
+// Returns empty string if no current tier is set.
+func (r *CodeAssistResponse) UserTier() string {
+	if r == nil || r.CurrentTier == nil {
+		return ""
+	}
+	return r.CurrentTier.Name
 }
 
 // GeminiCLICredentials represents the Gemini CLI "installed" format.
