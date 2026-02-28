@@ -389,8 +389,14 @@ func GlobalPeriodColWidths(snapshots []models.UsageSnapshot) PeriodColWidths {
 
 // collectDisplayPeriods returns the periods shown in the compact panel view,
 // with period-type name normalisation already applied ("Weekly", "Daily", etc.).
+//
+// Aggregate (model-free) periods are preferred. When a provider only returns
+// per-model periods (e.g. Gemini), all periods are included so that the
+// compact panel is not empty.
 func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 	session, weekly, daily, monthly := groupPeriods(snapshot.Periods)
+
+	// First pass: collect only aggregate (non-model) periods.
 	var out []models.UsagePeriod
 	for _, p := range session {
 		if p.Model == "" {
@@ -417,6 +423,76 @@ func collectDisplayPeriods(snapshot models.UsageSnapshot) []models.UsagePeriod {
 		if p.Model == "" {
 			out = append(out, p)
 		}
+	}
+
+	// Fallback: if no aggregate periods exist but there are model-specific
+	// periods, condense them into model-family summary lines (e.g. "Pro",
+	// "Flash") using the highest utilization from each family.
+	if len(out) == 0 && len(snapshot.Periods) > 0 {
+		out = condenseModelPeriods(snapshot.Periods)
+	}
+
+	return out
+}
+
+// condenseModelPeriods groups model-specific periods by family (e.g. "pro",
+// "flash") and returns one summary period per family using the highest
+// utilization. Models that don't match a known family are grouped as "Other".
+func condenseModelPeriods(periods []models.UsagePeriod) []models.UsagePeriod {
+	type bucket struct {
+		best models.UsagePeriod
+		set  bool
+	}
+
+	// Ordered families to check; first match wins.
+	families := []struct {
+		label   string
+		matches func(string) bool
+	}{
+		{"Pro", func(m string) bool {
+			lower := strings.ToLower(m)
+			return strings.Contains(lower, "pro") && !strings.Contains(lower, "flash")
+		}},
+		{"Flash", func(m string) bool {
+			return strings.Contains(strings.ToLower(m), "flash")
+		}},
+	}
+
+	buckets := make([]bucket, len(families))
+	var other bucket
+
+	for _, p := range periods {
+		matched := false
+		for i, f := range families {
+			if f.matches(p.Model) {
+				if !buckets[i].set || p.Utilization > buckets[i].best.Utilization {
+					buckets[i].best = p
+					buckets[i].set = true
+				}
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			if !other.set || p.Utilization > other.best.Utilization {
+				other.best = p
+				other.set = true
+			}
+		}
+	}
+
+	var out []models.UsagePeriod
+	for i, b := range buckets {
+		if b.set {
+			summary := b.best
+			summary.Name = families[i].label
+			out = append(out, summary)
+		}
+	}
+	if other.set {
+		summary := other.best
+		summary.Name = "Other"
+		out = append(out, summary)
 	}
 	return out
 }
