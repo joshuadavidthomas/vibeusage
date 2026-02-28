@@ -96,15 +96,6 @@ func fetchCredits(ctx context.Context, token string, httpTimeout float64) (fetch
 	return fetch.ResultOK(*snapshot), nil
 }
 
-type CreditsResponse struct {
-	Data CreditsData `json:"data"`
-}
-
-type CreditsData struct {
-	TotalCredits float64 `json:"total_credits"`
-	TotalUsage   float64 `json:"total_usage"`
-}
-
 func parseCreditsSnapshot(resp CreditsResponse) (*models.UsageSnapshot, error) {
 	total := resp.Data.TotalCredits
 	used := resp.Data.TotalUsage
