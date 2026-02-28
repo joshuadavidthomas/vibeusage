@@ -6,7 +6,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-func boolPtr(b bool) *bool     { return &b }
+func boolPtr(b bool) *bool          { return &b }
 func float64Ptr(f float64) *float64 { return &f }
 
 func TestParseTypedResponse_FullResponse(t *testing.T) {

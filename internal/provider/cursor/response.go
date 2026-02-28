@@ -9,15 +9,15 @@ import (
 // UsageSummaryResponse represents the response from the Cursor usage summary endpoint.
 // The API returns cents-based usage with individual and team breakdowns.
 type UsageSummaryResponse struct {
-	BillingCycleStart                  string           `json:"billingCycleStart,omitempty"`
-	BillingCycleEnd                    string           `json:"billingCycleEnd,omitempty"`
-	MembershipType                     string           `json:"membershipType,omitempty"`
-	LimitType                          string           `json:"limitType,omitempty"`
-	IsUnlimited                        *bool            `json:"isUnlimited,omitempty"`
-	AutoModelSelectedDisplayMessage    string           `json:"autoModelSelectedDisplayMessage,omitempty"`
-	NamedModelSelectedDisplayMessage   string           `json:"namedModelSelectedDisplayMessage,omitempty"`
-	IndividualUsage                    *IndividualUsage `json:"individualUsage,omitempty"`
-	TeamUsage                          *TeamUsage       `json:"teamUsage,omitempty"`
+	BillingCycleStart                string           `json:"billingCycleStart,omitempty"`
+	BillingCycleEnd                  string           `json:"billingCycleEnd,omitempty"`
+	MembershipType                   string           `json:"membershipType,omitempty"`
+	LimitType                        string           `json:"limitType,omitempty"`
+	IsUnlimited                      *bool            `json:"isUnlimited,omitempty"`
+	AutoModelSelectedDisplayMessage  string           `json:"autoModelSelectedDisplayMessage,omitempty"`
+	NamedModelSelectedDisplayMessage string           `json:"namedModelSelectedDisplayMessage,omitempty"`
+	IndividualUsage                  *IndividualUsage `json:"individualUsage,omitempty"`
+	TeamUsage                        *TeamUsage       `json:"teamUsage,omitempty"`
 }
 
 // BillingCycleEndTime parses the billing cycle end as a time.
@@ -64,14 +64,14 @@ type IndividualUsage struct {
 
 // PlanUsage represents included plan usage (amounts in cents).
 type PlanUsage struct {
-	Enabled         *bool          `json:"enabled,omitempty"`
-	Used            float64        `json:"used"`
-	Limit           float64        `json:"limit"`
-	Remaining       float64        `json:"remaining"`
-	Breakdown       *PlanBreakdown `json:"breakdown,omitempty"`
-	AutoPercentUsed float64        `json:"autoPercentUsed"`
-	APIPercentUsed  float64        `json:"apiPercentUsed"`
-	TotalPercentUsed float64       `json:"totalPercentUsed"`
+	Enabled          *bool          `json:"enabled,omitempty"`
+	Used             float64        `json:"used"`
+	Limit            float64        `json:"limit"`
+	Remaining        float64        `json:"remaining"`
+	Breakdown        *PlanBreakdown `json:"breakdown,omitempty"`
+	AutoPercentUsed  float64        `json:"autoPercentUsed"`
+	APIPercentUsed   float64        `json:"apiPercentUsed"`
+	TotalPercentUsed float64        `json:"totalPercentUsed"`
 }
 
 // PlanBreakdown breaks down plan usage into included and bonus credits (cents).
