@@ -84,11 +84,26 @@ func TestQuotaResponse_UnmarshalFullResponse(t *testing.T) {
 	if timeLim.Type != "TIME_LIMIT" {
 		t.Errorf("type = %q, want %q", timeLim.Type, "TIME_LIMIT")
 	}
+	if timeLim.Unit != 5 {
+		t.Errorf("unit = %d, want 5", timeLim.Unit)
+	}
+	if timeLim.Number != 1 {
+		t.Errorf("number = %d, want 1", timeLim.Number)
+	}
 	if timeLim.Usage != 1000 {
 		t.Errorf("usage = %d, want 1000", timeLim.Usage)
 	}
+	if timeLim.CurrentValue != 0 {
+		t.Errorf("currentValue = %d, want 0", timeLim.CurrentValue)
+	}
 	if timeLim.Remaining != 1000 {
 		t.Errorf("remaining = %d, want 1000", timeLim.Remaining)
+	}
+	if timeLim.Percentage != 0 {
+		t.Errorf("percentage = %d, want 0", timeLim.Percentage)
+	}
+	if timeLim.NextResetTime != 1773596236985 {
+		t.Errorf("nextResetTime = %d, want 1773596236985", timeLim.NextResetTime)
 	}
 	if len(timeLim.UsageDetails) != 3 {
 		t.Fatalf("expected 3 usage details, got %d", len(timeLim.UsageDetails))
