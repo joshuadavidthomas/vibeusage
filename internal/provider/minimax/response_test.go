@@ -67,6 +67,9 @@ func TestCodingPlanResponse_UnmarshalFullResponse(t *testing.T) {
 	if m.EndTime != 1771668000000 {
 		t.Errorf("end_time = %d, want 1771668000000", m.EndTime)
 	}
+	if m.RemainsTime != 8196068 {
+		t.Errorf("remains_time = %d, want 8196068", m.RemainsTime)
+	}
 	if m.CurrentIntervalTotalCount != 1500 {
 		t.Errorf("total_count = %d, want 1500", m.CurrentIntervalTotalCount)
 	}
