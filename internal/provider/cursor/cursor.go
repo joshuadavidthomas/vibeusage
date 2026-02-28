@@ -44,8 +44,8 @@ func (c Cursor) FetchStatus(ctx context.Context) models.ProviderStatus {
 }
 
 const (
-	usageSummaryURL = "https://www.cursor.com/api/usage-summary"
-	authMeURL       = "https://www.cursor.com/api/auth/me"
+	usageSummaryURL = "https://cursor.com/api/usage-summary"
+	authMeURL       = "https://cursor.com/api/auth/me"
 )
 
 // Auth returns the manual session token flow for Cursor.
@@ -148,40 +148,51 @@ func (s *WebStrategy) parseTypedResponse(usageResp UsageSummaryResponse, userRes
 	var periods []models.UsagePeriod
 	var overage *models.OverageUsage
 
-	if usageResp.PremiumRequests != nil {
-		used := usageResp.PremiumRequests.Used
-		available := usageResp.PremiumRequests.Available
-		total := used + available
-		var utilization int
-		if total > 0 {
-			utilization = int((used / total) * 100)
-		}
+	resetsAt := usageResp.BillingCycleEndTime()
 
-		var resetsAt *time.Time
-		if usageResp.BillingCycle != nil {
-			resetsAt = usageResp.BillingCycle.EndTime()
+	if usageResp.IndividualUsage != nil && usageResp.IndividualUsage.Plan != nil {
+		plan := usageResp.IndividualUsage.Plan
+		var utilization int
+
+		if plan.TotalPercentUsed > 0 {
+			utilization = int(plan.TotalPercentUsed)
+		} else if plan.Limit > 0 {
+			utilization = int((plan.Used / plan.Limit) * 100)
 		}
 
 		periods = append(periods, models.UsagePeriod{
-			Name:        "Premium Requests",
+			Name:        "Plan Usage",
 			Utilization: utilization,
 			PeriodType:  models.PeriodMonthly,
 			ResetsAt:    resetsAt,
 		})
 	}
 
-	if usageResp.OnDemandSpend != nil && usageResp.OnDemandSpend.LimitCents > 0 {
-		overage = &models.OverageUsage{
-			Used:      usageResp.OnDemandSpend.UsedCents / 100.0,
-			Limit:     usageResp.OnDemandSpend.LimitCents / 100.0,
-			Currency:  "USD",
-			IsEnabled: true,
+	if usageResp.IndividualUsage != nil && usageResp.IndividualUsage.OnDemand != nil {
+		od := usageResp.IndividualUsage.OnDemand
+		enabled := od.Enabled != nil && *od.Enabled
+		if enabled && od.Limit != nil && *od.Limit > 0 {
+			overage = &models.OverageUsage{
+				Used:      od.Used / 100.0,
+				Limit:     *od.Limit / 100.0,
+				Currency:  "USD",
+				IsEnabled: true,
+			}
 		}
 	}
 
+	// Identity: prefer membershipType from usage-summary, email from user/me response
+	membershipType := usageResp.MembershipType
 	var identity *models.ProviderIdentity
 	if userResp != nil && (userResp.Email != "" || userResp.MembershipType != "") {
-		identity = &models.ProviderIdentity{Email: userResp.Email, Plan: userResp.MembershipType}
+		email := userResp.Email
+		plan := userResp.MembershipType
+		if plan == "" {
+			plan = membershipType
+		}
+		identity = &models.ProviderIdentity{Email: email, Plan: plan}
+	} else if membershipType != "" {
+		identity = &models.ProviderIdentity{Plan: membershipType}
 	}
 
 	if len(periods) == 0 {

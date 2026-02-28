@@ -2,61 +2,110 @@ package cursor
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
 // UsageSummaryResponse represents the response from the Cursor usage summary endpoint.
+// The API returns cents-based usage with individual and team breakdowns.
 type UsageSummaryResponse struct {
-	PremiumRequests *PremiumRequests `json:"premium_requests,omitempty"`
-	BillingCycle    *BillingCycle    `json:"billing_cycle,omitempty"`
-	OnDemandSpend   *OnDemandSpend   `json:"on_demand_spend,omitempty"`
+	BillingCycleStart                string           `json:"billingCycleStart,omitempty"`
+	BillingCycleEnd                  string           `json:"billingCycleEnd,omitempty"`
+	MembershipType                   string           `json:"membershipType,omitempty"`
+	LimitType                        string           `json:"limitType,omitempty"`
+	IsUnlimited                      *bool            `json:"isUnlimited,omitempty"`
+	AutoModelSelectedDisplayMessage  string           `json:"autoModelSelectedDisplayMessage,omitempty"`
+	NamedModelSelectedDisplayMessage string           `json:"namedModelSelectedDisplayMessage,omitempty"`
+	IndividualUsage                  *IndividualUsage `json:"individualUsage,omitempty"`
+	TeamUsage                        *TeamUsage       `json:"teamUsage,omitempty"`
 }
 
-// PremiumRequests represents premium request usage.
-type PremiumRequests struct {
-	Used      float64 `json:"used"`
-	Available float64 `json:"available"`
+// BillingCycleEndTime parses the billing cycle end as a time.
+// Handles both ISO 8601 strings and Unix millisecond timestamps (as strings).
+func (r *UsageSummaryResponse) BillingCycleEndTime() *time.Time {
+	return parseFlexibleTime(r.BillingCycleEnd)
 }
 
-// BillingCycle represents billing cycle dates.
-// The "end" field can be either an RFC3339 string or a Unix millisecond timestamp.
-type BillingCycle struct {
-	EndRaw json.RawMessage `json:"end,omitempty"`
+// BillingCycleStartTime parses the billing cycle start as a time.
+func (r *UsageSummaryResponse) BillingCycleStartTime() *time.Time {
+	return parseFlexibleTime(r.BillingCycleStart)
 }
 
-// EndTime parses the "end" field as a time, handling both string and numeric formats.
-func (bc *BillingCycle) EndTime() *time.Time {
-	if bc == nil || len(bc.EndRaw) == 0 {
+// parseFlexibleTime parses a time string that may be ISO 8601 or Unix ms (as string or number).
+func parseFlexibleTime(raw string) *time.Time {
+	if raw == "" {
 		return nil
 	}
 
-	// Try string first
-	var s string
-	if json.Unmarshal(bc.EndRaw, &s) == nil && s != "" {
-		if t, err := time.Parse(time.RFC3339, s); err == nil {
-			return &t
-		}
+	// Try ISO 8601 with fractional seconds
+	if t, err := time.Parse("2006-01-02T15:04:05.999Z", raw); err == nil {
+		return &t
+	}
+	// Try ISO 8601 without fractional seconds
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return &t
 	}
 
-	// Try numeric (milliseconds)
-	var f float64
-	if json.Unmarshal(bc.EndRaw, &f) == nil && f > 0 {
-		t := time.UnixMilli(int64(f)).UTC()
+	// Try as Unix millisecond string (Connect RPC format)
+	var ms float64
+	if json.Unmarshal([]byte(raw), &ms) == nil && ms > 0 {
+		t := time.UnixMilli(int64(ms)).UTC()
 		return &t
 	}
 
 	return nil
 }
 
-// OnDemandSpend represents on-demand spending limits and usage.
-type OnDemandSpend struct {
-	LimitCents float64 `json:"limit_cents"`
-	UsedCents  float64 `json:"used_cents"`
+// IndividualUsage represents per-user usage data.
+type IndividualUsage struct {
+	Plan     *PlanUsage     `json:"plan,omitempty"`
+	OnDemand *OnDemandUsage `json:"onDemand,omitempty"`
 }
 
-// UserMeResponse represents the response from the Cursor user/me endpoint.
+// PlanUsage represents included plan usage (amounts in cents).
+type PlanUsage struct {
+	Enabled          *bool          `json:"enabled,omitempty"`
+	Used             float64        `json:"used"`
+	Limit            float64        `json:"limit"`
+	Remaining        float64        `json:"remaining"`
+	Breakdown        *PlanBreakdown `json:"breakdown,omitempty"`
+	AutoPercentUsed  float64        `json:"autoPercentUsed"`
+	APIPercentUsed   float64        `json:"apiPercentUsed"`
+	TotalPercentUsed float64        `json:"totalPercentUsed"`
+}
+
+// PlanBreakdown breaks down plan usage into included and bonus credits (cents).
+type PlanBreakdown struct {
+	Included float64 `json:"included"`
+	Bonus    float64 `json:"bonus"`
+	Total    float64 `json:"total"`
+}
+
+// OnDemandUsage represents on-demand spending (amounts in cents).
+// Limit and Remaining are nullable (nil when on-demand is disabled or unlimited).
+type OnDemandUsage struct {
+	Enabled   *bool    `json:"enabled,omitempty"`
+	Used      float64  `json:"used"`
+	Limit     *float64 `json:"limit"`
+	Remaining *float64 `json:"remaining"`
+}
+
+// TeamUsage represents team-level usage data.
+type TeamUsage struct {
+	OnDemand *OnDemandUsage `json:"onDemand,omitempty"`
+}
+
+// UserMeResponse represents the response from the Cursor auth/me endpoint.
 type UserMeResponse struct {
-	Email          string `json:"email,omitempty"`
+	Email         string `json:"email,omitempty"`
+	EmailVerified *bool  `json:"email_verified,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Sub           string `json:"sub,omitempty"`
+	CreatedAt     string `json:"created_at,omitempty"`
+	UpdatedAt     string `json:"updated_at,omitempty"`
+	Picture       string `json:"picture,omitempty"`
+
+	// Legacy field: some responses include membership_type here.
 	MembershipType string `json:"membership_type,omitempty"`
 }
 
@@ -73,7 +122,7 @@ type SessionCredentials struct {
 func (c *SessionCredentials) EffectiveToken() string {
 	for _, v := range []string{c.SessionToken, c.Token, c.SessionKey, c.Session} {
 		if v != "" {
-			return v
+			return strings.TrimSpace(v)
 		}
 	}
 	return ""
