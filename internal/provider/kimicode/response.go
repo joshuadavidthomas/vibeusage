@@ -32,12 +32,14 @@ type Membership struct {
 // UsageDetail represents usage quota info with limit, remaining, and reset time.
 type UsageDetail struct {
 	Limit     string `json:"limit"`
+	Used      string `json:"used,omitempty"`
 	Remaining string `json:"remaining"`
 	ResetTime string `json:"resetTime,omitempty"`
 }
 
 // Utilization returns the usage percentage, clamped to [0, 100].
-// Computed as (limit - remaining) / limit * 100.
+// Uses the explicit "used" field when available, otherwise computes
+// (limit - remaining) / limit * 100.
 func (u *UsageDetail) Utilization() int {
 	if u == nil {
 		return 0
@@ -46,11 +48,19 @@ func (u *UsageDetail) Utilization() int {
 	if err != nil || limit <= 0 {
 		return 0
 	}
-	remaining, err := strconv.Atoi(u.Remaining)
-	if err != nil {
-		return 0
+	var used int
+	if u.Used != "" {
+		used, err = strconv.Atoi(u.Used)
+		if err != nil {
+			return 0
+		}
+	} else {
+		remaining, err := strconv.Atoi(u.Remaining)
+		if err != nil {
+			return 0
+		}
+		used = limit - remaining
 	}
-	used := limit - remaining
 	pct := int(float64(used) / float64(limit) * 100)
 	return max(0, min(pct, 100))
 }
