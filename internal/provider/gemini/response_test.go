@@ -8,16 +8,18 @@ import (
 
 func TestQuotaResponse_UnmarshalFullResponse(t *testing.T) {
 	raw := `{
-		"quota_buckets": [
+		"buckets": [
 			{
-				"model_id": "models/gemini-2.0-flash",
-				"remaining_fraction": 0.75,
-				"reset_time": "2025-02-20T00:00:00Z"
+				"resetTime": "2025-02-20T00:00:00Z",
+				"tokenType": "REQUESTS",
+				"modelId": "gemini-2.0-flash",
+				"remainingFraction": 0.75
 			},
 			{
-				"model_id": "models/gemini-1.5-pro",
-				"remaining_fraction": 0.5,
-				"reset_time": "2025-02-20T00:00:00Z"
+				"resetTime": "2025-02-20T00:00:00Z",
+				"tokenType": "REQUESTS",
+				"modelId": "gemini-1.5-pro",
+				"remainingFraction": 0.5
 			}
 		]
 	}`
@@ -27,19 +29,89 @@ func TestQuotaResponse_UnmarshalFullResponse(t *testing.T) {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if len(resp.QuotaBuckets) != 2 {
-		t.Fatalf("len(quota_buckets) = %d, want 2", len(resp.QuotaBuckets))
+	if len(resp.Buckets) != 2 {
+		t.Fatalf("len(buckets) = %d, want 2", len(resp.Buckets))
 	}
 
-	b := resp.QuotaBuckets[0]
-	if b.ModelID != "models/gemini-2.0-flash" {
-		t.Errorf("model_id = %q, want %q", b.ModelID, "models/gemini-2.0-flash")
+	b := resp.Buckets[0]
+	if b.ModelID != "gemini-2.0-flash" {
+		t.Errorf("modelId = %q, want %q", b.ModelID, "gemini-2.0-flash")
 	}
 	if b.RemainingFraction == nil || *b.RemainingFraction != 0.75 {
-		t.Errorf("remaining_fraction = %v, want 0.75", b.RemainingFraction)
+		t.Errorf("remainingFraction = %v, want 0.75", b.RemainingFraction)
 	}
 	if b.ResetTime != "2025-02-20T00:00:00Z" {
-		t.Errorf("reset_time = %q, want %q", b.ResetTime, "2025-02-20T00:00:00Z")
+		t.Errorf("resetTime = %q, want %q", b.ResetTime, "2025-02-20T00:00:00Z")
+	}
+	if b.TokenType != "REQUESTS" {
+		t.Errorf("tokenType = %q, want %q", b.TokenType, "REQUESTS")
+	}
+}
+
+func TestQuotaResponse_UnmarshalLiveAPIShape(t *testing.T) {
+	// Matches the exact shape returned by the live API
+	raw := `{
+		"buckets": [
+			{
+				"resetTime": "2026-03-01T04:56:03Z",
+				"tokenType": "REQUESTS",
+				"modelId": "gemini-2.0-flash",
+				"remainingFraction": 1
+			},
+			{
+				"resetTime": "2026-03-01T04:56:03Z",
+				"tokenType": "REQUESTS",
+				"modelId": "gemini-2.0-flash_vertex",
+				"remainingFraction": 1
+			},
+			{
+				"resetTime": "2026-03-01T04:56:03Z",
+				"tokenType": "REQUESTS",
+				"modelId": "gemini-2.5-flash",
+				"remainingFraction": 1
+			},
+			{
+				"resetTime": "2026-03-01T04:56:03Z",
+				"tokenType": "REQUESTS",
+				"modelId": "gemini-2.5-pro",
+				"remainingFraction": 1
+			}
+		]
+	}`
+
+	var resp QuotaResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if len(resp.Buckets) != 4 {
+		t.Fatalf("len(buckets) = %d, want 4", len(resp.Buckets))
+	}
+
+	// Verify all fields parsed correctly
+	for i, b := range resp.Buckets {
+		if b.TokenType != "REQUESTS" {
+			t.Errorf("buckets[%d].tokenType = %q, want %q", i, b.TokenType, "REQUESTS")
+		}
+		if b.RemainingFraction == nil {
+			t.Errorf("buckets[%d].remainingFraction is nil", i)
+		} else if *b.RemainingFraction != 1 {
+			t.Errorf("buckets[%d].remainingFraction = %v, want 1", i, *b.RemainingFraction)
+		}
+		if b.ResetTime == "" {
+			t.Errorf("buckets[%d].resetTime is empty", i)
+		}
+		if b.ModelID == "" {
+			t.Errorf("buckets[%d].modelId is empty", i)
+		}
+	}
+
+	// Check specific model IDs
+	expectedModels := []string{"gemini-2.0-flash", "gemini-2.0-flash_vertex", "gemini-2.5-flash", "gemini-2.5-pro"}
+	for i, want := range expectedModels {
+		if resp.Buckets[i].ModelID != want {
+			t.Errorf("buckets[%d].modelId = %q, want %q", i, resp.Buckets[i].ModelID, want)
+		}
 	}
 }
 
@@ -51,8 +123,8 @@ func TestQuotaResponse_UnmarshalEmpty(t *testing.T) {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if resp.QuotaBuckets != nil {
-		t.Errorf("expected nil quota_buckets, got %v", resp.QuotaBuckets)
+	if resp.Buckets != nil {
+		t.Errorf("expected nil buckets, got %v", resp.Buckets)
 	}
 }
 
@@ -126,16 +198,87 @@ func TestQuotaBucket_ResetTimeUTC(t *testing.T) {
 	}
 }
 
-func TestCodeAssistResponse_Unmarshal(t *testing.T) {
-	raw := `{"user_tier": "premium"}`
+func TestCodeAssistResponse_UnmarshalFullResponse(t *testing.T) {
+	raw := `{
+		"currentTier": {
+			"id": "standard-tier",
+			"name": "Gemini Code Assist",
+			"description": "Unlimited coding assistant with the most powerful Gemini models",
+			"userDefinedCloudaicompanionProject": true,
+			"privacyNotice": {},
+			"usesGcpTos": true
+		},
+		"allowedTiers": [
+			{
+				"id": "standard-tier",
+				"name": "Gemini Code Assist",
+				"description": "Unlimited coding assistant with the most powerful Gemini models",
+				"userDefinedCloudaicompanionProject": true,
+				"privacyNotice": {},
+				"isDefault": true,
+				"usesGcpTos": true
+			}
+		],
+		"cloudaicompanionProject": "helpful-perigee-2nnd9",
+		"gcpManaged": false,
+		"manageSubscriptionUri": "https://accounts.google.com/AccountChooser?Email=test%40gmail.com&continue=https%3A%2F%2Fone.google.com%2Fsettings",
+		"paidTier": {
+			"id": "g1-pro-tier",
+			"name": "Gemini Code Assist in Google One AI Pro",
+			"description": "Google One AI Pro tier for Gemini Code Assist",
+			"privacyNotice": {}
+		}
+	}`
 
 	var resp CodeAssistResponse
 	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if resp.UserTier != "premium" {
-		t.Errorf("user_tier = %q, want %q", resp.UserTier, "premium")
+	if resp.CurrentTier == nil {
+		t.Fatal("expected non-nil currentTier")
+	}
+	if resp.CurrentTier.ID != "standard-tier" {
+		t.Errorf("currentTier.id = %q, want %q", resp.CurrentTier.ID, "standard-tier")
+	}
+	if resp.CurrentTier.Name != "Gemini Code Assist" {
+		t.Errorf("currentTier.name = %q, want %q", resp.CurrentTier.Name, "Gemini Code Assist")
+	}
+	if resp.CurrentTier.Description != "Unlimited coding assistant with the most powerful Gemini models" {
+		t.Errorf("currentTier.description = %q", resp.CurrentTier.Description)
+	}
+	if !resp.CurrentTier.UserDefinedCloudAICompanionProject {
+		t.Error("expected currentTier.userDefinedCloudaicompanionProject to be true")
+	}
+	if !resp.CurrentTier.UsesGCPTos {
+		t.Error("expected currentTier.usesGcpTos to be true")
+	}
+
+	if len(resp.AllowedTiers) != 1 {
+		t.Fatalf("len(allowedTiers) = %d, want 1", len(resp.AllowedTiers))
+	}
+	if !resp.AllowedTiers[0].IsDefault {
+		t.Error("expected allowedTiers[0].isDefault to be true")
+	}
+
+	if resp.CloudAICompanionProject != "helpful-perigee-2nnd9" {
+		t.Errorf("cloudaicompanionProject = %q, want %q", resp.CloudAICompanionProject, "helpful-perigee-2nnd9")
+	}
+	if resp.GCPManaged {
+		t.Error("expected gcpManaged to be false")
+	}
+	if resp.ManageSubscriptionURI == "" {
+		t.Error("expected non-empty manageSubscriptionUri")
+	}
+
+	if resp.PaidTier == nil {
+		t.Fatal("expected non-nil paidTier")
+	}
+	if resp.PaidTier.ID != "g1-pro-tier" {
+		t.Errorf("paidTier.id = %q, want %q", resp.PaidTier.ID, "g1-pro-tier")
+	}
+	if resp.PaidTier.Name != "Gemini Code Assist in Google One AI Pro" {
+		t.Errorf("paidTier.name = %q, want %q", resp.PaidTier.Name, "Gemini Code Assist in Google One AI Pro")
 	}
 }
 
@@ -147,8 +290,56 @@ func TestCodeAssistResponse_UnmarshalEmpty(t *testing.T) {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if resp.UserTier != "" {
-		t.Errorf("user_tier = %q, want empty", resp.UserTier)
+	if resp.CurrentTier != nil {
+		t.Errorf("expected nil currentTier, got %+v", resp.CurrentTier)
+	}
+	if resp.AllowedTiers != nil {
+		t.Errorf("expected nil allowedTiers, got %v", resp.AllowedTiers)
+	}
+	if resp.PaidTier != nil {
+		t.Errorf("expected nil paidTier, got %+v", resp.PaidTier)
+	}
+}
+
+func TestCodeAssistResponse_UserTier(t *testing.T) {
+	tests := []struct {
+		name string
+		resp *CodeAssistResponse
+		want string
+	}{
+		{
+			name: "with current tier",
+			resp: &CodeAssistResponse{
+				CurrentTier: &CodeAssistTier{Name: "Gemini Code Assist"},
+			},
+			want: "Gemini Code Assist",
+		},
+		{
+			name: "nil response",
+			resp: nil,
+			want: "",
+		},
+		{
+			name: "nil current tier",
+			resp: &CodeAssistResponse{},
+			want: "",
+		},
+		{
+			name: "empty tier name",
+			resp: &CodeAssistResponse{
+				CurrentTier: &CodeAssistTier{ID: "standard-tier"},
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.resp.UserTier()
+			if got != tt.want {
+				t.Errorf("UserTier() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

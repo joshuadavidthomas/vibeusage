@@ -1194,3 +1194,127 @@ func TestRenderSingleProvider_ConsistentPanelLineWidths(t *testing.T) {
 		t.Errorf("all panel lines should be the same visual width, got widths: %v", widths)
 	}
 }
+
+func TestCondenseModelPeriods(t *testing.T) {
+	reset := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("groups pro and flash families", func(t *testing.T) {
+		periods := []models.UsagePeriod{
+			{Name: "Gemini 2.5 Pro", Model: "gemini-2.5-pro", Utilization: 30, ResetsAt: &reset},
+			{Name: "Gemini 2.5 Pro Vertex", Model: "gemini-2.5-pro_vertex", Utilization: 10, ResetsAt: &reset},
+			{Name: "Gemini 2.5 Flash", Model: "gemini-2.5-flash", Utilization: 50, ResetsAt: &reset},
+			{Name: "Gemini 2.0 Flash", Model: "gemini-2.0-flash", Utilization: 20, ResetsAt: &reset},
+		}
+
+		result := condenseModelPeriods(periods)
+
+		if len(result) != 2 {
+			t.Fatalf("len = %d, want 2", len(result))
+		}
+
+		// Pro: highest utilization is 30%
+		if result[0].Name != "Pro" {
+			t.Errorf("result[0].Name = %q, want %q", result[0].Name, "Pro")
+		}
+		if result[0].Utilization != 30 {
+			t.Errorf("result[0].Utilization = %d, want 30", result[0].Utilization)
+		}
+
+		// Flash: highest utilization is 50%
+		if result[1].Name != "Flash" {
+			t.Errorf("result[1].Name = %q, want %q", result[1].Name, "Flash")
+		}
+		if result[1].Utilization != 50 {
+			t.Errorf("result[1].Utilization = %d, want 50", result[1].Utilization)
+		}
+	})
+
+	t.Run("unmatched models go to Other", func(t *testing.T) {
+		periods := []models.UsagePeriod{
+			{Name: "Some Model", Model: "some-model", Utilization: 40, ResetsAt: &reset},
+		}
+
+		result := condenseModelPeriods(periods)
+
+		if len(result) != 1 {
+			t.Fatalf("len = %d, want 1", len(result))
+		}
+		if result[0].Name != "Other" {
+			t.Errorf("result[0].Name = %q, want %q", result[0].Name, "Other")
+		}
+		if result[0].Utilization != 40 {
+			t.Errorf("result[0].Utilization = %d, want 40", result[0].Utilization)
+		}
+	})
+
+	t.Run("empty input returns nil", func(t *testing.T) {
+		result := condenseModelPeriods(nil)
+		if result != nil {
+			t.Errorf("expected nil, got %v", result)
+		}
+	})
+
+	t.Run("flash-lite counts as flash", func(t *testing.T) {
+		periods := []models.UsagePeriod{
+			{Name: "Gemini 2.5 Flash Lite", Model: "gemini-2.5-flash-lite", Utilization: 80, ResetsAt: &reset},
+		}
+
+		result := condenseModelPeriods(periods)
+
+		if len(result) != 1 {
+			t.Fatalf("len = %d, want 1", len(result))
+		}
+		if result[0].Name != "Flash" {
+			t.Errorf("result[0].Name = %q, want %q", result[0].Name, "Flash")
+		}
+		if result[0].Utilization != 80 {
+			t.Errorf("result[0].Utilization = %d, want 80", result[0].Utilization)
+		}
+	})
+}
+
+func TestCollectDisplayPeriods_ModelOnlyFallback(t *testing.T) {
+	reset := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	snapshot := models.UsageSnapshot{
+		Provider: "gemini",
+		Periods: []models.UsagePeriod{
+			{Name: "Gemini 2.5 Pro", Model: "gemini-2.5-pro", Utilization: 25, PeriodType: models.PeriodDaily, ResetsAt: &reset},
+			{Name: "Gemini 2.5 Flash", Model: "gemini-2.5-flash", Utilization: 10, PeriodType: models.PeriodDaily, ResetsAt: &reset},
+		},
+	}
+
+	result := collectDisplayPeriods(snapshot)
+
+	if len(result) != 2 {
+		t.Fatalf("len = %d, want 2", len(result))
+	}
+	if result[0].Name != "Pro" {
+		t.Errorf("result[0].Name = %q, want %q", result[0].Name, "Pro")
+	}
+	if result[1].Name != "Flash" {
+		t.Errorf("result[1].Name = %q, want %q", result[1].Name, "Flash")
+	}
+}
+
+func TestCollectDisplayPeriods_AggregatePreferred(t *testing.T) {
+	reset := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+
+	snapshot := models.UsageSnapshot{
+		Provider: "test",
+		Periods: []models.UsagePeriod{
+			{Name: "Daily", Utilization: 25, PeriodType: models.PeriodDaily, ResetsAt: &reset},
+			{Name: "Model X", Model: "model-x", Utilization: 50, PeriodType: models.PeriodDaily, ResetsAt: &reset},
+		},
+	}
+
+	result := collectDisplayPeriods(snapshot)
+
+	// Should only include the aggregate period, not the model-specific one
+	if len(result) != 1 {
+		t.Fatalf("len = %d, want 1", len(result))
+	}
+	if result[0].Name != "Daily" {
+		t.Errorf("result[0].Name = %q, want %q", result[0].Name, "Daily")
+	}
+}
