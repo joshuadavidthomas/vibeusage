@@ -134,9 +134,6 @@ Skip cache and fail fast if APIs are unreachable:
 vibeusage --no-cache
 ```
 
-> [!NOTE]
-> Provider-specific commands moved from `vibeusage <provider>` to `vibeusage usage <provider>` in v0.3.0. The old commands still work but show a deprecation message. They will be removed in v0.4.0.
-
 ## Statusline
 
 For status bars and scripts, `vibeusage statusline` outputs condensed usage:

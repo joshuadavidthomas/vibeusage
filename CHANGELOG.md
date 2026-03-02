@@ -36,6 +36,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Removed
 
+- Removed deprecated top-level provider command stubs (`vibeusage claude`, `vibeusage codex`, etc.). Use `vibeusage usage <provider>` instead.
 - Removed unreliable Claude plan tier inference.
 
 ### Fixed

@@ -81,12 +81,6 @@ func init() {
 	rootCmd.AddCommand(usageCmd)
 	rootCmd.AddCommand(statuslineCmd)
 
-	// TODO(v0.4.0): Remove deprecated provider stubs
-	ids := provider.ListIDs()
-	sort.Strings(ids)
-	for _, id := range ids {
-		rootCmd.AddCommand(makeDeprecatedProviderCmd(id))
-	}
 }
 
 func Execute() error {
@@ -262,19 +256,6 @@ func makeProviderCmd(providerID string) *cobra.Command {
 		Short: "Show usage for " + titleName,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fetchAndDisplayProvider(cmd.Context(), providerID)
-		},
-	}
-}
-
-// TODO(v0.4.0): Remove makeDeprecatedProviderCmd
-func makeDeprecatedProviderCmd(providerID string) *cobra.Command {
-	titleName := provider.DisplayName(providerID)
-	return &cobra.Command{
-		Use:    providerID,
-		Short:  "[Deprecated] Use: vibeusage usage " + providerID,
-		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("%s has moved - use 'vibeusage usage %s' instead", titleName, providerID)
 		},
 	}
 }
