@@ -434,7 +434,7 @@ vibeusage auth openrouter
 
 [warp.dev](https://warp.dev) — Warp terminal AI. Reports monthly credit usage and bonus credits.
 
-Requires an API key. Set `WARP_API_KEY` in your environment (also accepts `WARP_TOKEN`), or store one with:
+Requires an API key (`wk-...`). To create one, open Warp and go to **Settings → Platform → API Keys** (see [Warp docs](https://docs.warp.dev/reference/cli/api-keys)). Set `WARP_API_KEY` in your environment (also accepts `WARP_TOKEN`), or store one with:
 
 ```bash
 vibeusage auth warp
