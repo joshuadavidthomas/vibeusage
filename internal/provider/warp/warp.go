@@ -3,6 +3,7 @@ package warp
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -81,16 +82,26 @@ func (s *APIKeyStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 func fetchUsage(ctx context.Context, token string, httpTimeout float64) (fetch.FetchResult, error) {
 	client := httpclient.NewFromConfig(httpTimeout)
+
+	osName := runtime.GOOS
 	payload := GraphQLRequest{
 		OperationName: "GetRequestLimitInfo",
 		Query:         warpUsageQuery,
-		Variables:     map[string]any{},
+		Variables: map[string]any{
+			"requestContext": map[string]any{
+				"clientContext": map[string]any{},
+				"osContext": map[string]any{
+					"category": osName,
+					"name":     osName,
+				},
+			},
+		},
 	}
 
 	headers := []httpclient.RequestOption{
 		httpclient.WithBearer(token),
 		httpclient.WithHeader("x-warp-client-id", "vibeusage"),
-		httpclient.WithHeader("x-warp-os", "linux"),
+		httpclient.WithHeader("x-warp-os", osName),
 		httpclient.WithHeader("User-Agent", "warp/0 vibeusage/1"),
 	}
 
@@ -114,7 +125,49 @@ func fetchUsage(ctx context.Context, token string, httpTimeout float64) (fetch.F
 	return fetch.ResultOK(*snapshot), nil
 }
 
-const warpUsageQuery = `query GetRequestLimitInfo { requestLimitInfo { requestLimit requestsUsed nextRefreshTime isUnlimited bonusCredits { used total nextRefreshTime } } }`
+const warpUsageQuery = `query GetRequestLimitInfo($requestContext: RequestContext!) {
+  user(requestContext: $requestContext) {
+    __typename
+    ... on UserOutput {
+      user {
+        requestLimitInfo {
+          isUnlimited
+          nextRefreshTime
+          requestLimit
+          requestsUsedSinceLastRefresh
+          requestLimitRefreshDuration
+          isUnlimitedVoice
+          voiceRequestLimit
+          voiceTokenLimit
+          voiceRequestsUsedSinceLastRefresh
+          voiceTokensUsedSinceLastRefresh
+          isUnlimitedCodebaseIndices
+          maxCodebaseIndices
+          maxFilesPerRepo
+          embeddingGenerationBatchSize
+          requestLimitPooling
+        }
+        bonusGrants {
+          requestCreditsGranted
+          requestCreditsRemaining
+          expiration
+        }
+        workspaces {
+          name
+          bonusGrantsInfo {
+            grants {
+              requestCreditsGranted
+              requestCreditsRemaining
+              expiration
+            }
+          }
+        }
+      }
+    }
+  }
+}`
+
+// GraphQL request/response types
 
 type GraphQLRequest struct {
 	OperationName string         `json:"operationName"`
@@ -128,64 +181,155 @@ type GraphQLResponse struct {
 }
 
 type GraphQLData struct {
-	RequestLimitInfo *RequestLimitInfo `json:"requestLimitInfo"`
+	User *UserUnion `json:"user"`
 }
 
 type GraphQLError struct {
 	Message string `json:"message"`
 }
 
-type RequestLimitInfo struct {
-	RequestLimit    int           `json:"requestLimit"`
-	RequestsUsed    int           `json:"requestsUsed"`
-	NextRefreshTime string        `json:"nextRefreshTime"`
-	IsUnlimited     bool          `json:"isUnlimited"`
-	BonusCredits    *BonusCredits `json:"bonusCredits,omitempty"`
+type UserUnion struct {
+	TypeName string      `json:"__typename"`
+	User     *UserFields `json:"user"`
 }
 
-type BonusCredits struct {
-	Used            int    `json:"used"`
-	Total           int    `json:"total"`
-	NextRefreshTime string `json:"nextRefreshTime"`
+type UserFields struct {
+	RequestLimitInfo *RequestLimitInfo `json:"requestLimitInfo"`
+	BonusGrants      []BonusGrant      `json:"bonusGrants"`
+	Workspaces       []Workspace       `json:"workspaces"`
+}
+
+type RequestLimitInfo struct {
+	IsUnlimited                       bool   `json:"isUnlimited"`
+	NextRefreshTime                   string `json:"nextRefreshTime"`
+	RequestLimit                      int    `json:"requestLimit"`
+	RequestsUsedSinceLastRefresh      int    `json:"requestsUsedSinceLastRefresh"`
+	RequestLimitRefreshDuration       string `json:"requestLimitRefreshDuration"`
+	IsUnlimitedVoice                  bool   `json:"isUnlimitedVoice"`
+	VoiceRequestLimit                 int    `json:"voiceRequestLimit"`
+	VoiceTokenLimit                   int    `json:"voiceTokenLimit"`
+	VoiceRequestsUsedSinceLastRefresh int    `json:"voiceRequestsUsedSinceLastRefresh"`
+	VoiceTokensUsedSinceLastRefresh   int    `json:"voiceTokensUsedSinceLastRefresh"`
+	IsUnlimitedCodebaseIndices        bool   `json:"isUnlimitedCodebaseIndices"`
+	MaxCodebaseIndices                int    `json:"maxCodebaseIndices"`
+	MaxFilesPerRepo                   int    `json:"maxFilesPerRepo"`
+	EmbeddingGenerationBatchSize      int    `json:"embeddingGenerationBatchSize"`
+	RequestLimitPooling               string `json:"requestLimitPooling"`
+}
+
+type BonusGrant struct {
+	RequestCreditsGranted   int    `json:"requestCreditsGranted"`
+	RequestCreditsRemaining int    `json:"requestCreditsRemaining"`
+	Expiration              string `json:"expiration"`
+}
+
+type Workspace struct {
+	Name            string           `json:"name"`
+	BonusGrantsInfo *BonusGrantsInfo `json:"bonusGrantsInfo"`
+}
+
+type BonusGrantsInfo struct {
+	Grants []BonusGrant `json:"grants"`
 }
 
 func parseUsageSnapshot(resp GraphQLResponse) (*models.UsageSnapshot, error) {
 	if len(resp.Errors) > 0 {
 		return nil, fmt.Errorf("graphql error: %s", resp.Errors[0].Message)
 	}
-	if resp.Data == nil || resp.Data.RequestLimitInfo == nil {
+	if resp.Data == nil || resp.Data.User == nil {
+		return nil, fmt.Errorf("missing user data in response")
+	}
+
+	userUnion := resp.Data.User
+	if userUnion.TypeName != "" && userUnion.TypeName != "UserOutput" {
+		return nil, fmt.Errorf("unexpected user type %q", userUnion.TypeName)
+	}
+	if userUnion.User == nil || userUnion.User.RequestLimitInfo == nil {
 		return nil, fmt.Errorf("missing requestLimitInfo")
 	}
-	info := resp.Data.RequestLimitInfo
+
+	info := userUnion.User.RequestLimitInfo
 
 	utilization := 0
 	if !info.IsUnlimited && info.RequestLimit > 0 {
-		utilization = models.ClampPct((info.RequestsUsed * 100) / info.RequestLimit)
+		utilization = models.ClampPct((info.RequestsUsedSinceLastRefresh * 100) / info.RequestLimit)
 	}
+
+	periodType := models.PeriodMonthly
+	if strings.EqualFold(info.RequestLimitRefreshDuration, "DAILY") {
+		periodType = models.PeriodDaily
+	} else if strings.EqualFold(info.RequestLimitRefreshDuration, "WEEKLY") {
+		periodType = models.PeriodWeekly
+	}
+
 	primary := models.UsagePeriod{
 		Name:        "Monthly Credits",
 		Utilization: utilization,
-		PeriodType:  models.PeriodMonthly,
+		PeriodType:  periodType,
 		ResetsAt:    models.ParseRFC3339Ptr(info.NextRefreshTime),
 	}
 
 	periods := []models.UsagePeriod{primary}
-	if info.BonusCredits != nil && info.BonusCredits.Total > 0 {
-		bonusUtil := models.ClampPct((info.BonusCredits.Used * 100) / info.BonusCredits.Total)
+
+	// Combine user-level and workspace-level bonus grants
+	bonus := combineBonusGrants(userUnion.User)
+	if bonus.total > 0 {
+		bonusUsed := bonus.total - bonus.remaining
+		bonusUtil := 0
+		if bonus.total > 0 {
+			bonusUtil = models.ClampPct((bonusUsed * 100) / bonus.total)
+		}
 		periods = append(periods, models.UsagePeriod{
 			Name:        "Bonus Credits",
 			Utilization: bonusUtil,
 			PeriodType:  models.PeriodMonthly,
-			ResetsAt:    models.ParseRFC3339Ptr(info.BonusCredits.NextRefreshTime),
 		})
+	}
+
+	plan := "Free"
+	if info.IsUnlimited {
+		plan = "Unlimited"
+	}
+	pooling := info.RequestLimitPooling
+	if pooling != "" && !strings.EqualFold(pooling, "USER") {
+		plan += " (" + pooling + ")"
 	}
 
 	return &models.UsageSnapshot{
 		Provider:  "warp",
 		FetchedAt: time.Now().UTC(),
 		Periods:   periods,
-		Source:    "api_key",
+		Identity: &models.ProviderIdentity{
+			Plan: plan,
+		},
+		Source: "api_key",
 	}, nil
+}
+
+type bonusSummary struct {
+	remaining int
+	total     int
+}
+
+func combineBonusGrants(user *UserFields) bonusSummary {
+	var remaining, total int
+
+	for _, g := range user.BonusGrants {
+		remaining += g.RequestCreditsRemaining
+		total += g.RequestCreditsGranted
+	}
+
+	for _, ws := range user.Workspaces {
+		if ws.BonusGrantsInfo == nil {
+			continue
+		}
+		for _, g := range ws.BonusGrantsInfo.Grants {
+			remaining += g.RequestCreditsRemaining
+			total += g.RequestCreditsGranted
+		}
+	}
+
+	return bonusSummary{remaining: remaining, total: total}
 }
 
 func isAuthGraphQLError(err error) bool {
