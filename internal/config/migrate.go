@@ -12,7 +12,7 @@ import (
 // credentials.json file. It is safe to call multiple times — it's a no-op
 // if the old directory doesn't exist or has already been migrated.
 func MigrateCredentials() error {
-	oldDir := CredentialsDir()
+	oldDir := credentialsDir()
 	if _, err := os.Stat(oldDir); os.IsNotExist(err) {
 		return nil
 	}
