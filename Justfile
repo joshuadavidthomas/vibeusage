@@ -26,6 +26,10 @@ lint *ARGS:
 test *ARGS:
     go test ./... -race {{ ARGS }}
 
+# Regenerate README screenshots (requires freeze)
+screenshots:
+    bash scripts/screenshots.sh
+
 # Tidy go.mod/go.sum
 tidy:
     go mod tidy

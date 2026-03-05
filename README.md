@@ -2,6 +2,8 @@
 
 Track usage across agentic LLM providers from your terminal.
 
+<img src="docs/images/hero.svg" alt="vibeusage dashboard showing Claude, Codex, and Copilot usage with progress bars" />
+
 I get free access to GitHub Copilot Pro for my OSS contributions (thanks GitHub!), but I consistently forget to use it and every month leave free usage on the table. vibeusage keeps that visible across providers and gives you one place to see account usage, pace, and remaining headroom across your configured providers.
 
 ## Installation
@@ -53,15 +55,7 @@ Set up the providers you use:
 vibeusage auth
 ```
 
-```bash
-┃ Choose providers to set up
-┃ Space to select, Enter to confirm
-┃ > claude — Anthropic's Claude AI assistant (claude.ai) [detected: provider CLI]
-┃   codex — OpenAI's Codex/ChatGPT (platform.openai.com) [detected: provider CLI]
-┃   copilot — GitHub Copilot (github.com)
-┃   cursor — Cursor AI code editor (cursor.com)
-┃   ...
-```
+<img src="docs/images/auth.svg" alt="vibeusage auth interactive provider selection" />
 
 Providers with existing CLI credentials are detected automatically — just select them and hit Enter. For others, vibeusage walks you through authentication (API keys, device flows, or browser tokens).
 
@@ -70,21 +64,7 @@ Then check your usage:
 vibeusage
 ```
 
-```bash
-╭─Claude───────────────────────────────────────────────────────────────╮
-│ Session (5h)           ███████░░░░░░░░░░░░░ 38%    resets in 1h 40m  │
-│ Weekly                 ██████████████████░░ 98%    resets in 16h 40m │
-╰──────────────────────────────────────────────────────────────────────╯
-╭─Codex────────────────────────────────────────────────────────────────╮
-│ Session                ███░░░░░░░░░░░░░░░░░ 15%    resets in 15m     │
-│ Weekly                 ██░░░░░░░░░░░░░░░░░░ 12%    resets in 6d 19h  │
-╰──────────────────────────────────────────────────────────────────────╯
-╭─Copilot──────────────────────────────────────────────────────────────╮
-│ Monthly (Premium)      ██░░░░░░░░░░░░░░░░░░ 11%    resets in 4d 1h   │
-│ Monthly (Chat)         ░░░░░░░░░░░░░░░░░░░░  0%    resets in 4d 1h   │
-│ Monthly (Completions)  ░░░░░░░░░░░░░░░░░░░░  0%    resets in 4d 1h   │
-╰──────────────────────────────────────────────────────────────────────╯
-```
+<img src="docs/images/dashboard.svg" alt="vibeusage dashboard showing Claude, Codex, and Copilot usage panels with progress bars" />
 
 Bars are pace-colored by burn rate: **green** (on track or within 15% of expected), **yellow** (15–30% over expected pace), **red** (well over pace or near exhaustion). Pace compares your actual usage percentage to the fraction of time elapsed in the period.
 
@@ -104,22 +84,7 @@ Check a specific provider:
 vibeusage usage claude
 ```
 
-```bash
-Claude
-Auth OAuth
-
-● All Systems Operational  just now
-
-╭─Usage──────────────────────────────────────────────────────╮
-│ Session (5h)  ██░░░░░░░░░░░░░░░░░░ 10%    resets in 2h 22m │
-│                                                            │
-│ Weekly                                                     │
-│   All Models  ░░░░░░░░░░░░░░░░░░░░  2%    resets in 6d 21h │
-│   Sonnet      ░░░░░░░░░░░░░░░░░░░░  0%                     │
-│                                                            │
-│ Extra Usage: $73.72 USD (Unlimited)                        │
-╰────────────────────────────────────────────────────────────╯
-```
+<img src="docs/images/usage-single.svg" alt="vibeusage single provider detail view for Claude showing session and weekly breakdown" />
 
 Output as JSON for scripting or automation:
 
@@ -142,11 +107,7 @@ For status bars and scripts, `vibeusage statusline` outputs condensed usage:
 vibeusage statusline
 ```
 
-```bash
- Claude  5h ██████░░░░ 62%  1h   7d █████████░ 98% 16h
-  Codex  5h █░░░░░░░░░ 15% 15m   7d ██░░░░░░░░ 12% 6d9h
-Copilot 30d ██░░░░░░░░ 11% 4d1h
-```
+<img src="docs/images/statusline.svg" alt="vibeusage statusline condensed output with progress bars" />
 
 Compact text format for space-constrained widgets:
 
@@ -154,11 +115,7 @@ Compact text format for space-constrained widgets:
 vibeusage statusline --short
 ```
 
-```bash
- Claude  5h  62%  1h   7d  98% 16h
-  Codex  5h  15% 15m   7d  12% 6d9h
-Copilot 30d  11% 4d1h
-```
+<img src="docs/images/statusline-short.svg" alt="vibeusage statusline compact text format" />
 
 Filter to specific providers (single provider omits the label):
 
@@ -166,17 +123,7 @@ Filter to specific providers (single provider omits the label):
 vibeusage statusline -p claude
 ```
 
-```bash
-5h █░░░░░░░░░ 12%  2h  7d █░░░░░░░░░ 11% 5d12h
-```
-
-```bash
-vibeusage statusline -p claude --short
-```
-
-```bash
-5h 12%  2h  7d 11% 5d12h
-```
+<img src="docs/images/statusline-single.svg" alt="vibeusage statusline for a single provider" />
 
 ```bash
 vibeusage statusline -p claude -p codex  # Multiple providers
@@ -193,17 +140,7 @@ You can route a model to the provider with the best current headroom:
 vibeusage route claude-opus-4-6
 ```
 
-```bash
-Route: Claude Opus 4.6
-
-╭─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
-│ Provider    │ Usage               │ Headroom │ Cost │ Period  │ Resets In │ Plan        │
-├─────────────┼─────────────────────┼──────────┼──────┼─────────┼───────────┼─────────────┤
-│ Antigravity │ ░░░░░░░░░░░░░░░ 0%  │ 100%     │ —    │ weekly  │ 1h 19m    │ Antigravity │
-│ Copilot     │ █░░░░░░░░░░░░░░ 11% │ 29%      │ 3x   │ monthly │ 4d 1h     │ individual  │
-│ Claude      │ ██████████████░ 99% │ 1%       │ —    │ weekly  │ 16h 24m   │ Pro         │
-╰─────────────┴─────────────────────┴──────────┴──────┴─────────┴───────────┴─────────────╯
-```
+<img src="docs/images/route-model.svg" alt="vibeusage route showing provider comparison table for Claude Opus 4.6" />
 
 Or route via your own role/model group:
 
@@ -211,18 +148,7 @@ Or route via your own role/model group:
 vibeusage route --role coding
 ```
 
-```bash
-Route: coding (role)
-
-╭──────────────────┬─────────────┬─────────────────────┬──────────┬──────┬─────────┬───────────┬─────────────╮
-│ Model            │ Provider    │ Usage               │ Headroom │ Cost │ Period  │ Resets In │ Plan        │
-├──────────────────┼─────────────┼─────────────────────┼──────────┼──────┼─────────┼───────────┼─────────────┤
-│ claude-opus-4-6  │ Antigravity │ ░░░░░░░░░░░░░░░ 0%  │ 100%     │ —    │ weekly  │ 2h 24m    │ Antigravity │
-│ gpt-5.3-codex    │ Codex       │ █░░░░░░░░░░░░░░ 12% │ 88%      │ —    │ weekly  │ 6d 18h    │ plus        │
-│ claude-opus-4-6  │ Copilot     │ █░░░░░░░░░░░░░░ 11% │ 29%      │ 3x   │ monthly │ 4d 1h     │ individual  │
-│ claude-opus-4-6  │ Claude      │ ██████████████░ 99% │ 1%       │ —    │ weekly  │ 16h 24m   │ Pro         │
-╰──────────────────┴─────────────┴─────────────────────┴──────────┴──────┴─────────┴───────────┴─────────────╯
-```
+<img src="docs/images/route-role.svg" alt="vibeusage route showing role-based routing table for coding role" />
 
 Not sure which model ID to use?
 
@@ -276,24 +202,7 @@ Check the operational status of all providers:
 vibeusage status
 ```
 
-```bash
-╭─────────────┬─────────────────────────┬─────────────────────────┬─────────────────────────╮
-│ Provider    │ Status                  │ Description             │ Updated                 │
-├─────────────┼─────────────────────────┼─────────────────────────┼─────────────────────────┤
-│ amp         │ ●                       │ All Systems Operational │ just now                │
-│ antigravity │ ●                       │ All systems operational │ just now                │
-│ claude      │ ◐                       │ Minor Service Outage    │ just now                │
-│ codex       │ ●                       │ All Systems Operational │ just now                │
-│ copilot     │ ●                       │ All Systems Operational │ just now                │
-│ cursor      │ ●                       │ All Systems Operational │ just now                │
-│ gemini      │ ●                       │ All systems operational │ just now                │
-│ kimicode    │ ●                       │ All Systems Operational │ just now                │
-│ minimax     │ ?                       │                         │ unknown                 │
-│ openrouter  │ ●                       │ All systems operational │ just now                │
-│ warp        │ ●                       │ All Systems Operational │ just now                │
-│ zai         │ ?                       │                         │ unknown                 │
-╰─────────────┴─────────────────────────┴─────────────────────────┴─────────────────────────╯
-```
+<img src="docs/images/status.svg" alt="vibeusage status showing operational status of all providers" />
 
 Status fetches the current operational status from each provider's API status page (where available). ● indicates all systems operational, ◐ indicates a service disruption, and ? means status could not be determined. Use this to check if a provider is experiencing outages before troubleshooting credential issues.
 
