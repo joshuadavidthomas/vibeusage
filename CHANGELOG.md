@@ -20,6 +20,14 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- **Internal:** Added `vibeshots` dev binary and `just screenshots` for generating README terminal screenshots via [freeze](https://github.com/charmbracelet/freeze).
+
+### Changed
+
+- Replaced ASCII output examples in README with styled SVG screenshots.
+
 ## [0.4.0]
 
 ### Added
