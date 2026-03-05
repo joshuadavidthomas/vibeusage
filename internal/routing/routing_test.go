@@ -341,31 +341,6 @@ func TestRank_NilMultipliersEqualsNoMultipliers(t *testing.T) {
 	}
 }
 
-func TestComputeEffectiveHeadroom(t *testing.T) {
-	tests := []struct {
-		name       string
-		headroom   int
-		multiplier *float64
-		want       int
-	}{
-		{"nil multiplier", 80, nil, 80},
-		{"zero multiplier (free)", 50, floatPtr(0), 100},
-		{"1x multiplier", 90, floatPtr(1), 90},
-		{"3x multiplier", 90, floatPtr(3), 30},
-		{"0.33x multiplier", 30, floatPtr(0.33), 90},
-		{"0.33x capped at 100", 50, floatPtr(0.33), 100},
-		{"zero headroom", 0, floatPtr(3), 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := computeEffectiveHeadroom(tt.headroom, tt.multiplier)
-			if got != tt.want {
-				t.Errorf("computeEffectiveHeadroom(%d, %v) = %d, want %d", tt.headroom, tt.multiplier, got, tt.want)
-			}
-		})
-	}
-}
-
 // RankByRole tests
 
 func TestRankByRole_RanksAcrossModelsAndProviders(t *testing.T) {

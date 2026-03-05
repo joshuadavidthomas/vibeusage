@@ -52,6 +52,9 @@ var rootCmd = &cobra.Command{
 		if verbose && quiet {
 			verbose = false
 		}
+		if os.Getenv("NO_COLOR") != "" || os.Getenv("VIBEUSAGE_NO_COLOR") != "" {
+			noColor = true
+		}
 		l := newConfiguredLogger()
 		ctx := logging.WithLogger(cmd.Context(), l)
 		cmd.SetContext(ctx)

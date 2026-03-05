@@ -12,7 +12,6 @@ import (
 
 type DisplayConfig struct {
 	ShowRemaining bool   `toml:"show_remaining" json:"show_remaining"`
-	PaceColors    bool   `toml:"pace_colors" json:"pace_colors"`
 	ResetFormat   string `toml:"reset_format" json:"reset_format"`
 }
 
@@ -45,7 +44,6 @@ func DefaultConfig() Config {
 	return Config{
 		Display: DisplayConfig{
 			ShowRemaining: true,
-			PaceColors:    true,
 			ResetFormat:   "countdown",
 		},
 		Fetch: FetchConfig{
@@ -173,11 +171,11 @@ func Load(path string) (Config, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return applyEnvOverrides(cfg), nil
+		return cfg, nil
 	}
 
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
-		return applyEnvOverrides(DefaultConfig()), fmt.Errorf("parsing config %s: %w", path, err)
+		return DefaultConfig(), fmt.Errorf("parsing config %s: %w", path, err)
 	}
 
 	// Ensure maps are initialized
@@ -188,7 +186,7 @@ func Load(path string) (Config, error) {
 		cfg.Roles = make(map[string]RoleConfig)
 	}
 
-	return applyEnvOverrides(cfg), nil
+	return cfg, nil
 }
 
 func Save(cfg Config, path string) error {
@@ -211,11 +209,4 @@ func saveConfigFile(cfg Config, path string) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 	return nil
-}
-
-func applyEnvOverrides(cfg Config) Config {
-	if os.Getenv("VIBEUSAGE_NO_COLOR") != "" {
-		cfg.Display.PaceColors = false
-	}
-	return cfg
 }
