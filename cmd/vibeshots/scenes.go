@@ -95,6 +95,8 @@ func sceneDashboard() {
 		mockClaudeSnapshot(),
 		mockCodexSnapshot(),
 		mockCopilotSnapshot(),
+		mockCursorSnapshot(),
+		mockGeminiSnapshot(),
 	}
 
 	cw := display.GlobalPeriodColWidths(snapshots)

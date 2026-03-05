@@ -123,6 +123,44 @@ func mockCodexSnapshot() models.UsageSnapshot {
 	}
 }
 
+func mockCursorSnapshot() models.UsageSnapshot {
+	return models.UsageSnapshot{
+		Provider:  "cursor",
+		FetchedAt: time.Now(),
+		Source:    "api_key",
+		Identity: &models.ProviderIdentity{
+			Plan: "Pro",
+		},
+		Periods: []models.UsagePeriod{
+			{
+				Name:        "Plan Usage",
+				Utilization: 72,
+				PeriodType:  models.PeriodMonthly,
+				ResetsAt:    resetIn(12*24*time.Hour + 6*time.Hour),
+			},
+		},
+	}
+}
+
+func mockGeminiSnapshot() models.UsageSnapshot {
+	return models.UsageSnapshot{
+		Provider:  "gemini",
+		FetchedAt: time.Now(),
+		Source:    "api_key",
+		Identity: &models.ProviderIdentity{
+			Plan: "Free",
+		},
+		Periods: []models.UsagePeriod{
+			{
+				Name:        "Daily",
+				Utilization: 4,
+				PeriodType:  models.PeriodDaily,
+				ResetsAt:    resetIn(9*time.Hour + 32*time.Minute),
+			},
+		},
+	}
+}
+
 func mockCopilotSnapshot() models.UsageSnapshot {
 	return models.UsageSnapshot{
 		Provider:  "copilot",
