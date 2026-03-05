@@ -403,9 +403,7 @@ func mockRouteRoleRecommendation() routing.RoleRecommendation {
 }
 
 func mockProviderStatuses() map[string]models.ProviderStatus {
-	// Descriptions are now derived from Level via DisplayDescription().
-	// Only non-operational statuses with active incidents set Description
-	// as an override (e.g. incident titles from upstream APIs).
+	// Showcase all status levels so the vibeshot captures the full styling range.
 	return map[string]models.ProviderStatus{
 		"amp": {
 			Level:     models.StatusOperational,
@@ -421,16 +419,18 @@ func mockProviderStatuses() map[string]models.ProviderStatus {
 			UpdatedAt:   justNow(),
 		},
 		"codex": {
-			Level:     models.StatusOperational,
-			UpdatedAt: justNow(),
+			Level:       models.StatusDegraded,
+			Description: "Partial System Degradation",
+			UpdatedAt:   justNow(),
 		},
 		"copilot": {
 			Level:     models.StatusOperational,
 			UpdatedAt: justNow(),
 		},
 		"cursor": {
-			Level:     models.StatusOperational,
-			UpdatedAt: justNow(),
+			Level:       models.StatusMajorOutage,
+			Description: "API Completely Unavailable",
+			UpdatedAt:   justNow(),
 		},
 		"gemini": {
 			Level:     models.StatusOperational,
