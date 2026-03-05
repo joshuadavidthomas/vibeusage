@@ -1210,7 +1210,7 @@ func TestFindProviderCredential_VibeusageTakesPrecedenceOverEnv(t *testing.T) {
 }
 
 func TestFindProviderCredential_CredentialTypes(t *testing.T) {
-	credTypes := []string{"oauth", "session", "apikey"}
+	credTypes := []string{"oauth", "session", "apikey", "api_key"}
 
 	for _, credType := range credTypes {
 		t.Run(credType, func(t *testing.T) {

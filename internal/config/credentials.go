@@ -77,7 +77,7 @@ func expandPath(p string) string {
 // Returns (found, source, providerID+credType or path).
 func FindProviderCredential(providerID string, cliPaths []string, envVars []string) (bool, string, string) {
 	// Check vibeusage storage first
-	for _, credType := range []string{"oauth", "session", "apikey"} {
+	for _, credType := range []string{"oauth", "session", "apikey", "api_key"} {
 		data, _ := ReadCredential(providerID, credType)
 		if data != nil {
 			return true, "vibeusage", providerID + "/" + credType
