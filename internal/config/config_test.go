@@ -20,8 +20,6 @@ func setupTempDir(t *testing.T) string {
 	t.Setenv("VIBEUSAGE_CONFIG_DIR", filepath.Join(dir, "config"))
 	t.Setenv("VIBEUSAGE_DATA_DIR", filepath.Join(dir, "data"))
 	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(dir, "cache"))
-	// Clear env override variables so tests aren't affected by the host environment.
-	t.Setenv("VIBEUSAGE_NO_COLOR", "")
 	// Reset global config so tests don't leak state.
 	configMu.Lock()
 	globalConfig = nil
@@ -70,9 +68,6 @@ func TestDefaultConfig_Values(t *testing.T) {
 
 	if !cfg.Display.ShowRemaining {
 		t.Error("Display.ShowRemaining should default to true")
-	}
-	if !cfg.Display.PaceColors {
-		t.Error("Display.PaceColors should default to true")
 	}
 	if cfg.Display.ResetFormat != "countdown" {
 		t.Errorf("Display.ResetFormat = %q, want %q", cfg.Display.ResetFormat, "countdown")
@@ -251,7 +246,6 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 
 	original := DefaultConfig()
 	original.Fetch.Timeout = 99.0
-	original.Display.PaceColors = false
 	original.Display.ResetFormat = "relative"
 	original.Providers["claude"] = ProviderConfig{
 		Enabled: boolPtr(true),
@@ -269,9 +263,6 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 	if loaded.Fetch.Timeout != 99.0 {
 		t.Errorf("Fetch.Timeout = %v, want 99.0", loaded.Fetch.Timeout)
 	}
-	if loaded.Display.PaceColors {
-		t.Error("Display.PaceColors should be false after roundtrip")
-	}
 	if loaded.Display.ResetFormat != "relative" {
 		t.Errorf("Display.ResetFormat = %q, want %q", loaded.Display.ResetFormat, "relative")
 	}
@@ -281,36 +272,6 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 	}
 	if pc.Enabled == nil || !*pc.Enabled {
 		t.Error("Providers[claude].Enabled should be true after roundtrip")
-	}
-}
-
-// applyEnvOverrides
-
-func TestApplyEnvOverrides_NoColor(t *testing.T) {
-	t.Run("set disables pace colors", func(t *testing.T) {
-		t.Setenv("VIBEUSAGE_NO_COLOR", "1")
-		cfg := applyEnvOverrides(DefaultConfig())
-		if cfg.Display.PaceColors {
-			t.Error("PaceColors should be false when VIBEUSAGE_NO_COLOR is set")
-		}
-	})
-
-	t.Run("unset leaves pace colors default", func(t *testing.T) {
-		// t.Setenv not called → inherits test environment, but we clear it
-		t.Setenv("VIBEUSAGE_NO_COLOR", "")
-		cfg := applyEnvOverrides(DefaultConfig())
-		if !cfg.Display.PaceColors {
-			t.Error("PaceColors should remain true when VIBEUSAGE_NO_COLOR is empty")
-		}
-	})
-}
-
-func TestApplyEnvOverrides_NotSet_LeavesDefaults(t *testing.T) {
-	t.Setenv("VIBEUSAGE_NO_COLOR", "")
-
-	cfg := applyEnvOverrides(DefaultConfig())
-	if !cfg.Display.PaceColors {
-		t.Error("PaceColors should remain true when env is empty")
 	}
 }
 

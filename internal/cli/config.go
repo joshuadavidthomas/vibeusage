@@ -33,7 +33,6 @@ var configShowCmd = &cobra.Command{
 				},
 				Display: display.ConfigDisplayJSON{
 					ShowRemaining: cfg.Display.ShowRemaining,
-					PaceColors:    cfg.Display.PaceColors,
 					ResetFormat:   cfg.Display.ResetFormat,
 				},
 				Credentials: display.ConfigCredentialsJSON{

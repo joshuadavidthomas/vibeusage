@@ -52,7 +52,6 @@ type ConfigFetchJSON struct {
 // ConfigDisplayJSON represents the display section of config.
 type ConfigDisplayJSON struct {
 	ShowRemaining bool   `json:"show_remaining"`
-	PaceColors    bool   `json:"pace_colors"`
 	ResetFormat   string `json:"reset_format"`
 }
 
