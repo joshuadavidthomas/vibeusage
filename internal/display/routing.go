@@ -15,6 +15,25 @@ type RenderBarFunc func(utilization int) string
 // FormatResetFunc formats a duration until reset for display.
 type FormatResetFunc func(d *time.Duration) string
 
+// RouteRenderBar renders a utilization bar for route tables.
+func RouteRenderBar(utilization int) string {
+	return RenderBar(utilization, 15, PaceToColor(nil, utilization))
+}
+
+// RouteFormatReset formats a duration until reset for route tables.
+func RouteFormatReset(d *time.Duration) string {
+	if d == nil {
+		return ""
+	}
+	return FormatResetCountdown(d)
+}
+
+// RenderFormattedTable renders a FormattedTable as a string using the given options.
+func RenderFormattedTable(ft FormattedTable, opts TableOptions) string {
+	opts.RowStyles = ft.Styles
+	return NewTableWithOptions(ft.Headers, ft.Rows, opts)
+}
+
 // FormattedTable holds the pre-formatted rows, headers, and styles
 // for a routing recommendation table.
 type FormattedTable struct {

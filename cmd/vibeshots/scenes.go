@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
@@ -154,8 +152,8 @@ func sceneRouteModel() {
 	fmt.Println(titleStyle.Render("Route: " + rec.ModelName))
 	fmt.Println()
 
-	ft := display.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset)
-	renderRouteTable(ft)
+	ft := display.FormatRecommendationRows(rec, display.RouteRenderBar, display.RouteFormatReset)
+	fmt.Println(display.RenderFormattedTable(ft, display.TableOptions{Width: tableWidth}))
 }
 
 func sceneRouteRole() {
@@ -166,62 +164,19 @@ func sceneRouteRole() {
 	fmt.Println(titleStyle.Render("Route: " + rec.Role + " (role)"))
 	fmt.Println()
 
-	ft := display.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset)
-	renderRouteTable(ft)
+	ft := display.FormatRoleRecommendationRows(rec, display.RouteRenderBar, display.RouteFormatReset)
+	fmt.Println(display.RenderFormattedTable(ft, display.TableOptions{Width: tableWidth}))
 }
 
 func sceneStatus() {
 	printPrompt("vibeusage status")
 
 	statuses := mockProviderStatuses()
-
-	ids := make([]string, 0, len(statuses))
-	for id := range statuses {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	var rows [][]string
-	for _, pid := range ids {
-		s := statuses[pid]
-		desc := s.Description
-		if len(desc) > 30 {
-			desc = desc[:27] + "..."
-		}
-		rows = append(rows, []string{
-			pid,
-			display.StatusSymbol(s.Level, false),
-			desc,
-			display.FormatStatusUpdated(s.UpdatedAt),
-		})
-	}
-
+	headers, rows := display.FormatStatusRows(statuses, false)
 	fmt.Println(display.NewTableWithOptions(
-		[]string{"Provider", "Status", "Description", "Updated"},
+		headers,
 		rows,
 		display.TableOptions{Title: "Provider Status", Width: tableWidth},
-	))
-}
-
-// routeRenderBar renders a utilization bar for the route table.
-func routeRenderBar(utilization int) string {
-	return display.RenderBar(utilization, 15, display.PaceToColor(nil, utilization))
-}
-
-// routeFormatReset formats a duration until reset for the route table.
-func routeFormatReset(d *time.Duration) string {
-	if d == nil {
-		return ""
-	}
-	return display.FormatResetCountdown(d)
-}
-
-// renderRouteTable renders a FormattedTable using the display package.
-func renderRouteTable(ft display.FormattedTable) {
-	fmt.Println(display.NewTableWithOptions(
-		ft.Headers,
-		ft.Rows,
-		display.TableOptions{Width: tableWidth, RowStyles: ft.Styles},
 	))
 }
 
