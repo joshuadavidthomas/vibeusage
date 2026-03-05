@@ -66,7 +66,8 @@ func (c Codex) Auth() provider.AuthFlow {
 			"Note: Manually obtained tokens won't auto-refresh — run auth again when they expire.",
 		Placeholder: "ey... (OAuth access token)",
 		Validate:    provider.ValidateNotEmpty,
-		CredPath:    config.CredentialPath("codex", "oauth"),
+		ProviderID:  "codex",
+		CredType:    "oauth",
 		JSONKey:     "access_token",
 	}
 }
@@ -91,7 +92,10 @@ type OAuthStrategy struct {
 }
 
 func (s *OAuthStrategy) IsAvailable() bool {
-	for _, p := range s.credentialPaths() {
+	if config.HasCredential("codex", "oauth") {
+		return true
+	}
+	for _, p := range s.externalPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return true
 		}
@@ -168,15 +172,26 @@ func (s *OAuthStrategy) fetchUsage(ctx context.Context, client *httpclient.Clien
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) credentialPaths() []string {
+func (s *OAuthStrategy) externalPaths() []string {
 	home, _ := os.UserHomeDir()
-	return provider.CredentialSearchPaths("codex", "oauth", filepath.Join(home, ".codex", "auth.json"))
+	return []string{filepath.Join(home, ".codex", "auth.json")}
 }
 
 func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	for _, path := range s.credentialPaths() {
-		data, err := config.ReadCredential(path)
-		if err != nil || data == nil {
+	// Check vibeusage consolidated storage first
+	if data, err := config.ReadCredential("codex", "oauth"); err == nil && data != nil {
+		var cliCreds CLICredentials
+		if err := json.Unmarshal(data, &cliCreds); err == nil {
+			if creds := cliCreds.EffectiveCredentials(); creds != nil {
+				return creds
+			}
+		}
+	}
+
+	// Check external CLI paths
+	for _, path := range s.externalPaths() {
+		data, err := os.ReadFile(path)
+		if err != nil {
 			continue
 		}
 		var cliCreds CLICredentials

@@ -17,7 +17,7 @@ func TestSaveClaudeCredential_SessionKey(t *testing.T) {
 		t.Fatalf("saveClaudeCredential error: %v", err)
 	}
 
-	data, err := config.ReadCredential(config.CredentialPath("claude", "session"))
+	data, err := config.ReadCredential("claude", "session")
 	if err != nil {
 		t.Fatalf("ReadCredential error: %v", err)
 	}

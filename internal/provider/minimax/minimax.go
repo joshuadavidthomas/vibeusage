@@ -50,7 +50,8 @@ func (m Minimax) Auth() provider.AuthFlow {
 			"Note: Standard API keys (sk-api-) won't work — you need a Coding Plan key.",
 		Placeholder: "sk-cp-...",
 		Validate:    provider.ValidatePrefix("sk-cp-"),
-		CredPath:    config.CredentialPath("minimax", "apikey"),
+		ProviderID:  "minimax",
+		CredType:    "apikey",
 		JSONKey:     "api_key",
 	}
 }
@@ -69,9 +70,10 @@ type APIKeyStrategy struct {
 }
 
 var minimaxAPIKey = provider.APIKeySource{
-	EnvVars:  []string{"MINIMAX_API_KEY"},
-	CredPath: config.CredentialPath("minimax", "apikey"),
-	JSONKeys: []string{"api_key"},
+	EnvVars:    []string{"MINIMAX_API_KEY"},
+	ProviderID: "minimax",
+	CredType:   "apikey",
+	JSONKeys:   []string{"api_key"},
 }
 
 func (s *APIKeyStrategy) IsAvailable() bool {

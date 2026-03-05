@@ -643,7 +643,7 @@ func TestSubdirectoryPaths(t *testing.T) {
 		want string
 	}{
 		{"DataDir", DataDir(), "/base/data"},
-		{"CredentialsDir", CredentialsDir(), "/base/data/credentials"},
+		{"CredentialsFile", CredentialsFile(), "/base/data/credentials.json"},
 		{"SnapshotsDir", SnapshotsDir(), "/base/cache/snapshots"},
 		{"OrgIDsDir", OrgIDsDir(), "/base/cache/org-ids"},
 		{"ConfigFile", ConfigFile(), "/base/config/config.toml"},
@@ -964,25 +964,12 @@ func TestClearAllCache_EmptyDirs_NoError(t *testing.T) {
 
 // Credentials
 
-func TestCredentialPath_Format(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", "/base/config")
+func TestCredentialsFile_Format(t *testing.T) {
 	t.Setenv("VIBEUSAGE_DATA_DIR", "/base/data")
-	tests := []struct {
-		provider string
-		credType string
-		want     string
-	}{
-		{"claude", "oauth", "/base/data/credentials/claude/oauth.json"},
-		{"copilot", "session", "/base/data/credentials/copilot/session.json"},
-		{"gemini", "apikey", "/base/data/credentials/gemini/apikey.json"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.provider+"/"+tt.credType, func(t *testing.T) {
-			got := CredentialPath(tt.provider, tt.credType)
-			if got != tt.want {
-				t.Errorf("CredentialPath(%q, %q) = %q, want %q", tt.provider, tt.credType, got, tt.want)
-			}
-		})
+	got := CredentialsFile()
+	want := "/base/data/credentials.json"
+	if got != want {
+		t.Errorf("CredentialsFile() = %q, want %q", got, want)
 	}
 }
 
@@ -1015,15 +1002,14 @@ func TestExpandPath(t *testing.T) {
 }
 
 func TestWriteCredential_ReadCredential_Roundtrip(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "provider", "oauth.json")
+	setupTempDir(t)
 	content := []byte(`{"token":"secret123"}`)
 
-	if err := WriteCredential(path, content); err != nil {
+	if err := WriteCredential("testprov", "oauth", content); err != nil {
 		t.Fatalf("WriteCredential() error: %v", err)
 	}
 
-	got, err := ReadCredential(path)
+	got, err := ReadCredential("testprov", "oauth")
 	if err != nil {
 		t.Fatalf("ReadCredential() error: %v", err)
 	}
@@ -1033,14 +1019,13 @@ func TestWriteCredential_ReadCredential_Roundtrip(t *testing.T) {
 }
 
 func TestWriteCredential_FilePermissions(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "cred.json")
+	setupTempDir(t)
 
-	if err := WriteCredential(path, []byte("secret")); err != nil {
+	if err := WriteCredential("testprov", "oauth", []byte(`{"secret":"x"}`)); err != nil {
 		t.Fatalf("WriteCredential() error: %v", err)
 	}
 
-	info, err := os.Stat(path)
+	info, err := os.Stat(CredentialsFile())
 	if err != nil {
 		t.Fatalf("Stat() error: %v", err)
 	}
@@ -1051,34 +1036,34 @@ func TestWriteCredential_FilePermissions(t *testing.T) {
 }
 
 func TestWriteCredential_Atomic_NoTmpFileLeft(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "cred.json")
+	setupTempDir(t)
 
-	if err := WriteCredential(path, []byte("data")); err != nil {
+	if err := WriteCredential("testprov", "oauth", []byte(`{"data":"x"}`)); err != nil {
 		t.Fatalf("WriteCredential() error: %v", err)
 	}
 
-	tmpPath := path + ".tmp"
+	tmpPath := CredentialsFile() + ".tmp"
 	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
 		t.Error("temporary file should not remain after WriteCredential")
 	}
 }
 
-func TestWriteCredential_CreatesDirs(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "a", "b", "c", "cred.json")
+func TestWriteCredential_CreatesParentDir(t *testing.T) {
+	setupTempDir(t)
 
-	if err := WriteCredential(path, []byte("data")); err != nil {
+	if err := WriteCredential("testprov", "oauth", []byte(`{"data":"x"}`)); err != nil {
 		t.Fatalf("WriteCredential() error: %v", err)
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Error("WriteCredential should create parent directories")
+	if _, err := os.Stat(CredentialsFile()); os.IsNotExist(err) {
+		t.Error("WriteCredential should create parent directory and credentials file")
 	}
 }
 
-func TestReadCredential_MissingFile_ReturnsNilNil(t *testing.T) {
-	data, err := ReadCredential("/nonexistent/path/cred.json")
+func TestReadCredential_Missing_ReturnsNilNil(t *testing.T) {
+	setupTempDir(t)
+
+	data, err := ReadCredential("nonexistent", "oauth")
 	if err != nil {
 		t.Errorf("ReadCredential() error = %v, want nil", err)
 	}
@@ -1087,24 +1072,57 @@ func TestReadCredential_MissingFile_ReturnsNilNil(t *testing.T) {
 	}
 }
 
-func TestDeleteCredential_ExistingFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "cred.json")
-	if err := os.WriteFile(path, []byte("data"), 0o600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
+func TestDeleteCredential_Existing(t *testing.T) {
+	setupTempDir(t)
+
+	_ = WriteCredential("testprov", "oauth", []byte(`{"token":"x"}`))
+
+	if !DeleteCredential("testprov", "oauth") {
+		t.Error("DeleteCredential() should return true for existing credential")
 	}
 
-	if !DeleteCredential(path) {
-		t.Error("DeleteCredential() should return true for existing file")
-	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Error("file should be deleted")
+	data, _ := ReadCredential("testprov", "oauth")
+	if data != nil {
+		t.Error("credential should be deleted")
 	}
 }
 
-func TestDeleteCredential_MissingFile(t *testing.T) {
-	if DeleteCredential("/nonexistent/cred.json") {
-		t.Error("DeleteCredential() should return false for missing file")
+func TestDeleteCredential_Missing(t *testing.T) {
+	setupTempDir(t)
+
+	if DeleteCredential("nonexistent", "oauth") {
+		t.Error("DeleteCredential() should return false for missing credential")
+	}
+}
+
+func TestDeleteProviderCredentials(t *testing.T) {
+	setupTempDir(t)
+
+	_ = WriteCredential("testprov", "oauth", []byte(`{"a":"1"}`))
+	_ = WriteCredential("testprov", "session", []byte(`{"b":"2"}`))
+
+	if !DeleteProviderCredentials("testprov") {
+		t.Error("DeleteProviderCredentials() should return true")
+	}
+
+	data1, _ := ReadCredential("testprov", "oauth")
+	data2, _ := ReadCredential("testprov", "session")
+	if data1 != nil || data2 != nil {
+		t.Error("all provider credentials should be deleted")
+	}
+}
+
+func TestHasCredential(t *testing.T) {
+	setupTempDir(t)
+
+	if HasCredential("testprov", "oauth") {
+		t.Error("should not have credential before writing")
+	}
+
+	_ = WriteCredential("testprov", "oauth", []byte(`{"x":"y"}`))
+
+	if !HasCredential("testprov", "oauth") {
+		t.Error("should have credential after writing")
 	}
 }
 
@@ -1132,21 +1150,19 @@ func TestFileExists(t *testing.T) {
 func TestFindProviderCredential_VibeusageStorage(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
 
-	// Write a credential in vibeusage storage
-	credPath := CredentialPath("claude", "oauth")
-	if err := WriteCredential(credPath, []byte(`{"token":"test"}`)); err != nil {
+	if err := WriteCredential("claude", "oauth", []byte(`{"token":"test"}`)); err != nil {
 		t.Fatalf("WriteCredential() error: %v", err)
 	}
 
-	found, source, path := FindProviderCredential("claude", nil, nil)
+	found, source, ref := FindProviderCredential("claude", nil, nil)
 	if !found {
 		t.Error("should find credential in vibeusage storage")
 	}
 	if source != "vibeusage" {
 		t.Errorf("source = %q, want %q", source, "vibeusage")
 	}
-	if path != credPath {
-		t.Errorf("path = %q, want %q", path, credPath)
+	if ref != "claude/oauth" {
+		t.Errorf("ref = %q, want %q", ref, "claude/oauth")
 	}
 }
 
@@ -1169,7 +1185,6 @@ func TestFindProviderCredential_EnvVar(t *testing.T) {
 func TestFindProviderCredential_NoEnvVars(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
 
-	// With no env vars and no vibeusage storage, should not find anything
 	found, source, path := FindProviderCredential("unknownprovider", nil, nil)
 	if found {
 		t.Error("should not find credential with empty sources")
@@ -1186,8 +1201,7 @@ func TestFindProviderCredential_VibeusageTakesPrecedenceOverEnv(t *testing.T) {
 	setupTempDirWithCredentialIsolation(t)
 	t.Setenv("ANTHROPIC_API_KEY", "sk-test-key")
 
-	credPath := CredentialPath("claude", "session")
-	_ = WriteCredential(credPath, []byte(`{"key":"val"}`))
+	_ = WriteCredential("claude", "session", []byte(`{"key":"val"}`))
 
 	_, source, _ := FindProviderCredential("claude", nil, []string{"ANTHROPIC_API_KEY"})
 	if source != "vibeusage" {
@@ -1196,14 +1210,12 @@ func TestFindProviderCredential_VibeusageTakesPrecedenceOverEnv(t *testing.T) {
 }
 
 func TestFindProviderCredential_CredentialTypes(t *testing.T) {
-	// Test that all three credential types are checked
-	credTypes := []string{"oauth", "session", "apikey"}
+	credTypes := []string{"oauth", "session", "apikey", "api_key"}
 
 	for _, credType := range credTypes {
 		t.Run(credType, func(t *testing.T) {
 			setupTempDirWithCredentialIsolation(t)
-			credPath := CredentialPath("claude", credType)
-			_ = WriteCredential(credPath, []byte(`{}`))
+			_ = WriteCredential("claude", credType, []byte(`{}`))
 
 			found, source, _ := FindProviderCredential("claude", nil, nil)
 			if !found {
@@ -1433,31 +1445,24 @@ func TestCacheOrgID_ErrorWrapping(t *testing.T) {
 	}
 }
 
-func TestWriteCredential_ErrorWrapping_MkdirAll(t *testing.T) {
-	path := filepath.Join("/dev/null", "impossible", "cred.json")
-	err := WriteCredential(path, []byte("data"))
-	if err == nil {
-		t.Fatal("WriteCredential() should return an error for invalid path")
-	}
-	if !strings.Contains(err.Error(), "writing credential") {
-		t.Errorf("error should contain context 'writing credential', got: %v", err)
-	}
-}
-
-func TestWriteCredential_ErrorWrapping_WriteFile(t *testing.T) {
+func TestWriteCredential_ErrorWrapping_ReadOnly(t *testing.T) {
 	dir := t.TempDir()
-	// Make dir read-only so the write will fail
-	tmpDir := filepath.Join(dir, "readonly")
-	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+	// Make the data dir read-only so the write will fail
+	readonlyDir := filepath.Join(dir, "readonly")
+	if err := os.MkdirAll(readonlyDir, 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	if err := os.Chmod(tmpDir, 0o555); err != nil {
+	if err := os.Chmod(readonlyDir, 0o555); err != nil {
 		t.Fatalf("setup chmod: %v", err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(tmpDir, 0o755) })
+	t.Cleanup(func() { _ = os.Chmod(readonlyDir, 0o755) })
 
-	path := filepath.Join(tmpDir, "cred.json")
-	err := WriteCredential(path, []byte("data"))
+	t.Setenv("VIBEUSAGE_DATA_DIR", readonlyDir)
+	configMu.Lock()
+	globalConfig = nil
+	configMu.Unlock()
+
+	err := WriteCredential("testprov", "oauth", []byte(`{"data":"x"}`))
 	if err == nil {
 		t.Fatal("WriteCredential() should return an error when dir is read-only")
 	}

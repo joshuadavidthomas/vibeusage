@@ -17,7 +17,6 @@ const (
 	tokenPath       = "/api/oauth/token"
 	clientID        = "17e5f671-d194-4dfb-9706-5516cb48c098"
 	deviceFlowGrant = "urn:ietf:params:oauth:grant-type:device_code"
-	refreshGrant    = "refresh_token"
 )
 
 // oauthBaseURL returns the OAuth host, respecting the KIMI_CODE_OAUTH_HOST override.
@@ -34,16 +33,7 @@ type DeviceFlowStrategy struct {
 }
 
 func (s *DeviceFlowStrategy) IsAvailable() bool {
-	for _, p := range s.credentialPaths() {
-		if _, err := os.Stat(p); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-func (s *DeviceFlowStrategy) credentialPaths() []string {
-	return []string{config.CredentialPath("kimicode", "oauth")}
+	return config.HasCredential("kimicode", "oauth")
 }
 
 func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -68,30 +58,28 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 }
 
 func (s *DeviceFlowStrategy) loadCredentials() *oauth.Credentials {
-	for _, path := range s.credentialPaths() {
-		data, err := config.ReadCredential(path)
-		if err != nil || data == nil {
-			continue
-		}
+	data, err := config.ReadCredential("kimicode", "oauth")
+	if err != nil || data == nil {
+		return nil
+	}
 
-		// Try current RFC3339 format first
-		var creds oauth.Credentials
-		if err := json.Unmarshal(data, &creds); err == nil && creds.AccessToken != "" {
-			// If ExpiresAt looks like a number string, it might be a
-			// partially-migrated legacy credential; skip to migration.
-			if _, parseErr := time.Parse(time.RFC3339, creds.ExpiresAt); creds.ExpiresAt == "" || parseErr == nil {
-				return &creds
-			}
+	// Try current RFC3339 format first
+	var creds oauth.Credentials
+	if err := json.Unmarshal(data, &creds); err == nil && creds.AccessToken != "" {
+		// If ExpiresAt looks like a number string, it might be a
+		// partially-migrated legacy credential; skip to migration.
+		if _, parseErr := time.Parse(time.RFC3339, creds.ExpiresAt); creds.ExpiresAt == "" || parseErr == nil {
+			return &creds
 		}
+	}
 
-		// Try legacy float64 timestamp format and migrate
-		if migrated := migrateCredentials(data); migrated != nil {
-			// Write back in the new format so future loads are fast
-			if content, err := json.Marshal(migrated); err == nil {
-				_ = config.WriteCredential(path, content)
-			}
-			return migrated
+	// Try legacy float64 timestamp format and migrate
+	if migrated := migrateCredentials(data); migrated != nil {
+		// Write back in the new format so future loads are fast
+		if content, err := json.Marshal(migrated); err == nil {
+			_ = config.WriteCredential("kimicode", "oauth", content)
 		}
+		return migrated
 	}
 	return nil
 }

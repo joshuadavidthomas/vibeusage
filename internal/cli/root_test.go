@@ -303,7 +303,7 @@ func TestConfigPath_JSONOutput(t *testing.T) {
 		t.Fatalf("output is not valid JSON: %v\nOutput: %s", err, buf.String())
 	}
 
-	for _, key := range []string{"config_dir", "config_file", "cache_dir", "credentials_dir"} {
+	for _, key := range []string{"config_dir", "config_file", "cache_dir", "credentials_file"} {
 		if _, ok := parsed[key]; !ok {
 			t.Errorf("JSON output missing %q key", key)
 		}

@@ -26,6 +26,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Changed
 
+- **Breaking (internal storage):** Credential storage consolidated from individual files per provider (`credentials/<provider>/<type>.json`) into a single `credentials.json` file. Existing credentials are migrated automatically on first run — no action required. External credential sources (provider CLIs, environment variables) are unaffected.
 - Providers now appear automatically when credentials are available — no separate enable step required. If you have credentials for a provider (via `vibeusage auth`, a provider CLI, or environment variables), it will show up in `vibeusage` output. To exclude a provider, set `[providers.<id>] enabled = false` in `config.toml`.
 - Replaced ASCII output examples in README with styled PNG screenshots.
 

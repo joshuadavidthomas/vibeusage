@@ -46,7 +46,8 @@ func (w Warp) Auth() provider.AuthFlow {
 			"  2. Copy your token (starts with wk-)",
 		Placeholder: "wk-...",
 		Validate:    provider.ValidatePrefix("wk-"),
-		CredPath:    config.CredentialPath("warp", "apikey"),
+		ProviderID:  "warp",
+		CredType:    "apikey",
 		JSONKey:     "api_key",
 	}
 }
@@ -63,9 +64,10 @@ type APIKeyStrategy struct {
 }
 
 var warpAPIKey = provider.APIKeySource{
-	EnvVars:  []string{"WARP_API_KEY", "WARP_TOKEN"},
-	CredPath: config.CredentialPath("warp", "apikey"),
-	JSONKeys: []string{"api_key", "token"},
+	EnvVars:    []string{"WARP_API_KEY", "WARP_TOKEN"},
+	ProviderID: "warp",
+	CredType:   "apikey",
+	JSONKeys:   []string{"api_key", "token"},
 }
 
 func (s *APIKeyStrategy) IsAvailable() bool {

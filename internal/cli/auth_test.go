@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -70,10 +69,10 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 		t.Fatalf("expected 1 Input call, got %d", len(mock.InputCalls))
 	}
 
-	// Verify credential was saved
-	credPath := filepath.Join(tmpDir, "credentials", "claude", "session.json")
-	if _, err := os.Stat(credPath); os.IsNotExist(err) {
-		t.Error("expected credential file to be created")
+	// Verify credential was saved in consolidated store
+	data, _ := config.ReadCredential("claude", "session")
+	if data == nil {
+		t.Error("expected credential to be saved")
 	}
 }
 
@@ -206,9 +205,7 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 
-	credDir := filepath.Join(tmpDir, "credentials", "copilot")
-	_ = os.MkdirAll(credDir, 0o755)
-	_ = os.WriteFile(filepath.Join(credDir, "oauth.json"), []byte(`{"access_token":"test"}`), 0o600)
+	_ = config.WriteCredential("copilot", "oauth", []byte(`{"access_token":"test"}`))
 
 	// Stub verify so it doesn't make real network calls
 	oldVerify := verifyCredentialsFn
@@ -250,10 +247,8 @@ func TestAuthDelete_RemovesCredentialsAndDisables(t *testing.T) {
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	config.Override(t, config.DefaultConfig())
 
-	// Create credentials
-	credDir := filepath.Join(tmpDir, "credentials", "claude")
-	_ = os.MkdirAll(credDir, 0o755)
-	_ = os.WriteFile(filepath.Join(credDir, "session.json"), []byte(`{"session_key":"test"}`), 0o600)
+	// Create credentials via the consolidated store
+	_ = config.WriteCredential("claude", "session", []byte(`{"session_key":"test"}`))
 
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
@@ -278,8 +273,9 @@ func TestAuthDelete_RemovesCredentialsAndDisables(t *testing.T) {
 	}
 
 	// Credential should be gone
-	if _, err := os.Stat(filepath.Join(credDir, "session.json")); !os.IsNotExist(err) {
-		t.Error("credential file should have been deleted")
+	data, _ := config.ReadCredential("claude", "session")
+	if data != nil {
+		t.Error("credential should have been deleted")
 	}
 
 	if len(mock.ConfirmCalls) != 1 {
@@ -292,10 +288,7 @@ func TestAuthDelete_UserDeclinesConfirm(t *testing.T) {
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	config.Override(t, config.DefaultConfig())
 
-	credDir := filepath.Join(tmpDir, "credentials", "claude")
-	_ = os.MkdirAll(credDir, 0o755)
-	credPath := filepath.Join(credDir, "session.json")
-	_ = os.WriteFile(credPath, []byte(`{"session_key":"test"}`), 0o600)
+	_ = config.WriteCredential("claude", "session", []byte(`{"session_key":"test"}`))
 
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
@@ -317,8 +310,9 @@ func TestAuthDelete_UserDeclinesConfirm(t *testing.T) {
 	}
 
 	// Credential should still exist
-	if _, err := os.Stat(credPath); os.IsNotExist(err) {
-		t.Error("credential file should not have been deleted")
+	data, _ := config.ReadCredential("claude", "session")
+	if data == nil {
+		t.Error("credential should not have been deleted")
 	}
 }
 
@@ -340,13 +334,16 @@ func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
 		t.Fatalf("authSetToken error: %v", err)
 	}
 
-	// Credential should be saved
-	credPath := filepath.Join(tmpDir, "credentials", "cursor", "session.json")
-	if _, err := os.Stat(credPath); os.IsNotExist(err) {
-		t.Error("expected credential file to be created")
+	// Credential should be saved in consolidated file
+	data, readErr := config.ReadCredential("cursor", "session")
+	if readErr != nil {
+		t.Fatalf("ReadCredential error: %v", readErr)
+	}
+	if data == nil {
+		t.Error("expected credential to be saved")
 	}
 
-	// Provider should be configured (credential file exists)
+	// Provider should be configured
 	hasCreds, _ := provider.CheckCredentials("cursor")
 	if !hasCreds {
 		t.Error("cursor should have credentials after auth")

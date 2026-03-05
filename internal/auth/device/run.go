@@ -37,8 +37,10 @@ type Config struct {
 	// (e.g. adding a dash: "36F71B5E" → "36F7-1B5E").
 	FormatCode func(code string) string
 
-	// CredentialPath is where the OAuth credentials are saved.
-	CredentialPath string
+	// ProviderID is the provider identifier for credential storage.
+	ProviderID string
+	// CredType is the credential type (e.g. "oauth").
+	CredType string
 	// ShowRefreshHint prints "Token will refresh automatically." on success
 	// when a refresh token is present.
 	ShowRefreshHint bool
@@ -171,7 +173,7 @@ func Run(w io.Writer, quiet bool, cfg Config) (bool, error) {
 				).Format(time.RFC3339)
 			}
 			content, _ := json.Marshal(creds)
-			_ = config.WriteCredential(cfg.CredentialPath, content)
+			_ = config.WriteCredential(cfg.ProviderID, cfg.CredType, content)
 
 			if !quiet {
 				WriteSuccess(w)

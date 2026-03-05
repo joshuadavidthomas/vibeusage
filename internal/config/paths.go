@@ -37,7 +37,9 @@ func CacheDir() string {
 	return filepath.Join(xdg.CacheHome, appName)
 }
 
-func CredentialsDir() string  { return filepath.Join(DataDir(), "credentials") }
+// credentialsDir returns the path to the legacy per-file credentials directory.
+// Used only for migration from the old per-file layout.
+func credentialsDir() string  { return filepath.Join(DataDir(), "credentials") }
 func SnapshotsDir() string    { return filepath.Join(CacheDir(), "snapshots") }
 func OrgIDsDir() string       { return filepath.Join(CacheDir(), "org-ids") }
 func ModelsFile() string      { return filepath.Join(CacheDir(), "models.json") }

@@ -154,7 +154,7 @@ func authSetup() error {
 	var removed []string
 	for pid := range configuredSet {
 		if !selectedSet[pid] {
-			removeProviderCredentials(pid)
+			config.DeleteProviderCredentials(pid)
 			removed = append(removed, pid)
 		}
 	}
@@ -352,13 +352,6 @@ func offerExistingCredentials(providerID string, verify bool) (bool, error) {
 	return true, nil
 }
 
-// removeProviderCredentials deletes all vibeusage-stored credentials for a provider.
-func removeProviderCredentials(providerID string) {
-	for _, credType := range []string{"oauth", "session", "apikey"} {
-		config.DeleteCredential(config.CredentialPath(providerID, credType))
-	}
-}
-
 // HACK: package-level var to allow test stubbing. This should be replaced
 // with a proper interface (e.g. a Verifier on the auth command struct) once
 // the CLI is refactored away from package-level state.
@@ -411,7 +404,7 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 		}
 	} else {
 		credData, _ := json.Marshal(map[string]string{flow.JSONKey: value})
-		if err := config.WriteCredential(flow.CredPath, credData); err != nil {
+		if err := config.WriteCredential(flow.ProviderID, flow.CredType, credData); err != nil {
 			return fmt.Errorf("error saving credential: %w", err)
 		}
 	}
@@ -450,8 +443,7 @@ func authGeneric(providerID string) error {
 	}
 
 	credData, _ := json.Marshal(map[string]string{"api_key": value})
-	path := config.CredentialPath(providerID, "apikey")
-	if err := config.WriteCredential(path, credData); err != nil {
+	if err := config.WriteCredential(providerID, "apikey", credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
 	}
 
@@ -475,7 +467,7 @@ func authDeleteProvider(providerID string) error {
 		}
 	}
 
-	removeProviderCredentials(providerID)
+	config.DeleteProviderCredentials(providerID)
 	config.ClearProviderCache(providerID)
 
 	if !quiet {
@@ -508,7 +500,7 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 				}
 			} else if f.JSONKey != "" {
 				credData, _ := json.Marshal(map[string]string{f.JSONKey: token})
-				if err := config.WriteCredential(f.CredPath, credData); err != nil {
+				if err := config.WriteCredential(f.ProviderID, f.CredType, credData); err != nil {
 					return fmt.Errorf("error saving credential: %w", err)
 				}
 			}
@@ -521,8 +513,7 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 
 	// Fallback for providers without a ManualKeyAuthFlow.
 	credData, _ := json.Marshal(map[string]string{"api_key": token})
-	path := config.CredentialPath(providerID, "apikey")
-	if err := config.WriteCredential(path, credData); err != nil {
+	if err := config.WriteCredential(providerID, "apikey", credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
 	}
 	if !quiet {

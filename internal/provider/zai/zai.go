@@ -48,7 +48,8 @@ func (z Zai) Auth() provider.AuthFlow {
 			"  2. Create a new API key (or copy an existing one)",
 		Placeholder: "paste API key here",
 		Validate:    provider.ValidateNotEmpty,
-		CredPath:    config.CredentialPath("zai", "apikey"),
+		ProviderID:  "zai",
+		CredType:    "apikey",
 		JSONKey:     "api_key",
 	}
 }
@@ -67,9 +68,10 @@ type APIKeyStrategy struct {
 }
 
 var zaiAPIKey = provider.APIKeySource{
-	EnvVars:  []string{"ZAI_API_KEY"},
-	CredPath: config.CredentialPath("zai", "apikey"),
-	JSONKeys: []string{"api_key"},
+	EnvVars:    []string{"ZAI_API_KEY"},
+	ProviderID: "zai",
+	CredType:   "apikey",
+	JSONKeys:   []string{"api_key"},
 }
 
 func (s *APIKeyStrategy) IsAvailable() bool {

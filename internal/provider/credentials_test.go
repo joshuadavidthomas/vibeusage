@@ -36,8 +36,7 @@ func TestFindCredential_VibeusageStorage(t *testing.T) {
 		creds: CredentialInfo{EnvVars: []string{"TEST_KEY"}},
 	})
 
-	credPath := config.CredentialPath("testprov", "oauth")
-	if err := config.WriteCredential(credPath, []byte(`{"token":"x"}`)); err != nil {
+	if err := config.WriteCredential("testprov", "oauth", []byte(`{"token":"x"}`)); err != nil {
 		t.Fatalf("WriteCredential: %v", err)
 	}
 
@@ -48,8 +47,8 @@ func TestFindCredential_VibeusageStorage(t *testing.T) {
 	if source != "vibeusage" {
 		t.Errorf("source = %q, want vibeusage", source)
 	}
-	if path != credPath {
-		t.Errorf("path = %q, want %q", path, credPath)
+	if path != "testprov/oauth" {
+		t.Errorf("path = %q, want %q", path, "testprov/oauth")
 	}
 }
 
@@ -99,8 +98,7 @@ func TestFindCredential_VibeusageTakesPrecedenceOverEnv(t *testing.T) {
 	})
 
 	t.Setenv("MY_TEST_KEY", "secret")
-	credPath := config.CredentialPath("testprov", "session")
-	_ = config.WriteCredential(credPath, []byte(`{"key":"val"}`))
+	_ = config.WriteCredential("testprov", "session", []byte(`{"key":"val"}`))
 
 	_, source, _ := FindCredential("testprov")
 	if source != "vibeusage" {
@@ -180,7 +178,7 @@ func TestIsFirstRun_WithCreds(t *testing.T) {
 
 	Register(&stubProvider{id: "prov1"})
 
-	_ = config.WriteCredential(config.CredentialPath("prov1", "apikey"), []byte(`{}`))
+	_ = config.WriteCredential("prov1", "apikey", []byte(`{}`))
 
 	if IsFirstRun() {
 		t.Error("IsFirstRun should be false when credentials exist")
@@ -206,8 +204,8 @@ func TestCountConfigured_Some(t *testing.T) {
 	Register(&stubProvider{id: "prov2"})
 	Register(&stubProvider{id: "prov3"})
 
-	_ = config.WriteCredential(config.CredentialPath("prov1", "oauth"), []byte(`{}`))
-	_ = config.WriteCredential(config.CredentialPath("prov3", "session"), []byte(`{}`))
+	_ = config.WriteCredential("prov1", "oauth", []byte(`{}`))
+	_ = config.WriteCredential("prov3", "session", []byte(`{}`))
 
 	if got := CountConfigured(); got != 2 {
 		t.Errorf("CountConfigured() = %d, want 2", got)

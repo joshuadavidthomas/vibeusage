@@ -43,12 +43,14 @@ type ManualKeyAuthFlow struct {
 	Placeholder string
 	// Validate checks the user's input before saving.
 	Validate func(string) error
-	// CredPath is the credential file path suffix (e.g. "claude/session").
-	CredPath string
+	// ProviderID is the provider identifier for credential storage.
+	ProviderID string
+	// CredType is the credential type (e.g. "apikey", "session", "oauth").
+	CredType string
 	// JSONKey is the key name used in the JSON credential file (e.g. "session_key").
 	JSONKey string
 	// Save optionally overrides how credentials are persisted. If nil, the CLI
-	// writes {JSONKey: value} to CredPath.
+	// writes {JSONKey: value} to the consolidated credentials file.
 	Save func(value string) error
 }
 

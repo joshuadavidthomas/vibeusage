@@ -31,8 +31,7 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 	if key := os.Getenv("KIMI_CODE_API_KEY"); key != "" {
 		return key
 	}
-	path := config.CredentialPath("kimicode", "apikey")
-	data, err := config.ReadCredential(path)
+	data, err := config.ReadCredential("kimicode", "apikey")
 	if err != nil || data == nil {
 		return ""
 	}
