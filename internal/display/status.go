@@ -19,7 +19,7 @@ func FormatStatusRows(statuses map[string]models.ProviderStatus, noColor bool) (
 
 	for _, pid := range ids {
 		s := statuses[pid]
-		desc := s.Description
+		desc := s.DisplayDescription()
 		if len(desc) > 30 {
 			desc = desc[:27] + "..."
 		}

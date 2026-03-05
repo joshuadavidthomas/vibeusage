@@ -126,10 +126,38 @@ const (
 	StatusUnknown       StatusLevel = "unknown"
 )
 
+// StatusDescription returns the canonical vibeusage description for this level.
+func (l StatusLevel) StatusDescription() string {
+	switch l {
+	case StatusOperational:
+		return "All systems operational"
+	case StatusDegraded:
+		return "Degraded performance"
+	case StatusPartialOutage:
+		return "Partial outage"
+	case StatusMajorOutage:
+		return "Major outage"
+	case StatusUnknown:
+		return "Unknown"
+	default:
+		return "Unknown"
+	}
+}
+
 type ProviderStatus struct {
 	Level       StatusLevel `json:"level"`
 	Description string      `json:"description,omitempty"`
 	UpdatedAt   *time.Time  `json:"updated_at,omitempty"`
+}
+
+// DisplayDescription returns the description to show in output.
+// If Description is set (e.g. from an active incident), it takes precedence.
+// Otherwise, the canonical description for the status level is returned.
+func (s ProviderStatus) DisplayDescription() string {
+	if s.Description != "" {
+		return s.Description
+	}
+	return s.Level.StatusDescription()
 }
 
 type UsageSnapshot struct {

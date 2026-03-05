@@ -37,11 +37,16 @@ func fetchStatuspageStatusFromURL(ctx context.Context, url string) models.Provid
 
 	level := indicatorToLevel(data.Status.Indicator)
 	now := time.Now().UTC()
-	return models.ProviderStatus{
-		Level:       level,
-		Description: data.Status.Description,
-		UpdatedAt:   &now,
+	status := models.ProviderStatus{
+		Level:     level,
+		UpdatedAt: &now,
 	}
+	// Only preserve upstream description for non-operational states (active incidents).
+	// For operational status, let DisplayDescription() return the canonical description.
+	if level != models.StatusOperational {
+		status.Description = data.Status.Description
+	}
+	return status
 }
 
 func indicatorToLevel(indicator string) models.StatusLevel {
@@ -99,9 +104,8 @@ func fetchGoogleAppsStatusFromURL(ctx context.Context, incidentURL string, keywo
 
 	now := time.Now().UTC()
 	return models.ProviderStatus{
-		Level:       models.StatusOperational,
-		Description: "All systems operational",
-		UpdatedAt:   &now,
+		Level:     models.StatusOperational,
+		UpdatedAt: &now,
 	}
 }
 
@@ -178,9 +182,8 @@ func parseOnlineOrNotFeed(feed rssFeed) models.ProviderStatus {
 	// If no items, assume operational
 	if len(feed.Channel.Items) == 0 {
 		return models.ProviderStatus{
-			Level:       models.StatusOperational,
-			Description: "All systems operational",
-			UpdatedAt:   &now,
+			Level:     models.StatusOperational,
+			UpdatedAt: &now,
 		}
 	}
 
@@ -212,9 +215,8 @@ func parseOnlineOrNotFeed(feed rssFeed) models.ProviderStatus {
 	}
 
 	return models.ProviderStatus{
-		Level:       models.StatusOperational,
-		Description: "All systems operational",
-		UpdatedAt:   &now,
+		Level:     models.StatusOperational,
+		UpdatedAt: &now,
 	}
 }
 

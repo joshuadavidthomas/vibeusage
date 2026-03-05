@@ -68,7 +68,7 @@ func OutputStatusJSON(w io.Writer, statuses map[string]models.ProviderStatus) er
 	for pid, status := range statuses {
 		entry := StatusEntryJSON{
 			Level:       string(status.Level),
-			Description: status.Description,
+			Description: status.DisplayDescription(),
 		}
 		if status.UpdatedAt != nil {
 			entry.UpdatedAt = status.UpdatedAt.Format(time.RFC3339)

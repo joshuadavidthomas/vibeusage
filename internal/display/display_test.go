@@ -910,15 +910,14 @@ func TestRenderSingleProvider_WithStatus(t *testing.T) {
 	}
 	opts := DetailOptions{
 		Status: &models.ProviderStatus{
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
-			UpdatedAt:   &now,
+			Level:     models.StatusOperational,
+			UpdatedAt: &now,
 		},
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, opts))
-	if !strings.Contains(result, "All Systems Operational") {
-		t.Errorf("expected status description, got: %q", result)
+	if !strings.Contains(result, "All systems operational") {
+		t.Errorf("expected canonical status description, got: %q", result)
 	}
 	if !strings.Contains(result, "●") {
 		t.Errorf("expected status symbol, got: %q", result)
@@ -940,8 +939,29 @@ func TestRenderSingleProvider_WithStatusDegraded(t *testing.T) {
 	}
 
 	result := stripANSI(RenderSingleProvider(snap, false, opts))
+	// Incident-specific description overrides the canonical "Degraded performance"
 	if !strings.Contains(result, "Elevated error rates") {
-		t.Errorf("expected degraded status description, got: %q", result)
+		t.Errorf("expected incident description override, got: %q", result)
+	}
+}
+
+func TestRenderSingleProvider_WithStatusDegradedNoDescription(t *testing.T) {
+	now := time.Now()
+	snap := models.UsageSnapshot{
+		Provider: "claude",
+		Periods:  []models.UsagePeriod{{Name: "Monthly", Utilization: 50, PeriodType: models.PeriodMonthly}},
+	}
+	opts := DetailOptions{
+		Status: &models.ProviderStatus{
+			Level:     models.StatusDegraded,
+			UpdatedAt: &now,
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, opts))
+	// Without incident description, falls back to canonical description
+	if !strings.Contains(result, "Degraded performance") {
+		t.Errorf("expected canonical degraded description, got: %q", result)
 	}
 }
 
@@ -994,9 +1014,8 @@ func TestRenderSingleProvider_StatusBetweenTitleAndPanel(t *testing.T) {
 	}
 	opts := DetailOptions{
 		Status: &models.ProviderStatus{
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
-			UpdatedAt:   &now,
+			Level:     models.StatusOperational,
+			UpdatedAt: &now,
 		},
 	}
 
@@ -1004,7 +1023,7 @@ func TestRenderSingleProvider_StatusBetweenTitleAndPanel(t *testing.T) {
 
 	// Verify ordering: title before status before panel
 	titleIdx := strings.Index(result, "Claude")
-	statusIdx := strings.Index(result, "Operational")
+	statusIdx := strings.Index(result, "operational")
 	panelIdx := strings.Index(result, "╭")
 
 	if titleIdx == -1 || statusIdx == -1 || panelIdx == -1 {
@@ -1128,16 +1147,15 @@ func TestFormatSourceName(t *testing.T) {
 func TestRenderStatusLine_Operational(t *testing.T) {
 	now := time.Now()
 	status := models.ProviderStatus{
-		Level:       models.StatusOperational,
-		Description: "All Systems Operational",
-		UpdatedAt:   &now,
+		Level:     models.StatusOperational,
+		UpdatedAt: &now,
 	}
 	result := stripANSI(renderStatusLine(status))
 	if !strings.Contains(result, "●") {
 		t.Error("expected operational symbol ●")
 	}
-	if !strings.Contains(result, "All Systems Operational") {
-		t.Error("expected status description")
+	if !strings.Contains(result, "All systems operational") {
+		t.Error("expected canonical status description")
 	}
 	if !strings.Contains(result, "just now") {
 		t.Error("expected time indicator")
@@ -1149,9 +1167,9 @@ func TestRenderStatusLine_NoDescription(t *testing.T) {
 		Level: models.StatusDegraded,
 	}
 	result := stripANSI(renderStatusLine(status))
-	// Should fall back to level name
-	if !strings.Contains(result, "degraded") {
-		t.Errorf("expected level name as fallback, got: %q", result)
+	// Should use canonical description for the level
+	if !strings.Contains(result, "Degraded performance") {
+		t.Errorf("expected canonical description, got: %q", result)
 	}
 }
 
