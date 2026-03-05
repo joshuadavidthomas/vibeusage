@@ -31,7 +31,7 @@ type StatusEntryJSON struct {
 type AuthStatusEntryJSON struct {
 	Authenticated bool   `json:"authenticated"`
 	Source        string `json:"source"`
-	Enabled       bool   `json:"enabled"`
+	Disabled      bool   `json:"disabled,omitempty"`
 }
 
 // ConfigShowJSON represents the config show JSON output.

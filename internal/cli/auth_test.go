@@ -255,9 +255,6 @@ func TestAuthDelete_RemovesCredentialsAndDisables(t *testing.T) {
 	_ = os.MkdirAll(credDir, 0o755)
 	_ = os.WriteFile(filepath.Join(credDir, "session.json"), []byte(`{"session_key":"test"}`), 0o600)
 
-	// Enable the provider
-	_ = config.WriteEnabledProviders([]string{"claude", "copilot"})
-
 	mock := &prompt.Mock{
 		ConfirmFunc: func(cfg prompt.ConfirmConfig) (bool, error) {
 			if !strings.Contains(cfg.Title, "Claude") {
@@ -283,17 +280,6 @@ func TestAuthDelete_RemovesCredentialsAndDisables(t *testing.T) {
 	// Credential should be gone
 	if _, err := os.Stat(filepath.Join(credDir, "session.json")); !os.IsNotExist(err) {
 		t.Error("credential file should have been deleted")
-	}
-
-	// Should be removed from enabled list
-	enabled := config.ReadEnabledProviders()
-	for _, id := range enabled {
-		if id == "claude" {
-			t.Error("claude should have been removed from enabled providers")
-		}
-	}
-	if len(enabled) != 1 || enabled[0] != "copilot" {
-		t.Errorf("expected [copilot], got %v", enabled)
 	}
 
 	if len(mock.ConfirmCalls) != 1 {
@@ -360,16 +346,10 @@ func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
 		t.Error("expected credential file to be created")
 	}
 
-	// Should be enabled
-	enabled := config.ReadEnabledProviders()
-	found := false
-	for _, id := range enabled {
-		if id == "cursor" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("cursor should be in enabled providers")
+	// Provider should be configured (credential file exists)
+	hasCreds, _ := provider.CheckCredentials("cursor")
+	if !hasCreds {
+		t.Error("cursor should have credentials after auth")
 	}
 }
 
