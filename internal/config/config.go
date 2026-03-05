@@ -26,9 +26,7 @@ type CredentialsConfig struct {
 }
 
 type ProviderConfig struct {
-	AuthSource       string `toml:"auth_source" json:"auth_source"`
-	PreferredBrowser string `toml:"preferred_browser,omitempty" json:"preferred_browser,omitempty"`
-	Enabled          *bool  `toml:"enabled,omitempty" json:"enabled,omitempty"`
+	Enabled *bool `toml:"enabled,omitempty" json:"enabled,omitempty"`
 }
 
 type RoleConfig struct {
