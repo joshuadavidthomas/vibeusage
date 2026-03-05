@@ -13,7 +13,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/keychain"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 const (
@@ -33,7 +32,10 @@ type OAuthStrategy struct {
 }
 
 func (s *OAuthStrategy) IsAvailable() bool {
-	for _, p := range s.credentialPaths() {
+	if config.HasCredential("claude", "oauth") {
+		return true
+	}
+	for _, p := range s.externalPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return true
 		}
@@ -143,35 +145,50 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) credentialPaths() []string {
+func (s *OAuthStrategy) externalPaths() []string {
 	home, _ := os.UserHomeDir()
-	return provider.CredentialSearchPaths("claude", "oauth", filepath.Join(home, ".claude", ".credentials.json"))
+	return []string{filepath.Join(home, ".claude", ".credentials.json")}
 }
 
 func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	for _, path := range s.credentialPaths() {
-		data, err := config.ReadCredential(path)
+	// Check vibeusage consolidated storage first
+	if data, err := config.ReadCredential("claude", "oauth"); err == nil && data != nil {
+		if creds := parseClaudeCredentials(data); creds != nil {
+			return creds
+		}
+	}
+
+	// Check external CLI paths
+	for _, path := range s.externalPaths() {
+		data, err := os.ReadFile(path)
 		if err != nil || data == nil {
 			continue
 		}
-
-		// Try Claude CLI format first
-		var cliCreds ClaudeCLICredentials
-		if err := json.Unmarshal(data, &cliCreds); err == nil && cliCreds.ClaudeAiOauth != nil {
-			creds := cliCreds.ClaudeAiOauth.ToOAuthCredentials()
-			return &creds
-		}
-
-		// Standard vibeusage format
-		var creds oauth.Credentials
-		if err := json.Unmarshal(data, &creds); err != nil {
-			continue
-		}
-		if creds.AccessToken != "" {
-			return &creds
+		if creds := parseClaudeCredentials(data); creds != nil {
+			return creds
 		}
 	}
+
 	return s.loadKeychainCredentials()
+}
+
+func parseClaudeCredentials(data []byte) *oauth.Credentials {
+	// Try Claude CLI format first
+	var cliCreds ClaudeCLICredentials
+	if err := json.Unmarshal(data, &cliCreds); err == nil && cliCreds.ClaudeAiOauth != nil {
+		creds := cliCreds.ClaudeAiOauth.ToOAuthCredentials()
+		return &creds
+	}
+
+	// Standard vibeusage format
+	var creds oauth.Credentials
+	if err := json.Unmarshal(data, &creds); err != nil {
+		return nil
+	}
+	if creds.AccessToken != "" {
+		return &creds
+	}
+	return nil
 }
 
 func (s *OAuthStrategy) loadKeychainCredentials() *oauth.Credentials {

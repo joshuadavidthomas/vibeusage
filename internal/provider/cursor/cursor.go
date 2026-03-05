@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -59,7 +58,8 @@ func (c Cursor) Auth() provider.AuthFlow {
 			"  5. Copy its value",
 		Placeholder: "paste token here",
 		Validate:    provider.ValidateNotEmpty,
-		CredPath:    config.CredentialPath("cursor", "session"),
+		ProviderID:  "cursor",
+		CredType:    "session",
 		JSONKey:     "session_token",
 	}
 }
@@ -73,9 +73,7 @@ type WebStrategy struct {
 }
 
 func (s *WebStrategy) IsAvailable() bool {
-	path := config.CredentialPath("cursor", "session")
-	_, err := os.Stat(path)
-	return err == nil
+	return config.HasCredential("cursor", "session")
 }
 
 func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -129,8 +127,7 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 }
 
 func (s *WebStrategy) loadSessionToken() string {
-	path := config.CredentialPath("cursor", "session")
-	data, err := config.ReadCredential(path)
+	data, err := config.ReadCredential("cursor", "session")
 	if err != nil || data == nil {
 		return ""
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
-	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
 const (
@@ -34,7 +33,10 @@ type OAuthStrategy struct {
 }
 
 func (s *OAuthStrategy) IsAvailable() bool {
-	for _, p := range s.credentialPaths() {
+	if config.HasCredential("gemini", "oauth") {
+		return true
+	}
+	for _, p := range s.externalPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return true
 		}
@@ -42,9 +44,9 @@ func (s *OAuthStrategy) IsAvailable() bool {
 	return false
 }
 
-func (s *OAuthStrategy) credentialPaths() []string {
+func (s *OAuthStrategy) externalPaths() []string {
 	home, _ := os.UserHomeDir()
-	return provider.CredentialSearchPaths("gemini", "oauth", filepath.Join(home, ".gemini", "oauth_creds.json"))
+	return []string{filepath.Join(home, ".gemini", "oauth_creds.json")}
 }
 
 func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -87,8 +89,19 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 }
 
 func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	for _, path := range s.credentialPaths() {
-		data, err := config.ReadCredential(path)
+	// Check vibeusage consolidated storage first
+	if data, err := config.ReadCredential("gemini", "oauth"); err == nil && data != nil {
+		var cliCreds GeminiCLICredentials
+		if err := json.Unmarshal(data, &cliCreds); err == nil {
+			if creds := cliCreds.EffectiveCredentials(); creds != nil {
+				return creds
+			}
+		}
+	}
+
+	// Check external CLI paths
+	for _, path := range s.externalPaths() {
+		data, err := os.ReadFile(path)
 		if err != nil || data == nil {
 			continue
 		}

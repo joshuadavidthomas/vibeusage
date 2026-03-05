@@ -3,7 +3,6 @@ package amp
 import (
 	"context"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -14,9 +13,10 @@ type APIKeyStrategy struct {
 }
 
 var ampAPIKey = provider.APIKeySource{
-	EnvVars:  []string{"AMP_API_KEY"},
-	CredPath: config.CredentialPath("amp", "apikey"),
-	JSONKeys: []string{"api_key"},
+	EnvVars:    []string{"AMP_API_KEY"},
+	ProviderID: "amp",
+	CredType:   "apikey",
+	JSONKeys:   []string{"api_key"},
 }
 
 func (s *APIKeyStrategy) IsAvailable() bool {

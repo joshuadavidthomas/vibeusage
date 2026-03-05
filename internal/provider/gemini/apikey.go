@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -27,11 +25,8 @@ func (s *APIKeyStrategy) IsAvailable() bool {
 	if os.Getenv("GEMINI_API_KEY") != "" {
 		return true
 	}
-	credDir := filepath.Join(config.CredentialsDir(), "gemini")
-	for _, name := range []string{"api_key.txt", "api_key.json"} {
-		if _, err := os.Stat(filepath.Join(credDir, name)); err == nil {
-			return true
-		}
+	if config.HasCredential("gemini", "api_key") {
+		return true
 	}
 	return false
 }
@@ -104,23 +99,15 @@ func (s *APIKeyStrategy) loadAPIKey() string {
 	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
 		return key
 	}
-	// Check credential files
-	for _, suffix := range []string{".txt", ".json"} {
-		path := filepath.Join(config.CredentialsDir(), "gemini", "api_key"+suffix)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
+	data, err := config.ReadCredential("gemini", "api_key")
+	if err != nil || data == nil {
+		return ""
+	}
+	var keyFile apiKeyFile
+	if json.Unmarshal(data, &keyFile) == nil {
+		if key := keyFile.effectiveKey(); key != "" {
+			return key
 		}
-		if suffix == ".json" {
-			var keyFile apiKeyFile
-			if json.Unmarshal(data, &keyFile) == nil {
-				if key := keyFile.effectiveKey(); key != "" {
-					return key
-				}
-			}
-			continue // Don't return raw JSON as an API key
-		}
-		return strings.TrimSpace(string(data))
 	}
 	return ""
 }

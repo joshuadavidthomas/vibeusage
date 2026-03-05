@@ -100,7 +100,7 @@ func Refresh(ctx context.Context, refreshToken string, cfg RefreshConfig) *Crede
 	}
 
 	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(config.CredentialPath(cfg.ProviderID, "oauth"), content)
+	_ = config.WriteCredential(cfg.ProviderID, "oauth", content)
 
 	return updated
 }

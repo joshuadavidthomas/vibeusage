@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/device"
@@ -68,7 +67,8 @@ func (c Copilot) Auth() provider.AuthFlow {
 				}
 				return code
 			},
-			CredentialPath:  config.CredentialPath("copilot", "oauth"),
+			ProviderID:      "copilot",
+			CredType:        "oauth",
 			ShowRefreshHint: true,
 		},
 	}
@@ -90,9 +90,7 @@ type DeviceFlowStrategy struct {
 }
 
 func (s *DeviceFlowStrategy) IsAvailable() bool {
-	path := config.CredentialPath("copilot", "oauth")
-	_, err := os.Stat(path)
-	return err == nil
+	return config.HasCredential("copilot", "oauth")
 }
 
 func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
@@ -165,7 +163,7 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 }
 
 func (s *DeviceFlowStrategy) loadCredentials() *oauth.Credentials {
-	data, err := config.ReadCredential(config.CredentialPath("copilot", "oauth"))
+	data, err := config.ReadCredential("copilot", "oauth")
 	if err != nil || data == nil {
 		return nil
 	}

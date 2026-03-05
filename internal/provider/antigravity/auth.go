@@ -147,7 +147,7 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 	}
 
 	content, _ := json.Marshal(creds)
-	if err := config.WriteCredential(config.CredentialPath("antigravity", "oauth"), content); err != nil {
+	if err := config.WriteCredential("antigravity", "oauth", content); err != nil {
 		return false, fmt.Errorf("failed to save credentials: %w", err)
 	}
 

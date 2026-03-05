@@ -43,7 +43,8 @@ func (o OpenRouter) Auth() provider.AuthFlow {
 			"  2. Create or copy an API key",
 		Placeholder: "sk-or-...",
 		Validate:    provider.ValidateNotEmpty,
-		CredPath:    config.CredentialPath("openrouter", "apikey"),
+		ProviderID:  "openrouter",
+		CredType:    "apikey",
 		JSONKey:     "api_key",
 	}
 }
@@ -60,9 +61,10 @@ type APIKeyStrategy struct {
 }
 
 var openrouterAPIKey = provider.APIKeySource{
-	EnvVars:  []string{"OPENROUTER_API_KEY"},
-	CredPath: config.CredentialPath("openrouter", "apikey"),
-	JSONKeys: []string{"api_key"},
+	EnvVars:    []string{"OPENROUTER_API_KEY"},
+	ProviderID: "openrouter",
+	CredType:   "apikey",
+	JSONKeys:   []string{"api_key"},
 }
 
 func (s *APIKeyStrategy) IsAvailable() bool {

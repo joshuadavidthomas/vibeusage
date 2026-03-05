@@ -66,13 +66,13 @@ var configPathCmd = &cobra.Command{
 			if showCache {
 				return display.OutputJSON(outWriter, map[string]string{"cache_dir": config.CacheDir()})
 			} else if showCreds {
-				return display.OutputJSON(outWriter, map[string]string{"credentials_dir": config.CredentialsDir()})
+				return display.OutputJSON(outWriter, map[string]string{"credentials_file": config.CredentialsFile()})
 			}
 			return display.OutputJSON(outWriter, map[string]string{
-				"config_dir":      config.ConfigDir(),
-				"config_file":     config.ConfigFile(),
-				"cache_dir":       config.CacheDir(),
-				"credentials_dir": config.CredentialsDir(),
+				"config_dir":       config.ConfigDir(),
+				"config_file":      config.ConfigFile(),
+				"cache_dir":        config.CacheDir(),
+				"credentials_file": config.CredentialsFile(),
 			})
 		}
 
@@ -80,7 +80,7 @@ var configPathCmd = &cobra.Command{
 			if showCache {
 				outln(config.CacheDir())
 			} else if showCreds {
-				outln(config.CredentialsDir())
+				outln(config.CredentialsFile())
 			} else {
 				outln(config.ConfigDir())
 			}
@@ -90,12 +90,12 @@ var configPathCmd = &cobra.Command{
 		if showCache {
 			outln(config.CacheDir())
 		} else if showCreds {
-			outln(config.CredentialsDir())
+			outln(config.CredentialsFile())
 		} else {
 			out("Config dir:    %s\n", config.ConfigDir())
 			out("Config file:   %s\n", config.ConfigFile())
 			out("Cache dir:     %s\n", config.CacheDir())
-			out("Credentials:   %s\n", config.CredentialsDir())
+			out("Credentials:   %s\n", config.CredentialsFile())
 		}
 		return nil
 	},

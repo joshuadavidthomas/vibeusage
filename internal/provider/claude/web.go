@@ -114,8 +114,7 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 }
 
 func (s *WebStrategy) loadSessionKey() string {
-	path := config.CredentialPath("claude", "session")
-	data, err := config.ReadCredential(path)
+	data, err := config.ReadCredential("claude", "session")
 	if err != nil || data == nil {
 		return ""
 	}

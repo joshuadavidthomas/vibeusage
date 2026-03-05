@@ -78,7 +78,10 @@ type OAuthStrategy struct {
 }
 
 func (s *OAuthStrategy) IsAvailable() bool {
-	for _, p := range s.credentialPaths() {
+	if config.HasCredential("antigravity", "oauth") {
+		return true
+	}
+	for _, p := range s.externalPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return true
 		}
@@ -90,12 +93,12 @@ func (s *OAuthStrategy) IsAvailable() bool {
 	return false
 }
 
-func (s *OAuthStrategy) credentialPaths() []string {
-	var external []string
+func (s *OAuthStrategy) externalPaths() []string {
+	var paths []string
 	if configDir, err := os.UserConfigDir(); err == nil {
-		external = append(external, filepath.Join(configDir, "Antigravity", "credentials.json"))
+		paths = append(paths, filepath.Join(configDir, "Antigravity", "credentials.json"))
 	}
-	return provider.CredentialSearchPaths("antigravity", "oauth", external...)
+	return paths
 }
 
 // vscdbPath returns the path to Antigravity's VS Code state database.
@@ -148,25 +151,21 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 }
 
 func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	// Try JSON credential files first
-	for _, path := range s.credentialPaths() {
-		data, err := config.ReadCredential(path)
+	// Check vibeusage consolidated storage first
+	if data, err := config.ReadCredential("antigravity", "oauth"); err == nil && data != nil {
+		if creds := parseAntigravityCredentials(data); creds != nil {
+			return creds
+		}
+	}
+
+	// Check external CLI paths
+	for _, path := range s.externalPaths() {
+		data, err := os.ReadFile(path)
 		if err != nil || data == nil {
 			continue
 		}
-
-		// Try the Antigravity credential format
-		var agCreds AntigravityCredentials
-		if err := json.Unmarshal(data, &agCreds); err == nil {
-			if creds := agCreds.ToOAuthCredentials(); creds != nil {
-				return creds
-			}
-		}
-
-		// Try direct OAuth credentials format
-		var oauthCreds oauth.Credentials
-		if err := json.Unmarshal(data, &oauthCreds); err == nil && oauthCreds.AccessToken != "" {
-			return &oauthCreds
+		if creds := parseAntigravityCredentials(data); creds != nil {
+			return creds
 		}
 	}
 
@@ -176,6 +175,23 @@ func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 		return result.creds
 	}
 
+	return nil
+}
+
+func parseAntigravityCredentials(data []byte) *oauth.Credentials {
+	// Try the Antigravity credential format
+	var agCreds AntigravityCredentials
+	if err := json.Unmarshal(data, &agCreds); err == nil {
+		if creds := agCreds.ToOAuthCredentials(); creds != nil {
+			return creds
+		}
+	}
+
+	// Try direct OAuth credentials format
+	var oauthCreds oauth.Credentials
+	if err := json.Unmarshal(data, &oauthCreds); err == nil && oauthCreds.AccessToken != "" {
+		return &oauthCreds
+	}
 	return nil
 }
 

@@ -354,9 +354,7 @@ func offerExistingCredentials(providerID string, verify bool) (bool, error) {
 
 // removeProviderCredentials deletes all vibeusage-stored credentials for a provider.
 func removeProviderCredentials(providerID string) {
-	for _, credType := range []string{"oauth", "session", "apikey"} {
-		config.DeleteCredential(config.CredentialPath(providerID, credType))
-	}
+	config.DeleteProviderCredentials(providerID)
 }
 
 // HACK: package-level var to allow test stubbing. This should be replaced
@@ -411,7 +409,7 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 		}
 	} else {
 		credData, _ := json.Marshal(map[string]string{flow.JSONKey: value})
-		if err := config.WriteCredential(flow.CredPath, credData); err != nil {
+		if err := config.WriteCredential(flow.ProviderID, flow.CredType, credData); err != nil {
 			return fmt.Errorf("error saving credential: %w", err)
 		}
 	}
@@ -450,8 +448,7 @@ func authGeneric(providerID string) error {
 	}
 
 	credData, _ := json.Marshal(map[string]string{"api_key": value})
-	path := config.CredentialPath(providerID, "apikey")
-	if err := config.WriteCredential(path, credData); err != nil {
+	if err := config.WriteCredential(providerID, "apikey", credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
 	}
 
@@ -508,7 +505,7 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 				}
 			} else if f.JSONKey != "" {
 				credData, _ := json.Marshal(map[string]string{f.JSONKey: token})
-				if err := config.WriteCredential(f.CredPath, credData); err != nil {
+				if err := config.WriteCredential(f.ProviderID, f.CredType, credData); err != nil {
 					return fmt.Errorf("error saving credential: %w", err)
 				}
 			}
@@ -521,8 +518,7 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 
 	// Fallback for providers without a ManualKeyAuthFlow.
 	credData, _ := json.Marshal(map[string]string{"api_key": token})
-	path := config.CredentialPath(providerID, "apikey")
-	if err := config.WriteCredential(path, credData); err != nil {
+	if err := config.WriteCredential(providerID, "apikey", credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
 	}
 	if !quiet {

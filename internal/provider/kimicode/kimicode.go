@@ -58,9 +58,10 @@ func (k KimiCode) Auth() provider.AuthFlow {
 				"client_id":  clientID,
 				"grant_type": deviceFlowGrant,
 			},
-			HTTPOptions:    commonHeaders(),
-			HTTPTimeout:    config.Get().Fetch.Timeout,
-			CredentialPath: config.CredentialPath("kimicode", "oauth"),
+			HTTPOptions: commonHeaders(),
+			HTTPTimeout: config.Get().Fetch.Timeout,
+			ProviderID:  "kimicode",
+			CredType:    "oauth",
 		},
 	}
 }

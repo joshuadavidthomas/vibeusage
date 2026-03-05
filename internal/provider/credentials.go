@@ -11,9 +11,10 @@ import (
 // APIKeySource describes where to find an API key for a provider. Declare one
 // per provider and call Load() from both IsAvailable and Fetch.
 type APIKeySource struct {
-	EnvVars  []string // environment variables to check, in order
-	CredPath string   // credential file path
-	JSONKeys []string // JSON keys to try within the credential file
+	EnvVars    []string // environment variables to check, in order
+	ProviderID string   // provider ID for credential lookup
+	CredType   string   // credential type (e.g. "apikey", "oauth")
+	JSONKeys   []string // JSON keys to try within the credential file
 }
 
 // Load checks environment variables and then the credential file for an API
@@ -24,7 +25,7 @@ func (s APIKeySource) Load() string {
 			return v
 		}
 	}
-	data, err := config.ReadCredential(s.CredPath)
+	data, err := config.ReadCredential(s.ProviderID, s.CredType)
 	if err != nil || data == nil {
 		return ""
 	}
@@ -38,12 +39,6 @@ func (s APIKeySource) Load() string {
 		}
 	}
 	return ""
-}
-
-// CredentialSearchPaths returns the canonical vibeusage credential path first,
-// followed by external credential paths (provider CLI files, etc.).
-func CredentialSearchPaths(providerID, credType string, external ...string) []string {
-	return append([]string{config.CredentialPath(providerID, credType)}, external...)
 }
 
 // FindCredential checks for credentials for the given provider in

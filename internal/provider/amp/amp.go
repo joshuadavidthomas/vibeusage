@@ -45,7 +45,8 @@ func (a Amp) Auth() provider.AuthFlow {
 		Instructions: "Paste your Amp API key. If Amp CLI is installed, vibeusage can also auto-detect ~/.local/share/amp/secrets.json.",
 		Placeholder:  "amp-...",
 		Validate:     provider.ValidateNotEmpty,
-		CredPath:     config.CredentialPath("amp", "apikey"),
+		ProviderID:   "amp",
+		CredType:     "apikey",
 		JSONKey:      "api_key",
 	}
 }

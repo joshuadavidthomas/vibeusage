@@ -58,7 +58,8 @@ func (g Gemini) Auth() provider.AuthFlow {
 			"OAuth credentials, which will be picked up automatically.",
 		Placeholder: "AI Studio API key",
 		Validate:    provider.ValidateNotEmpty,
-		CredPath:    config.CredentialPath("gemini", "api_key"),
+		ProviderID:  "gemini",
+		CredType:    "api_key",
 		JSONKey:     "api_key",
 	}
 }

@@ -60,9 +60,8 @@ func (c Claude) Auth() provider.AuthFlow {
 func saveClaudeCredential(value string) error {
 	value = strings.TrimSpace(value)
 
-	path := config.CredentialPath("claude", "session")
 	content, _ := json.Marshal(map[string]string{"session_key": value})
-	return config.WriteCredential(path, content)
+	return config.WriteCredential("claude", "session", content)
 }
 
 func init() {
