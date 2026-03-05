@@ -73,9 +73,9 @@ func mockClaudeDashboardSnapshot() models.UsageSnapshot {
 			},
 			{
 				Name:        "Weekly",
-				Utilization: 94,
+				Utilization: 99,
 				PeriodType:  models.PeriodWeekly,
-				ResetsAt:    resetIn(3*24*time.Hour + 8*time.Hour),
+				ResetsAt:    resetIn(24 * time.Hour),
 			},
 		},
 		Overage: &models.OverageUsage{
