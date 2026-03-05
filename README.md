@@ -2,7 +2,7 @@
 
 Track usage across agentic LLM providers from your terminal.
 
-<img src="docs/images/hero.svg" alt="vibeusage dashboard showing Claude, Codex, and Copilot usage with progress bars" />
+<img src="docs/images/hero.png" alt="vibeusage dashboard showing Claude, Codex, and Copilot usage with progress bars" />
 
 I get free access to GitHub Copilot Pro for my OSS contributions (thanks GitHub!), but I consistently forget to use it and every month leave free usage on the table. vibeusage keeps that visible across providers and gives you one place to see account usage, pace, and remaining headroom across your configured providers.
 
@@ -55,7 +55,7 @@ Set up the providers you use:
 vibeusage auth
 ```
 
-<img src="docs/images/auth.svg" alt="vibeusage auth interactive provider selection" />
+<img src="docs/images/auth.png" alt="vibeusage auth interactive provider selection" />
 
 Providers with existing CLI credentials are detected automatically — just select them and hit Enter. For others, vibeusage walks you through authentication (API keys, device flows, or browser tokens).
 
@@ -64,7 +64,7 @@ Then check your usage:
 vibeusage
 ```
 
-<img src="docs/images/dashboard.svg" alt="vibeusage dashboard showing Claude, Codex, and Copilot usage panels with progress bars" />
+<img src="docs/images/dashboard.png" alt="vibeusage dashboard showing Claude, Codex, and Copilot usage panels with progress bars" />
 
 Bars are pace-colored by burn rate: **green** (on track or within 15% of expected), **yellow** (15–30% over expected pace), **red** (well over pace or near exhaustion). Pace compares your actual usage percentage to the fraction of time elapsed in the period.
 
@@ -84,7 +84,7 @@ Check a specific provider:
 vibeusage usage claude
 ```
 
-<img src="docs/images/usage-single.svg" alt="vibeusage single provider detail view for Claude showing session and weekly breakdown" />
+<img src="docs/images/usage-single.png" alt="vibeusage single provider detail view for Claude showing session and weekly breakdown" />
 
 Output as JSON for scripting or automation:
 
@@ -107,7 +107,7 @@ For status bars and scripts, `vibeusage statusline` outputs condensed usage:
 vibeusage statusline
 ```
 
-<img src="docs/images/statusline.svg" alt="vibeusage statusline condensed output with progress bars" />
+<img src="docs/images/statusline.png" alt="vibeusage statusline condensed output with progress bars" />
 
 Compact text format for space-constrained widgets:
 
@@ -115,7 +115,7 @@ Compact text format for space-constrained widgets:
 vibeusage statusline --short
 ```
 
-<img src="docs/images/statusline-short.svg" alt="vibeusage statusline compact text format" />
+<img src="docs/images/statusline-short.png" alt="vibeusage statusline compact text format" />
 
 Filter to specific providers (single provider omits the label):
 
@@ -123,7 +123,7 @@ Filter to specific providers (single provider omits the label):
 vibeusage statusline -p claude
 ```
 
-<img src="docs/images/statusline-single.svg" alt="vibeusage statusline for a single provider" />
+<img src="docs/images/statusline-single.png" alt="vibeusage statusline for a single provider" />
 
 ```bash
 vibeusage statusline -p claude -p codex  # Multiple providers
@@ -140,7 +140,7 @@ You can route a model to the provider with the best current headroom:
 vibeusage route claude-opus-4-6
 ```
 
-<img src="docs/images/route-model.svg" alt="vibeusage route showing provider comparison table for Claude Opus 4.6" />
+<img src="docs/images/route-model.png" alt="vibeusage route showing provider comparison table for Claude Opus 4.6" />
 
 Or route via your own role/model group:
 
@@ -148,7 +148,7 @@ Or route via your own role/model group:
 vibeusage route --role coding
 ```
 
-<img src="docs/images/route-role.svg" alt="vibeusage route showing role-based routing table for coding role" />
+<img src="docs/images/route-role.png" alt="vibeusage route showing role-based routing table for coding role" />
 
 Not sure which model ID to use?
 
@@ -202,7 +202,7 @@ Check the operational status of all providers:
 vibeusage status
 ```
 
-<img src="docs/images/status.svg" alt="vibeusage status showing operational status of all providers" />
+<img src="docs/images/status.png" alt="vibeusage status showing operational status of all providers" />
 
 Status fetches the current operational status from each provider's API status page (where available). ● indicates all systems operational, ◐ indicates a service disruption, and ? means status could not be determined. Use this to check if a provider is experiencing outages before troubleshooting credential issues.
 

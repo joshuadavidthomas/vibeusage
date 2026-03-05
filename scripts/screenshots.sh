@@ -26,9 +26,9 @@ for scene in $scenes; do
     "$BIN" "$scene" | freeze \
         --language ansi \
         --config "$CONFIG" \
-        --output "${OUTDIR}/${scene}.svg"
+        --output "${OUTDIR}/${scene}.png"
 done
 
 echo ""
 echo "Done: ${OUTDIR}/"
-ls -lh "${OUTDIR}"/*.svg
+ls -lh "${OUTDIR}"/*.png

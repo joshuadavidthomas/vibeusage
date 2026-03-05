@@ -26,7 +26,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Changed
 
-- Replaced ASCII output examples in README with styled SVG screenshots.
+- Replaced ASCII output examples in README with styled PNG screenshots.
 
 ## [0.4.0]
 

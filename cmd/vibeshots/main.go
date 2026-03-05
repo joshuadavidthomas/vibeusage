@@ -3,7 +3,7 @@
 // This is a development-only tool — it is not distributed to users.
 // Each subcommand renders a specific "scene" using the real display
 // functions with curated mock data, writing ANSI-styled output to stdout.
-// Pipe the output through `freeze` to produce SVG images.
+// Pipe the output through `freeze` to produce PNG images.
 //
 // Usage:
 //
