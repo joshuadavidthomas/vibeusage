@@ -196,7 +196,6 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *oauth.Credentia
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL:    oauthTokenURL,
 		FormFields:  map[string]string{"client_id": oauthClientID},
-		Headers:     []httpclient.RequestOption{httpclient.WithHeader("anthropic-beta", anthropicBetaTag)},
 		ProviderID:  "claude",
 		HTTPTimeout: s.HTTPTimeout,
 	})

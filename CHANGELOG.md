@@ -32,6 +32,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Fixed Claude OAuth token refresh always failing. When your Claude token expired, vibeusage could not refresh it and would report "OAuth token expired and could not be refreshed" even though the refresh token was still valid.
 - Fixed CLI-based token refresh timing out before the Claude CLI could finish starting up.
+- Removed unnecessary `anthropic-beta` header from token refresh requests (only needed for usage/account API calls).
 
 ## [0.4.0]
 
