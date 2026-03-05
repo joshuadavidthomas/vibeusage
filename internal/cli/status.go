@@ -107,11 +107,11 @@ func displayStatusTable(ctx context.Context, statuses map[string]models.Provider
 		return
 	}
 
-	headers, rows := display.FormatStatusRows(statuses, noColor)
+	headers, rows, rowStyles := display.FormatStatusRows(statuses, noColor)
 	outln(display.NewTableWithOptions(
 		headers,
 		rows,
-		display.TableOptions{Title: "Provider Status", NoColor: noColor, Width: display.TerminalWidth()},
+		display.TableOptions{Title: "Provider Status", NoColor: noColor, Width: display.TerminalWidth(), RowStyles: rowStyles},
 	))
 
 	if durationMs > 0 {

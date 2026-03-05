@@ -174,11 +174,11 @@ func sceneStatus() {
 	printPrompt("vibeusage status")
 
 	statuses := mockProviderStatuses()
-	headers, rows := display.FormatStatusRows(statuses, false)
+	headers, rows, rowStyles := display.FormatStatusRows(statuses, false)
 	fmt.Println(display.NewTableWithOptions(
 		headers,
 		rows,
-		display.TableOptions{Title: "Provider Status", Width: 80},
+		display.TableOptions{Title: "Provider Status", Width: 80, RowStyles: rowStyles},
 	))
 }
 

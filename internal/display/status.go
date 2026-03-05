@@ -6,9 +6,10 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-// FormatStatusRows builds table headers and rows from a provider status map.
-// Rows are sorted by provider ID. Descriptions are truncated to 30 characters.
-func FormatStatusRows(statuses map[string]models.ProviderStatus, noColor bool) (headers []string, rows [][]string) {
+// FormatStatusRows builds table headers, rows, and per-row styles from a
+// provider status map. Rows are sorted by provider ID. Descriptions are
+// truncated to 30 characters. Providers with unknown status are marked dim.
+func FormatStatusRows(statuses map[string]models.ProviderStatus, noColor bool) (headers []string, rows [][]string, styles []RowStyle) {
 	ids := make([]string, 0, len(statuses))
 	for id := range statuses {
 		ids = append(ids, id)
@@ -29,7 +30,12 @@ func FormatStatusRows(statuses map[string]models.ProviderStatus, noColor bool) (
 			desc,
 			FormatStatusUpdated(s.UpdatedAt),
 		})
+		if s.Level == models.StatusUnknown {
+			styles = append(styles, RowDim)
+		} else {
+			styles = append(styles, RowNormal)
+		}
 	}
 
-	return headers, rows
+	return headers, rows, styles
 }
