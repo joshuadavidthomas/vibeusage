@@ -92,7 +92,7 @@ func sceneDashboard() {
 	printPrompt("vibeusage")
 
 	snapshots := []models.UsageSnapshot{
-		mockClaudeSnapshot(),
+		mockClaudeDashboardSnapshot(),
 		mockCodexSnapshot(),
 		mockCopilotSnapshot(),
 		mockCursorSnapshot(),

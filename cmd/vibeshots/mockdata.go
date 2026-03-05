@@ -56,6 +56,37 @@ func mockClaudeSnapshot() models.UsageSnapshot {
 	}
 }
 
+func mockClaudeDashboardSnapshot() models.UsageSnapshot {
+	return models.UsageSnapshot{
+		Provider:  "claude",
+		FetchedAt: time.Now(),
+		Source:    "oauth",
+		Identity: &models.ProviderIdentity{
+			Plan: "Pro",
+		},
+		Periods: []models.UsagePeriod{
+			{
+				Name:        "Session (5h)",
+				Utilization: 38,
+				PeriodType:  models.PeriodSession,
+				ResetsAt:    resetIn(1*time.Hour + 40*time.Minute),
+			},
+			{
+				Name:        "Weekly",
+				Utilization: 82,
+				PeriodType:  models.PeriodWeekly,
+				ResetsAt:    resetIn(5*24*time.Hour + 3*time.Hour),
+			},
+		},
+		Overage: &models.OverageUsage{
+			Used:      73.72,
+			Limit:     0,
+			Currency:  "USD",
+			IsEnabled: true,
+		},
+	}
+}
+
 func mockClaudeDetailSnapshot() models.UsageSnapshot {
 	return models.UsageSnapshot{
 		Provider:  "claude",
