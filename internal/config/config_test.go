@@ -114,7 +114,7 @@ func TestIsProviderEnabled(t *testing.T) {
 		{
 			name: "enabled when Enabled is nil",
 			providers: map[string]ProviderConfig{
-				"claude": {AuthSource: "oauth"},
+				"claude": {},
 			},
 			providerID: "claude",
 			want:       true,
@@ -254,8 +254,7 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 	original.Display.PaceColors = false
 	original.Display.ResetFormat = "relative"
 	original.Providers["claude"] = ProviderConfig{
-		AuthSource: "oauth",
-		Enabled:    boolPtr(true),
+		Enabled: boolPtr(true),
 	}
 
 	if err := Save(original, path); err != nil {
@@ -279,9 +278,6 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 	pc, ok := loaded.Providers["claude"]
 	if !ok {
 		t.Fatal("Providers[claude] not found after roundtrip")
-	}
-	if pc.AuthSource != "oauth" {
-		t.Errorf("Providers[claude].AuthSource = %q, want %q", pc.AuthSource, "oauth")
 	}
 	if pc.Enabled == nil || !*pc.Enabled {
 		t.Error("Providers[claude].Enabled should be true after roundtrip")
