@@ -22,14 +22,14 @@ type CLIRefreshConfig struct {
 // RefreshViaCLI attempts to refresh OAuth credentials by spawning a CLI tool
 // that refreshes tokens as a side effect on startup. It polls for fresh
 // credentials every 25ms and kills the process as soon as they appear (or
-// after a 2-second timeout).
+// after a 15-second timeout).
 func RefreshViaCLI(ctx context.Context, cfg CLIRefreshConfig) *Credentials {
 	binPath, err := exec.LookPath(cfg.BinaryName)
 	if err != nil {
 		return nil
 	}
 
-	tctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	tctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(tctx, binPath, cfg.Args...)

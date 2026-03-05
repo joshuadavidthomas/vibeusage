@@ -19,7 +19,8 @@ import (
 const (
 	oauthUsageURL        = "https://api.anthropic.com/api/oauth/usage"
 	oauthAccountURL      = "https://api.anthropic.com/api/oauth/account"
-	oauthTokenURL        = "https://api.anthropic.com/oauth/token"
+	oauthTokenURL        = "https://platform.claude.com/v1/oauth/token"
+	oauthClientID        = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	anthropicBetaTag     = "oauth-2025-04-20"
 	claudeKeychainSecret = "Claude Code-credentials"
 )
@@ -194,6 +195,7 @@ func (s *OAuthStrategy) loadKeychainCredentials() *oauth.Credentials {
 func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL:    oauthTokenURL,
+		FormFields:  map[string]string{"client_id": oauthClientID},
 		Headers:     []httpclient.RequestOption{httpclient.WithHeader("anthropic-beta", anthropicBetaTag)},
 		ProviderID:  "claude",
 		HTTPTimeout: s.HTTPTimeout,
