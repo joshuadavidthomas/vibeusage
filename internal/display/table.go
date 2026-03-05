@@ -32,7 +32,7 @@ func NewTableWithOptions(headers []string, rows [][]string, opts TableOptions) s
 	headerStyle := lipgloss.NewStyle().Bold(true).Padding(0, 1)
 	cellStyle := lipgloss.NewStyle().Padding(0, 1)
 	boldStyle := lipgloss.NewStyle().Bold(true).Padding(0, 1)
-	dimStyle := lipgloss.NewStyle().Faint(true).Italic(true).Padding(0, 1)
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Padding(0, 1)
 	borderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
 	if opts.NoColor {

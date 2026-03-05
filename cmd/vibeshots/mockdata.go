@@ -96,9 +96,8 @@ func mockClaudeDetailSnapshot() models.UsageSnapshot {
 			Plan: "Pro",
 		},
 		Status: &models.ProviderStatus{
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		Periods: []models.UsagePeriod{
 			{
@@ -404,21 +403,15 @@ func mockRouteRoleRecommendation() routing.RoleRecommendation {
 }
 
 func mockProviderStatuses() map[string]models.ProviderStatus {
-	// Descriptions match what each provider's real status source returns:
-	//   Statuspage.io → "All Systems Operational" (amp, claude, codex, copilot, cursor, kimicode, warp)
-	//   Google Apps   → "All systems operational" (antigravity, gemini)
-	//   OnlineOrNot   → "All systems operational" (openrouter)
-	//   None          → "" with StatusUnknown (minimax, zai)
+	// Showcase all status levels so the vibeshot captures the full styling range.
 	return map[string]models.ProviderStatus{
 		"amp": {
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		"antigravity": {
-			Level:       models.StatusOperational,
-			Description: "All systems operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		"claude": {
 			Level:       models.StatusPartialOutage,
@@ -426,42 +419,37 @@ func mockProviderStatuses() map[string]models.ProviderStatus {
 			UpdatedAt:   justNow(),
 		},
 		"codex": {
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
+			Level:       models.StatusDegraded,
+			Description: "Partial System Degradation",
 			UpdatedAt:   justNow(),
 		},
 		"copilot": {
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		"cursor": {
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
+			Level:       models.StatusMajorOutage,
+			Description: "API Completely Unavailable",
 			UpdatedAt:   justNow(),
 		},
 		"gemini": {
-			Level:       models.StatusOperational,
-			Description: "All systems operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		"kimicode": {
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		"minimax": {
 			Level: models.StatusUnknown,
 		},
 		"openrouter": {
-			Level:       models.StatusOperational,
-			Description: "All systems operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		"warp": {
-			Level:       models.StatusOperational,
-			Description: "All Systems Operational",
-			UpdatedAt:   justNow(),
+			Level:     models.StatusOperational,
+			UpdatedAt: justNow(),
 		},
 		"zai": {
 			Level: models.StatusUnknown,

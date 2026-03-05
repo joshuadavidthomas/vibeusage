@@ -297,10 +297,7 @@ func formatSourceName(source string) string {
 // renderStatusLine renders a compact status indicator line.
 func renderStatusLine(status models.ProviderStatus) string {
 	sym := StatusSymbol(status.Level, false)
-	desc := string(status.Level)
-	if status.Description != "" {
-		desc = status.Description
-	}
+	desc := status.DisplayDescription()
 	line := sym + " " + desc
 	if status.UpdatedAt != nil {
 		line += dimStyle.Render("  " + FormatStatusUpdated(status.UpdatedAt))

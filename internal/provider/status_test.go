@@ -33,8 +33,8 @@ func TestFetchStatuspageStatus_Success(t *testing.T) {
 	if status.Level != models.StatusOperational {
 		t.Errorf("expected StatusOperational, got %v", status.Level)
 	}
-	if status.Description != "All Systems Operational" {
-		t.Errorf("expected description 'All Systems Operational', got %q", status.Description)
+	if status.Description != "" {
+		t.Errorf("expected empty Description for operational status, got %q", status.Description)
 	}
 	if status.UpdatedAt == nil {
 		t.Error("expected UpdatedAt to be set")
@@ -178,8 +178,8 @@ func TestFetchOnlineOrNotStatus_NoIncidents(t *testing.T) {
 	if status.Level != models.StatusOperational {
 		t.Errorf("expected StatusOperational for empty feed, got %v", status.Level)
 	}
-	if status.Description != "All systems operational" {
-		t.Errorf("expected 'All systems operational', got %q", status.Description)
+	if status.Description != "" {
+		t.Errorf("expected empty Description for operational status, got %q", status.Description)
 	}
 }
 

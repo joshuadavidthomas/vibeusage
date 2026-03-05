@@ -65,8 +65,7 @@ func TestOutputStatusJSON_WritesToWriter(t *testing.T) {
 	var buf bytes.Buffer
 	statuses := map[string]models.ProviderStatus{
 		"claude": {
-			Level:       models.StatusOperational,
-			Description: "All systems normal",
+			Level: models.StatusOperational,
 		},
 	}
 
@@ -485,9 +484,8 @@ func TestOutputStatusJSON_Structure(t *testing.T) {
 	now := time.Now()
 	statuses := map[string]models.ProviderStatus{
 		"claude": {
-			Level:       models.StatusOperational,
-			Description: "All systems go",
-			UpdatedAt:   &now,
+			Level:     models.StatusOperational,
+			UpdatedAt: &now,
 		},
 		"copilot": {
 			Level:       models.StatusDegraded,
@@ -512,8 +510,9 @@ func TestOutputStatusJSON_Structure(t *testing.T) {
 	if claude.Level != "operational" {
 		t.Errorf("claude.level = %q, want %q", claude.Level, "operational")
 	}
-	if claude.Description != "All systems go" {
-		t.Errorf("claude.description = %q, want %q", claude.Description, "All systems go")
+	// DisplayDescription() returns canonical description even when Description field is empty
+	if claude.Description != "All systems operational" {
+		t.Errorf("claude.description = %q, want %q", claude.Description, "All systems operational")
 	}
 	if claude.UpdatedAt == "" {
 		t.Error("claude should have updated_at")
@@ -522,6 +521,10 @@ func TestOutputStatusJSON_Structure(t *testing.T) {
 	copilot, ok := result["copilot"]
 	if !ok {
 		t.Fatal("missing 'copilot' key")
+	}
+	// Incident-specific description overrides canonical
+	if copilot.Description != "Partial issues" {
+		t.Errorf("copilot.description = %q, want %q", copilot.Description, "Partial issues")
 	}
 	if copilot.UpdatedAt != "" {
 		t.Errorf("copilot should not have updated_at, got %q", copilot.UpdatedAt)

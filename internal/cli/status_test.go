@@ -21,9 +21,8 @@ func TestDisplayStatusTable_ContainsProviderData(t *testing.T) {
 	now := time.Now()
 	statuses := map[string]models.ProviderStatus{
 		"claude": {
-			Level:       models.StatusOperational,
-			Description: "All systems normal",
-			UpdatedAt:   &now,
+			Level:     models.StatusOperational,
+			UpdatedAt: &now,
 		},
 		"cursor": {
 			Level:       models.StatusDegraded,
@@ -44,7 +43,7 @@ func TestDisplayStatusTable_ContainsProviderData(t *testing.T) {
 
 	output := buf.String()
 
-	for _, want := range []string{"claude", "cursor", "All systems normal", "Slow responses"} {
+	for _, want := range []string{"claude", "cursor", "All systems operational", "Slow responses"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("output missing %q\n\nGot:\n%s", want, output)
 		}
@@ -54,8 +53,7 @@ func TestDisplayStatusTable_ContainsProviderData(t *testing.T) {
 func TestDisplayStatusTable_HasTableBorders(t *testing.T) {
 	statuses := map[string]models.ProviderStatus{
 		"claude": {
-			Level:       models.StatusOperational,
-			Description: "OK",
+			Level: models.StatusOperational,
 		},
 	}
 
@@ -85,9 +83,8 @@ func TestDisplayStatusTable_QuietMode(t *testing.T) {
 	now := time.Now()
 	statuses := map[string]models.ProviderStatus{
 		"claude": {
-			Level:       models.StatusOperational,
-			Description: "OK",
-			UpdatedAt:   &now,
+			Level:     models.StatusOperational,
+			UpdatedAt: &now,
 		},
 	}
 
@@ -114,7 +111,7 @@ func TestDisplayStatusTable_QuietMode(t *testing.T) {
 
 func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 	statuses := map[string]models.ProviderStatus{
-		"claude": {Level: models.StatusOperational, Description: "OK"},
+		"claude": {Level: models.StatusOperational},
 	}
 
 	// Capture logger output via context injection
@@ -138,7 +135,7 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 
 func TestDisplayStatusTable_Headers(t *testing.T) {
 	statuses := map[string]models.ProviderStatus{
-		"claude": {Level: models.StatusOperational, Description: "OK"},
+		"claude": {Level: models.StatusOperational},
 	}
 
 	var buf bytes.Buffer
@@ -236,7 +233,7 @@ func TestFetchAllStatuses_CollectsAllResults(t *testing.T) {
 		"ok": &statusStubProvider{
 			id: "ok",
 			fetchStatus: func(ctx context.Context) models.ProviderStatus {
-				return models.ProviderStatus{Level: models.StatusOperational, Description: "All good"}
+				return models.ProviderStatus{Level: models.StatusOperational}
 			},
 		},
 		"down": &statusStubProvider{

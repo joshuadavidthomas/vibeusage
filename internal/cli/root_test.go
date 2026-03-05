@@ -535,7 +535,7 @@ func TestVerboseOutput_StatusTable_SuppressedInQuiet(t *testing.T) {
 	defer func() { noColor = oldNoColor }()
 
 	statuses := map[string]models.ProviderStatus{
-		"claude": {Level: models.StatusOperational, Description: "OK"},
+		"claude": {Level: models.StatusOperational},
 	}
 
 	displayStatusTable(ctx, statuses, 250)

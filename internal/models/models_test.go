@@ -550,6 +550,70 @@ func TestIsStale(t *testing.T) {
 	}
 }
 
+func TestStatusDescription(t *testing.T) {
+	tests := []struct {
+		level StatusLevel
+		want  string
+	}{
+		{StatusOperational, "All systems operational"},
+		{StatusDegraded, "Degraded performance"},
+		{StatusPartialOutage, "Partial outage"},
+		{StatusMajorOutage, "Major outage"},
+		{StatusUnknown, "Unknown"},
+		{StatusLevel("bogus"), "Unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.level), func(t *testing.T) {
+			got := tt.level.StatusDescription()
+			if got != tt.want {
+				t.Errorf("StatusDescription() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDisplayDescription(t *testing.T) {
+	tests := []struct {
+		name   string
+		status ProviderStatus
+		want   string
+	}{
+		{
+			name:   "operational with no description uses canonical",
+			status: ProviderStatus{Level: StatusOperational},
+			want:   "All systems operational",
+		},
+		{
+			name:   "degraded with no description uses canonical",
+			status: ProviderStatus{Level: StatusDegraded},
+			want:   "Degraded performance",
+		},
+		{
+			name:   "incident description overrides canonical",
+			status: ProviderStatus{Level: StatusDegraded, Description: "Elevated error rates"},
+			want:   "Elevated error rates",
+		},
+		{
+			name:   "unknown with no description uses canonical",
+			status: ProviderStatus{Level: StatusUnknown},
+			want:   "Unknown",
+		},
+		{
+			name:   "major outage with incident title",
+			status: ProviderStatus{Level: StatusMajorOutage, Description: "Complete API failure"},
+			want:   "Complete API failure",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.status.DisplayDescription()
+			if got != tt.want {
+				t.Errorf("DisplayDescription() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
