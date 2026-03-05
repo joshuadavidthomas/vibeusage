@@ -22,6 +22,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Added
 
+- Added `NO_COLOR` and `VIBEUSAGE_NO_COLOR` environment variable support for disabling colored output (follows the [no-color.org](https://no-color.org/) convention). Previously only the `--no-color` flag worked.
 - **Internal:** Added `vibeshots` dev binary and `just screenshots` for generating README terminal screenshots via [freeze](https://github.com/charmbracelet/freeze).
 
 ### Changed
@@ -32,11 +33,13 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Removed
 
+- Removed unused `pace_colors` display config option. Pace-aware coloring is always on — use `--no-color` or `NO_COLOR=1` to disable all colors.
 - Removed unused `auth_source` and `preferred_browser` fields from `[providers.<id>]` config.
 
 ### Fixed
 
 - Fixed Claude OAuth token refresh always failing. When your Claude token expired, vibeusage could not refresh it and would report "OAuth token expired and could not be refreshed" even though the refresh token was still valid.
+- Fixed usage bars showing misleading colors at high utilization. Previously, 99% usage with 23 hours until reset showed yellow because the pace ratio (~1.15) looked borderline — but only 1% budget remained for 14% of the period. Color decisions now factor in absolute headroom (remaining budget vs remaining time), not just burn rate.
 - Fixed CLI-based token refresh timing out before the Claude CLI could finish starting up.
 - Removed unnecessary `anthropic-beta` header from token refresh requests (only needed for usage/account API calls).
 - Fixed providers silently disappearing from output when the internal `enabled_providers.json` file got out of sync with actual credentials. The file has been removed; credential availability is now the sole source of truth.
