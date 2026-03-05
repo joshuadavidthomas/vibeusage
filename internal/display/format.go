@@ -32,8 +32,11 @@ func formatHM(h, m int) string { return strconv.Itoa(h) + "h " + strconv.Itoa(m)
 func formatM(m int) string     { return strconv.Itoa(m) + "m" }
 
 // PaceToColor returns a color name ("green", "yellow", or "red") based on
-// the pace ratio and current utilization percentage.
-func PaceToColor(paceRatio *float64, utilization int) string {
+// the pace ratio, current utilization percentage, and elapsed time in the
+// period. The elapsedRatio (0.0–1.0) enables headroom-aware color decisions:
+// pace ratio alone can mask dangerously low remaining budget when utilization
+// is high (e.g. 99% at 86% elapsed has pace ~1.15 but only 1% headroom).
+func PaceToColor(paceRatio *float64, utilization int, elapsedRatio *float64) string {
 	// Exhausted quota is always red — you're blocked regardless of pace.
 	if utilization >= 100 {
 		return "red"
@@ -46,6 +49,26 @@ func PaceToColor(paceRatio *float64, utilization int) string {
 			return "yellow"
 		}
 		return "red"
+	}
+	// Headroom check: evaluate remaining budget relative to remaining time.
+	// Pace ratio captures burn rate but can mask how little budget actually
+	// remains. Example: 99% utilization at 86% elapsed → pace 1.15 looks
+	// borderline, but only 1% budget for 14% of the period is clearly
+	// unsustainable.
+	//
+	// headroom = remaining_budget% / remaining_time%. A value of 1.0 means
+	// budget and time are proportional; below 1.0 means you're running out
+	// of budget faster than time.
+	if elapsedRatio != nil && *elapsedRatio < 1.0 {
+		remainingBudget := float64(100 - utilization)
+		remainingTime := (1.0 - *elapsedRatio) * 100.0
+		headroom := remainingBudget / remainingTime
+		if headroom < 0.25 {
+			return "red"
+		}
+		if headroom < 0.50 && utilization >= 80 {
+			return "red"
+		}
 	}
 	// Near-exhaustion floor: ≥90% utilization is always at least yellow.
 	// Pace ratio captures burn rate, not how much budget remains. At 90%+
