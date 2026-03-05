@@ -76,7 +76,7 @@ func buildPeriodTable(rows []periodTableRow) string {
 	var lines []string
 	for _, r := range rows {
 		p := r.period
-		color := pace.Color(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
+		color := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio()).Color()
 		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
 		bar := RenderBar(p.Utilization, 20, color)
 
@@ -555,7 +555,7 @@ func buildPeriodTableWithWidths(rows []periodTableRow, cw PeriodColWidths) strin
 	var lines []string
 	for _, r := range rows {
 		p := r.period
-		color := pace.Color(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
+		color := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio()).Color()
 		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
 		bar := RenderBar(p.Utilization, 20, color)
 

@@ -18,7 +18,7 @@ type FormatResetFunc func(d *time.Duration) string
 
 // RouteRenderBar renders a utilization bar for route tables.
 func RouteRenderBar(utilization int) string {
-	return RenderBar(utilization, 15, pace.Color(nil, utilization, nil))
+	return RenderBar(utilization, 15, pace.Assess(nil, utilization, nil).Color())
 }
 
 // RouteFormatReset formats a duration until reset for route tables.

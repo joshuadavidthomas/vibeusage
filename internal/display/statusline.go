@@ -80,7 +80,7 @@ func renderStatuslineTable(w io.Writer, outcomes map[string]fetch.FetchOutcome, 
 
 		for _, p := range periods {
 			utilization := min(p.Utilization, 100)
-			color := pace.Color(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
+			color := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio()).Color()
 			qual, dur := periodNameParts(p)
 			timer := formatDurationCompact(p.TimeUntilReset())
 			if timer == "" {

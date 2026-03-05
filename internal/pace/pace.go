@@ -2,76 +2,125 @@ package pace
 
 import "math"
 
+// Level represents the health of a usage budget — how urgently the user
+// should be aware of their consumption.
+type Level int
+
+const (
+	OK       Level = iota // on track, no concern
+	Warning               // elevated usage, worth watching
+	Critical              // at or near limit, action needed
+)
+
+func (l Level) String() string {
+	switch l {
+	case Critical:
+		return "critical"
+	case Warning:
+		return "warning"
+	default:
+		return "ok"
+	}
+}
+
+// Color maps a Level to a traffic-light color name for display.
+func (l Level) Color() string {
+	switch l {
+	case Critical:
+		return "red"
+	case Warning:
+		return "yellow"
+	default:
+		return "green"
+	}
+}
+
 // Headroom thresholds: remaining budget relative to remaining time.
 const (
-	HeadroomCritical = 0.25 // below this, color is always red
-	HeadroomLow      = 0.50 // below this + high utilization, color is red
+	HeadroomCritical = 0.25 // below this, level is always Critical
+	HeadroomLow      = 0.50 // below this + high utilization, level is Critical
 )
 
 // Pace ratio thresholds: burn rate relative to elapsed time.
 const (
-	PaceOnTrack  = 1.15 // at or below is considered on-track (green)
-	PaceElevated = 1.30 // at or below is considered elevated (yellow)
+	PaceOnTrack  = 1.15 // at or below is considered on-track
+	PaceElevated = 1.30 // at or below is considered elevated
 )
 
 // Utilization thresholds.
 const (
-	UtilModerate  = 50  // utilization below which color is green (no pace data)
-	UtilHigh      = 80  // utilization above which low headroom triggers red
-	UtilCautious  = 90  // utilization above which color is always at least yellow
-	UtilExhausted = 100 // utilization at which color is always red
+	UtilModerate  = 50  // utilization below which level is OK (no pace data)
+	UtilHigh      = 80  // utilization above which low headroom escalates to Critical
+	UtilCautious  = 90  // utilization above which level is always at least Warning
+	UtilExhausted = 100 // utilization at which level is always Critical
 )
 
-// Color returns a color name ("green", "yellow", or "red") based on the
-// pace ratio, current utilization percentage, and elapsed time in the period.
+// Assess evaluates the health of a usage period and returns a Level.
 //
-// The elapsedRatio (0.0–1.0) enables headroom-aware color decisions: pace
-// ratio alone can mask dangerously low remaining budget when utilization is
-// high (e.g. 99% at 86% elapsed has pace ~1.15 but only 1% headroom).
-func Color(paceRatio *float64, utilization int, elapsedRatio *float64) string {
-	// Exhausted quota is always red — you're blocked regardless of pace.
+// It considers three signals in priority order:
+//  1. Utilization — is the quota exhausted or nearly so?
+//  2. Headroom — is remaining budget sustainable for the remaining time?
+//  3. Pace — is the current burn rate on track to finish within budget?
+//
+// The elapsedRatio (0.0–1.0) enables headroom-aware assessment. Without it,
+// only pace and utilization are used.
+func Assess(paceRatio *float64, utilization int, elapsedRatio *float64) Level {
 	if utilization >= UtilExhausted {
-		return "red"
+		return Critical
 	}
 	if paceRatio == nil {
-		if utilization < UtilModerate {
-			return "green"
-		}
-		if utilization < UtilHigh {
-			return "yellow"
-		}
-		return "red"
+		return fromUtilization(utilization)
 	}
-	// Headroom check: evaluate remaining budget relative to remaining time.
-	// Pace ratio captures burn rate but can mask how little budget actually
-	// remains. Example: 99% utilization at 86% elapsed → pace 1.15 looks
-	// borderline, but only 1% budget for 14% of the period is clearly
-	// unsustainable.
 	if elapsedRatio != nil && *elapsedRatio < 1.0 {
-		h := HeadroomRatio(utilization, *elapsedRatio)
-		if h < HeadroomCritical {
-			return "red"
-		}
-		if h < HeadroomLow && utilization >= UtilHigh {
-			return "red"
+		if level, escalated := fromHeadroom(utilization, *elapsedRatio); escalated {
+			return level
 		}
 	}
-	// Near-exhaustion floor: ≥90% utilization is always at least yellow.
-	// At 90%+ you have ≤10% left regardless of pace, which warrants a
-	// caution signal. Pace can still escalate to red, but not rescue to green.
+	return fromPace(*paceRatio, utilization)
+}
+
+// fromUtilization assesses level from utilization alone, used when no pace
+// data is available (e.g. too early in the period or no reset time known).
+func fromUtilization(utilization int) Level {
+	if utilization < UtilModerate {
+		return OK
+	}
+	if utilization < UtilHigh {
+		return Warning
+	}
+	return Critical
+}
+
+// fromHeadroom checks if remaining budget is dangerously low relative to
+// remaining time. Returns the escalated level and true if headroom is
+// insufficient, or (_, false) to defer to pace-based assessment.
+func fromHeadroom(utilization int, elapsedRatio float64) (Level, bool) {
+	h := HeadroomRatio(utilization, elapsedRatio)
+	if h < HeadroomCritical {
+		return Critical, true
+	}
+	if h < HeadroomLow && utilization >= UtilHigh {
+		return Critical, true
+	}
+	return OK, false
+}
+
+// fromPace assesses level from burn rate, with a near-exhaustion floor
+// that prevents high utilization from ever appearing OK.
+func fromPace(paceRatio float64, utilization int) Level {
 	if utilization >= UtilCautious {
-		if *paceRatio > PaceOnTrack {
-			return "red"
+		if paceRatio > PaceOnTrack {
+			return Critical
 		}
-		return "yellow"
+		return Warning
 	}
-	if *paceRatio <= PaceOnTrack {
-		return "green"
+	if paceRatio <= PaceOnTrack {
+		return OK
 	}
-	if *paceRatio <= PaceElevated {
-		return "yellow"
+	if paceRatio <= PaceElevated {
+		return Warning
 	}
-	return "red"
+	return Critical
 }
 
 // HeadroomRatio computes remaining budget relative to remaining time.
