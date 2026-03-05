@@ -178,7 +178,7 @@ func sceneStatus() {
 	fmt.Println(display.NewTableWithOptions(
 		headers,
 		rows,
-		display.TableOptions{Title: "Provider Status", Width: tableWidth},
+		display.TableOptions{Title: "Provider Status", Width: 80},
 	))
 }
 
