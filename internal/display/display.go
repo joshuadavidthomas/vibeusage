@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/pace"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
@@ -75,7 +76,7 @@ func buildPeriodTable(rows []periodTableRow) string {
 	var lines []string
 	for _, r := range rows {
 		p := r.period
-		color := PaceToColor(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
+		color := pace.Color(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
 		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
 		bar := RenderBar(p.Utilization, 20, color)
 
@@ -554,7 +555,7 @@ func buildPeriodTableWithWidths(rows []periodTableRow, cw PeriodColWidths) strin
 	var lines []string
 	for _, r := range rows {
 		p := r.period
-		color := PaceToColor(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
+		color := pace.Color(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
 		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
 		bar := RenderBar(p.Utilization, 20, color)
 

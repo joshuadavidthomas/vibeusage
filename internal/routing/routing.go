@@ -1,11 +1,11 @@
 package routing
 
 import (
-	"math"
 	"sort"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/pace"
 )
 
 // Candidate represents a provider that can serve a given model,
@@ -75,7 +75,7 @@ func Rank(providerIDs []string, snapshots map[string]ProviderData, multipliers m
 
 		headroom := primary.Remaining()
 		mult := multipliers[pid]
-		effectiveHeadroom := computeEffectiveHeadroom(headroom, mult)
+		effectiveHeadroom := pace.EffectiveHeadroom(headroom, mult)
 
 		candidates = append(candidates, Candidate{
 			ProviderID:        pid,
@@ -100,21 +100,6 @@ func Rank(providerIDs []string, snapshots map[string]ProviderData, multipliers m
 
 	sort.Strings(unavailable)
 	return candidates, unavailable
-}
-
-// computeEffectiveHeadroom adjusts raw headroom for multiplier cost.
-//   - nil multiplier (non-copilot): headroom is used as-is
-//   - multiplier == 0: model is free, effective headroom is 100
-//   - multiplier > 0: headroom / multiplier, capped at 100
-func computeEffectiveHeadroom(headroom int, multiplier *float64) int {
-	if multiplier == nil {
-		return headroom
-	}
-	if *multiplier == 0 {
-		return 100
-	}
-	eff := float64(headroom) / *multiplier
-	return int(math.Min(eff, 100))
 }
 
 // ProviderData bundles a snapshot with its cache status.
@@ -204,7 +189,7 @@ func RankByRole(modelEntries []RoleModelEntry, snapshots map[string]ProviderData
 			if multiplierFn != nil {
 				mult = multiplierFn(entry.ModelName, pid)
 			}
-			effectiveHeadroom := computeEffectiveHeadroom(headroom, mult)
+			effectiveHeadroom := pace.EffectiveHeadroom(headroom, mult)
 
 			candidates = append(candidates, RoleCandidate{
 				Candidate: Candidate{
