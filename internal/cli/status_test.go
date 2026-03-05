@@ -83,9 +83,8 @@ func TestDisplayStatusTable_QuietMode(t *testing.T) {
 	now := time.Now()
 	statuses := map[string]models.ProviderStatus{
 		"claude": {
-			Level:       models.StatusOperational,
-			Description: "OK",
-			UpdatedAt:   &now,
+			Level:     models.StatusOperational,
+			UpdatedAt: &now,
 		},
 	}
 
@@ -112,7 +111,7 @@ func TestDisplayStatusTable_QuietMode(t *testing.T) {
 
 func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 	statuses := map[string]models.ProviderStatus{
-		"claude": {Level: models.StatusOperational, Description: "OK"},
+		"claude": {Level: models.StatusOperational},
 	}
 
 	// Capture logger output via context injection
@@ -136,7 +135,7 @@ func TestDisplayStatusTable_VerboseShowsDuration(t *testing.T) {
 
 func TestDisplayStatusTable_Headers(t *testing.T) {
 	statuses := map[string]models.ProviderStatus{
-		"claude": {Level: models.StatusOperational, Description: "OK"},
+		"claude": {Level: models.StatusOperational},
 	}
 
 	var buf bytes.Buffer

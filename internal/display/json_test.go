@@ -65,8 +65,7 @@ func TestOutputStatusJSON_WritesToWriter(t *testing.T) {
 	var buf bytes.Buffer
 	statuses := map[string]models.ProviderStatus{
 		"claude": {
-			Level:       models.StatusOperational,
-			Description: "All systems normal",
+			Level: models.StatusOperational,
 		},
 	}
 
