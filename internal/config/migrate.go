@@ -26,6 +26,7 @@ func MigrateCredentials() error {
 	}
 
 	migrated := false
+	readErrors := false
 	entries, err := os.ReadDir(oldDir)
 	if err != nil {
 		return nil // directory might be empty or unreadable, skip
@@ -40,6 +41,7 @@ func MigrateCredentials() error {
 
 		files, err := os.ReadDir(providerDir)
 		if err != nil {
+			readErrors = true
 			continue
 		}
 
@@ -58,6 +60,7 @@ func MigrateCredentials() error {
 
 			data, err := os.ReadFile(filepath.Join(providerDir, f.Name()))
 			if err != nil {
+				readErrors = true
 				continue
 			}
 
@@ -80,8 +83,12 @@ func MigrateCredentials() error {
 		}
 	}
 
-	// Clean up old directory tree
-	_ = os.RemoveAll(oldDir)
+	// Only clean up the old directory if all files were read successfully.
+	// If some files couldn't be read (permissions, I/O errors), leave them
+	// so the next migration attempt can pick them up.
+	if !readErrors {
+		_ = os.RemoveAll(oldDir)
+	}
 
 	return nil
 }

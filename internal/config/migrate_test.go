@@ -112,6 +112,38 @@ func TestMigrateCredentials_SkipsInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestMigrateCredentials_PreservesOldDirOnReadError(t *testing.T) {
+	dir := setupTempDir(t)
+
+	// Create old-style credential directory with an unreadable subdirectory
+	oldDir := filepath.Join(dir, "data", "credentials")
+	goodDir := filepath.Join(oldDir, "claude")
+	badDir := filepath.Join(oldDir, "secret")
+	_ = os.MkdirAll(goodDir, 0o755)
+	_ = os.MkdirAll(badDir, 0o755)
+	_ = os.WriteFile(filepath.Join(goodDir, "oauth.json"), []byte(`{"token":"ok"}`), 0o600)
+	_ = os.WriteFile(filepath.Join(badDir, "oauth.json"), []byte(`{"token":"hidden"}`), 0o600)
+
+	// Make the bad directory unreadable so os.ReadDir fails on it
+	_ = os.Chmod(badDir, 0o000)
+	t.Cleanup(func() { _ = os.Chmod(badDir, 0o755) })
+
+	if err := MigrateCredentials(); err != nil {
+		t.Fatalf("MigrateCredentials() error: %v", err)
+	}
+
+	// Good credential should be migrated
+	data, _ := ReadCredential("claude", "oauth")
+	if data == nil {
+		t.Error("readable credential should be migrated")
+	}
+
+	// Old directory should still exist because of the read error
+	if _, err := os.Stat(oldDir); os.IsNotExist(err) {
+		t.Error("old directory should be preserved when some files couldn't be read")
+	}
+}
+
 func TestMigrateCredentials_Idempotent(t *testing.T) {
 	dir := setupTempDir(t)
 

@@ -17,7 +17,6 @@ const (
 	tokenPath       = "/api/oauth/token"
 	clientID        = "17e5f671-d194-4dfb-9706-5516cb48c098"
 	deviceFlowGrant = "urn:ietf:params:oauth:grant-type:device_code"
-	refreshGrant    = "refresh_token"
 )
 
 // oauthBaseURL returns the OAuth host, respecting the KIMI_CODE_OAUTH_HOST override.
