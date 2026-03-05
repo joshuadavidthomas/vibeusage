@@ -373,6 +373,11 @@ func mockRouteRoleRecommendation() routing.RoleRecommendation {
 }
 
 func mockProviderStatuses() map[string]models.ProviderStatus {
+	// Descriptions match what each provider's real status source returns:
+	//   Statuspage.io → "All Systems Operational" (amp, claude, codex, copilot, cursor, kimicode, warp)
+	//   Google Apps   → "All systems operational" (antigravity, gemini)
+	//   OnlineOrNot   → "All systems operational" (openrouter)
+	//   None          → "" with StatusUnknown (minimax, zai)
 	return map[string]models.ProviderStatus{
 		"amp": {
 			Level:       models.StatusOperational,
@@ -386,7 +391,7 @@ func mockProviderStatuses() map[string]models.ProviderStatus {
 		},
 		"claude": {
 			Level:       models.StatusPartialOutage,
-			Description: "Minor Service Outage",
+			Description: "Partial System Outage",
 			UpdatedAt:   justNow(),
 		},
 		"codex": {
