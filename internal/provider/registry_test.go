@@ -174,7 +174,9 @@ func TestAvailableIDs_FiltersEnabledAndAvailable(t *testing.T) {
 	}
 }
 
-func TestAvailableIDs_RespectsEnabledProviders(t *testing.T) {
+func boolPtr(v bool) *bool { return &v }
+
+func TestAvailableIDs_RespectsConfigDisabledProvider(t *testing.T) {
 	testenv.ApplySameDir(t.Setenv, t.TempDir())
 
 	orig := registry
@@ -190,8 +192,8 @@ func TestAvailableIDs_RespectsEnabledProviders(t *testing.T) {
 		strategies: []fetch.Strategy{&stubStrategy{available: true}},
 	})
 
-	_ = config.WriteEnabledProviders([]string{"alpha"})
 	cfg := config.DefaultConfig()
+	cfg.Providers["beta"] = config.ProviderConfig{Enabled: boolPtr(false)}
 
 	got := AvailableIDs(cfg)
 	if len(got) != 1 {
@@ -218,7 +220,7 @@ func TestAvailableIDs_RespectsProviderDisabled(t *testing.T) {
 	})
 
 	cfg := config.DefaultConfig()
-	cfg.Providers["beta"] = config.ProviderConfig{Enabled: false}
+	cfg.Providers["beta"] = config.ProviderConfig{Enabled: boolPtr(false)}
 
 	got := AvailableIDs(cfg)
 	if len(got) != 1 {

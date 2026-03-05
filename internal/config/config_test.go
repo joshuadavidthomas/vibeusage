@@ -21,7 +21,6 @@ func setupTempDir(t *testing.T) string {
 	t.Setenv("VIBEUSAGE_DATA_DIR", filepath.Join(dir, "data"))
 	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(dir, "cache"))
 	// Clear env override variables so tests aren't affected by the host environment.
-	t.Setenv("VIBEUSAGE_ENABLED_PROVIDERS", "")
 	t.Setenv("VIBEUSAGE_NO_COLOR", "")
 	// Reset global config so tests don't leak state.
 	configMu.Lock()
@@ -97,53 +96,41 @@ func TestDefaultConfig_Values(t *testing.T) {
 
 // IsProviderEnabled
 
+func boolPtr(v bool) *bool { return &v }
+
 func TestIsProviderEnabled(t *testing.T) {
 	tests := []struct {
-		name             string
-		enabledProviders []string // nil means no file, empty means empty file
-		writeFile        bool
-		providers        map[string]ProviderConfig
-		providerID       string
-		want             bool
+		name       string
+		providers  map[string]ProviderConfig
+		providerID string
+		want       bool
 	}{
 		{
-			name:       "all enabled when no enabled file exists",
-			writeFile:  false,
+			name:       "enabled when not in providers map",
 			providers:  map[string]ProviderConfig{},
 			providerID: "claude",
 			want:       true,
 		},
 		{
-			name:             "provider in allowlist is enabled",
-			writeFile:        true,
-			enabledProviders: []string{"claude", "copilot"},
-			providers:        map[string]ProviderConfig{},
-			providerID:       "claude",
-			want:             true,
-		},
-		{
-			name:             "provider not in allowlist is disabled",
-			writeFile:        true,
-			enabledProviders: []string{"claude", "copilot"},
-			providers:        map[string]ProviderConfig{},
-			providerID:       "gemini",
-			want:             false,
-		},
-		{
-			name:             "explicit Enabled:false overrides allowlist",
-			writeFile:        true,
-			enabledProviders: []string{"claude", "copilot"},
+			name: "enabled when Enabled is nil",
 			providers: map[string]ProviderConfig{
-				"claude": {Enabled: false},
+				"claude": {AuthSource: "oauth"},
 			},
 			providerID: "claude",
-			want:       false,
+			want:       true,
 		},
 		{
-			name:      "explicit Enabled:false overrides no file",
-			writeFile: false,
+			name: "enabled when explicitly true",
 			providers: map[string]ProviderConfig{
-				"claude": {Enabled: false},
+				"claude": {Enabled: boolPtr(true)},
+			},
+			providerID: "claude",
+			want:       true,
+		},
+		{
+			name: "disabled when explicitly false",
+			providers: map[string]ProviderConfig{
+				"claude": {Enabled: boolPtr(false)},
 			},
 			providerID: "claude",
 			want:       false,
@@ -151,11 +138,6 @@ func TestIsProviderEnabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir := setupTempDir(t)
-			_ = dir
-			if tt.writeFile {
-				_ = WriteEnabledProviders(tt.enabledProviders)
-			}
 			cfg := Config{
 				Providers: tt.providers,
 			}
@@ -273,7 +255,7 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 	original.Display.ResetFormat = "relative"
 	original.Providers["claude"] = ProviderConfig{
 		AuthSource: "oauth",
-		Enabled:    true,
+		Enabled:    boolPtr(true),
 	}
 
 	if err := Save(original, path); err != nil {
@@ -301,7 +283,7 @@ func TestSave_Load_Roundtrip(t *testing.T) {
 	if pc.AuthSource != "oauth" {
 		t.Errorf("Providers[claude].AuthSource = %q, want %q", pc.AuthSource, "oauth")
 	}
-	if !pc.Enabled {
+	if pc.Enabled == nil || !*pc.Enabled {
 		t.Error("Providers[claude].Enabled should be true after roundtrip")
 	}
 }
@@ -369,7 +351,7 @@ func TestGet_ReturnsCopy(t *testing.T) {
 
 	// Map isolation: mutating Providers on one copy must not affect another
 	cfg3 := Get()
-	cfg3.Providers["injected"] = ProviderConfig{Enabled: true}
+	cfg3.Providers["injected"] = ProviderConfig{Enabled: boolPtr(true)}
 	cfg4 := Get()
 	if _, ok := cfg4.Providers["injected"]; ok {
 		t.Error("Get() should return a copy: Providers map mutation leaked")
