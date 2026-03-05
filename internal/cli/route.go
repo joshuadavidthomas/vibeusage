@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -218,7 +217,7 @@ func displayRecommendation(rec routing.Recommendation) error {
 	}
 
 	out("Route: %s\n\n", rec.ModelName)
-	renderRouteTable(display.FormatRecommendationRows(rec, routeRenderBar, routeFormatReset))
+	renderRouteTable(display.FormatRecommendationRows(rec, display.RouteRenderBar, display.RouteFormatReset))
 	return nil
 }
 
@@ -421,7 +420,7 @@ func displayRoleRecommendation(rec routing.RoleRecommendation) error {
 	}
 
 	out("Route: %s (role)\n\n", rec.Role)
-	renderRouteTable(display.FormatRoleRecommendationRows(rec, routeRenderBar, routeFormatReset))
+	renderRouteTable(display.FormatRoleRecommendationRows(rec, display.RouteRenderBar, display.RouteFormatReset))
 	return nil
 }
 
@@ -507,22 +506,5 @@ func buildModelRolesMap(roles map[string][]string) map[string][]string {
 // renderRouteTable renders a FormattedTable to the output writer using the
 // shared route table options (noColor flag, terminal width, row styles).
 func renderRouteTable(ft display.FormattedTable) {
-	outln(display.NewTableWithOptions(
-		ft.Headers,
-		ft.Rows,
-		display.TableOptions{NoColor: noColor, Width: display.TerminalWidth(), RowStyles: ft.Styles},
-	))
-}
-
-// routeRenderBar renders a utilization bar with color for the route table.
-func routeRenderBar(utilization int) string {
-	return display.RenderBar(utilization, 15, display.PaceToColor(nil, utilization))
-}
-
-// routeFormatReset formats a duration until reset for the route table.
-func routeFormatReset(d *time.Duration) string {
-	if d == nil {
-		return ""
-	}
-	return display.FormatResetCountdown(d)
+	outln(display.RenderFormattedTable(ft, display.TableOptions{NoColor: noColor, Width: display.TerminalWidth()}))
 }

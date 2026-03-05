@@ -93,13 +93,13 @@ func fetchAllStatuses(ctx context.Context, providers map[string]provider.Provide
 
 func displayStatusTable(ctx context.Context, statuses map[string]models.ProviderStatus, durationMs int64) {
 	logger := logging.FromContext(ctx)
-	ids := make([]string, 0, len(statuses))
-	for id := range statuses {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 
 	if quiet {
+		ids := make([]string, 0, len(statuses))
+		for id := range statuses {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
 		for _, pid := range ids {
 			s := statuses[pid]
 			out("%s: %s %s\n", pid, display.StatusSymbol(s.Level, noColor), string(s.Level))
@@ -107,23 +107,9 @@ func displayStatusTable(ctx context.Context, statuses map[string]models.Provider
 		return
 	}
 
-	var rows [][]string
-	for _, pid := range ids {
-		s := statuses[pid]
-		desc := s.Description
-		if len(desc) > 30 {
-			desc = desc[:27] + "..."
-		}
-		rows = append(rows, []string{
-			pid,
-			display.StatusSymbol(s.Level, noColor),
-			desc,
-			display.FormatStatusUpdated(s.UpdatedAt),
-		})
-	}
-
+	headers, rows := display.FormatStatusRows(statuses, noColor)
 	outln(display.NewTableWithOptions(
-		[]string{"Provider", "Status", "Description", "Updated"},
+		headers,
 		rows,
 		display.TableOptions{Title: "Provider Status", NoColor: noColor, Width: display.TerminalWidth()},
 	))

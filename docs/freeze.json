@@ -1,0 +1,23 @@
+{
+    "window": true,
+    "theme": "tokyonight-moon",
+    "background": "#222436",
+    "padding": [20, 40, 20, 20],
+    "margin": "0",
+    "border": {
+        "radius": 8,
+        "width": 0,
+        "color": "#515151"
+    },
+    "shadow": {
+        "blur": 0,
+        "x": 0,
+        "y": 0
+    },
+    "font": {
+        "family": "Fira Code",
+        "size": 14,
+        "ligatures": true
+    },
+    "line_height": 1.2
+}
