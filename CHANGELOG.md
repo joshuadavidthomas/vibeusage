@@ -32,7 +32,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Removed
 
-- Removed unused `auth_source` and `preferred_browser` fields from `[providers.<id>]` config. Only `enabled` is read by production code; the other two were forward-declared for features that were never implemented.
+- Removed unused `auth_source` and `preferred_browser` fields from `[providers.<id>]` config.
 
 ### Fixed
 
