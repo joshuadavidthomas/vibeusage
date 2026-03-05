@@ -154,7 +154,7 @@ func authSetup() error {
 	var removed []string
 	for pid := range configuredSet {
 		if !selectedSet[pid] {
-			removeProviderCredentials(pid)
+			config.DeleteProviderCredentials(pid)
 			removed = append(removed, pid)
 		}
 	}
@@ -352,11 +352,6 @@ func offerExistingCredentials(providerID string, verify bool) (bool, error) {
 	return true, nil
 }
 
-// removeProviderCredentials deletes all vibeusage-stored credentials for a provider.
-func removeProviderCredentials(providerID string) {
-	config.DeleteProviderCredentials(providerID)
-}
-
 // HACK: package-level var to allow test stubbing. This should be replaced
 // with a proper interface (e.g. a Verifier on the auth command struct) once
 // the CLI is refactored away from package-level state.
@@ -472,7 +467,7 @@ func authDeleteProvider(providerID string) error {
 		}
 	}
 
-	removeProviderCredentials(providerID)
+	config.DeleteProviderCredentials(providerID)
 	config.ClearProviderCache(providerID)
 
 	if !quiet {

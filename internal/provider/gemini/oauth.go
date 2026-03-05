@@ -102,7 +102,7 @@ func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 	// Check external CLI paths
 	for _, path := range s.externalPaths() {
 		data, err := os.ReadFile(path)
-		if err != nil || data == nil {
+		if err != nil {
 			continue
 		}
 		var cliCreds GeminiCLICredentials

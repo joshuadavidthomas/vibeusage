@@ -192,8 +192,7 @@ func DeleteProviderCredentials(providerID string) bool {
 	return saveCredentialsStore(store) == nil
 }
 
-// HasCredential checks if a credential exists for a provider and credential type
-// without reading the full content.
+// HasCredential reports whether a credential exists for a provider and credential type.
 func HasCredential(providerID, credType string) bool {
 	data, _ := ReadCredential(providerID, credType)
 	return data != nil
