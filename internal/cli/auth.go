@@ -86,9 +86,12 @@ func authSetup() error {
 	allProviders := provider.ListIDs()
 	sort.Strings(allProviders)
 
-	enabledSet := make(map[string]bool)
-	for _, id := range config.ReadEnabledProviders() {
-		enabledSet[id] = true
+	configuredSet := make(map[string]bool)
+	for _, pid := range allProviders {
+		hasCreds, _ := provider.CheckCredentials(pid)
+		if hasCreds {
+			configuredSet[pid] = true
+		}
 	}
 
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -107,13 +110,13 @@ func authSetup() error {
 		options = append(options, prompt.SelectOption{
 			Label:    label,
 			Value:    pid,
-			Selected: enabledSet[pid],
+			Selected: configuredSet[pid],
 		})
 	}
 
 	title := "Choose providers to set up"
-	if len(enabledSet) > 0 {
-		title = "Manage enabled providers"
+	if len(configuredSet) > 0 {
+		title = "Manage configured providers"
 	}
 
 	selected, err := prompt.Default.MultiSelect(prompt.MultiSelectConfig{
@@ -134,36 +137,25 @@ func authSetup() error {
 		return err
 	}
 
-	// Only auth newly-selected providers; already-enabled ones stay as-is.
-	var newProviders []string
-	for _, pid := range selected {
-		if !enabledSet[pid] {
-			newProviders = append(newProviders, pid)
-		}
-	}
-
-	// Build the final enabled set from the selection.
-	// Deselected providers get removed; authProvider calls enableProvider
-	// for successful new auths, so start with just the kept ones.
+	// Only auth newly-selected providers; already-configured ones stay as-is.
 	selectedSet := make(map[string]bool, len(selected))
 	for _, pid := range selected {
 		selectedSet[pid] = true
 	}
-	var kept []string
-	for _, pid := range config.ReadEnabledProviders() {
-		if selectedSet[pid] {
-			kept = append(kept, pid)
-		} else {
-			removeProviderCredentials(pid)
+
+	var newProviders []string
+	for _, pid := range selected {
+		if !configuredSet[pid] {
+			newProviders = append(newProviders, pid)
 		}
 	}
-	_ = config.WriteEnabledProviders(kept)
 
-	// Track removals for summary.
+	// Remove credentials for deselected providers.
 	var removed []string
-	for id := range enabledSet {
-		if !selectedSet[id] {
-			removed = append(removed, id)
+	for pid := range configuredSet {
+		if !selectedSet[pid] {
+			removeProviderCredentials(pid)
+			removed = append(removed, pid)
 		}
 	}
 	sort.Strings(removed)
@@ -183,15 +175,21 @@ func authSetup() error {
 
 	// Summary
 	outln()
-	finalEnabled := config.ReadEnabledProviders()
-	if len(finalEnabled) > 0 {
-		out("Enabled: %s\n", strings.Join(finalEnabled, ", "))
+	var configured []string
+	for _, pid := range allProviders {
+		hasCreds, _ := provider.CheckCredentials(pid)
+		if hasCreds {
+			configured = append(configured, pid)
+		}
+	}
+	if len(configured) > 0 {
+		out("Configured: %s\n", strings.Join(configured, ", "))
 	}
 	if len(removed) > 0 {
-		out("Removed: %s\n", strings.Join(removed, ", "))
+		out("Removed:    %s\n", strings.Join(removed, ", "))
 	}
 	if len(failed) > 0 {
-		out("Failed:  %s\n", strings.Join(failed, ", "))
+		out("Failed:     %s\n", strings.Join(failed, ", "))
 		outln("Retry with: vibeusage auth <provider>")
 	}
 	return nil
@@ -201,10 +199,7 @@ func authStatusCommand() error {
 	allProviders := provider.ListIDs()
 	sort.Strings(allProviders)
 
-	enabledSet := make(map[string]bool)
-	for _, id := range config.ReadEnabledProviders() {
-		enabledSet[id] = true
-	}
+	cfg := config.Get()
 
 	if jsonOutput {
 		data := make(map[string]display.AuthStatusEntryJSON)
@@ -213,7 +208,7 @@ func authStatusCommand() error {
 			data[pid] = display.AuthStatusEntryJSON{
 				Authenticated: hasCreds,
 				Source:        sourceToLabel(source),
-				Enabled:       enabledSet[pid],
+				Disabled:      !cfg.IsProviderEnabled(pid),
 			}
 		}
 		return display.OutputJSON(outWriter, data)
@@ -223,10 +218,10 @@ func authStatusCommand() error {
 		for _, pid := range allProviders {
 			hasCreds, _ := provider.CheckCredentials(pid)
 			status := "not configured"
-			if hasCreds && enabledSet[pid] {
-				status = "enabled"
+			if hasCreds && cfg.IsProviderEnabled(pid) {
+				status = "configured"
 			} else if hasCreds {
-				status = "authenticated (not enabled)"
+				status = "configured (disabled in config)"
 			}
 			out("%s: %s\n", pid, status)
 		}
@@ -234,17 +229,16 @@ func authStatusCommand() error {
 	}
 
 	var rows [][]string
-	var unenabled []string
+	var unconfigured []string
 	for _, pid := range allProviders {
 		hasCreds, source := provider.CheckCredentials(pid)
-		if hasCreds && enabledSet[pid] {
-			rows = append(rows, []string{pid, "✓ Enabled", sourceToLabel(source)})
+		if hasCreds && cfg.IsProviderEnabled(pid) {
+			rows = append(rows, []string{pid, "✓ Configured", sourceToLabel(source)})
 		} else if hasCreds {
-			rows = append(rows, []string{pid, "✓ Authenticated", sourceToLabel(source)})
-			unenabled = append(unenabled, pid)
+			rows = append(rows, []string{pid, "✓ Configured (disabled)", sourceToLabel(source)})
 		} else {
 			rows = append(rows, []string{pid, "✗ Not configured", "—"})
-			unenabled = append(unenabled, pid)
+			unconfigured = append(unconfigured, pid)
 		}
 	}
 
@@ -254,10 +248,10 @@ func authStatusCommand() error {
 		display.TableOptions{Title: "Authentication Status", NoColor: noColor, Width: display.TerminalWidth()},
 	))
 
-	if len(unenabled) > 0 {
+	if len(unconfigured) > 0 {
 		outln()
-		outln("To enable a provider, run:")
-		for _, pid := range unenabled {
+		outln("To set up a provider, run:")
+		for _, pid := range unconfigured {
 			out("  vibeusage auth %s\n", pid)
 		}
 	}
@@ -266,9 +260,7 @@ func authStatusCommand() error {
 }
 
 // authProvider dispatches to the appropriate auth flow based on what the
-// provider declares via the Authenticator interface. On success, the
-// provider is added to enabled_providers so only explicitly authed
-// providers are tracked.
+// provider declares via the Authenticator interface.
 func authProvider(providerID string, p provider.Provider) error {
 	auth, ok := p.(provider.Authenticator)
 	if !ok {
@@ -294,7 +286,6 @@ func authProvider(providerID string, p provider.Provider) error {
 	if skip, err := offerExistingCredentials(providerID, verify); err != nil {
 		return err
 	} else if skip {
-		enableProvider(providerID)
 		return nil
 	}
 
@@ -319,9 +310,6 @@ func authProvider(providerID string, p provider.Provider) error {
 		return authGeneric(providerID)
 	}
 
-	if err == nil {
-		enableProvider(providerID)
-	}
 	return err
 }
 
@@ -362,12 +350,6 @@ func offerExistingCredentials(providerID string, verify bool) (bool, error) {
 	}
 
 	return true, nil
-}
-
-// enableProvider adds a provider to the enabled list in the data directory,
-// making provider tracking opt-in via the auth command.
-func enableProvider(providerID string) {
-	config.AddEnabledProvider(providerID)
 }
 
 // removeProviderCredentials deletes all vibeusage-stored credentials for a provider.
@@ -448,7 +430,6 @@ func authGeneric(providerID string) error {
 			out("✓ %s is already authenticated (%s)\n",
 				provider.DisplayName(providerID), sourceToLabel(source))
 		}
-		enableProvider(providerID)
 		return nil
 	}
 
@@ -477,7 +458,6 @@ func authGeneric(providerID string) error {
 	if !quiet {
 		out("✓ %s credential saved\n", provider.DisplayName(providerID))
 	}
-	enableProvider(providerID)
 	return nil
 }
 
@@ -496,17 +476,6 @@ func authDeleteProvider(providerID string) error {
 	}
 
 	removeProviderCredentials(providerID)
-
-	// Remove from enabled list.
-	enabled := config.ReadEnabledProviders()
-	var kept []string
-	for _, id := range enabled {
-		if id != providerID {
-			kept = append(kept, id)
-		}
-	}
-	_ = config.WriteEnabledProviders(kept)
-
 	config.ClearProviderCache(providerID)
 
 	if !quiet {
@@ -543,7 +512,6 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 					return fmt.Errorf("error saving credential: %w", err)
 				}
 			}
-			enableProvider(providerID)
 			if !quiet {
 				out("✓ %s credential saved\n", provider.DisplayName(providerID))
 			}
@@ -557,7 +525,6 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 	if err := config.WriteCredential(path, credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
 	}
-	enableProvider(providerID)
 	if !quiet {
 		out("✓ %s credential saved\n", provider.DisplayName(providerID))
 	}
