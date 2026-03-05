@@ -28,7 +28,7 @@ type CredentialsConfig struct {
 type ProviderConfig struct {
 	AuthSource       string `toml:"auth_source" json:"auth_source"`
 	PreferredBrowser string `toml:"preferred_browser,omitempty" json:"preferred_browser,omitempty"`
-	Enabled          bool   `toml:"enabled" json:"enabled"`
+	Enabled          *bool  `toml:"enabled,omitempty" json:"enabled,omitempty"`
 }
 
 type RoleConfig struct {
@@ -109,19 +109,14 @@ func (c Config) clone() Config {
 }
 
 func (c Config) IsProviderEnabled(providerID string) bool {
-	if pc, ok := c.Providers[providerID]; ok && !pc.Enabled {
-		return false
-	}
-	enabled := ReadEnabledProviders()
-	if len(enabled) == 0 {
+	pc, ok := c.Providers[providerID]
+	if !ok {
 		return true
 	}
-	for _, id := range enabled {
-		if id == providerID {
-			return true
-		}
+	if pc.Enabled == nil {
+		return true
 	}
-	return false
+	return *pc.Enabled
 }
 
 func (c Config) GetRole(name string) (RoleConfig, bool) {
