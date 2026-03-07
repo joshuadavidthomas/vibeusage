@@ -406,6 +406,168 @@ func TestExecutePipeline_CacheFallback(t *testing.T) {
 	}
 }
 
+func TestExecutePipeline_FreshCacheHitSkipsFetch(t *testing.T) {
+	cache := newMemCache()
+	cached := models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-500 * time.Millisecond).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+		Source:    "previous-fetch",
+	}
+	cache.data["test-provider"] = cached
+
+	cfg := PipelineConfig{
+		Timeout:       30 * time.Second,
+		Cache:         cache,
+		FreshCacheTTL: time.Second,
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 99)), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected success from fresh cache reuse, got error: %s", outcome.Error)
+	}
+	if !outcome.Cached {
+		t.Error("expected Cached=true for fresh cache reuse")
+	}
+	if outcome.Source != "cache" {
+		t.Errorf("expected source %q, got %q", "cache", outcome.Source)
+	}
+	if fetchCalled {
+		t.Error("expected fresh cache hit to skip live fetch")
+	}
+	if outcome.Snapshot == nil {
+		t.Fatal("expected cached snapshot")
+	}
+	if !outcome.Snapshot.FetchedAt.Equal(cached.FetchedAt) {
+		t.Errorf("cached snapshot timestamp changed: got %v want %v", outcome.Snapshot.FetchedAt, cached.FetchedAt)
+	}
+}
+
+func TestExecutePipeline_FreshCacheMissFallsThroughToFetch(t *testing.T) {
+	cache := newMemCache()
+	cache.data["test-provider"] = models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-2 * time.Second).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+		Source:    "previous-fetch",
+	}
+
+	cfg := PipelineConfig{
+		Timeout:       30 * time.Second,
+		Cache:         cache,
+		FreshCacheTTL: time.Second,
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 55)), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected live fetch success, got error: %s", outcome.Error)
+	}
+	if outcome.Cached {
+		t.Error("expected stale cache to fall through to live fetch")
+	}
+	if !fetchCalled {
+		t.Error("expected stale cache miss to call live fetch")
+	}
+	if outcome.Source != "mock" {
+		t.Errorf("expected source %q, got %q", "mock", outcome.Source)
+	}
+}
+
+func TestExecutePipeline_FreshCacheDisabledWithNoCacheFlag(t *testing.T) {
+	cache := newMemCache()
+	cache.data["test-provider"] = models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-500 * time.Millisecond).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:       30 * time.Second,
+		Cache:         cache,
+		FreshCacheTTL: time.Second,
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 65)), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected live fetch success with cache disabled, got error: %s", outcome.Error)
+	}
+	if outcome.Cached {
+		t.Error("expected Cached=false when cache is disabled")
+	}
+	if !fetchCalled {
+		t.Error("expected --no-cache behavior to bypass fresh cache reuse")
+	}
+}
+
+func TestExecutePipeline_FreshCacheRejectsZeroFetchedAt(t *testing.T) {
+	cache := newMemCache()
+	cache.data["test-provider"] = models.UsageSnapshot{
+		Provider: "test-provider",
+		Periods:  []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:       30 * time.Second,
+		Cache:         cache,
+		FreshCacheTTL: time.Second,
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 70)), nil
+		},
+	}
+
+	ctx := context.Background()
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected live fetch success, got error: %s", outcome.Error)
+	}
+	if outcome.Cached {
+		t.Error("expected zero-timestamp cache entry to be ignored for fresh reuse")
+	}
+	if !fetchCalled {
+		t.Error("expected zero-timestamp cache entry to be treated as stale")
+	}
+}
+
 func TestExecutePipeline_CacheFallbackServesStaleWhenFetchAttempted(t *testing.T) {
 	cache := newMemCache()
 	cache.data["test-provider"] = models.UsageSnapshot{
@@ -736,17 +898,19 @@ func TestExecutePipeline_SkipsUnavailableTriesAvailable(t *testing.T) {
 
 func TestExecutePipeline_NoCacheFallbackWhenNotConfigured(t *testing.T) {
 	// When no strategies are available (unconfigured provider), cache should NOT be served
-	// even if fresh data exists. This prevents misleading users with old data.
+	// even if the snapshot is fresh. This prevents misleading users with stale or
+	// recently cached data after credentials disappear.
 	cache := newMemCache()
 	cache.data["test-provider"] = models.UsageSnapshot{
 		Provider:  "test-provider",
-		FetchedAt: time.Now().Add(-10 * time.Minute).UTC(),
+		FetchedAt: time.Now().Add(-500 * time.Millisecond).UTC(),
 		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 30}},
 	}
 
 	cfg := PipelineConfig{
-		Timeout: 5 * time.Second,
-		Cache:   cache,
+		Timeout:       5 * time.Second,
+		Cache:         cache,
+		FreshCacheTTL: time.Second,
 	}
 
 	strategy := &mockStrategy{
