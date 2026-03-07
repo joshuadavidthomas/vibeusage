@@ -93,7 +93,9 @@ vibeusage --json
 vibeusage usage codex --json
 ```
 
-Skip cache and fail fast if APIs are unreachable:
+For scripts, widgets, and statuslines, vibeusage reuses a successful snapshot for 1 second before refetching. That keeps output effectively live while protecting you from accidentally hammering the same provider with bursty repeat calls.
+
+Skip cached snapshots entirely and always fetch live:
 
 ```bash
 vibeusage --no-cache
@@ -366,7 +368,7 @@ The following arguments are available globally for every command:
 | `--no-color` | | Disable colored output |
 | `--verbose` | `-v` | Show detailed output |
 | `--quiet` | `-q` | Minimal output |
-| `--no-cache` | | Disable cache fallback on API failure |
+| `--no-cache` | | Disable cached snapshot reuse and fallback |
 
 ## Configuration
 
@@ -455,13 +457,18 @@ Then run `vibeusage auth --status` again.
 
 ### Clearing the cache
 
-vibeusage caches usage data to gracefully handle API failures. If you see `(2h ago)` in output, the API was down and cached data was served. To clear this cache:
+vibeusage caches usage data in two ways:
+
+- very recent successful snapshots are reused for up to 1 second to avoid bursty repeat fetches from scripts and statuslines
+- older snapshots are kept as a fallback when an API call fails
+
+If you see `(2h ago)` in output, the API was down and cached data was served. To clear this cache:
 
 ```bash
 rm -rf "$(vibeusage config path --cache)"
 ```
 
-Use `--no-cache` to bypass the cache and fail fast if the API is unreachable.
+Use `--no-cache` to bypass both 1-second snapshot reuse and stale fallback, and fail fast if the API is unreachable.
 
 ## Updating
 
