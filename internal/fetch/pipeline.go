@@ -3,14 +3,29 @@ package fetch
 import (
 	"context"
 	"time"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
 // ExecutePipeline tries each strategy in order until one succeeds.
-// All configuration (timeout, stale threshold, cache) is provided via cfg
-// rather than read from a global singleton.
+// When enabled, a very short fresh-cache window deduplicates bursty repeat
+// invocations before any live fetch is attempted. All configuration is
+// provided via cfg rather than read from a global singleton.
 func ExecutePipeline(ctx context.Context, providerID string, strategies []Strategy, useCache bool, cfg PipelineConfig) FetchOutcome {
 	anyAttempted := false
 	lastErr := ""
+
+	if useCache && cfg.Cache != nil && cfg.FreshCacheTTL > 0 && hasAvailableStrategy(strategies) {
+		if cached := cfg.Cache.Load(providerID); isFreshSnapshot(cached, cfg.FreshCacheTTL) {
+			return FetchOutcome{
+				ProviderID: providerID,
+				Success:    true,
+				Snapshot:   cached,
+				Source:     "cache",
+				Cached:     true,
+			}
+		}
+	}
 
 	for _, strategy := range strategies {
 		if !strategy.IsAvailable() {
@@ -102,4 +117,20 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 type fetchAttemptResult struct {
 	result FetchResult
 	err    error
+}
+
+func hasAvailableStrategy(strategies []Strategy) bool {
+	for _, strategy := range strategies {
+		if strategy.IsAvailable() {
+			return true
+		}
+	}
+	return false
+}
+
+func isFreshSnapshot(snapshot *models.UsageSnapshot, ttl time.Duration) bool {
+	if snapshot == nil || snapshot.FetchedAt.IsZero() || ttl <= 0 {
+		return false
+	}
+	return time.Since(snapshot.FetchedAt) <= ttl
 }

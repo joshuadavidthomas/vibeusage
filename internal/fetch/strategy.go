@@ -20,8 +20,9 @@ type Cache interface {
 // PipelineConfig holds the parameters that ExecutePipeline needs,
 // replacing the previous hidden dependency on config.Get().
 type PipelineConfig struct {
-	Timeout time.Duration
-	Cache   Cache
+	Timeout       time.Duration
+	Cache         Cache
+	FreshCacheTTL time.Duration
 }
 
 // OrchestratorConfig holds parameters for FetchAllProviders and

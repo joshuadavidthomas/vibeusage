@@ -35,6 +35,8 @@ import (
 // version is injected at build time via -ldflags.
 var version = "dev"
 
+const freshSnapshotReuseTTL = time.Second
+
 var (
 	jsonOutput bool
 	noColor    bool
@@ -77,7 +79,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colored output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Minimal output")
-	rootCmd.PersistentFlags().BoolVar(&noCache, "no-cache", false, "Disable cache fallback on API failure")
+	rootCmd.PersistentFlags().BoolVar(&noCache, "no-cache", false, "Disable cached snapshot reuse and fallback")
 	rootCmd.Flags().Bool("version", false, "Show version and exit")
 
 	rootCmd.AddCommand(authCmd)
@@ -346,8 +348,9 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 
 func pipelineConfigFromConfig(cfg config.Config) fetch.PipelineConfig {
 	return fetch.PipelineConfig{
-		Timeout: time.Duration(cfg.Fetch.Timeout * float64(time.Second)),
-		Cache:   config.FileCache{},
+		Timeout:       time.Duration(cfg.Fetch.Timeout * float64(time.Second)),
+		Cache:         config.FileCache{},
+		FreshCacheTTL: freshSnapshotReuseTTL,
 	}
 }
 

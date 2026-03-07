@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Changed
+
+- Repeated CLI invocations now reuse a successful snapshot for 1 second before refetching. This protects scripts, statuslines, and other programmatic uses from accidentally spamming provider calls while keeping output effectively live. Use `--no-cache` to force a fresh fetch every time.
+
 ## [0.5.0]
 
 ### Added
