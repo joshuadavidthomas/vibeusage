@@ -3,6 +3,7 @@ package fetch
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -44,6 +45,45 @@ func (c *memCache) Load(providerID string) *models.UsageSnapshot {
 		return nil
 	}
 	return &s
+}
+
+// memThrottles is a thread-safe in-memory ThrottleStore for testing.
+// Load respects RetryAt — callers see nil once the cooldown has passed,
+// matching the filesystem implementation.
+type memThrottles struct {
+	mu   sync.Mutex
+	data map[string]ThrottleMarker
+}
+
+func newMemThrottles() *memThrottles {
+	return &memThrottles{data: make(map[string]ThrottleMarker)}
+}
+
+func (t *memThrottles) Load(providerID string) *ThrottleMarker {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	m, ok := t.data[providerID]
+	if !ok {
+		return nil
+	}
+	if time.Now().After(m.RetryAt) {
+		delete(t.data, providerID)
+		return nil
+	}
+	return &m
+}
+
+func (t *memThrottles) Save(providerID string, marker ThrottleMarker) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.data[providerID] = marker
+	return nil
+}
+
+func (t *memThrottles) Clear(providerID string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.data, providerID)
 }
 
 func defaultTestPipelineCfg() PipelineConfig {
@@ -947,5 +987,217 @@ func TestExecutePipeline_NilCacheNoFallback(t *testing.T) {
 
 	if outcome.Success {
 		t.Error("expected failure — nil cache means no fallback")
+	}
+}
+
+func TestExecutePipeline_ThrottleMarkerServesCacheWithoutFetch(t *testing.T) {
+	cache := newMemCache()
+	cache.data["test-provider"] = models.UsageSnapshot{
+		Provider:  "test-provider",
+		FetchedAt: time.Now().Add(-5 * time.Minute).UTC(),
+		Periods:   []models.UsagePeriod{{Name: "monthly", Utilization: 42}},
+		Source:    "previous-fetch",
+	}
+
+	throttles := newMemThrottles()
+	throttles.data["test-provider"] = ThrottleMarker{
+		RetryAt: time.Now().Add(10 * time.Minute),
+		Reason:  "Rate limited",
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 80)), nil
+		},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:   30 * time.Second,
+		Cache:     cache,
+		Throttles: throttles,
+	}
+
+	outcome := ExecutePipeline(context.Background(), "test-provider", []Strategy{strategy}, true, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected cache hit during throttle window, got error: %s", outcome.Error)
+	}
+	if outcome.Source != "cache (throttled)" {
+		t.Errorf("expected source %q, got %q", "cache (throttled)", outcome.Source)
+	}
+	if !outcome.Cached {
+		t.Error("expected Cached=true")
+	}
+	if fetchCalled {
+		t.Error("expected throttle marker to skip live fetch")
+	}
+}
+
+func TestExecutePipeline_ThrottleMarkerNoCacheReturnsError(t *testing.T) {
+	throttles := newMemThrottles()
+	throttles.data["test-provider"] = ThrottleMarker{
+		RetryAt: time.Now().Add(10 * time.Minute),
+		Reason:  "Rate limited by Anthropic",
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 80)), nil
+		},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:   30 * time.Second,
+		Cache:     newMemCache(),
+		Throttles: throttles,
+	}
+
+	outcome := ExecutePipeline(context.Background(), "test-provider", []Strategy{strategy}, true, cfg)
+
+	if outcome.Success {
+		t.Fatal("expected failure when throttled with no cache")
+	}
+	if fetchCalled {
+		t.Error("expected throttle marker to skip live fetch even without cache")
+	}
+	if !strings.Contains(outcome.Error, "Rate limited by Anthropic") {
+		t.Errorf("expected rate-limit reason in error, got %q", outcome.Error)
+	}
+	if !strings.Contains(outcome.Error, "retry after") {
+		t.Errorf("expected retry-after hint in error, got %q", outcome.Error)
+	}
+}
+
+func TestExecutePipeline_ThrottleMarkerBypassedWithNoCacheFlag(t *testing.T) {
+	throttles := newMemThrottles()
+	throttles.data["test-provider"] = ThrottleMarker{
+		RetryAt: time.Now().Add(10 * time.Minute),
+		Reason:  "Rate limited",
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 12)), nil
+		},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:   30 * time.Second,
+		Cache:     newMemCache(),
+		Throttles: throttles,
+	}
+
+	outcome := ExecutePipeline(context.Background(), "test-provider", []Strategy{strategy}, false, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected --no-cache to bypass throttle and call strategy, got error: %s", outcome.Error)
+	}
+	if !fetchCalled {
+		t.Error("expected --no-cache to bypass throttle check")
+	}
+}
+
+func TestExecutePipeline_RetryAfterPersisted(t *testing.T) {
+	retryAt := time.Now().Add(2 * time.Minute).UTC()
+
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			return ResultThrottled("Rate limited by Anthropic", retryAt), nil
+		},
+	}
+
+	throttles := newMemThrottles()
+	cfg := PipelineConfig{
+		Timeout:   30 * time.Second,
+		Cache:     newMemCache(),
+		Throttles: throttles,
+	}
+
+	outcome := ExecutePipeline(context.Background(), "test-provider", []Strategy{strategy}, false, cfg)
+
+	if outcome.Success {
+		t.Error("expected non-success outcome when strategy returned throttled result without cache")
+	}
+	saved, ok := throttles.data["test-provider"]
+	if !ok {
+		t.Fatal("expected throttle marker to be persisted after 429 result")
+	}
+	if !saved.RetryAt.Equal(retryAt) {
+		t.Errorf("persisted RetryAt = %v, want %v", saved.RetryAt, retryAt)
+	}
+	if saved.Reason != "Rate limited by Anthropic" {
+		t.Errorf("persisted Reason = %q, want %q", saved.Reason, "Rate limited by Anthropic")
+	}
+}
+
+func TestExecutePipeline_SuccessClearsThrottleMarker(t *testing.T) {
+	throttles := newMemThrottles()
+	throttles.data["test-provider"] = ThrottleMarker{
+		RetryAt: time.Now().Add(-1 * time.Second),
+		Reason:  "stale marker",
+	}
+
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			return ResultOK(testSnapshot("test-provider", "mock", 33)), nil
+		},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:   30 * time.Second,
+		Cache:     newMemCache(),
+		Throttles: throttles,
+	}
+
+	outcome := ExecutePipeline(context.Background(), "test-provider", []Strategy{strategy}, false, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected success, got error: %s", outcome.Error)
+	}
+	if _, ok := throttles.data["test-provider"]; ok {
+		t.Error("expected throttle marker to be cleared on success")
+	}
+}
+
+func TestExecutePipeline_ExpiredThrottleMarkerIgnored(t *testing.T) {
+	throttles := newMemThrottles()
+	throttles.data["test-provider"] = ThrottleMarker{
+		RetryAt: time.Now().Add(-1 * time.Minute),
+		Reason:  "stale",
+	}
+
+	fetchCalled := false
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			fetchCalled = true
+			return ResultOK(testSnapshot("test-provider", "mock", 44)), nil
+		},
+	}
+
+	cfg := PipelineConfig{
+		Timeout:   30 * time.Second,
+		Cache:     newMemCache(),
+		Throttles: throttles,
+	}
+
+	outcome := ExecutePipeline(context.Background(), "test-provider", []Strategy{strategy}, true, cfg)
+
+	if !outcome.Success {
+		t.Fatalf("expected success once throttle window passed, got error: %s", outcome.Error)
+	}
+	if !fetchCalled {
+		t.Error("expected live fetch once throttle window expired")
 	}
 }

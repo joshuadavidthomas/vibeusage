@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -98,6 +99,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	type usageOutcome struct {
 		resp    OAuthUsageResponse
 		status  int
+		header  http.Header
 		jsonErr error
 		err     error
 	}
@@ -115,7 +117,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 			usageCh <- usageOutcome{err: err}
 			return
 		}
-		usageCh <- usageOutcome{resp: usageResp, status: resp.StatusCode, jsonErr: resp.JSONErr}
+		usageCh <- usageOutcome{resp: usageResp, status: resp.StatusCode, header: resp.Header, jsonErr: resp.JSONErr}
 	}()
 
 	if cachedIdentity != nil {
@@ -143,6 +145,10 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 	if usage.status == 403 {
 		return fetch.ResultFatal("Not authorized to access usage."), nil
+	}
+	if usage.status == 429 {
+		retryAt := parseRetryAfter(usage.header, time.Now().UTC())
+		return fetch.ResultThrottled("Rate limited by Anthropic", retryAt), nil
 	}
 	if usage.status != 200 {
 		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", usage.status)), nil
