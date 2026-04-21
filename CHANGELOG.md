@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- Added an update-available header to normal terminal output when a newer vibeusage release is available. Release checks are cached to keep routine CLI use cheap. Machine-oriented output (`--json`, `statusline`, `completion`) remains unchanged.
+
 ## [0.6.0]
 
 ### Added
