@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func floatPtr(f float64) *float64 { return &f }
@@ -411,6 +413,90 @@ func TestLoadKeychainCredentials(t *testing.T) {
 	}
 	if creds.RefreshToken != "ref" {
 		t.Errorf("refresh_token = %q, want ref", creds.RefreshToken)
+	}
+}
+
+func TestLoadCachedIdentity(t *testing.T) {
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T)
+		wantNil bool
+	}{
+		{
+			name:    "no cache",
+			setup:   func(t *testing.T) {},
+			wantNil: true,
+		},
+		{
+			name: "cache present but identity nil",
+			setup: func(t *testing.T) {
+				snap := models.UsageSnapshot{
+					Provider:  "claude",
+					FetchedAt: time.Now().UTC(),
+				}
+				if err := config.CacheSnapshot(snap); err != nil {
+					t.Fatalf("CacheSnapshot: %v", err)
+				}
+			},
+			wantNil: true,
+		},
+		{
+			name: "cache present but identity empty",
+			setup: func(t *testing.T) {
+				snap := models.UsageSnapshot{
+					Provider:  "claude",
+					FetchedAt: time.Now().UTC(),
+					Identity:  &models.ProviderIdentity{},
+				}
+				if err := config.CacheSnapshot(snap); err != nil {
+					t.Fatalf("CacheSnapshot: %v", err)
+				}
+			},
+			wantNil: true,
+		},
+		{
+			name: "cache stale",
+			setup: func(t *testing.T) {
+				snap := models.UsageSnapshot{
+					Provider:  "claude",
+					FetchedAt: time.Now().UTC().Add(-25 * time.Hour),
+					Identity:  &models.ProviderIdentity{Email: "u@example.com", Plan: "Max 20x"},
+				}
+				if err := config.CacheSnapshot(snap); err != nil {
+					t.Fatalf("CacheSnapshot: %v", err)
+				}
+			},
+			wantNil: true,
+		},
+		{
+			name: "cache fresh with identity",
+			setup: func(t *testing.T) {
+				snap := models.UsageSnapshot{
+					Provider:  "claude",
+					FetchedAt: time.Now().UTC().Add(-1 * time.Hour),
+					Identity:  &models.ProviderIdentity{Email: "u@example.com", Plan: "Max 20x"},
+				}
+				if err := config.CacheSnapshot(snap); err != nil {
+					t.Fatalf("CacheSnapshot: %v", err)
+				}
+			},
+			wantNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+			tt.setup(t)
+
+			got := loadCachedIdentity()
+			if tt.wantNil && got != nil {
+				t.Errorf("loadCachedIdentity() = %+v, want nil", got)
+			}
+			if !tt.wantNil && got == nil {
+				t.Error("loadCachedIdentity() = nil, want non-nil")
+			}
+		})
 	}
 }
 
