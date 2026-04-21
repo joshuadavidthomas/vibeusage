@@ -17,6 +17,8 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/updater"
+
 	// Register all providers
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/amp"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/antigravity"
@@ -34,13 +36,6 @@ import (
 
 // version is injected at build time via -ldflags.
 var version = "dev"
-
-// freshSnapshotReuseTTL is how long a cached snapshot is considered
-// "fresh enough" to skip the network entirely. Matches the ~1 minute
-// refresh cadence of Anthropic's own usage UI and broadly suits other
-// providers whose quotas update on similar timescales. --no-cache
-// bypasses this window and always fetches live.
-const freshSnapshotReuseTTL = 60 * time.Second
 
 var (
 	jsonOutput bool
@@ -75,6 +70,8 @@ var rootCmd = &cobra.Command{
 		if err := config.MigrateCredentials(); err != nil {
 			l.Warn("credential migration failed", "err", err)
 		}
+
+		showUpdateCheckHeader(cmd)
 	},
 	RunE: runDefaultUsage,
 }
@@ -87,15 +84,15 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noCache, "no-cache", false, "Disable cached snapshot reuse and fallback")
 	rootCmd.Flags().Bool("version", false, "Show version and exit")
 
-	rootCmd.AddCommand(authCmd)
-	rootCmd.AddCommand(statusCmd)
-	rootCmd.AddCommand(configCmd)
-
-	rootCmd.AddCommand(routeCmd)
-	rootCmd.AddCommand(updateCmd)
-	rootCmd.AddCommand(usageCmd)
-	rootCmd.AddCommand(statuslineCmd)
-
+	rootCmd.AddCommand(
+		authCmd,
+		configCmd,
+		routeCmd,
+		statusCmd,
+		statuslineCmd,
+		updateCmd,
+		usageCmd,
+	)
 }
 
 func Execute() error {
@@ -106,6 +103,76 @@ func Execute() error {
 // Commands access it via cmd.Context().
 func ExecuteContext(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
+}
+
+const (
+	updateCheckBackgroundRefreshInterval = time.Hour
+	updateCheckForegroundRefreshInterval = 24 * time.Hour
+	updateCheckTimeout                   = 800 * time.Millisecond
+)
+
+func showUpdateCheckHeader(cmd *cobra.Command) {
+	if cmd == nil || jsonOutput || quiet || !isTerminal() || !updater.IsReleaseVersion(version) {
+		return
+	}
+
+	if versionFlag, err := cmd.Flags().GetBool("version"); err == nil && versionFlag {
+		return
+	}
+
+	switch cmd.Name() {
+	case "completion", "help", "statusline", "update":
+		return
+	}
+
+	cached := updater.LoadLatestReleaseCache()
+	var availableUpdate *updater.AvailableUpdate
+	if cached != nil {
+		availableUpdate, _ = updater.AvailableUpdateForVersion(version, *cached)
+	}
+
+	client := updater.NewCheckClient(updateCheckTimeout)
+	switch {
+	case cached == nil || cached.AttemptExpired(updateCheckForegroundRefreshInterval):
+		latestRelease := refreshUpdateCheckCache(client, cached)
+		if latestRelease == nil {
+			return
+		}
+		availableUpdate, _ = updater.AvailableUpdateForVersion(version, *latestRelease)
+	case cached.AttemptExpired(updateCheckBackgroundRefreshInterval):
+		go refreshUpdateCheckCache(client, cached)
+	}
+
+	if availableUpdate == nil {
+		return
+	}
+
+	_, _ = fmt.Fprintln(
+		outWriter,
+		display.RenderUpdateCheckHeader(
+			availableUpdate.CurrentVersion,
+			availableUpdate.LatestVersion,
+			noColor,
+		),
+	)
+	_, _ = fmt.Fprintln(outWriter)
+}
+
+func refreshUpdateCheckCache(client *updater.Client, cached *updater.LatestReleaseInfo) *updater.LatestReleaseInfo {
+	ctx, cancel := context.WithTimeout(context.Background(), updateCheckTimeout)
+	defer cancel()
+
+	latestRelease, err := updater.RefreshLatestReleaseCache(ctx, client, cached)
+	if err == nil || cached != nil {
+		_ = updater.SaveLatestReleaseCache(latestRelease)
+	}
+	if err != nil {
+		if cached != nil {
+			return &latestRelease
+		}
+		return nil
+	}
+	return &latestRelease
 }
 
 func runDefaultUsage(cmd *cobra.Command, args []string) error {
@@ -352,6 +419,12 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 }
 
 func pipelineConfigFromConfig(cfg config.Config) fetch.PipelineConfig {
+	// Treat cached snapshots as "fresh enough" for about a minute before
+	// forcing a live fetch. This matches the rough refresh cadence of provider
+	// usage UIs while keeping normal CLI use responsive. --no-cache bypasses
+	// this window entirely.
+	const freshSnapshotReuseTTL = 60 * time.Second
+
 	return fetch.PipelineConfig{
 		Timeout:       time.Duration(cfg.Fetch.Timeout * float64(time.Second)),
 		Cache:         config.FileCache{},
