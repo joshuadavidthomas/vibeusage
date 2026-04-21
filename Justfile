@@ -22,13 +22,17 @@ fmt *ARGS='.':
 lint *ARGS:
     golangci-lint run {{ ARGS }}
 
-# Run tests
-test *ARGS:
-    go test ./... -race {{ ARGS }}
+# CLI
+run *ARGS:
+    go run ./cmd/vibeusage {{ ARGS }}
 
 # Regenerate README screenshots (requires freeze)
 screenshots:
     bash scripts/screenshots.sh
+
+# Run tests
+test *ARGS:
+    go test ./... -race {{ ARGS }}
 
 # Tidy go.mod/go.sum
 tidy:

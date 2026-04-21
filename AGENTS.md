@@ -23,7 +23,7 @@ Development uses a local sandbox via `.env` / `.envrc` (loaded by direnv):
 - `VIBEUSAGE_DATA_DIR=.sandbox/vibeusage/data`
 - `VIBEUSAGE_CACHE_DIR=.sandbox/vibeusage/cache`
 
-The `vibeusage` shell alias runs `go run ./cmd/vibeusage` with these env vars. When testing CLI behavior manually, use the alias or set these env vars. Check `.sandbox/vibeusage/config/config.toml` for the active sandbox config — it may differ from defaults.
+The `just run` Just command runs `go run ./cmd/vibeusage` with these env vars. When testing CLI behavior manually, use the alias or set these env vars. Check `.sandbox/vibeusage/config/config.toml` for the active sandbox config — it may differ from defaults.
 
 ## Operational Notes
 
