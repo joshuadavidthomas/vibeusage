@@ -35,7 +35,12 @@ import (
 // version is injected at build time via -ldflags.
 var version = "dev"
 
-const freshSnapshotReuseTTL = time.Second
+// freshSnapshotReuseTTL is how long a cached snapshot is considered
+// "fresh enough" to skip the network entirely. Matches the ~1 minute
+// refresh cadence of Anthropic's own usage UI and broadly suits other
+// providers whose quotas update on similar timescales. --no-cache
+// bypasses this window and always fetches live.
+const freshSnapshotReuseTTL = 60 * time.Second
 
 var (
 	jsonOutput bool
