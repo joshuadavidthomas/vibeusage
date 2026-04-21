@@ -21,10 +21,6 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 			Utilization: 75.0,
 			ResetsAt:    "2025-02-26T00:00:00Z",
 		},
-		Monthly: &UsagePeriodResponse{
-			Utilization: 30.0,
-			ResetsAt:    "2025-03-01T00:00:00Z",
-		},
 		SevenDaySonnet: &UsagePeriodResponse{
 			Utilization: 60.0,
 			ResetsAt:    "2025-02-26T00:00:00Z",
@@ -33,14 +29,15 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 			Utilization: 10.0,
 			ResetsAt:    "2025-02-26T00:00:00Z",
 		},
-		SevenDayHaiku: &UsagePeriodResponse{
-			Utilization: 90.0,
+		SevenDayOmelette: &UsagePeriodResponse{
+			Utilization: 3.0,
 			ResetsAt:    "2025-02-26T00:00:00Z",
 		},
 		ExtraUsage: &ExtraUsageResponse{
 			IsEnabled:    true,
 			UsedCredits:  550,
 			MonthlyLimit: floatPtr(10000),
+			Currency:     "USD",
 		},
 	}
 
@@ -57,9 +54,9 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 		t.Errorf("source = %q, want %q", snapshot.Source, "oauth")
 	}
 
-	// Should have 6 periods: 3 standard + 3 model-specific
-	if len(snapshot.Periods) != 6 {
-		t.Fatalf("len(periods) = %d, want 6", len(snapshot.Periods))
+	// Should have 5 periods: 2 standard (5h + 7d) + 3 model-specific (sonnet, opus, omelette)
+	if len(snapshot.Periods) != 5 {
+		t.Fatalf("len(periods) = %d, want 5", len(snapshot.Periods))
 	}
 
 	// Find periods by name
@@ -94,17 +91,6 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 		t.Errorf("All Models period_type = %q, want %q", sevenDay.PeriodType, models.PeriodWeekly)
 	}
 
-	monthly, ok := periodByName["Monthly"]
-	if !ok {
-		t.Fatal("missing Monthly period")
-	}
-	if monthly.Utilization != 30 {
-		t.Errorf("Monthly utilization = %d, want 30", monthly.Utilization)
-	}
-	if monthly.PeriodType != models.PeriodMonthly {
-		t.Errorf("Monthly period_type = %q, want %q", monthly.PeriodType, models.PeriodMonthly)
-	}
-
 	// Model-specific periods
 	sonnet, ok := periodByName["Sonnet"]
 	if !ok {
@@ -128,12 +114,15 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 		t.Errorf("Opus utilization = %d, want 10", opus.Utilization)
 	}
 
-	haiku, ok := periodByName["Haiku"]
+	design, ok := periodByName["Claude Design"]
 	if !ok {
-		t.Fatal("missing Haiku period")
+		t.Fatal("missing Claude Design period")
 	}
-	if haiku.Utilization != 90 {
-		t.Errorf("Haiku utilization = %d, want 90", haiku.Utilization)
+	if design.Utilization != 3 {
+		t.Errorf("Claude Design utilization = %d, want 3", design.Utilization)
+	}
+	if design.Model != "omelette" {
+		t.Errorf("Claude Design model = %q, want %q", design.Model, "omelette")
 	}
 
 	// Overage

@@ -77,7 +77,7 @@ func buildPeriodTable(rows []periodTableRow) string {
 	for _, r := range rows {
 		p := r.period
 		color := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio()).Color()
-		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
+		pct := colorStyle(color).Render(formatPeriodValue(p))
 		bar := RenderBar(p.Utilization, 20, color)
 
 		reset := ""
@@ -93,6 +93,15 @@ func buildPeriodTable(rows []periodTableRow) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// formatPeriodValue renders the value column for a usage period.
+// Count-based periods show "used / limit"; percentage periods show "N%".
+func formatPeriodValue(p models.UsagePeriod) string {
+	if p.IsCountBased() {
+		return fmt.Sprintf("%d / %d", *p.Used, *p.Limit)
+	}
+	return fmt.Sprintf("%d%%", p.Utilization)
 }
 
 // cleanPeriodTableOutput strips the single leading border space and trailing
@@ -162,12 +171,21 @@ func formatBalance(billing *models.BillingDetail) string {
 func formatBillingDetail(snapshot models.UsageSnapshot) string {
 	var parts []string
 
-	// Reset date from the monthly period (billing cycle reset)
-	for _, p := range snapshot.Periods {
-		if p.PeriodType == models.PeriodMonthly && p.ResetsAt != nil {
-			parts = append(parts, "Resets "+p.ResetsAt.Format("Jan 2"))
-			break
+	// Reset date: prefer the overage reset (Claude's monthly spend boundary),
+	// fall back to the monthly period if one is present.
+	var resetsAt *time.Time
+	if snapshot.Overage != nil && snapshot.Overage.ResetsAt != nil {
+		resetsAt = snapshot.Overage.ResetsAt
+	} else {
+		for _, p := range snapshot.Periods {
+			if p.PeriodType == models.PeriodMonthly && p.ResetsAt != nil {
+				resetsAt = p.ResetsAt
+				break
+			}
 		}
+	}
+	if resetsAt != nil {
+		parts = append(parts, "Resets "+resetsAt.Format("Jan 2"))
 	}
 
 	if snapshot.Billing != nil {
@@ -376,7 +394,7 @@ func GlobalPeriodColWidths(snapshots []models.UsageSnapshot) PeriodColWidths {
 	for _, s := range snapshots {
 		for _, p := range collectDisplayPeriods(s) {
 			cw.Name = max(cw.Name, len(p.Name))
-			cw.Pct = max(cw.Pct, len(fmt.Sprintf("%d%%", p.Utilization)))
+			cw.Pct = max(cw.Pct, len(formatPeriodValue(p)))
 			if d := p.TimeUntilReset(); d != nil {
 				cw.Reset = max(cw.Reset, len("resets in "+FormatResetCountdown(d)))
 			}
@@ -553,7 +571,7 @@ func buildPeriodTableWithWidths(rows []periodTableRow, cw PeriodColWidths) strin
 	for _, r := range rows {
 		p := r.period
 		color := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio()).Color()
-		pct := colorStyle(color).Render(fmt.Sprintf("%d%%", p.Utilization))
+		pct := colorStyle(color).Render(formatPeriodValue(p))
 		bar := RenderBar(p.Utilization, 20, color)
 
 		reset := ""

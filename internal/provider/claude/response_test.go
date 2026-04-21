@@ -11,11 +11,11 @@ func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
 	raw := `{
 		"five_hour": {"utilization": 42.0, "resets_at": "2025-02-19T22:00:00Z"},
 		"seven_day": {"utilization": 75.0, "resets_at": "2025-02-26T00:00:00Z"},
-		"monthly": {"utilization": 30.0, "resets_at": "2025-03-01T00:00:00Z"},
 		"seven_day_sonnet": {"utilization": 60.0, "resets_at": "2025-02-26T00:00:00Z"},
 		"seven_day_opus": {"utilization": 10.0, "resets_at": "2025-02-26T00:00:00Z"},
-		"seven_day_haiku": {"utilization": 90.0, "resets_at": "2025-02-26T00:00:00Z"},
-		"extra_usage": {"is_enabled": true, "used_credits": 550, "monthly_limit": 10000}
+		"seven_day_omelette": {"utilization": 3.0, "resets_at": "2025-02-26T00:00:00Z"},
+		"omelette_promotional": {"utilization": 1.0, "resets_at": "2025-02-26T00:00:00Z"},
+		"extra_usage": {"is_enabled": true, "used_credits": 550, "monthly_limit": 10000, "currency": "USD"}
 	}`
 
 	var resp OAuthUsageResponse
@@ -41,13 +41,6 @@ func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
 		t.Errorf("seven_day utilization = %v, want 75.0", resp.SevenDay.Utilization)
 	}
 
-	if resp.Monthly == nil {
-		t.Fatal("expected monthly to be present")
-	}
-	if resp.Monthly.Utilization != 30.0 {
-		t.Errorf("monthly utilization = %v, want 30.0", resp.Monthly.Utilization)
-	}
-
 	// Model-specific periods
 	if resp.SevenDaySonnet == nil {
 		t.Fatal("expected seven_day_sonnet to be present")
@@ -63,11 +56,18 @@ func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
 		t.Errorf("seven_day_opus utilization = %v, want 10.0", resp.SevenDayOpus.Utilization)
 	}
 
-	if resp.SevenDayHaiku == nil {
-		t.Fatal("expected seven_day_haiku to be present")
+	if resp.SevenDayOmelette == nil {
+		t.Fatal("expected seven_day_omelette to be present")
 	}
-	if resp.SevenDayHaiku.Utilization != 90.0 {
-		t.Errorf("seven_day_haiku utilization = %v, want 90.0", resp.SevenDayHaiku.Utilization)
+	if resp.SevenDayOmelette.Utilization != 3.0 {
+		t.Errorf("seven_day_omelette utilization = %v, want 3.0", resp.SevenDayOmelette.Utilization)
+	}
+
+	if resp.OmelettePromotional == nil {
+		t.Fatal("expected omelette_promotional to be present")
+	}
+	if resp.OmelettePromotional.Utilization != 1.0 {
+		t.Errorf("omelette_promotional utilization = %v, want 1.0", resp.OmelettePromotional.Utilization)
 	}
 
 	// Extra usage
@@ -82,6 +82,9 @@ func TestOAuthUsageResponse_UnmarshalFullResponse(t *testing.T) {
 	}
 	if resp.ExtraUsage.MonthlyLimit == nil || *resp.ExtraUsage.MonthlyLimit != 10000 {
 		t.Errorf("extra_usage.monthly_limit = %v, want 10000", resp.ExtraUsage.MonthlyLimit)
+	}
+	if resp.ExtraUsage.Currency != "USD" {
+		t.Errorf("extra_usage.currency = %q, want %q", resp.ExtraUsage.Currency, "USD")
 	}
 }
 
@@ -106,11 +109,11 @@ func TestOAuthUsageResponse_UnmarshalMinimalResponse(t *testing.T) {
 	if resp.SevenDay != nil {
 		t.Error("expected seven_day to be nil")
 	}
-	if resp.Monthly != nil {
-		t.Error("expected monthly to be nil")
-	}
 	if resp.SevenDaySonnet != nil {
 		t.Error("expected seven_day_sonnet to be nil")
+	}
+	if resp.SevenDayOmelette != nil {
+		t.Error("expected seven_day_omelette to be nil")
 	}
 	if resp.ExtraUsage != nil {
 		t.Error("expected extra_usage to be nil")
@@ -131,8 +134,8 @@ func TestOAuthUsageResponse_UnmarshalEmptyResponse(t *testing.T) {
 	if resp.SevenDay != nil {
 		t.Error("expected seven_day to be nil")
 	}
-	if resp.Monthly != nil {
-		t.Error("expected monthly to be nil")
+	if resp.SevenDayOmelette != nil {
+		t.Error("expected seven_day_omelette to be nil")
 	}
 }
 

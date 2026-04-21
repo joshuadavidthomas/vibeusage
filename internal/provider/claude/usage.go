@@ -7,26 +7,27 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
+// codenameLabels maps Anthropic's internal weekly-bucket codenames to
+// their human-readable display names.
+var codenameLabels = map[string]string{
+	"omelette":             "Claude Design",
+	"omelette_promotional": "Claude Design (Promo)",
+	"iguana_necktie":       "Iguana Necktie",
+}
+
 // parseUsageResponse converts an OAuthUsageResponse (returned by both the
 // OAuth and web session endpoints) into a UsageSnapshot. The source parameter
-// identifies which strategy produced the data ("oauth" or "web"). An optional
-// overage override can be provided for strategies that fetch overage data from
-// a separate endpoint.
-func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride *models.OverageUsage) *models.UsageSnapshot {
+// identifies which strategy produced the data ("oauth" or "web").
+func parseUsageResponse(resp OAuthUsageResponse, source string) *models.UsageSnapshot {
 	var periods []models.UsagePeriod
 
-	type periodInfo struct {
+	standardPeriods := []struct {
+		data       *UsagePeriodResponse
 		name       string
 		periodType models.PeriodType
-	}
-
-	standardPeriods := []struct {
-		data *UsagePeriodResponse
-		info periodInfo
 	}{
-		{resp.FiveHour, periodInfo{"Session (5h)", models.PeriodSession}},
-		{resp.SevenDay, periodInfo{"All Models", models.PeriodWeekly}},
-		{resp.Monthly, periodInfo{"Monthly", models.PeriodMonthly}},
+		{resp.FiveHour, "Session (5h)", models.PeriodSession},
+		{resp.SevenDay, "All Models", models.PeriodWeekly},
 	}
 
 	for _, sp := range standardPeriods {
@@ -34,24 +35,26 @@ func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride 
 			continue
 		}
 		p := models.UsagePeriod{
-			Name:        sp.info.name,
+			Name:        sp.name,
 			Utilization: int(sp.data.Utilization),
-			PeriodType:  sp.info.periodType,
+			PeriodType:  sp.periodType,
 		}
 		p.ResetsAt = models.ParseRFC3339Ptr(sp.data.ResetsAt)
 		periods = append(periods, p)
 	}
 
 	modelPeriods := []struct {
-		data      *UsagePeriodResponse
-		modelName string
+		data    *UsagePeriodResponse
+		display string
+		model   string
 	}{
-		{resp.SevenDaySonnet, "Sonnet"},
-		{resp.SevenDayOpus, "Opus"},
-		{resp.SevenDayHaiku, "Haiku"},
-		{resp.SevenDayOAuthApps, "OAuth Apps"},
-		{resp.SevenDayCowork, "Cowork"},
-		{resp.IguanaNecktie, "Iguana Necktie"},
+		{resp.SevenDaySonnet, "Sonnet", "sonnet"},
+		{resp.SevenDayOpus, "Opus", "opus"},
+		{resp.SevenDayOAuthApps, "OAuth Apps", "oauth_apps"},
+		{resp.SevenDayCowork, "Cowork", "cowork"},
+		{resp.SevenDayOmelette, codenameLabels["omelette"], "omelette"},
+		{resp.OmelettePromotional, codenameLabels["omelette_promotional"], "omelette_promotional"},
+		{resp.IguanaNecktie, codenameLabels["iguana_necktie"], "iguana_necktie"},
 	}
 
 	for _, mp := range modelPeriods {
@@ -59,41 +62,33 @@ func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride 
 			continue
 		}
 		p := models.UsagePeriod{
-			Name:        mp.modelName,
+			Name:        mp.display,
 			Utilization: int(mp.data.Utilization),
 			PeriodType:  models.PeriodWeekly,
-			Model:       strings.ToLower(strings.ReplaceAll(mp.modelName, " ", "_")),
+			Model:       strings.ToLower(strings.ReplaceAll(mp.model, " ", "_")),
 		}
 		p.ResetsAt = models.ParseRFC3339Ptr(mp.data.ResetsAt)
 		periods = append(periods, p)
 	}
 
-	// Prefer inline extra_usage from the response; fall back to the
-	// override provided by the caller (e.g. from a separate endpoint).
 	var overage *models.OverageUsage
 	if resp.ExtraUsage != nil && resp.ExtraUsage.IsEnabled {
 		var limit float64
 		if resp.ExtraUsage.MonthlyLimit != nil {
 			limit = *resp.ExtraUsage.MonthlyLimit / 100.0
 		}
+		currency := resp.ExtraUsage.Currency
+		if currency == "" {
+			currency = "USD"
+		}
+		resetsAt := firstOfNextMonthUTC(time.Now().UTC())
 		overage = &models.OverageUsage{
 			Used:      resp.ExtraUsage.UsedCredits / 100.0,
 			Limit:     limit,
-			Currency:  "USD",
+			Currency:  currency,
 			IsEnabled: true,
+			ResetsAt:  &resetsAt,
 		}
-	} else if overageOverride != nil {
-		overage = overageOverride
-	}
-
-	// Build identity from plan field or infer from usage features.
-	plan := resp.Plan
-	if plan == "" && resp.BillingType != "" {
-		plan = resp.BillingType
-	}
-	var identity *models.ProviderIdentity
-	if plan != "" {
-		identity = &models.ProviderIdentity{Plan: plan}
 	}
 
 	now := time.Now().UTC()
@@ -102,7 +97,14 @@ func parseUsageResponse(resp OAuthUsageResponse, source string, overageOverride 
 		FetchedAt: now,
 		Periods:   periods,
 		Overage:   overage,
-		Identity:  identity,
 		Source:    source,
 	}
+}
+
+// firstOfNextMonthUTC returns midnight UTC on the first day of the month
+// following the given time. This is the reset boundary Anthropic uses for
+// extra-usage spending caps (matches purchases_reset_at in /prepaid/bundles).
+func firstOfNextMonthUTC(now time.Time) time.Time {
+	year, month, _ := now.Date()
+	return time.Date(year, month+1, 1, 0, 0, 0, 0, time.UTC)
 }

@@ -20,9 +20,19 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- Added daily routine run quota for Claude (visible for web-session users), rendered as `used / limit` instead of a percentage.
+- Claude's extra-usage billing now shows a reset date (first of next month UTC) alongside the spend.
+
 ### Changed
 
 - Repeated CLI invocations now reuse a successful snapshot for 1 second before refetching. This protects scripts, statuslines, and other programmatic uses from accidentally spamming provider calls while keeping output effectively live. Use `--no-cache` to force a fresh fetch every time.
+- Refreshed Claude's per-model weekly breakdown to match Anthropic's updated usage UI, adding "Claude Design" (plus its promotional variant) and "Iguana Necktie" rows.
+
+### Removed
+
+- Removed Claude's "Monthly" and 7-day Haiku rows. Anthropic's API no longer returns these buckets.
 
 ## [0.5.0]
 

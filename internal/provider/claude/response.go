@@ -21,24 +21,23 @@ type ExtraUsageResponse struct {
 	UsedCredits  float64  `json:"used_credits"`
 	MonthlyLimit *float64 `json:"monthly_limit"`
 	Utilization  *float64 `json:"utilization"`
+	Currency     string   `json:"currency,omitempty"`
 }
 
 // OAuthUsageResponse represents the usage response returned by both the OAuth
 // endpoint (/api/oauth/usage) and the web session endpoint
 // (/api/organizations/{orgID}/usage).
 type OAuthUsageResponse struct {
-	FiveHour          *UsagePeriodResponse `json:"five_hour,omitempty"`
-	SevenDay          *UsagePeriodResponse `json:"seven_day,omitempty"`
-	Monthly           *UsagePeriodResponse `json:"monthly,omitempty"`
-	SevenDaySonnet    *UsagePeriodResponse `json:"seven_day_sonnet,omitempty"`
-	SevenDayOpus      *UsagePeriodResponse `json:"seven_day_opus,omitempty"`
-	SevenDayHaiku     *UsagePeriodResponse `json:"seven_day_haiku,omitempty"`
-	SevenDayOAuthApps *UsagePeriodResponse `json:"seven_day_oauth_apps,omitempty"`
-	SevenDayCowork    *UsagePeriodResponse `json:"seven_day_cowork,omitempty"`
-	IguanaNecktie     *UsagePeriodResponse `json:"iguana_necktie,omitempty"`
-	ExtraUsage        *ExtraUsageResponse  `json:"extra_usage,omitempty"`
-	Plan              string               `json:"plan,omitempty"`
-	BillingType       string               `json:"billing_type,omitempty"`
+	FiveHour            *UsagePeriodResponse `json:"five_hour,omitempty"`
+	SevenDay            *UsagePeriodResponse `json:"seven_day,omitempty"`
+	SevenDaySonnet      *UsagePeriodResponse `json:"seven_day_sonnet,omitempty"`
+	SevenDayOpus        *UsagePeriodResponse `json:"seven_day_opus,omitempty"`
+	SevenDayOAuthApps   *UsagePeriodResponse `json:"seven_day_oauth_apps,omitempty"`
+	SevenDayCowork      *UsagePeriodResponse `json:"seven_day_cowork,omitempty"`
+	SevenDayOmelette    *UsagePeriodResponse `json:"seven_day_omelette,omitempty"`
+	OmelettePromotional *UsagePeriodResponse `json:"omelette_promotional,omitempty"`
+	IguanaNecktie       *UsagePeriodResponse `json:"iguana_necktie,omitempty"`
+	ExtraUsage          *ExtraUsageResponse  `json:"extra_usage,omitempty"`
 }
 
 // ClaudeCLIOAuth represents the nested OAuth data inside Claude CLI credentials.
@@ -64,27 +63,6 @@ func (c *ClaudeCLIOAuth) ToOAuthCredentials() oauth.Credentials {
 // ClaudeCLICredentials represents the Claude CLI credentials file format.
 type ClaudeCLICredentials struct {
 	ClaudeAiOauth *ClaudeCLIOAuth `json:"claudeAiOauth,omitempty"`
-}
-
-// WebOverageResponse represents the response from /api/organizations/{orgID}/overage_spend_limit.
-type WebOverageResponse struct {
-	HasHardLimit bool    `json:"has_hard_limit"`
-	CurrentSpend float64 `json:"current_spend"`
-	HardLimit    float64 `json:"hard_limit"`
-}
-
-// ToOverageUsage converts the web overage response to a models.OverageUsage.
-// Returns nil if there is no hard limit.
-func (r *WebOverageResponse) ToOverageUsage() *models.OverageUsage {
-	if !r.HasHardLimit {
-		return nil
-	}
-	return &models.OverageUsage{
-		Used:      r.CurrentSpend / 100.0,
-		Limit:     r.HardLimit / 100.0,
-		Currency:  "USD",
-		IsEnabled: true,
-	}
 }
 
 // WebOrganization represents a single organization from /api/organizations.
@@ -150,9 +128,19 @@ func (o *OAuthAccountOrganization) HasCapability(cap string) bool {
 // WebPrepaidCreditsResponse represents the response from
 // /api/organizations/{orgID}/prepaid/credits.
 type WebPrepaidCreditsResponse struct {
-	Amount             int             `json:"amount"`               // cents, can be negative
-	Currency           string          `json:"currency"`             // "USD"
-	AutoReloadSettings json.RawMessage `json:"auto_reload_settings"` // null = off
+	Amount                    int             `json:"amount"`               // cents, can be negative
+	Currency                  string          `json:"currency"`             // "USD"
+	AutoReloadSettings        json.RawMessage `json:"auto_reload_settings"` // null = off
+	PendingInvoiceAmountCents *int            `json:"pending_invoice_amount_cents,omitempty"`
+}
+
+// RoutinesBudgetResponse represents the response from
+// https://claude.ai/v1/code/routines/run-budget. The limit and used fields
+// are returned as strings by the API.
+type RoutinesBudgetResponse struct {
+	Limit                 json.Number `json:"limit"`
+	Used                  json.Number `json:"used"`
+	UnifiedBillingEnabled bool        `json:"unified_billing_enabled"`
 }
 
 // IsAutoReloadEnabled reports whether auto-reload is configured.

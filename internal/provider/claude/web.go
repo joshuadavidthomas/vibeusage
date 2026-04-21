@@ -12,7 +12,10 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
-const webBaseURL = "https://claude.ai/api/organizations"
+const (
+	webBaseURL     = "https://claude.ai/api/organizations"
+	webRoutinesURL = "https://claude.ai/v1/code/routines/run-budget"
+)
 
 // WebStrategy fetches Claude usage using a session cookie.
 type WebStrategy struct {
@@ -38,24 +41,24 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	sessionCookie := httpclient.WithCookie("sessionKey", sessionKey)
 	orgBase := webBaseURL + "/" + orgID
 
-	// Fetch usage, overage, and prepaid credits concurrently.
-	// Overage and credits are best-effort — failures are silently ignored.
+	// Fetch usage, prepaid credits, and routines budget concurrently.
+	// Credits and routines are best-effort — failures are silently ignored.
 	type usageOutcome struct {
 		resp    OAuthUsageResponse
 		status  int
 		jsonErr error
 		err     error
 	}
-	type overageOutcome struct {
-		overage *models.OverageUsage
-	}
 	type creditsOutcome struct {
 		credits *WebPrepaidCreditsResponse
 	}
+	type routinesOutcome struct {
+		routines *RoutinesBudgetResponse
+	}
 
 	usageCh := make(chan usageOutcome, 1)
-	overageCh := make(chan overageOutcome, 1)
 	creditsCh := make(chan creditsOutcome, 1)
+	routinesCh := make(chan routinesOutcome, 1)
 
 	go func() {
 		var usageResp OAuthUsageResponse
@@ -68,16 +71,6 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}()
 
 	go func() {
-		var overageResp WebOverageResponse
-		resp, err := client.GetJSONCtx(ctx, orgBase+"/overage_spend_limit", &overageResp, sessionCookie)
-		if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
-			overageCh <- overageOutcome{}
-			return
-		}
-		overageCh <- overageOutcome{overage: overageResp.ToOverageUsage()}
-	}()
-
-	go func() {
 		var creditsResp WebPrepaidCreditsResponse
 		resp, err := client.GetJSONCtx(ctx, orgBase+"/prepaid/credits", &creditsResp, sessionCookie)
 		if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
@@ -87,9 +80,19 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		creditsCh <- creditsOutcome{credits: &creditsResp}
 	}()
 
+	go func() {
+		var routinesResp RoutinesBudgetResponse
+		resp, err := client.GetJSONCtx(ctx, webRoutinesURL, &routinesResp, sessionCookie)
+		if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
+			routinesCh <- routinesOutcome{}
+			return
+		}
+		routinesCh <- routinesOutcome{routines: &routinesResp}
+	}()
+
 	usage := <-usageCh
-	overage := <-overageCh
 	credits := <-creditsCh
+	routines := <-routinesCh
 
 	if usage.err != nil {
 		return fetch.ResultFail("Request failed: " + usage.err.Error()), nil
@@ -104,13 +107,48 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail(fmt.Sprintf("Invalid usage response: %v", usage.jsonErr)), nil
 	}
 
-	snapshot := parseUsageResponse(usage.resp, "web", overage.overage)
+	snapshot := parseUsageResponse(usage.resp, "web")
 
 	if credits.credits != nil {
 		snapshot.Billing = credits.credits.ToBillingDetail()
 	}
 
+	if routines.routines != nil {
+		if p := routinesToPeriod(routines.routines); p != nil {
+			snapshot.Periods = append(snapshot.Periods, *p)
+		}
+	}
+
 	return fetch.ResultOK(*snapshot), nil
+}
+
+// routinesToPeriod converts a routines budget response into a count-based
+// usage period. Returns nil if the response cannot be parsed.
+func routinesToPeriod(r *RoutinesBudgetResponse) *models.UsagePeriod {
+	limit, err := r.Limit.Int64()
+	if err != nil {
+		return nil
+	}
+	used, err := r.Used.Int64()
+	if err != nil {
+		return nil
+	}
+	usedInt := int(used)
+	limitInt := int(limit)
+	utilization := 0
+	if limitInt > 0 {
+		utilization = int((float64(usedInt) / float64(limitInt)) * 100)
+		if utilization > 100 {
+			utilization = 100
+		}
+	}
+	return &models.UsagePeriod{
+		Name:        "Daily routine runs",
+		Utilization: utilization,
+		PeriodType:  models.PeriodDaily,
+		Used:        &usedInt,
+		Limit:       &limitInt,
+	}
 }
 
 func (s *WebStrategy) loadSessionKey() string {
