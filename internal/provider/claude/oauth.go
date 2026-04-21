@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
@@ -22,6 +23,12 @@ const (
 	oauthClientID        = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	anthropicBetaTag     = "oauth-2025-04-20"
 	claudeKeychainSecret = "Claude Code-credentials"
+
+	// accountReuseTTL is how long a cached identity (email, plan, org)
+	// is trusted before we re-fetch /oauth/account. Identity data changes
+	// on the order of months (plan upgrades, org renames); reusing it for
+	// a day halves the per-fetch request count at negligible freshness cost.
+	accountReuseTTL = 24 * time.Hour
 )
 
 var readKeychainSecret = keychain.ReadGenericPassword
@@ -84,8 +91,10 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
 	}
 
-	// Fetch usage and account concurrently. Account enrichment is
-	// best-effort — failures are silently ignored.
+	cachedIdentity := loadCachedIdentity()
+
+	// Fetch usage, and (when no recent cached identity) account concurrently.
+	// Account enrichment is best-effort — failures are silently ignored.
 	type usageOutcome struct {
 		resp    OAuthUsageResponse
 		status  int
@@ -109,15 +118,19 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		usageCh <- usageOutcome{resp: usageResp, status: resp.StatusCode, jsonErr: resp.JSONErr}
 	}()
 
-	go func() {
-		var acctResp OAuthAccountResponse
-		resp, err := client.GetJSONCtx(ctx, oauthAccountURL, &acctResp, authOpts...)
-		if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
-			accountCh <- accountOutcome{}
-			return
-		}
-		accountCh <- accountOutcome{resp: &acctResp}
-	}()
+	if cachedIdentity != nil {
+		accountCh <- accountOutcome{}
+	} else {
+		go func() {
+			var acctResp OAuthAccountResponse
+			resp, err := client.GetJSONCtx(ctx, oauthAccountURL, &acctResp, authOpts...)
+			if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
+				accountCh <- accountOutcome{}
+				return
+			}
+			accountCh <- accountOutcome{resp: &acctResp}
+		}()
+	}
 
 	usage := <-usageCh
 	account := <-accountCh
@@ -140,9 +153,31 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 	snapshot := s.parseOAuthUsageResponse(usage.resp)
 
-	enrichWithAccount(snapshot, account.resp)
+	if cachedIdentity != nil {
+		snapshot.Identity = cachedIdentity
+	} else {
+		enrichWithAccount(snapshot, account.resp)
+	}
 
 	return fetch.ResultOK(*snapshot), nil
+}
+
+// loadCachedIdentity returns the cached Claude identity if the on-disk
+// snapshot is within accountReuseTTL and has a populated Identity. Returns
+// nil otherwise, signalling that /oauth/account should be fetched.
+func loadCachedIdentity() *models.ProviderIdentity {
+	cached := config.LoadCachedSnapshot("claude")
+	if cached == nil || cached.Identity == nil {
+		return nil
+	}
+	if time.Since(cached.FetchedAt) > accountReuseTTL {
+		return nil
+	}
+	id := cached.Identity
+	if id.Email == "" && id.Plan == "" && id.Organization == "" {
+		return nil
+	}
+	return id
 }
 
 func (s *OAuthStrategy) externalPaths() []string {

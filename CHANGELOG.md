@@ -29,6 +29,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Repeated CLI invocations now reuse a successful snapshot for 1 second before refetching. This protects scripts, statuslines, and other programmatic uses from accidentally spamming provider calls while keeping output effectively live. Use `--no-cache` to force a fresh fetch every time.
 - Refreshed Claude's per-model weekly breakdown to match Anthropic's updated usage UI, adding "Claude Design" (plus its promotional variant) and "Iguana Necktie" rows.
+- Claude now skips the `/oauth/account` request when a cached identity (email, plan, org) is less than 24 hours old, halving the per-fetch request count during active use. Identity data changes rarely, so reuse is safe; `--no-cache` still forces a fresh fetch of everything.
 
 ### Removed
 
