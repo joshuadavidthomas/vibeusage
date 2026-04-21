@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -1464,5 +1465,90 @@ func TestSeedDefaultRoles_PreservesExistingConfigWhenCacheIsStale(t *testing.T) 
 	}
 	if len(loaded.Roles) == 0 {
 		t.Error("expected default roles to be seeded")
+	}
+}
+
+func TestSaveAndLoadThrottle(t *testing.T) {
+	setupTempDir(t)
+
+	retryAt := time.Now().Add(5 * time.Minute).UTC().Truncate(time.Second)
+	marker := fetch.ThrottleMarker{
+		RetryAt: retryAt,
+		Reason:  "Rate limited by provider",
+	}
+
+	if err := SaveThrottle("claude", marker); err != nil {
+		t.Fatalf("SaveThrottle error: %v", err)
+	}
+
+	loaded := LoadThrottle("claude")
+	if loaded == nil {
+		t.Fatal("expected throttle marker to load")
+	}
+	if !loaded.RetryAt.Equal(retryAt) {
+		t.Errorf("RetryAt = %v, want %v", loaded.RetryAt, retryAt)
+	}
+	if loaded.Reason != marker.Reason {
+		t.Errorf("Reason = %q, want %q", loaded.Reason, marker.Reason)
+	}
+}
+
+func TestLoadThrottle_ExpiredIsDeleted(t *testing.T) {
+	setupTempDir(t)
+
+	past := time.Now().Add(-1 * time.Minute).UTC()
+	if err := SaveThrottle("claude", fetch.ThrottleMarker{RetryAt: past, Reason: "old"}); err != nil {
+		t.Fatalf("SaveThrottle error: %v", err)
+	}
+
+	if m := LoadThrottle("claude"); m != nil {
+		t.Errorf("expected nil for expired marker, got %+v", m)
+	}
+
+	if _, err := os.Stat(ThrottlePath("claude")); !os.IsNotExist(err) {
+		t.Error("expected expired throttle file to be removed on load")
+	}
+}
+
+func TestLoadThrottle_MissingReturnsNil(t *testing.T) {
+	setupTempDir(t)
+	if m := LoadThrottle("claude"); m != nil {
+		t.Errorf("expected nil for missing marker, got %+v", m)
+	}
+}
+
+func TestClearThrottle(t *testing.T) {
+	setupTempDir(t)
+
+	marker := fetch.ThrottleMarker{RetryAt: time.Now().Add(time.Hour), Reason: "rate limited"}
+	if err := SaveThrottle("claude", marker); err != nil {
+		t.Fatalf("SaveThrottle error: %v", err)
+	}
+
+	ClearThrottle("claude")
+
+	if _, err := os.Stat(ThrottlePath("claude")); !os.IsNotExist(err) {
+		t.Error("expected throttle file to be removed after ClearThrottle")
+	}
+}
+
+func TestFileThrottleStore_ImplementsInterface(t *testing.T) {
+	setupTempDir(t)
+
+	var store fetch.ThrottleStore = FileThrottleStore{}
+
+	retryAt := time.Now().Add(3 * time.Minute).UTC().Truncate(time.Second)
+	if err := store.Save("claude", fetch.ThrottleMarker{RetryAt: retryAt, Reason: "rl"}); err != nil {
+		t.Fatalf("Save error: %v", err)
+	}
+
+	loaded := store.Load("claude")
+	if loaded == nil || !loaded.RetryAt.Equal(retryAt) {
+		t.Errorf("Load mismatch: got %+v, want RetryAt=%v", loaded, retryAt)
+	}
+
+	store.Clear("claude")
+	if store.Load("claude") != nil {
+		t.Error("expected nil after Clear")
 	}
 }

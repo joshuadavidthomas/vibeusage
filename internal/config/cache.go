@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -79,6 +81,7 @@ func ClearOrgIDCache(providerID string) {
 func ClearProviderCache(providerID string) {
 	_ = os.Remove(SnapshotPath(providerID))
 	_ = os.Remove(OrgIDPath(providerID))
+	_ = os.Remove(ThrottlePath(providerID))
 }
 
 func ClearSnapshotCache(providerID string) {
@@ -90,6 +93,49 @@ func ClearSnapshotCache(providerID string) {
 	for _, e := range entries {
 		_ = os.Remove(filepath.Join(SnapshotsDir(), e.Name()))
 	}
+}
+
+func ThrottlePath(providerID string) string {
+	return filepath.Join(ThrottlesDir(), providerID+".json")
+}
+
+func SaveThrottle(providerID string, marker fetch.ThrottleMarker) error {
+	path := ThrottlePath(providerID)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("saving throttle for %s: %w", providerID, err)
+	}
+	data, err := json.Marshal(marker)
+	if err != nil {
+		return fmt.Errorf("saving throttle for %s: %w", providerID, err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("saving throttle for %s: %w", providerID, err)
+	}
+	return nil
+}
+
+// LoadThrottle returns the persisted throttle marker for the provider,
+// or nil if none exists or it has expired. Expired markers are deleted
+// lazily so the on-disk state stays tidy.
+func LoadThrottle(providerID string) *fetch.ThrottleMarker {
+	path := ThrottlePath(providerID)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var m fetch.ThrottleMarker
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil
+	}
+	if time.Now().After(m.RetryAt) {
+		_ = os.Remove(path)
+		return nil
+	}
+	return &m
+}
+
+func ClearThrottle(providerID string) {
+	_ = os.Remove(ThrottlePath(providerID))
 }
 
 func ClearModelsCache() {
@@ -104,7 +150,15 @@ func ClearAllCache(providerID string) {
 	}
 	ClearSnapshotCache("")
 	ClearOrgIDCache("")
+	ClearThrottles()
 	ClearModelsCache()
+}
+
+func ClearThrottles() {
+	entries, _ := os.ReadDir(ThrottlesDir())
+	for _, e := range entries {
+		_ = os.Remove(filepath.Join(ThrottlesDir(), e.Name()))
+	}
 }
 
 // FileCache implements fetch.Cache using the filesystem-based snapshot
@@ -118,4 +172,20 @@ func (FileCache) Save(snapshot models.UsageSnapshot) error {
 
 func (FileCache) Load(providerID string) *models.UsageSnapshot {
 	return LoadCachedSnapshot(providerID)
+}
+
+// FileThrottleStore implements fetch.ThrottleStore on top of the
+// filesystem-based throttle marker helpers.
+type FileThrottleStore struct{}
+
+func (FileThrottleStore) Load(providerID string) *fetch.ThrottleMarker {
+	return LoadThrottle(providerID)
+}
+
+func (FileThrottleStore) Save(providerID string, marker fetch.ThrottleMarker) error {
+	return SaveThrottle(providerID, marker)
+}
+
+func (FileThrottleStore) Clear(providerID string) {
+	ClearThrottle(providerID)
 }

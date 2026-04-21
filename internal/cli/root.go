@@ -350,6 +350,7 @@ func pipelineConfigFromConfig(cfg config.Config) fetch.PipelineConfig {
 	return fetch.PipelineConfig{
 		Timeout:       time.Duration(cfg.Fetch.Timeout * float64(time.Second)),
 		Cache:         config.FileCache{},
+		Throttles:     config.FileThrottleStore{},
 		FreshCacheTTL: freshSnapshotReuseTTL,
 	}
 }

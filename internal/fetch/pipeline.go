@@ -2,6 +2,7 @@ package fetch
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
@@ -14,6 +15,34 @@ import (
 func ExecutePipeline(ctx context.Context, providerID string, strategies []Strategy, useCache bool, cfg PipelineConfig) FetchOutcome {
 	anyAttempted := false
 	lastErr := ""
+
+	// Honor a persisted rate-limit cooldown before any network attempt.
+	// Within the window, serve cache if present; otherwise surface the
+	// cooldown as the error so the user sees why nothing fetched.
+	if useCache && cfg.Throttles != nil && hasAvailableStrategy(strategies) {
+		if marker := cfg.Throttles.Load(providerID); marker != nil {
+			if cfg.Cache != nil {
+				if cached := cfg.Cache.Load(providerID); cached != nil {
+					return FetchOutcome{
+						ProviderID: providerID,
+						Success:    true,
+						Snapshot:   cached,
+						Source:     "cache (throttled)",
+						Cached:     true,
+					}
+				}
+			}
+			reason := marker.Reason
+			if reason == "" {
+				reason = "Rate limited"
+			}
+			return FetchOutcome{
+				ProviderID: providerID,
+				Success:    false,
+				Error:      fmt.Sprintf("%s; retry after %s", reason, marker.RetryAt.Format(time.RFC3339)),
+			}
+		}
+	}
 
 	if useCache && cfg.Cache != nil && cfg.FreshCacheTTL > 0 && hasAvailableStrategy(strategies) {
 		if cached := cfg.Cache.Load(providerID); isFreshSnapshot(cached, cfg.FreshCacheTTL) {
@@ -63,9 +92,20 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 			continue
 		}
 
+		if result.RetryAfter != nil && cfg.Throttles != nil {
+			reason := result.Error
+			if reason == "" {
+				reason = "Rate limited"
+			}
+			_ = cfg.Throttles.Save(providerID, ThrottleMarker{RetryAt: *result.RetryAfter, Reason: reason})
+		}
+
 		if result.Success && result.Snapshot != nil {
 			if cfg.Cache != nil {
 				_ = cfg.Cache.Save(*result.Snapshot)
+			}
+			if cfg.Throttles != nil {
+				cfg.Throttles.Clear(providerID)
 			}
 
 			return FetchOutcome{

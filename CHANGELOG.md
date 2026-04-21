@@ -24,6 +24,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Added daily routine run quota for Claude (visible for web-session users), rendered as `used / limit` instead of a percentage.
 - Claude's extra-usage billing now shows a reset date (first of next month UTC) alongside the spend.
+- Honor `Retry-After` on 429 responses from Claude: vibeusage persists a per-provider cooldown, serves cached data (tagged `cache (throttled)`) during the window, and resumes live fetches automatically once the cooldown passes. `--no-cache` bypasses the cooldown.
 
 ### Changed
 
