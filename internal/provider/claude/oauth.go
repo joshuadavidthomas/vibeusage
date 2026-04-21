@@ -219,5 +219,5 @@ func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *oauth.Credentia
 }
 
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {
-	return parseUsageResponse(resp, "oauth", nil)
+	return parseUsageResponse(resp, "oauth")
 }

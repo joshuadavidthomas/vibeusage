@@ -5,65 +5,6 @@ import (
 	"testing"
 )
 
-func TestWebOverageResponse_UnmarshalWithHardLimit(t *testing.T) {
-	raw := `{
-		"has_hard_limit": true,
-		"current_spend": 2550,
-		"hard_limit": 10000
-	}`
-
-	var resp WebOverageResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if !resp.HasHardLimit {
-		t.Error("expected has_hard_limit to be true")
-	}
-	if resp.CurrentSpend != 2550 {
-		t.Errorf("current_spend = %v, want 2550", resp.CurrentSpend)
-	}
-	if resp.HardLimit != 10000 {
-		t.Errorf("hard_limit = %v, want 10000", resp.HardLimit)
-	}
-}
-
-func TestWebOverageResponse_UnmarshalNoHardLimit(t *testing.T) {
-	raw := `{
-		"has_hard_limit": false,
-		"current_spend": 0,
-		"hard_limit": 0
-	}`
-
-	var resp WebOverageResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if resp.HasHardLimit {
-		t.Error("expected has_hard_limit to be false")
-	}
-	if resp.CurrentSpend != 0 {
-		t.Errorf("current_spend = %v, want 0", resp.CurrentSpend)
-	}
-	if resp.HardLimit != 0 {
-		t.Errorf("hard_limit = %v, want 0", resp.HardLimit)
-	}
-}
-
-func TestWebOverageResponse_UnmarshalEmptyResponse(t *testing.T) {
-	raw := `{}`
-
-	var resp WebOverageResponse
-	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
-		t.Fatalf("unmarshal failed: %v", err)
-	}
-
-	if resp.HasHardLimit {
-		t.Error("expected has_hard_limit to be false")
-	}
-}
-
 func TestWebOrganization_UnmarshalWithUUID(t *testing.T) {
 	raw := `{
 		"uuid": "org-uuid-123",
@@ -285,56 +226,5 @@ func TestWebSessionCredentials_UnmarshalEmpty(t *testing.T) {
 
 	if creds.SessionKey != "" {
 		t.Errorf("session_key = %q, want empty", creds.SessionKey)
-	}
-}
-
-func TestWebOverageResponse_ToOverageUsage(t *testing.T) {
-	tests := []struct {
-		name     string
-		resp     WebOverageResponse
-		wantNil  bool
-		wantUsed float64
-	}{
-		{
-			name: "with hard limit",
-			resp: WebOverageResponse{
-				HasHardLimit: true,
-				CurrentSpend: 2550,
-				HardLimit:    10000,
-			},
-			wantNil:  false,
-			wantUsed: 25.50,
-		},
-		{
-			name: "without hard limit",
-			resp: WebOverageResponse{
-				HasHardLimit: false,
-			},
-			wantNil: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.resp.ToOverageUsage()
-			if tt.wantNil {
-				if got != nil {
-					t.Errorf("ToOverageUsage() = %+v, want nil", got)
-				}
-				return
-			}
-			if got == nil {
-				t.Fatal("ToOverageUsage() = nil, want non-nil")
-			}
-			if got.Used != tt.wantUsed {
-				t.Errorf("Used = %v, want %v", got.Used, tt.wantUsed)
-			}
-			if got.Currency != "USD" {
-				t.Errorf("Currency = %q, want %q", got.Currency, "USD")
-			}
-			if !got.IsEnabled {
-				t.Error("expected IsEnabled to be true")
-			}
-		})
 	}
 }

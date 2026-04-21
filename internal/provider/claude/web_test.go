@@ -13,7 +13,7 @@ func TestParseUsageResponse_WebSource(t *testing.T) {
 		SevenDaySonnet: &UsagePeriodResponse{Utilization: 15.0, ResetsAt: "2025-02-26T00:00:00Z"},
 	}
 
-	snapshot := parseUsageResponse(resp, "web", nil)
+	snapshot := parseUsageResponse(resp, "web")
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
@@ -50,47 +50,18 @@ func TestParseUsageResponse_WebSource(t *testing.T) {
 	}
 }
 
-func TestParseUsageResponse_WebWithOverageOverride(t *testing.T) {
-	resp := OAuthUsageResponse{
-		FiveHour: &UsagePeriodResponse{Utilization: 50.0},
-	}
-	overage := &models.OverageUsage{
-		Used:      25.50,
-		Limit:     100.00,
-		Currency:  "USD",
-		IsEnabled: true,
-	}
-
-	snapshot := parseUsageResponse(resp, "web", overage)
-
-	if snapshot == nil {
-		t.Fatal("expected non-nil snapshot")
-	}
-	if snapshot.Overage == nil {
-		t.Fatal("expected overage to be present")
-	}
-	if snapshot.Overage.Used != 25.50 {
-		t.Errorf("overage used = %v, want 25.50", snapshot.Overage.Used)
-	}
-}
-
-func TestParseUsageResponse_InlineExtraUsageTakesPrecedence(t *testing.T) {
+func TestParseUsageResponse_InlineExtraUsagePopulatesOverage(t *testing.T) {
 	resp := OAuthUsageResponse{
 		FiveHour: &UsagePeriodResponse{Utilization: 50.0},
 		ExtraUsage: &ExtraUsageResponse{
 			IsEnabled:    true,
 			UsedCredits:  1000,
 			MonthlyLimit: floatPtr(5000),
+			Currency:     "USD",
 		},
 	}
-	overrideOverage := &models.OverageUsage{
-		Used:      99.99,
-		Limit:     200.00,
-		Currency:  "USD",
-		IsEnabled: true,
-	}
 
-	snapshot := parseUsageResponse(resp, "web", overrideOverage)
+	snapshot := parseUsageResponse(resp, "web")
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")
@@ -98,16 +69,27 @@ func TestParseUsageResponse_InlineExtraUsageTakesPrecedence(t *testing.T) {
 	if snapshot.Overage == nil {
 		t.Fatal("expected overage to be present")
 	}
-	// Inline extra_usage should win over the override
 	if snapshot.Overage.Used != 10.0 { // 1000 / 100.0
-		t.Errorf("overage used = %v, want 10.0 (from inline extra_usage)", snapshot.Overage.Used)
+		t.Errorf("overage used = %v, want 10.0", snapshot.Overage.Used)
+	}
+	if snapshot.Overage.Limit != 50.0 { // 5000 / 100.0
+		t.Errorf("overage limit = %v, want 50.0", snapshot.Overage.Limit)
+	}
+	if snapshot.Overage.Currency != "USD" {
+		t.Errorf("overage currency = %q, want USD", snapshot.Overage.Currency)
+	}
+	if snapshot.Overage.ResetsAt == nil {
+		t.Fatal("expected overage.resets_at to be set (first of next month)")
+	}
+	if snapshot.Overage.ResetsAt.Day() != 1 {
+		t.Errorf("overage.resets_at day = %d, want 1", snapshot.Overage.ResetsAt.Day())
 	}
 }
 
 func TestParseUsageResponse_EmptyResponse(t *testing.T) {
 	resp := OAuthUsageResponse{}
 
-	snapshot := parseUsageResponse(resp, "web", nil)
+	snapshot := parseUsageResponse(resp, "web")
 
 	if snapshot == nil {
 		t.Fatal("expected non-nil snapshot")

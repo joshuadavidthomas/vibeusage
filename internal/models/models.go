@@ -35,6 +35,14 @@ type UsagePeriod struct {
 	PeriodType  PeriodType `json:"period_type"`
 	ResetsAt    *time.Time `json:"resets_at,omitempty"`
 	Model       string     `json:"model,omitempty"`
+	Used        *int       `json:"used,omitempty"`
+	Limit       *int       `json:"limit,omitempty"`
+}
+
+// IsCountBased reports whether this period is a count-based quota
+// (e.g. daily routine runs) rather than a percentage-based utilization.
+func (p UsagePeriod) IsCountBased() bool {
+	return p.Used != nil && p.Limit != nil
 }
 
 func (p UsagePeriod) Remaining() int {
@@ -82,10 +90,11 @@ type BillingDetail struct {
 }
 
 type OverageUsage struct {
-	Used      float64 `json:"used"`
-	Limit     float64 `json:"limit"`
-	Currency  string  `json:"currency"`
-	IsEnabled bool    `json:"is_enabled"`
+	Used      float64    `json:"used"`
+	Limit     float64    `json:"limit"`
+	Currency  string     `json:"currency"`
+	IsEnabled bool       `json:"is_enabled"`
+	ResetsAt  *time.Time `json:"resets_at,omitempty"`
 }
 
 func (o OverageUsage) Remaining() float64 {
