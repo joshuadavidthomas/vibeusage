@@ -3,6 +3,7 @@ package pace
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func pf(v float64) *float64 { return &v }
@@ -147,6 +148,97 @@ func TestHeadroomRatio(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEstimateRecovery(t *testing.T) {
+	weekly := 7 * 24 * time.Hour
+
+	tests := []struct {
+		name         string
+		input        RecoveryInput
+		wantRecovery bool
+		wantPause    time.Duration
+	}{
+		{
+			name: "critical weekly usage recovers when time catches up",
+			input: RecoveryInput{
+				Utilization:    93,
+				ElapsedRatio:   float64(weekly-47*time.Hour) / float64(weekly),
+				TimeUntilReset: 47 * time.Hour,
+				PeriodDuration: weekly,
+			},
+			wantRecovery: true,
+			wantPause:    23*time.Hour + 29*time.Minute,
+		},
+		{
+			name: "non-critical usage has no recovery guidance",
+			input: RecoveryInput{
+				Utilization:    50,
+				ElapsedRatio:   0.50,
+				TimeUntilReset: 84 * time.Hour,
+				PeriodDuration: weekly,
+			},
+			wantRecovery: false,
+		},
+		{
+			name: "exhausted usage cannot recover before reset",
+			input: RecoveryInput{
+				Utilization:    100,
+				ElapsedRatio:   0.90,
+				TimeUntilReset: 17 * time.Hour,
+				PeriodDuration: weekly,
+			},
+			wantRecovery: false,
+		},
+		{
+			name: "missing reset time has no recovery guidance",
+			input: RecoveryInput{
+				Utilization:    93,
+				ElapsedRatio:   0.72,
+				TimeUntilReset: 0,
+				PeriodDuration: weekly,
+			},
+			wantRecovery: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := EstimateRecovery(tt.input)
+			if !tt.wantRecovery {
+				if got != nil {
+					t.Fatalf("EstimateRecovery() = %#v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("EstimateRecovery() = nil, want recovery")
+			}
+			if got.RemainingPercent != 100-tt.input.Utilization {
+				t.Errorf("RemainingPercent = %d, want %d", got.RemainingPercent, 100-tt.input.Utilization)
+			}
+			if got.TimeUntilReset != tt.input.TimeUntilReset {
+				t.Errorf("TimeUntilReset = %s, want %s", got.TimeUntilReset, tt.input.TimeUntilReset)
+			}
+			if diff := absDuration(got.PauseUntilBelowCritical - tt.wantPause); diff > time.Minute {
+				t.Errorf("PauseUntilBelowCritical = %s, want ~%s", got.PauseUntilBelowCritical, tt.wantPause)
+			}
+			before := got.PauseUntilBelowCritical - time.Minute
+			if before > 0 && AssessAfter(tt.input, before) != Critical {
+				t.Errorf("AssessAfter(%s) should still be critical", before)
+			}
+			if AssessAfter(tt.input, got.PauseUntilBelowCritical) == Critical {
+				t.Errorf("AssessAfter(%s) should recover below critical", got.PauseUntilBelowCritical)
+			}
+		})
+	}
+}
+
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
 
 func TestEffectiveHeadroom(t *testing.T) {

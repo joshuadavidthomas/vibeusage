@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- Added recovery guidance for critical usage periods in provider detail views, showing how long to pause to get back on pace and the safe pace until reset.
+
 ## [0.7.0]
 
 ### Added
