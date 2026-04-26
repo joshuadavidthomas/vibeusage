@@ -47,58 +47,6 @@ type periodTableRow struct {
 	period      models.UsagePeriod
 }
 
-// buildPeriodTable renders period rows as borderless lipgloss tables.
-// Each period is its own single-row table. When a period has detail
-// (e.g. dollar amounts), it's placed in the same cell as the percentage
-// separated by a newline so alignment is handled by the table.
-func buildPeriodTable(rows []periodTableRow) string {
-	if len(rows) == 0 {
-		return ""
-	}
-
-	nameWidth := 0
-	for _, r := range rows {
-		nameWidth = max(nameWidth, len(r.displayName))
-	}
-
-	styleFunc := func(_ int, col int) lipgloss.Style {
-		switch col {
-		case 0:
-			return lipgloss.NewStyle().Width(nameWidth)
-		case 2:
-			return lipgloss.NewStyle().Align(lipgloss.Right)
-		case 3:
-			return lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-		}
-		return lipgloss.NewStyle()
-	}
-
-	var lines []string
-	for _, r := range rows {
-		p := r.period
-		level := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
-		color := level.Color()
-		pct := colorStyle(color).Render(formatPeriodValue(p))
-		bar := RenderBar(p.Utilization, 20, color)
-
-		reset := ""
-		if d := p.TimeUntilReset(); d != nil {
-			reset = "resets in " + FormatResetCountdown(d)
-		}
-
-		t := table.New().
-			Border(lipgloss.HiddenBorder()).
-			StyleFunc(styleFunc).
-			Row(r.displayName, bar, pct, reset)
-		lines = append(lines, cleanPeriodTableOutput(t.Render()))
-		if recovery := formatRecoveryHint(p, level); recovery != "" {
-			lines = append(lines, recovery)
-		}
-	}
-
-	return strings.Join(lines, "\n")
-}
-
 // formatPeriodValue renders the value column for a usage period.
 // Count-based periods show "used / limit"; percentage periods show "N%".
 func formatPeriodValue(p models.UsagePeriod) string {
@@ -108,7 +56,7 @@ func formatPeriodValue(p models.UsagePeriod) string {
 	return fmt.Sprintf("%d%%", p.Utilization)
 }
 
-func formatRecoveryHint(p models.UsagePeriod, level pace.Level) string {
+func formatRecoveryHint(p models.UsagePeriod, level pace.Level, indent int) string {
 	if p.IsCountBased() || level != pace.Critical {
 		return ""
 	}
@@ -128,8 +76,9 @@ func formatRecoveryHint(p models.UsagePeriod, level pace.Level) string {
 	}
 
 	labelStyle := dimStyle.Bold(true)
-	line1 := dimStyle.Render("    ") + labelStyle.Render("Ahead of pace:") + dimStyle.Render(fmt.Sprintf(" pause ~%s to get back on pace", FormatResetCountdown(&recovery.PauseUntilBelowCritical)))
-	line2 := dimStyle.Render("    ") + labelStyle.Render("Safe pace until reset:") + dimStyle.Render(fmt.Sprintf(" ~%s", formatSafePace(recovery.RemainingPercent, recovery.TimeUntilReset, p.PeriodType)))
+	pad := strings.Repeat(" ", indent)
+	line1 := dimStyle.Render(pad) + labelStyle.Render("Ahead of pace:") + dimStyle.Render(fmt.Sprintf(" pause ~%s to get back on pace", FormatResetCountdown(&recovery.PauseUntilBelowCritical)))
+	line2 := dimStyle.Render(pad) + labelStyle.Render("Safe pace until reset:") + dimStyle.Render(fmt.Sprintf(" ~%s", formatSafePace(recovery.RemainingPercent, recovery.TimeUntilReset, p.PeriodType)))
 	return line1 + "\n" + line2
 }
 
@@ -372,30 +321,34 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 	session, weekly, daily, monthly := groupPeriods(snapshot.Periods)
 	longer := pickLonger(weekly, daily, monthly)
 
+	var sessionRows []periodTableRow
+	for _, p := range session {
+		sessionRows = append(sessionRows, periodTableRow{p.Name, p})
+	}
+
+	var longerRows []periodTableRow
+	for _, p := range longer.periods {
+		name := formatSubPeriodName(&p, longer.header)
+		longerRows = append(longerRows, periodTableRow{name, p})
+	}
+
+	cw := PeriodColWidthsForRows(append(sessionRows, longerRows...))
+	tableOptions := periodTableOptions{widths: cw, recoveryHints: true}
+
 	// Session periods
-	if len(session) > 0 {
-		var rows []periodTableRow
-		for _, p := range session {
-			rows = append(rows, periodTableRow{p.Name, p})
-		}
-		b.WriteString(buildPeriodTable(rows))
+	if len(sessionRows) > 0 {
+		b.WriteString(buildPeriodTableWithOptions(sessionRows, tableOptions))
 	}
 
 	// Longer periods with per-model breakdowns
-	if len(session) > 0 && len(longer.periods) > 0 {
+	if len(sessionRows) > 0 && len(longerRows) > 0 {
 		b.WriteString("\n\n")
 	}
 
-	if len(longer.periods) > 0 {
+	if len(longerRows) > 0 {
 		b.WriteString(longer.header)
-
-		var rows []periodTableRow
-		for _, p := range longer.periods {
-			name := formatSubPeriodName(&p, longer.header)
-			rows = append(rows, periodTableRow{name, p})
-		}
 		b.WriteByte('\n')
-		b.WriteString(buildPeriodTable(rows))
+		b.WriteString(buildPeriodTableWithOptions(longerRows, tableOptions))
 	}
 
 	// Overage and billing details
@@ -431,14 +384,23 @@ func (cw PeriodColWidths) RowWidth() int {
 // GlobalPeriodColWidths computes the widest values for each column across all
 // provided snapshots, using the same name normalisations as RenderProviderPanel.
 func GlobalPeriodColWidths(snapshots []models.UsageSnapshot) PeriodColWidths {
-	var cw PeriodColWidths
+	var rows []periodTableRow
 	for _, s := range snapshots {
 		for _, p := range collectDisplayPeriods(s) {
-			cw.Name = max(cw.Name, len(p.Name))
-			cw.Pct = max(cw.Pct, len(formatPeriodValue(p)))
-			if d := p.TimeUntilReset(); d != nil {
-				cw.Reset = max(cw.Reset, len("resets in "+FormatResetCountdown(d)))
-			}
+			rows = append(rows, periodTableRow{p.Name, p})
+		}
+	}
+	return PeriodColWidthsForRows(rows)
+}
+
+// PeriodColWidthsForRows computes the widest values for each table column.
+func PeriodColWidthsForRows(rows []periodTableRow) PeriodColWidths {
+	var cw PeriodColWidths
+	for _, r := range rows {
+		cw.Name = max(cw.Name, lipgloss.Width(r.displayName))
+		cw.Pct = max(cw.Pct, lipgloss.Width(formatPeriodValue(r.period)))
+		if d := r.period.TimeUntilReset(); d != nil {
+			cw.Reset = max(cw.Reset, lipgloss.Width("resets in "+FormatResetCountdown(d)))
 		}
 	}
 	return cw
@@ -582,18 +544,23 @@ func renderPeriodTable(periods []models.UsagePeriod, cw PeriodColWidths) string 
 	for _, p := range periods {
 		rows = append(rows, periodTableRow{p.Name, p})
 	}
-	return buildPeriodTableWithWidths(rows, cw)
+	return buildPeriodTableWithOptions(rows, periodTableOptions{widths: cw})
 }
 
-// buildPeriodTableWithWidths builds a period table with explicit column widths
-// for cross-panel alignment in the dashboard view. Each period is rendered as
-// a one-row table so detail sub-lines can be inserted between periods without
-// inflating the pct column width for all panels.
-func buildPeriodTableWithWidths(rows []periodTableRow, cw PeriodColWidths) string {
+type periodTableOptions struct {
+	widths        PeriodColWidths
+	recoveryHints bool
+}
+
+// buildPeriodTableWithOptions builds a period table with explicit column widths.
+// Each period is rendered as a one-row table so detail sub-lines can be inserted
+// between periods without inflating the pct column width for all panels.
+func buildPeriodTableWithOptions(rows []periodTableRow, opts periodTableOptions) string {
 	if len(rows) == 0 {
 		return ""
 	}
 
+	cw := opts.widths
 	styleFunc := func(_ int, col int) lipgloss.Style {
 		switch col {
 		case 0:
@@ -611,7 +578,8 @@ func buildPeriodTableWithWidths(rows []periodTableRow, cw PeriodColWidths) strin
 	var lines []string
 	for _, r := range rows {
 		p := r.period
-		color := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio()).Color()
+		level := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
+		color := level.Color()
 		pct := colorStyle(color).Render(formatPeriodValue(p))
 		bar := RenderBar(p.Utilization, 20, color)
 
@@ -625,6 +593,11 @@ func buildPeriodTableWithWidths(rows []periodTableRow, cw PeriodColWidths) strin
 			StyleFunc(styleFunc).
 			Row(r.displayName, bar, pct, reset)
 		lines = append(lines, cleanPeriodTableOutput(t.Render()))
+		if opts.recoveryHints {
+			if recovery := formatRecoveryHint(p, level, 4); recovery != "" {
+				lines = append(lines, recovery)
+			}
+		}
 	}
 
 	return strings.Join(lines, "\n")
