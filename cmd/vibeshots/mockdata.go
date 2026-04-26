@@ -108,9 +108,9 @@ func mockClaudeDetailSnapshot() models.UsageSnapshot {
 			},
 			{
 				Name:        "Weekly",
-				Utilization: 2,
+				Utilization: 93,
 				PeriodType:  models.PeriodWeekly,
-				ResetsAt:    resetIn(6*24*time.Hour + 21*time.Hour),
+				ResetsAt:    resetIn(1*24*time.Hour + 23*time.Hour),
 			},
 			{
 				Name:        "Sonnet",

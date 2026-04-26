@@ -1,6 +1,9 @@
 package pace
 
-import "math"
+import (
+	"math"
+	"time"
+)
 
 // Level represents the health of a usage budget — how urgently the user
 // should be aware of their consumption.
@@ -151,4 +154,64 @@ func EffectiveHeadroom(headroom int, multiplier *float64) int {
 	}
 	eff := float64(headroom) / *multiplier
 	return int(math.Min(eff, 100))
+}
+
+// Recovery describes how a critical usage period can recover if usage pauses.
+type Recovery struct {
+	PauseUntilBelowCritical time.Duration
+	RemainingPercent        int
+	TimeUntilReset          time.Duration
+}
+
+// RecoveryInput contains the period data needed to estimate recovery.
+type RecoveryInput struct {
+	Utilization    int
+	ElapsedRatio   float64
+	TimeUntilReset time.Duration
+	PeriodDuration time.Duration
+}
+
+// EstimateRecovery returns recovery guidance for a critical period. It assumes
+// usage remains constant while time passes, then estimates when the existing
+// pace assessment would fall below Critical.
+func EstimateRecovery(input RecoveryInput) *Recovery {
+	if input.TimeUntilReset <= 0 || input.PeriodDuration <= 0 {
+		return nil
+	}
+	if AssessAfter(input, 0) != Critical {
+		return nil
+	}
+	if AssessAfter(input, input.TimeUntilReset) == Critical {
+		return nil
+	}
+
+	low := time.Duration(0)
+	high := input.TimeUntilReset
+	for high-low > time.Minute {
+		mid := low + (high-low)/2
+		if AssessAfter(input, mid) == Critical {
+			low = mid
+		} else {
+			high = mid
+		}
+	}
+
+	return &Recovery{
+		PauseUntilBelowCritical: high,
+		RemainingPercent:        100 - input.Utilization,
+		TimeUntilReset:          input.TimeUntilReset,
+	}
+}
+
+// AssessAfter evaluates a period after wait has elapsed with no additional usage.
+func AssessAfter(input RecoveryInput, wait time.Duration) Level {
+	nextElapsed := input.ElapsedRatio + float64(wait)/float64(input.PeriodDuration)
+	nextElapsed = math.Max(0.0, math.Min(nextElapsed, 1.0))
+	var nextPace *float64
+	if nextElapsed >= 0.10 {
+		expected := nextElapsed * 100.0
+		ratio := float64(input.Utilization) / expected
+		nextPace = &ratio
+	}
+	return Assess(nextPace, input.Utilization, &nextElapsed)
 }
