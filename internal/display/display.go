@@ -76,7 +76,8 @@ func buildPeriodTable(rows []periodTableRow) string {
 	var lines []string
 	for _, r := range rows {
 		p := r.period
-		color := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio()).Color()
+		level := pace.Assess(p.PaceRatio(), p.Utilization, p.ElapsedRatio())
+		color := level.Color()
 		pct := colorStyle(color).Render(formatPeriodValue(p))
 		bar := RenderBar(p.Utilization, 20, color)
 
@@ -90,6 +91,9 @@ func buildPeriodTable(rows []periodTableRow) string {
 			StyleFunc(styleFunc).
 			Row(r.displayName, bar, pct, reset)
 		lines = append(lines, cleanPeriodTableOutput(t.Render()))
+		if recovery := formatRecoveryHint(p, level); recovery != "" {
+			lines = append(lines, recovery)
+		}
 	}
 
 	return strings.Join(lines, "\n")
@@ -102,6 +106,43 @@ func formatPeriodValue(p models.UsagePeriod) string {
 		return fmt.Sprintf("%d / %d", *p.Used, *p.Limit)
 	}
 	return fmt.Sprintf("%d%%", p.Utilization)
+}
+
+func formatRecoveryHint(p models.UsagePeriod, level pace.Level) string {
+	if p.IsCountBased() || level != pace.Critical {
+		return ""
+	}
+	reset := p.TimeUntilReset()
+	elapsed := p.ElapsedRatio()
+	if reset == nil || elapsed == nil {
+		return ""
+	}
+	recovery := pace.EstimateRecovery(pace.RecoveryInput{
+		Utilization:    p.Utilization,
+		ElapsedRatio:   *elapsed,
+		TimeUntilReset: *reset,
+		PeriodDuration: time.Duration(p.PeriodType.Hours() * float64(time.Hour)),
+	})
+	if recovery == nil {
+		return ""
+	}
+
+	labelStyle := dimStyle.Bold(true)
+	line1 := dimStyle.Render("    ") + labelStyle.Render("Ahead of pace:") + dimStyle.Render(fmt.Sprintf(" pause ~%s to get back on pace", FormatResetCountdown(&recovery.PauseUntilBelowCritical)))
+	line2 := dimStyle.Render("    ") + labelStyle.Render("Safe pace until reset:") + dimStyle.Render(fmt.Sprintf(" ~%s", formatSafePace(recovery.RemainingPercent, recovery.TimeUntilReset, p.PeriodType)))
+	return line1 + "\n" + line2
+}
+
+func formatSafePace(remaining int, untilReset time.Duration, periodType models.PeriodType) string {
+	if untilReset <= 0 {
+		return "0%"
+	}
+	if periodType == models.PeriodSession {
+		perHour := float64(remaining) / untilReset.Hours()
+		return fmt.Sprintf("%.1f%%/hour", perHour)
+	}
+	perDay := float64(remaining) / (untilReset.Hours() / 24.0)
+	return fmt.Sprintf("%.1f%%/day", perDay)
 }
 
 // cleanPeriodTableOutput strips the single leading border space and trailing

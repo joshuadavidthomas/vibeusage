@@ -66,7 +66,7 @@ vibeusage
 
 <img src="docs/images/dashboard.png" alt="vibeusage dashboard showing Claude, Codex, and Copilot usage panels with progress bars" />
 
-Bars are pace-colored by burn rate: **green** (on track or within 15% of expected), **yellow** (15–30% over expected pace), **red** (well over pace or near exhaustion). Pace compares your actual usage percentage to the fraction of time elapsed in the period.
+Bars are pace-colored by burn rate: **green** (on track or within 15% of expected), **yellow** (15–30% over expected pace), **red** (well over pace or near exhaustion). Pace compares your actual usage percentage to the fraction of time elapsed in the period. Provider detail views also show recovery guidance for critical periods: how long to pause to get back on pace, plus the safe pace until reset.
 
 Only providers you explicitly enable via `vibeusage auth` are tracked. Run it again anytime to add, remove, or re-authenticate providers.
 
@@ -84,7 +84,7 @@ Check a specific provider:
 vibeusage usage claude
 ```
 
-<img src="docs/images/usage-single.png" alt="vibeusage single provider detail view for Claude showing session and weekly breakdown" />
+<img src="docs/images/usage-single.png" alt="vibeusage single provider detail view showing session and weekly breakdown" />
 
 Output as JSON for scripting or automation:
 
