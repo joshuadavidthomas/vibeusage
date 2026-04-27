@@ -1173,6 +1173,46 @@ func TestRenderStatusLine_NoDescription(t *testing.T) {
 	}
 }
 
+func TestRenderSingleProvider_DetailUsageColumnsAlign(t *testing.T) {
+	reset := time.Now().Add(3 * time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "codex",
+		Periods: []models.UsagePeriod{
+			{Name: "Session", Utilization: 25, PeriodType: models.PeriodSession, ResetsAt: &reset},
+			{Name: "All Models", Utilization: 60, PeriodType: models.PeriodWeekly, ResetsAt: &reset},
+			{Name: "GPT-5.3-Codex-Spark Weekly", Utilization: 0, PeriodType: models.PeriodWeekly, ResetsAt: &reset, Model: "gpt-5.3-codex-spark"},
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	lines := strings.Split(result, "\n")
+
+	var sessionLine, allModelsLine, modelLine string
+	for _, line := range lines {
+		switch {
+		case strings.Contains(line, "Session"):
+			sessionLine = line
+		case strings.Contains(line, "All Models"):
+			allModelsLine = line
+		case strings.Contains(line, "GPT-5.3-Codex-Spark Weekly"):
+			modelLine = line
+		}
+	}
+	if sessionLine == "" || allModelsLine == "" || modelLine == "" {
+		t.Fatalf("expected session, aggregate, and model rows in output:\n%s", result)
+	}
+
+	sessionBar := strings.IndexAny(sessionLine, "█░")
+	allModelsBar := strings.IndexAny(allModelsLine, "█░")
+	modelBar := strings.IndexAny(modelLine, "█░")
+	if sessionBar == -1 || allModelsBar == -1 || modelBar == -1 {
+		t.Fatalf("expected bar characters in rows:\n%s\n%s\n%s", sessionLine, allModelsLine, modelLine)
+	}
+	if sessionBar != allModelsBar || sessionBar != modelBar {
+		t.Errorf("bar columns should align, got session=%d allModels=%d model=%d\n%s", sessionBar, allModelsBar, modelBar, result)
+	}
+}
+
 func TestRenderSingleProvider_ConsistentPanelLineWidths(t *testing.T) {
 	reset := time.Now().Add(3 * time.Hour)
 	snap := models.UsageSnapshot{
