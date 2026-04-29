@@ -1,13 +1,19 @@
 package codex
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/provider"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestParseUsageResponse_FullResponse(t *testing.T) {
@@ -243,5 +249,112 @@ func TestCodexHomeDir_ExpandsTilde(t *testing.T) {
 	want := home + "/.custom-codex"
 	if got := codexHomeDir(); got != want {
 		t.Errorf("codexHomeDir() = %q, want %q", got, want)
+	}
+}
+
+func stubCodexKeychainEmpty(t *testing.T) {
+	t.Helper()
+	old := readKeychainSecret
+	t.Cleanup(func() { readKeychainSecret = old })
+	readKeychainSecret = func(string, string) (string, error) {
+		return "", errors.New("no entry")
+	}
+}
+
+func writeCodexCLICreds(t *testing.T, home string) {
+	t.Helper()
+	dir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := `{"tokens":{"access_token":"cli-tok","refresh_token":"cli-ref"}}`
+	if err := os.WriteFile(filepath.Join(dir, "auth.json"), []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+
+	writeCodexCLICreds(t, home)
+	if err := config.WriteCredential("codex", "oauth", []byte(`{"access_token":"stale"}`)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+
+	s := OAuthStrategy{}
+	creds := s.loadCredentials()
+	if creds == nil {
+		t.Fatal("loadCredentials() = nil, want canonical creds")
+	}
+	if creds.AccessToken != "cli-tok" {
+		t.Errorf("access_token = %q, want cli-tok", creds.AccessToken)
+	}
+	if config.HasCredential("codex", "oauth") {
+		t.Error("orphan codex/oauth slot should have been deleted")
+	}
+}
+
+func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+
+	if err := config.WriteCredential("codex", "oauth", []byte(`{"access_token":"stale"}`)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+
+	s := OAuthStrategy{}
+	if creds := s.loadCredentials(); creds != nil {
+		t.Errorf("loadCredentials() = %+v, want nil (no canonical source)", creds)
+	}
+	if !config.HasCredential("codex", "oauth") {
+		t.Error("orphan should not be deleted when no canonical source is found")
+	}
+}
+
+func TestAuth_FailsWhenNoCanonicalSource(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+
+	flow, ok := Codex{}.Auth().(provider.CustomAuthFlow)
+	if !ok {
+		t.Fatalf("Codex.Auth() type = %T, want CustomAuthFlow", Codex{}.Auth())
+	}
+
+	var buf bytes.Buffer
+	success, err := flow.RunFlow(&buf, false)
+	if success {
+		t.Error("RunFlow() success = true, want false (no creds detected)")
+	}
+	if err == nil {
+		t.Error("RunFlow() err = nil, want non-nil so the auth command exits non-zero")
+	}
+	if !strings.Contains(buf.String(), "codex login") {
+		t.Errorf("RunFlow output = %q, want it to instruct the user to run codex login", buf.String())
+	}
+}
+
+func TestAuth_SucceedsWhenCanonicalSourcePresent(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+	writeCodexCLICreds(t, home)
+
+	flow := Codex{}.Auth().(provider.CustomAuthFlow)
+	success, err := flow.RunFlow(&bytes.Buffer{}, true)
+	if err != nil {
+		t.Fatalf("RunFlow() err = %v", err)
+	}
+	if !success {
+		t.Error("RunFlow() success = false, want true (creds present)")
 	}
 }

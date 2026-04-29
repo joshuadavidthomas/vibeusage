@@ -2,9 +2,13 @@ package kimicode
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestAPIKeyStrategy_IsAvailable_EnvVar(t *testing.T) {
@@ -179,5 +183,30 @@ func TestKimiCode_Meta(t *testing.T) {
 	}
 	if meta.Name != "Kimi Code" {
 		t.Errorf("Name = %q, want %q", meta.Name, "Kimi Code")
+	}
+}
+
+func TestSaveKimicodeCredentials_PersistsToSlot(t *testing.T) {
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+
+	in := &oauth.Credentials{
+		AccessToken:  "new-access",
+		RefreshToken: "new-refresh",
+		ExpiresAt:    "2099-01-01T00:00:00Z",
+	}
+	if err := saveKimicodeCredentials(in); err != nil {
+		t.Fatalf("saveKimicodeCredentials: %v", err)
+	}
+
+	data, err := config.ReadCredential("kimicode", "oauth")
+	if err != nil || data == nil {
+		t.Fatalf("ReadCredential after save: data=%q err=%v", data, err)
+	}
+	var got oauth.Credentials
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got != *in {
+		t.Errorf("persisted creds = %+v, want %+v", got, *in)
 	}
 }

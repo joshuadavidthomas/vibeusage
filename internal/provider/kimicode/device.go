@@ -3,6 +3,7 @@ package kimicode
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -89,7 +90,15 @@ func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *oauth.Cred
 		TokenURL:    oauthBaseURL() + tokenPath,
 		FormFields:  map[string]string{"client_id": clientID},
 		Headers:     commonHeaders(),
-		ProviderID:  "kimicode",
+		Save:        saveKimicodeCredentials,
 		HTTPTimeout: s.HTTPTimeout,
 	})
+}
+
+func saveKimicodeCredentials(c *oauth.Credentials) error {
+	content, err := json.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("marshal kimicode credentials: %w", err)
+	}
+	return config.WriteCredential("kimicode", "oauth", content)
 }

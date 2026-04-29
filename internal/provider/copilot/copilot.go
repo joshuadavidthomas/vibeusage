@@ -182,9 +182,17 @@ func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *oauth.Cred
 		TokenURL:    tokenURL,
 		FormFields:  map[string]string{"client_id": clientID},
 		Headers:     []httpclient.RequestOption{httpclient.WithHeader("Accept", "application/json")},
-		ProviderID:  "copilot",
+		Save:        saveCopilotCredentials,
 		HTTPTimeout: s.HTTPTimeout,
 	})
+}
+
+func saveCopilotCredentials(c *oauth.Credentials) error {
+	content, err := json.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("marshal copilot credentials: %w", err)
+	}
+	return config.WriteCredential("copilot", "oauth", content)
 }
 
 func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.UsageSnapshot {

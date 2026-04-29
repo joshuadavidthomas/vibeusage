@@ -2,7 +2,6 @@ package antigravity
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -146,8 +145,7 @@ func exchangeCode(w io.Writer, code, redirectURI string, quiet bool) (bool, erro
 		creds.ExpiresAt = time.Now().UTC().Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339)
 	}
 
-	content, _ := json.Marshal(creds)
-	if err := config.WriteCredential("antigravity", "oauth", content); err != nil {
+	if err := saveAntigravityCredentials(creds); err != nil {
 		return false, fmt.Errorf("failed to save credentials: %w", err)
 	}
 
