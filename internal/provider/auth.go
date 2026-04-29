@@ -63,6 +63,16 @@ type Authenticator interface {
 	Auth() AuthFlow
 }
 
+// TokenAcceptor is an optional interface for providers whose primary Auth()
+// flow isn't a ManualKeyAuthFlow but still accept a manually pasted
+// credential via the `--token` flag (e.g. KimiCode advertises a device flow
+// for OAuth but also supports a stored API key). Providers that do not
+// implement this interface reject `--token` so vibeusage doesn't write a
+// credential its fetch strategies will silently ignore.
+type TokenAcceptor interface {
+	AcceptToken(token string) error
+}
+
 // ValidateNotEmpty returns an error if the string is empty or whitespace-only.
 // Use this as the Validate field in ManualKeyAuthFlow for providers that need
 // only basic non-empty checking.

@@ -485,10 +485,9 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 		return fmt.Errorf("credential cannot be empty")
 	}
 
-	auth, ok := p.(provider.Authenticator)
-	if ok {
-		flow := auth.Auth()
-		if f, isManual := flow.(provider.ManualKeyAuthFlow); isManual {
+	if auth, ok := p.(provider.Authenticator); ok {
+		switch f := auth.Auth().(type) {
+		case provider.ManualKeyAuthFlow:
 			if f.Validate != nil {
 				if err := f.Validate(token); err != nil {
 					return err
@@ -508,10 +507,27 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 				out("✓ %s credential saved\n", provider.DisplayName(providerID))
 			}
 			return nil
+		default:
+			// The provider's primary flow doesn't accept a manually pasted
+			// token (e.g. device flow, browser redirect, or a CLI-owned
+			// chain). Some such providers still expose a secondary stored
+			// credential path — they opt in via TokenAcceptor. Without that
+			// opt-in we refuse rather than write a credential fetch will
+			// silently ignore.
+			if acceptor, ok := p.(provider.TokenAcceptor); ok {
+				if err := acceptor.AcceptToken(token); err != nil {
+					return fmt.Errorf("error saving credential: %w", err)
+				}
+				if !quiet {
+					out("✓ %s credential saved\n", provider.DisplayName(providerID))
+				}
+				return nil
+			}
+			return fmt.Errorf("%s does not support --token; run `vibeusage auth %s` for the supported flow", provider.DisplayName(providerID), providerID)
 		}
 	}
 
-	// Fallback for providers without a ManualKeyAuthFlow.
+	// Provider doesn't implement Authenticator at all — generic apikey fallback.
 	credData, _ := json.Marshal(map[string]string{"api_key": token})
 	if err := config.WriteCredential(providerID, "apikey", credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)

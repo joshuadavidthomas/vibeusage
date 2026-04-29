@@ -2,6 +2,8 @@ package claude
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -511,5 +513,98 @@ func TestLoadKeychainCredentials_Error(t *testing.T) {
 	s := OAuthStrategy{}
 	if creds := s.loadKeychainCredentials(); creds != nil {
 		t.Fatalf("expected nil credentials, got %+v", creds)
+	}
+}
+
+// stubKeychainEmpty stubs readKeychainSecret to behave as if the keychain
+// has no entry. It restores the previous stub when the test ends.
+func stubKeychainEmpty(t *testing.T) {
+	t.Helper()
+	old := readKeychainSecret
+	t.Cleanup(func() { readKeychainSecret = old })
+	readKeychainSecret = func(string, string) (string, error) {
+		return "", errors.New("no entry")
+	}
+}
+
+// writeClaudeCLICreds writes a Claude CLI credentials file to ~/.claude.
+func writeClaudeCLICreds(t *testing.T, home string) {
+	t.Helper()
+	dir := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := `{"claudeAiOauth":{"accessToken":"cli-tok","refreshToken":"cli-ref","expiresAt":4102444800000}}`
+	if err := os.WriteFile(filepath.Join(dir, ".credentials.json"), []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubKeychainEmpty(t)
+
+	writeClaudeCLICreds(t, home)
+	if err := config.WriteCredential("claude", "oauth", []byte(`{"access_token":"stale"}`)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+
+	s := OAuthStrategy{}
+	creds := s.loadCredentials()
+	if creds == nil {
+		t.Fatal("loadCredentials() = nil, want canonical creds")
+	}
+	if creds.AccessToken != "cli-tok" {
+		t.Errorf("access_token = %q, want cli-tok (canonical CLI source)", creds.AccessToken)
+	}
+	if config.HasCredential("claude", "oauth") {
+		t.Error("orphan claude/oauth slot should have been deleted")
+	}
+}
+
+func TestLoadCredentials_DeletesOrphanSlotWhenKeychainPresent(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+
+	old := readKeychainSecret
+	t.Cleanup(func() { readKeychainSecret = old })
+	readKeychainSecret = func(string, string) (string, error) {
+		return `{"claudeAiOauth":{"accessToken":"kc-tok","refreshToken":"kc-ref","expiresAt":4102444800000}}`, nil
+	}
+
+	if err := config.WriteCredential("claude", "oauth", []byte(`{"access_token":"stale"}`)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+
+	s := OAuthStrategy{}
+	creds := s.loadCredentials()
+	if creds == nil {
+		t.Fatal("loadCredentials() = nil, want keychain creds")
+	}
+	if creds.AccessToken != "kc-tok" {
+		t.Errorf("access_token = %q, want kc-tok", creds.AccessToken)
+	}
+	if config.HasCredential("claude", "oauth") {
+		t.Error("orphan claude/oauth slot should have been deleted")
+	}
+}
+
+func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubKeychainEmpty(t)
+
+	if err := config.WriteCredential("claude", "oauth", []byte(`{"access_token":"stale"}`)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+
+	s := OAuthStrategy{}
+	if creds := s.loadCredentials(); creds != nil {
+		t.Errorf("loadCredentials() = %+v, want nil (no canonical source)", creds)
+	}
+	if !config.HasCredential("claude", "oauth") {
+		t.Error("orphan should not be deleted when no canonical source is found")
 	}
 }

@@ -19,12 +19,15 @@ type TokenResponse = oauth.TokenResponse
 type RefreshConfig struct {
 	ClientID     string
 	ClientSecret string
-	ProviderID   string // e.g. "gemini" or "antigravity"
-	HTTPTimeout  float64
+	// Save, if non-nil, is invoked with the refreshed credentials so the
+	// caller can persist them. See oauth.RefreshConfig.Save.
+	Save        func(*oauth.Credentials) error
+	HTTPTimeout float64
 }
 
-// RefreshToken refreshes an expired Google OAuth token and saves the updated
-// credentials to disk. Returns nil if the refresh fails.
+// RefreshToken refreshes an expired Google OAuth token. If cfg.Save is
+// non-nil, it is invoked with the new credentials. Returns nil if the
+// refresh fails.
 func RefreshToken(ctx context.Context, creds *oauth.Credentials, cfg RefreshConfig) *oauth.Credentials {
 	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
 		TokenURL: TokenURL,
@@ -32,7 +35,7 @@ func RefreshToken(ctx context.Context, creds *oauth.Credentials, cfg RefreshConf
 			"client_id":     cfg.ClientID,
 			"client_secret": cfg.ClientSecret,
 		},
-		ProviderID:  cfg.ProviderID,
+		Save:        cfg.Save,
 		HTTPTimeout: cfg.HTTPTimeout,
 	})
 }

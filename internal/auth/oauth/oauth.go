@@ -4,11 +4,10 @@ package oauth
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 )
 
 // RefreshBuffer is the duration before token expiry at which a refresh is
@@ -53,14 +52,24 @@ type RefreshConfig struct {
 	FormFields map[string]string
 	// Headers are provider-specific request options (e.g. anthropic-beta header).
 	Headers []httpclient.RequestOption
-	// ProviderID is used to determine the credential save path.
-	ProviderID string
+	// Save, if non-nil, is invoked with the refreshed credentials so the caller
+	// can persist them. Vibeusage-owned chains pass a writer here; piggy-back
+	// providers (where another tool owns the rotating chain) leave it nil so
+	// rotated tokens are not written back to vibeusage's own credential store.
+	//
+	// A Save error does not invalidate the refreshed credentials — they are
+	// still returned for use by the current request — but the failure is
+	// logged via the context's logger (see logging.FromContext) so operators
+	// can detect that rotated tokens were not durably stored. The next
+	// invocation will refresh again.
+	Save func(*Credentials) error
 	// HTTPTimeout is the request timeout in seconds.
 	HTTPTimeout float64
 }
 
-// Refresh exchanges a refresh token for a new access token and saves the
-// updated credentials to disk. Returns nil if the refresh fails for any reason.
+// Refresh exchanges a refresh token for a new access token. If cfg.Save is
+// non-nil, it is invoked with the new credentials so the caller can persist
+// them. Returns nil if the refresh fails for any reason.
 func Refresh(ctx context.Context, refreshToken string, cfg RefreshConfig) *Credentials {
 	if refreshToken == "" {
 		return nil
@@ -99,8 +108,11 @@ func Refresh(ctx context.Context, refreshToken string, cfg RefreshConfig) *Crede
 		updated.RefreshToken = refreshToken
 	}
 
-	content, _ := json.Marshal(updated)
-	_ = config.WriteCredential(cfg.ProviderID, "oauth", content)
+	if cfg.Save != nil {
+		if err := cfg.Save(updated); err != nil {
+			logging.FromContext(ctx).Warn("oauth: persisting refreshed credentials failed", "err", err)
+		}
+	}
 
 	return updated
 }

@@ -385,6 +385,61 @@ func TestAuthSetToken_RejectsEmpty(t *testing.T) {
 	}
 }
 
+func TestAuthSetToken_RejectsCustomAuthFlowProvider(t *testing.T) {
+	// Codex now uses a CustomAuthFlow that defers to the Codex CLI; --token
+	// has no usable destination and previously fell through to a generic
+	// apikey slot that fetch ignored. authSetToken must refuse instead.
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	p, _ := provider.Get("codex")
+	err := authSetToken("codex", p, "some-token")
+	if err == nil {
+		t.Fatal("expected --token to be rejected for codex (CustomAuthFlow)")
+	}
+	if config.HasCredential("codex", "apikey") {
+		t.Error("codex/apikey must not be written for a CustomAuthFlow provider")
+	}
+	if config.HasCredential("codex", "oauth") {
+		t.Error("codex/oauth must not be written by --token")
+	}
+}
+
+func TestAuthSetToken_AcceptsKimiCodeViaTokenAcceptor(t *testing.T) {
+	// KimiCode advertises a DeviceAuthFlow but also supports a stored API
+	// key via APIKeyStrategy; it implements provider.TokenAcceptor so
+	// --token routes to the apikey slot instead of being rejected.
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	t.Setenv("KIMI_CODE_API_KEY", "")
+	config.Override(t, config.DefaultConfig())
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	p, _ := provider.Get("kimicode")
+	if err := authSetToken("kimicode", p, "my-api-key"); err != nil {
+		t.Fatalf("authSetToken error: %v", err)
+	}
+	data, err := config.ReadCredential("kimicode", "apikey")
+	if err != nil || data == nil {
+		t.Fatalf("kimicode/apikey not written: data=%q err=%v", data, err)
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if payload["api_key"] != "my-api-key" {
+		t.Errorf("api_key = %q, want my-api-key", payload["api_key"])
+	}
+}
+
 // JSON output tests
 
 func TestAuthStatusJSON_UsesTypedStruct(t *testing.T) {

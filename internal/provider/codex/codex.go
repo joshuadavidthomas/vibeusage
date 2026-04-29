@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,27 +49,29 @@ func (c Codex) FetchStatus(ctx context.Context) models.ProviderStatus {
 	return provider.FetchStatuspageStatus(ctx, "https://status.openai.com")
 }
 
-// Auth returns the manual bearer token flow for Codex.
-// Codex uses OAuth tokens managed by the Codex CLI — users must authenticate
-// with the CLI first, or provide an access token obtained from the browser.
+// Auth points users at the Codex CLI for credential setup. vibeusage is a
+// read-only consumer of the Codex CLI's rotating OAuth chain; manually
+// pasted access tokens never refreshed and silently broke once expired.
 func (c Codex) Auth() provider.AuthFlow {
-	return provider.ManualKeyAuthFlow{
-		Instructions: "Codex uses OAuth tokens from the Codex CLI (recommended):\n" +
-			"  Install the CLI and run `codex login`\n" +
-			"\n" +
-			"Or provide an access token manually:\n" +
-			"  1. Open https://chatgpt.com in your browser and sign in\n" +
-			"  2. Open DevTools (F12 or Cmd+Option+I) → Network tab\n" +
-			"  3. Reload the page and click any request to chatgpt.com/backend-api/\n" +
-			"  4. In Request Headers, find the Authorization header\n" +
-			"  5. Copy the value after \"Bearer \" (starts with ey...)\n" +
-			"\n" +
-			"Note: Manually obtained tokens won't auto-refresh — run auth again when they expire.",
-		Placeholder: "ey... (OAuth access token)",
-		Validate:    provider.ValidateNotEmpty,
-		ProviderID:  "codex",
-		CredType:    "oauth",
-		JSONKey:     "access_token",
+	return provider.CustomAuthFlow{
+		RunFlow: func(w io.Writer, quiet bool) (bool, error) {
+			// We can only detect what the Codex CLI has already written. If a
+			// canonical source is present, accept it as success; otherwise
+			// instruct the user and return failure so the auth command exits
+			// non-zero (instead of silently no-oping).
+			s := &OAuthStrategy{}
+			if s.IsAvailable() {
+				if !quiet {
+					_, _ = fmt.Fprintln(w, "✓ Codex CLI credentials detected.")
+				}
+				return true, nil
+			}
+			if !quiet {
+				_, _ = fmt.Fprintln(w, "Codex uses OAuth tokens managed by the Codex CLI.")
+				_, _ = fmt.Fprintln(w, "Install the CLI and run `codex login`, then re-run this command.")
+			}
+			return false, fmt.Errorf("Codex CLI credentials not detected")
+		},
 	}
 }
 
@@ -77,10 +80,6 @@ func init() {
 }
 
 const (
-	// OAuth client ID extracted from the Codex CLI installation.
-	// Required to refresh tokens stored in ~/.codex/auth.json.
-	codexClientID      = "app_EMoamEEZ73f0CkXaXp7hrann"
-	codexTokenURL      = "https://auth.openai.com/oauth/token"
 	defaultUsageURL    = "https://chatgpt.com/backend-api/wham/usage"
 	codexKeychainLabel = "Codex Auth"
 )
@@ -92,9 +91,6 @@ type OAuthStrategy struct {
 }
 
 func (s *OAuthStrategy) IsAvailable() bool {
-	if config.HasCredential("codex", "oauth") {
-		return true
-	}
 	for _, p := range s.externalPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return true
@@ -114,24 +110,21 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	// The Codex CLI stores credentials without expires_at, so the shared
-	// NeedsRefresh() can't detect expiry. Treat a missing expires_at with
-	// a refresh token as needing refresh — the token may be stale and the
-	// only way to know is to try.
+	// NeedsRefresh() can't detect expiry. When a refresh token is present,
+	// always defer to the Codex CLI to refresh — it owns the rotating chain,
+	// and any direct refresh from here would invalidate the CLI's copy.
 	if creds.NeedsRefresh() || (creds.ExpiresAt == "" && creds.RefreshToken != "") {
-		refreshed := s.refreshToken(ctx, creds)
-		if refreshed == nil {
-			refreshed = oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
-				BinaryName: "codex",
-				Args: []string{
-					"exec", "say ok",
-					"--skip-git-repo-check",
-					"--sandbox", "read-only",
-				},
-				LoadCredentials: func() *oauth.Credentials {
-					return s.loadCredentials()
-				},
-			})
-		}
+		refreshed := oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
+			BinaryName: "codex",
+			Args: []string{
+				"exec", "say ok",
+				"--skip-git-repo-check",
+				"--sandbox", "read-only",
+			},
+			LoadCredentials: func() *oauth.Credentials {
+				return s.loadCredentials()
+			},
+		})
 		if refreshed == nil {
 			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with `codex login`."), nil
 		}
@@ -178,17 +171,10 @@ func (s *OAuthStrategy) externalPaths() []string {
 }
 
 func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	// Check vibeusage consolidated storage first
-	if data, err := config.ReadCredential("codex", "oauth"); err == nil && data != nil {
-		var cliCreds CLICredentials
-		if err := json.Unmarshal(data, &cliCreds); err == nil {
-			if creds := cliCreds.EffectiveCredentials(); creds != nil {
-				return creds
-			}
-		}
-	}
-
-	// Check external CLI paths
+	// Read only from canonical Codex CLI sources. The OAuth chain is owned
+	// by the Codex CLI; vibeusage is a piggy-back consumer and never writes
+	// new tokens. Any stale entry in vibeusage's own credentials store is
+	// cleared lazily so it can't shadow the live source.
 	for _, path := range s.externalPaths() {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -199,10 +185,28 @@ func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 			continue
 		}
 		if creds := cliCreds.EffectiveCredentials(); creds != nil {
+			cleanupOrphanOAuthSlot()
 			return creds
 		}
 	}
-	return s.loadKeychainCredentials()
+
+	if creds := s.loadKeychainCredentials(); creds != nil {
+		cleanupOrphanOAuthSlot()
+		return creds
+	}
+	return nil
+}
+
+// cleanupOrphanOAuthSlot removes any vibeusage-owned codex/oauth credential.
+// Earlier versions of vibeusage wrote rotated refresh tokens here (and accepted
+// manually pasted access tokens), both of which silently invalidated the Codex
+// CLI's own refresh token. The slot has no legitimate use now that Auth()
+// points users at `codex login`, so it is safe to drop whenever a canonical
+// CLI/keychain source is present.
+func cleanupOrphanOAuthSlot() {
+	if config.HasCredential("codex", "oauth") {
+		config.DeleteCredential("codex", "oauth")
+	}
 }
 
 func (s *OAuthStrategy) loadKeychainCredentials() *oauth.Credentials {
@@ -241,15 +245,6 @@ func codexHomeDir() string {
 		return filepath.Clean(".codex")
 	}
 	return filepath.Join(home, ".codex")
-}
-
-func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {
-	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
-		TokenURL:    codexTokenURL,
-		FormFields:  map[string]string{"client_id": codexClientID},
-		ProviderID:  "codex",
-		HTTPTimeout: s.HTTPTimeout,
-	})
 }
 
 func (s *OAuthStrategy) getUsageURL() string {
