@@ -20,8 +20,6 @@ import (
 const (
 	oauthUsageURL        = "https://api.anthropic.com/api/oauth/usage"
 	oauthAccountURL      = "https://api.anthropic.com/api/oauth/account"
-	oauthTokenURL        = "https://platform.claude.com/v1/oauth/token"
-	oauthClientID        = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 	anthropicBetaTag     = "oauth-2025-04-20"
 	claudeKeychainSecret = "Claude Code-credentials"
 
@@ -40,9 +38,6 @@ type OAuthStrategy struct {
 }
 
 func (s *OAuthStrategy) IsAvailable() bool {
-	if config.HasCredential("claude", "oauth") {
-		return true
-	}
 	for _, p := range s.externalPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return true
@@ -62,24 +57,21 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := s.refreshToken(ctx, creds)
-		if refreshed == nil {
-			refreshed = oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
-				BinaryName: "claude",
-				Args: []string{
-					"-p", "ok",
-					"--model", "haiku",
-					"--output-format", "json",
-					"--no-session-persistence",
-					"--permission-mode", "plan",
-					"--allowed-tools", "",
-					"--max-budget-usd", "0.001",
-				},
-				LoadCredentials: func() *oauth.Credentials {
-					return s.loadCredentials()
-				},
-			})
-		}
+		refreshed := oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
+			BinaryName: "claude",
+			Args: []string{
+				"-p", "ok",
+				"--model", "haiku",
+				"--output-format", "json",
+				"--no-session-persistence",
+				"--permission-mode", "plan",
+				"--allowed-tools", "",
+				"--max-budget-usd", "0.001",
+			},
+			LoadCredentials: func() *oauth.Credentials {
+				return s.loadCredentials()
+			},
+		})
 		if refreshed == nil {
 			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with the Claude CLI."), nil
 		}
@@ -192,25 +184,37 @@ func (s *OAuthStrategy) externalPaths() []string {
 }
 
 func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	// Check vibeusage consolidated storage first
-	if data, err := config.ReadCredential("claude", "oauth"); err == nil && data != nil {
-		if creds := parseClaudeCredentials(data); creds != nil {
-			return creds
-		}
-	}
-
-	// Check external CLI paths
+	// Read only from canonical Claude CLI sources. The OAuth chain is owned
+	// by the Claude CLI; vibeusage is a piggy-back consumer and never writes
+	// new tokens. Any stale entry in vibeusage's own credentials store is
+	// cleared lazily so it can't shadow the live source.
 	for _, path := range s.externalPaths() {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
 		if creds := parseClaudeCredentials(data); creds != nil {
+			cleanupOrphanOAuthSlot()
 			return creds
 		}
 	}
 
-	return s.loadKeychainCredentials()
+	if creds := s.loadKeychainCredentials(); creds != nil {
+		cleanupOrphanOAuthSlot()
+		return creds
+	}
+	return nil
+}
+
+// cleanupOrphanOAuthSlot removes any vibeusage-owned claude/oauth credential.
+// Earlier versions of vibeusage wrote rotated refresh tokens here, which
+// silently invalidated the Claude CLI's own refresh token. The vibeusage slot
+// has no legitimate use for Claude (manual auth uses claude/session), so it
+// is safe to drop whenever a canonical CLI/keychain source is present.
+func cleanupOrphanOAuthSlot() {
+	if config.HasCredential("claude", "oauth") {
+		config.DeleteCredential("claude", "oauth")
+	}
 }
 
 func parseClaudeCredentials(data []byte) *oauth.Credentials {
@@ -248,15 +252,6 @@ func (s *OAuthStrategy) loadKeychainCredentials() *oauth.Credentials {
 		return nil
 	}
 	return &creds
-}
-
-func (s *OAuthStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {
-	return oauth.Refresh(ctx, creds.RefreshToken, oauth.RefreshConfig{
-		TokenURL:    oauthTokenURL,
-		FormFields:  map[string]string{"client_id": oauthClientID},
-		ProviderID:  "claude",
-		HTTPTimeout: s.HTTPTimeout,
-	})
 }
 
 func (s *OAuthStrategy) parseOAuthUsageResponse(resp OAuthUsageResponse) *models.UsageSnapshot {

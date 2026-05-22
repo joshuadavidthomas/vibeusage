@@ -23,7 +23,26 @@ type CLIRefreshConfig struct {
 // that refreshes tokens as a side effect on startup. It polls for fresh
 // credentials every 25ms and kills the process as soon as they appear (or
 // after a 15-second timeout).
+//
+// "Fresh" means the access token differs from whatever was on disk before
+// the subprocess started. Some providers (notably Codex) store credentials
+// without an expires_at, so NeedsRefresh() alone can't tell whether the CLI
+// has actually rotated the token — checking for a change in access token
+// avoids accepting the pre-refresh creds on the first poll.
 func RefreshViaCLI(ctx context.Context, cfg CLIRefreshConfig) *Credentials {
+	initial := cfg.LoadCredentials()
+	var initialToken string
+	if initial != nil {
+		initialToken = initial.AccessToken
+	}
+
+	isFresh := func(c *Credentials) bool {
+		if c == nil || c.AccessToken == "" || c.AccessToken == initialToken {
+			return false
+		}
+		return !c.NeedsRefresh()
+	}
+
 	binPath, err := exec.LookPath(cfg.BinaryName)
 	if err != nil {
 		return nil
@@ -50,7 +69,7 @@ func RefreshViaCLI(ctx context.Context, cfg CLIRefreshConfig) *Credentials {
 	defer ticker.Stop()
 
 	for {
-		if creds := cfg.LoadCredentials(); creds != nil && !creds.NeedsRefresh() {
+		if creds := cfg.LoadCredentials(); isFresh(creds) {
 			killProcess(cmd)
 			return creds
 		}
@@ -58,14 +77,14 @@ func RefreshViaCLI(ctx context.Context, cfg CLIRefreshConfig) *Credentials {
 		select {
 		case <-done:
 			creds := cfg.LoadCredentials()
-			if creds == nil || creds.NeedsRefresh() {
+			if !isFresh(creds) {
 				return nil
 			}
 			return creds
 		case <-tctx.Done():
 			killProcess(cmd)
 			creds := cfg.LoadCredentials()
-			if creds == nil || creds.NeedsRefresh() {
+			if !isFresh(creds) {
 				return nil
 			}
 			return creds

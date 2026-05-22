@@ -1,10 +1,14 @@
 package copilot
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestParseTypedUsageResponse_FullResponse(t *testing.T) {
@@ -208,5 +212,30 @@ func TestParseTypedUsageResponse_InvalidResetDate(t *testing.T) {
 	}
 	if snapshot.Periods[0].ResetsAt != nil {
 		t.Error("expected nil resets_at for invalid date")
+	}
+}
+
+func TestSaveCopilotCredentials_PersistsToSlot(t *testing.T) {
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+
+	in := &oauth.Credentials{
+		AccessToken:  "new-access",
+		RefreshToken: "new-refresh",
+		ExpiresAt:    "2099-01-01T00:00:00Z",
+	}
+	if err := saveCopilotCredentials(in); err != nil {
+		t.Fatalf("saveCopilotCredentials: %v", err)
+	}
+
+	data, err := config.ReadCredential("copilot", "oauth")
+	if err != nil || data == nil {
+		t.Fatalf("ReadCredential after save: data=%q err=%v", data, err)
+	}
+	var got oauth.Credentials
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if got != *in {
+		t.Errorf("persisted creds = %+v, want %+v", got, *in)
 	}
 }

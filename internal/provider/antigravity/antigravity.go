@@ -112,7 +112,7 @@ func vscdbPath() string {
 }
 
 func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	creds := s.loadCredentials()
+	creds, source := s.loadCredentials()
 	if creds == nil {
 		return fetch.ResultFail("No OAuth credentials found"), nil
 	}
@@ -121,11 +121,30 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
+	// Buggy-era residue: vibeusage's slot was populated by the pre-fix
+	// refresh path (no vibeusage_owned marker) and there is no canonical
+	// IDE source to migrate to. The chain forked at the moment of that
+	// rotated-RT write, so we can't refresh and can't trust the access
+	// token long-term. Fail closed so the user re-auths cleanly.
+	if source == sourceUnmarkedSlot {
+		return fetch.ResultFatal("Stale Antigravity credentials detected. Run `vibeusage auth antigravity` to re-authenticate."), nil
+	}
+
 	if creds.NeedsRefresh() {
+		// Only refresh against Google's token endpoint when vibeusage owns the
+		// chain (i.e. the user explicitly minted credentials via `vibeusage
+		// auth antigravity`). For creds piggy-backed off the IDE's file or
+		// vscdb, the refresh request itself can rotate the refresh token
+		// server-side — invalidating the IDE's stored copy and breaking its
+		// next refresh. Fail closed and let the user re-authenticate via
+		// the IDE, which will refresh on its own terms.
+		if source != sourceSlot {
+			return fetch.ResultFail("Token expired. Sign back in via the Antigravity IDE to refresh credentials, or run `vibeusage auth antigravity` for a vibeusage-owned chain."), nil
+		}
 		refreshed := google.RefreshToken(ctx, creds, google.RefreshConfig{
 			ClientID:     antigravityClientID,
 			ClientSecret: antigravityClientSecret,
-			ProviderID:   "antigravity",
+			Save:         saveAntigravityCredentials,
 			HTTPTimeout:  s.HTTPTimeout,
 		})
 		if refreshed == nil {
@@ -150,32 +169,109 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	return fetch.ResultOK(*snapshot), nil
 }
 
-func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	// Check vibeusage consolidated storage first
-	if data, err := config.ReadCredential("antigravity", "oauth"); err == nil && data != nil {
-		if creds := parseAntigravityCredentials(data); creds != nil {
-			return creds
-		}
+// credSource identifies which storage location supplied the loaded credentials.
+// Vibeusage owns the rotating chain only when the slot was the source (i.e.
+// the user minted credentials via `vibeusage auth antigravity`); for the
+// IDE-managed file and vscdb sources, vibeusage piggy-backs and must not
+// persist rotated tokens. sourceUnmarkedSlot is a buggy-era residue that
+// can no longer be safely refreshed and is treated as a hard failure.
+type credSource int
+
+const (
+	sourceNone credSource = iota
+	sourceSlot
+	sourceFile
+	sourceVSCDB
+	sourceUnmarkedSlot
+)
+
+func (s *OAuthStrategy) loadCredentials() (*oauth.Credentials, credSource) {
+	// Read the vibeusage slot first, but distinguish legitimately-minted
+	// credentials (carrying the vibeusage_owned marker, written by
+	// RunAuthFlow / saveAntigravityCredentials) from buggy-era residue (the
+	// old refresh path persisted rotated tokens here without a marker).
+	slotCreds, slotOwned := s.loadSlotCredentials()
+	if slotOwned {
+		return slotCreds, sourceSlot
 	}
 
-	// Check external CLI paths
+	// Check external CLI paths (IDE's credentials file).
 	for _, path := range s.externalPaths() {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
 		if creds := parseAntigravityCredentials(data); creds != nil {
-			return creds
+			if slotCreds != nil {
+				config.DeleteCredential("antigravity", "oauth")
+			}
+			return creds, sourceFile
 		}
 	}
 
-	// Try reading from Antigravity's VS Code state database
+	// Try reading from Antigravity's VS Code state database.
 	if result := loadFromVSCDB(); result != nil {
 		s.vscdb = result
-		return result.creds
+		if slotCreds != nil {
+			config.DeleteCredential("antigravity", "oauth")
+		}
+		return result.creds, sourceVSCDB
 	}
 
-	return nil
+	// No canonical source. If we still have an unmarked slot, surface it
+	// as sourceUnmarkedSlot so callers can recognise buggy-era residue and
+	// force a re-auth instead of refreshing it against Google or treating
+	// it as legitimate detected credentials.
+	if slotCreds != nil {
+		return slotCreds, sourceUnmarkedSlot
+	}
+
+	return nil, sourceNone
+}
+
+// loadSlotCredentials reads vibeusage's antigravity/oauth slot and reports
+// whether it carries the vibeusage_owned marker. Unmarked slots predate the
+// owned-chain marker (or were written by the old buggy refresh path) and are
+// not safe to refresh against Google's token endpoint.
+func (s *OAuthStrategy) loadSlotCredentials() (*oauth.Credentials, bool) {
+	data, err := config.ReadCredential("antigravity", "oauth")
+	if err != nil || data == nil {
+		return nil, false
+	}
+	var sc slotCredentials
+	if err := json.Unmarshal(data, &sc); err != nil || sc.AccessToken == "" {
+		return nil, false
+	}
+	return &oauth.Credentials{
+		AccessToken:  sc.AccessToken,
+		RefreshToken: sc.RefreshToken,
+		ExpiresAt:    sc.ExpiresAt,
+	}, sc.VibeusageOwned
+}
+
+// slotCredentials is the on-disk shape for vibeusage's antigravity/oauth slot.
+// VibeusageOwned distinguishes credentials minted via `vibeusage auth
+// antigravity` (refreshable here) from stale credentials written by the
+// pre-fix refresh path (must not be refreshed here).
+type slotCredentials struct {
+	AccessToken    string `json:"access_token"`
+	RefreshToken   string `json:"refresh_token,omitempty"`
+	ExpiresAt      string `json:"expires_at,omitempty"`
+	VibeusageOwned bool   `json:"vibeusage_owned,omitempty"`
+}
+
+func saveAntigravityCredentials(c *oauth.Credentials) error {
+	sc := slotCredentials{
+		AccessToken:    c.AccessToken,
+		RefreshToken:   c.RefreshToken,
+		ExpiresAt:      c.ExpiresAt,
+		VibeusageOwned: true,
+	}
+	content, err := json.Marshal(sc)
+	if err != nil {
+		return fmt.Errorf("marshal antigravity credentials: %w", err)
+	}
+	return config.WriteCredential("antigravity", "oauth", content)
 }
 
 func parseAntigravityCredentials(data []byte) *oauth.Credentials {

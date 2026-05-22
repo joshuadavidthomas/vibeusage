@@ -18,11 +18,6 @@ import (
 )
 
 const (
-	// OAuth client credentials extracted from the Gemini CLI installation.
-	// Required to refresh tokens stored in ~/.gemini/oauth_creds.json.
-	geminiClientID     = "77185425430.apps.googleusercontent.com"
-	geminiClientSecret = "GOCSPX-1mdrl61JR9D-iFHq4QPq2mJGwZv"
-
 	quotaURL      = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota"
 	codeAssistURL = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
 )
@@ -33,9 +28,6 @@ type OAuthStrategy struct {
 }
 
 func (s *OAuthStrategy) IsAvailable() bool {
-	if config.HasCredential("gemini", "oauth") {
-		return true
-	}
 	for _, p := range s.externalPaths() {
 		if _, err := os.Stat(p); err == nil {
 			return true
@@ -60,16 +52,12 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	}
 
 	if creds.NeedsRefresh() {
-		refreshed := google.RefreshToken(ctx, creds, google.RefreshConfig{
-			ClientID:     geminiClientID,
-			ClientSecret: geminiClientSecret,
-			ProviderID:   "gemini",
-			HTTPTimeout:  s.HTTPTimeout,
-		})
-		if refreshed == nil {
-			return fetch.ResultFail("Failed to refresh token"), nil
-		}
-		creds = refreshed
+		// The Gemini CLI owns the rotating chain in ~/.gemini/oauth_creds.json,
+		// and a refresh request to Google's token endpoint may rotate the
+		// refresh token server-side — invalidating the CLI's stored copy and
+		// breaking its next refresh. Fail closed and let the user re-run the
+		// CLI, which will refresh on its own terms.
+		return fetch.ResultFail("OAuth token expired. Run the Gemini CLI (e.g. `gemini`) to refresh credentials, then retry."), nil
 	}
 
 	quotaResp, codeAssistResp, fetchErr := s.fetchQuotaData(ctx, creds.AccessToken)
@@ -89,17 +77,10 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 }
 
 func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
-	// Check vibeusage consolidated storage first
-	if data, err := config.ReadCredential("gemini", "oauth"); err == nil && data != nil {
-		var cliCreds GeminiCLICredentials
-		if err := json.Unmarshal(data, &cliCreds); err == nil {
-			if creds := cliCreds.EffectiveCredentials(); creds != nil {
-				return creds
-			}
-		}
-	}
-
-	// Check external CLI paths
+	// Read only from the canonical Gemini CLI source. The OAuth chain is
+	// owned by the Gemini CLI; vibeusage is a piggy-back consumer and never
+	// writes new tokens. Any stale entry in vibeusage's own credentials
+	// store is cleared lazily so it can't shadow the live source.
 	for _, path := range s.externalPaths() {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -110,10 +91,23 @@ func (s *OAuthStrategy) loadCredentials() *oauth.Credentials {
 			continue
 		}
 		if creds := cliCreds.EffectiveCredentials(); creds != nil {
+			cleanupOrphanOAuthSlot()
 			return creds
 		}
 	}
 	return nil
+}
+
+// cleanupOrphanOAuthSlot removes any vibeusage-owned gemini/oauth credential.
+// Gemini's vibeusage Auth() flow stores an api_key, not an OAuth grant — the
+// only way the slot gets populated is by older buggy refresh writes, which
+// silently invalidated the Gemini CLI's own refresh token. The slot has no
+// legitimate use, so it is safe to drop whenever we successfully read from
+// the canonical CLI source.
+func cleanupOrphanOAuthSlot() {
+	if config.HasCredential("gemini", "oauth") {
+		config.DeleteCredential("gemini", "oauth")
+	}
 }
 
 type fetchError struct {

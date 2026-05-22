@@ -1,9 +1,16 @@
 package antigravity
 
 import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
 func TestMeta(t *testing.T) {
@@ -291,5 +298,225 @@ func TestPeriodTypeForTier(t *testing.T) {
 				t.Errorf("periodTypeForTier(%q) = %q, want %q", tt.tier, got, tt.want)
 			}
 		})
+	}
+}
+
+// applyAntigravityTestEnv isolates os.UserConfigDir(), os.UserHomeDir() and
+// vibeusage's config dir to fresh temp dirs so external paths and the vscdb
+// lookup never resolve to real user data.
+func applyAntigravityTestEnv(t *testing.T) string {
+	t.Helper()
+	cfg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("HOME", t.TempDir())
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	return cfg
+}
+
+func writeAntigravityFileCreds(t *testing.T, configDir string) {
+	t.Helper()
+	dir := filepath.Join(configDir, "Antigravity")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := `{"access_token":"file-tok","refresh_token":"file-ref","expires_at":"2099-01-01T00:00:00Z"}`
+	if err := os.WriteFile(filepath.Join(dir, "credentials.json"), []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+// writeAntigravityOwnedSlot writes a slot credential with the
+// vibeusage_owned marker, simulating creds minted via `vibeusage auth
+// antigravity`.
+func writeAntigravityOwnedSlot(t *testing.T) {
+	t.Helper()
+	content := `{"access_token":"slot-tok","refresh_token":"slot-ref","expires_at":"2099-01-01T00:00:00Z","vibeusage_owned":true}`
+	if err := config.WriteCredential("antigravity", "oauth", []byte(content)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+}
+
+// writeAntigravityUnmarkedSlot writes a slot credential without the
+// vibeusage_owned marker, simulating buggy-era residue from the pre-fix
+// refresh path.
+func writeAntigravityUnmarkedSlot(t *testing.T) {
+	t.Helper()
+	content := `{"access_token":"slot-tok","refresh_token":"slot-ref","expires_at":"2099-01-01T00:00:00Z"}`
+	if err := config.WriteCredential("antigravity", "oauth", []byte(content)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+}
+
+func TestLoadCredentials_OwnedSlotWinsOverFile(t *testing.T) {
+	cfg := applyAntigravityTestEnv(t)
+	writeAntigravityFileCreds(t, cfg)
+	writeAntigravityOwnedSlot(t)
+
+	s := &OAuthStrategy{}
+	creds, source := s.loadCredentials()
+	if creds == nil {
+		t.Fatal("loadCredentials() returned nil creds")
+	}
+	if source != sourceSlot {
+		t.Errorf("source = %v, want sourceSlot", source)
+	}
+	if creds.AccessToken != "slot-tok" {
+		t.Errorf("access_token = %q, want slot-tok", creds.AccessToken)
+	}
+}
+
+func TestLoadCredentials_UnmarkedSlotMigrates_FilePresent(t *testing.T) {
+	cfg := applyAntigravityTestEnv(t)
+	writeAntigravityFileCreds(t, cfg)
+	writeAntigravityUnmarkedSlot(t)
+
+	s := &OAuthStrategy{}
+	creds, source := s.loadCredentials()
+	if creds == nil {
+		t.Fatal("loadCredentials() returned nil creds")
+	}
+	if source != sourceFile {
+		t.Errorf("source = %v, want sourceFile (unmarked slot is buggy-era residue)", source)
+	}
+	if creds.AccessToken != "file-tok" {
+		t.Errorf("access_token = %q, want file-tok (canonical source)", creds.AccessToken)
+	}
+	if config.HasCredential("antigravity", "oauth") {
+		t.Error("unmarked slot should be deleted when canonical source is found")
+	}
+}
+
+func TestLoadCredentials_UnmarkedSlotSurfacesAsBuggyResidue(t *testing.T) {
+	applyAntigravityTestEnv(t)
+	writeAntigravityUnmarkedSlot(t)
+
+	s := &OAuthStrategy{}
+	creds, source := s.loadCredentials()
+	if creds == nil {
+		t.Fatal("loadCredentials() returned nil creds")
+	}
+	if source != sourceUnmarkedSlot {
+		t.Errorf("source = %v, want sourceUnmarkedSlot (buggy-era residue must be distinguishable from legitimate piggyback)", source)
+	}
+	if creds.AccessToken != "slot-tok" {
+		t.Errorf("access_token = %q, want slot-tok", creds.AccessToken)
+	}
+	if !config.HasCredential("antigravity", "oauth") {
+		t.Error("unmarked slot should be preserved when there is no canonical replacement (Fetch surfaces a re-auth message instead of deleting blindly)")
+	}
+}
+
+func TestFetch_FailsClosedForUnmarkedSlot(t *testing.T) {
+	applyAntigravityTestEnv(t)
+	writeAntigravityUnmarkedSlot(t)
+
+	s := &OAuthStrategy{}
+	res, err := s.Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch error: %v", err)
+	}
+	if res.Success {
+		t.Fatal("Fetch should fail for an unmarked slot — the chain forked when the buggy refresh wrote the rotated RT")
+	}
+	if res.ShouldFallback {
+		t.Error("Fetch should be fatal (no fallback) so verification during `vibeusage auth` cannot accept stale piggyback creds")
+	}
+	if !strings.Contains(res.Error, "vibeusage auth antigravity") {
+		t.Errorf("Fetch error = %q, want guidance to re-auth", res.Error)
+	}
+}
+
+func TestLoadCredentials_FileSourceWhenNoSlot(t *testing.T) {
+	cfg := applyAntigravityTestEnv(t)
+	writeAntigravityFileCreds(t, cfg)
+
+	s := &OAuthStrategy{}
+	creds, source := s.loadCredentials()
+	if creds == nil {
+		t.Fatal("loadCredentials() returned nil creds")
+	}
+	if source != sourceFile {
+		t.Errorf("source = %v, want sourceFile", source)
+	}
+	if creds.AccessToken != "file-tok" {
+		t.Errorf("access_token = %q, want file-tok", creds.AccessToken)
+	}
+}
+
+func TestLoadCredentials_NoneWhenNothingPresent(t *testing.T) {
+	applyAntigravityTestEnv(t)
+
+	s := &OAuthStrategy{}
+	creds, source := s.loadCredentials()
+	if creds != nil {
+		t.Errorf("creds = %+v, want nil", creds)
+	}
+	if source != sourceNone {
+		t.Errorf("source = %v, want sourceNone", source)
+	}
+}
+
+func TestSaveAntigravityCredentials_RoundTripsAsOwnedSlot(t *testing.T) {
+	applyAntigravityTestEnv(t)
+
+	in := &oauth.Credentials{
+		AccessToken:  "new-access",
+		RefreshToken: "new-refresh",
+		ExpiresAt:    "2099-01-01T00:00:00Z",
+	}
+	if err := saveAntigravityCredentials(in); err != nil {
+		t.Fatalf("saveAntigravityCredentials: %v", err)
+	}
+
+	s := &OAuthStrategy{}
+	got, source := s.loadCredentials()
+	if got == nil {
+		t.Fatal("loadCredentials() = nil after save")
+	}
+	if source != sourceSlot {
+		t.Errorf("source = %v, want sourceSlot (saveAntigravityCredentials must mark as vibeusage-owned)", source)
+	}
+	if got.AccessToken != in.AccessToken {
+		t.Errorf("access_token = %q, want %q", got.AccessToken, in.AccessToken)
+	}
+	if got.RefreshToken != in.RefreshToken {
+		t.Errorf("refresh_token = %q, want %q", got.RefreshToken, in.RefreshToken)
+	}
+
+	// Verify the marker landed on disk.
+	data, err := config.ReadCredential("antigravity", "oauth")
+	if err != nil || data == nil {
+		t.Fatalf("ReadCredential after save: data=%q err=%v", data, err)
+	}
+	if !strings.Contains(string(data), `"vibeusage_owned":true`) {
+		t.Errorf("persisted slot missing vibeusage_owned marker: %s", data)
+	}
+}
+
+func TestFetch_FailsClosedForSourceFileWhenRefreshNeeded(t *testing.T) {
+	cfg := applyAntigravityTestEnv(t)
+
+	// Write a sourceFile credential with an expired access token so
+	// NeedsRefresh() triggers the refresh branch.
+	expired := "2020-01-01T00:00:00Z"
+	dir := filepath.Join(cfg, "Antigravity")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := `{"access_token":"file-tok","refresh_token":"file-ref","expires_at":"` + expired + `"}`
+	if err := os.WriteFile(filepath.Join(dir, "credentials.json"), []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	s := &OAuthStrategy{}
+	res, err := s.Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch error: %v", err)
+	}
+	if res.Success {
+		t.Fatal("Fetch should fail when sourceFile creds need refresh")
+	}
+	if !strings.Contains(res.Error, "Antigravity IDE") {
+		t.Errorf("Fetch error = %q, want guidance to use the IDE", res.Error)
 	}
 }

@@ -118,6 +118,88 @@ func TestRefreshViaCLI_RespectsContextCancellation(t *testing.T) {
 	}
 }
 
+func TestRefreshViaCLI_DoesNotShortCircuitWhenCredsHaveNoExpiry(t *testing.T) {
+	// Regression: providers like Codex store creds without expires_at, so
+	// NeedsRefresh() returns false even for stale tokens. RefreshViaCLI must
+	// not accept the pre-refresh creds on the first poll just because they
+	// look "non-expiring".
+	binDir, credPath := setupFakeCLI(t,
+		"#!/usr/bin/env sh\nsleep 0.05\nmkdir -p \"$(dirname \"$CRED_PATH\")\"\n"+
+			"cat > \"$CRED_PATH\" <<'JSON'\n"+
+			"{\"access_token\":\"refreshed\",\"refresh_token\":\"newref\"}\n"+
+			"JSON\n")
+
+	// Pre-write the existing creds file with the *old* token (no expires_at).
+	initial := `{"access_token":"stale","refresh_token":"oldref"}`
+	if err := os.WriteFile(credPath, []byte(initial), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	got := RefreshViaCLI(context.Background(), CLIRefreshConfig{
+		BinaryName:      "testcli",
+		Args:            []string{"refresh"},
+		LoadCredentials: credLoader(credPath),
+	})
+	_ = binDir
+
+	if got == nil {
+		t.Fatal("RefreshViaCLI() = nil, want refreshed creds")
+	}
+	if got.AccessToken != "refreshed" {
+		t.Errorf("access_token = %q, want %q (must wait for CLI to write new token)", got.AccessToken, "refreshed")
+	}
+}
+
+func TestRefreshViaCLI_RejectsChangedButExpiredToken(t *testing.T) {
+	// A changed access token still has to satisfy !NeedsRefresh(). If the
+	// CLI rotates to a token that's already expired, treat it as a failed
+	// refresh — we don't want the caller to immediately re-enter the
+	// refresh path.
+	binDir, credPath := setupFakeCLI(t,
+		"#!/usr/bin/env sh\nsleep 0.05\nmkdir -p \"$(dirname \"$CRED_PATH\")\"\n"+
+			"cat > \"$CRED_PATH\" <<'JSON'\n"+
+			"{\"access_token\":\"changed\",\"refresh_token\":\"r\",\"expires_at\":\"2020-01-01T00:00:00Z\"}\n"+
+			"JSON\n")
+
+	initial := `{"access_token":"stale","refresh_token":"r","expires_at":"2020-01-01T00:00:00Z"}`
+	if err := os.WriteFile(credPath, []byte(initial), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	got := RefreshViaCLI(context.Background(), CLIRefreshConfig{
+		BinaryName:      "testcli",
+		Args:            []string{"refresh"},
+		LoadCredentials: credLoader(credPath),
+	})
+	_ = binDir
+
+	if got != nil {
+		t.Errorf("RefreshViaCLI() = %+v, want nil for a token that was rotated to an already-expired value", got)
+	}
+}
+
+func TestRefreshViaCLI_ReturnsNilWhenCLIDoesNotChangeToken(t *testing.T) {
+	// If the CLI exits without rotating the token, refresh has effectively
+	// failed — we must return nil rather than the unchanged creds.
+	binDir, credPath := setupFakeCLI(t, "#!/usr/bin/env sh\nexit 0\n")
+
+	initial := `{"access_token":"unchanged","refresh_token":"ref"}`
+	if err := os.WriteFile(credPath, []byte(initial), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	got := RefreshViaCLI(context.Background(), CLIRefreshConfig{
+		BinaryName:      "testcli",
+		Args:            []string{"refresh"},
+		LoadCredentials: credLoader(credPath),
+	})
+	_ = binDir
+
+	if got != nil {
+		t.Errorf("RefreshViaCLI() = %+v, want nil when token did not change", got)
+	}
+}
+
 func TestRefreshViaCLI_PollsMultipleTimes(t *testing.T) {
 	binDir, credPath := setupFakeCLI(t,
 		"#!/usr/bin/env sh\nsleep 0.1\nmkdir -p \"$(dirname \"$CRED_PATH\")\"\n"+
