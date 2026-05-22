@@ -20,6 +20,15 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Changed
+
+- Codex authentication now defers to the Codex CLI: run `codex login` and vibeusage picks up the credentials. Manually pasted tokens are no longer accepted, and `vibeusage auth codex --token` now errors.
+- Expired OAuth credentials owned by an external tool (Gemini CLI, Antigravity IDE) now prompt re-authentication via that tool instead of being refreshed by vibeusage.
+
+### Fixed
+
+- Fixed vibeusage invalidating the refresh tokens of external CLIs and IDEs (Claude, Codex, Gemini, Antigravity) when refreshing their OAuth tokens, which could force you to re-authenticate those tools.
+
 ## [0.8.0]
 
 ### Added
