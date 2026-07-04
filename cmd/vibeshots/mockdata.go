@@ -41,8 +41,15 @@ func mockClaudeSnapshot() models.UsageSnapshot {
 				ResetsAt:    resetIn(1*time.Hour + 40*time.Minute),
 			},
 			{
-				Name:        "Weekly",
-				Utilization: 98,
+				Name:        "All Models",
+				Utilization: 56,
+				PeriodType:  models.PeriodWeekly,
+				ResetsAt:    resetIn(16*time.Hour + 40*time.Minute),
+			},
+			{
+				Name:        "Fable",
+				Model:       "claude-fable-5",
+				Utilization: 88,
 				PeriodType:  models.PeriodWeekly,
 				ResetsAt:    resetIn(16*time.Hour + 40*time.Minute),
 			},
@@ -72,8 +79,15 @@ func mockClaudeDashboardSnapshot() models.UsageSnapshot {
 				ResetsAt:    resetIn(1*time.Hour + 40*time.Minute),
 			},
 			{
-				Name:        "Weekly",
-				Utilization: 99,
+				Name:        "All Models",
+				Utilization: 56,
+				PeriodType:  models.PeriodWeekly,
+				ResetsAt:    resetIn(24 * time.Hour),
+			},
+			{
+				Name:        "Fable",
+				Model:       "claude-fable-5",
+				Utilization: 88,
 				PeriodType:  models.PeriodWeekly,
 				ResetsAt:    resetIn(24 * time.Hour),
 			},
@@ -107,16 +121,24 @@ func mockClaudeDetailSnapshot() models.UsageSnapshot {
 				ResetsAt:    resetIn(2*time.Hour + 22*time.Minute),
 			},
 			{
-				Name:        "Weekly",
-				Utilization: 93,
+				Name:        "All Models",
+				Utilization: 56,
 				PeriodType:  models.PeriodWeekly,
 				ResetsAt:    resetIn(1*24*time.Hour + 23*time.Hour),
 			},
 			{
-				Name:        "Sonnet",
-				Model:       "sonnet",
-				Utilization: 0,
+				Name:        "Fable",
+				Model:       "claude-fable-5",
+				Utilization: 88,
 				PeriodType:  models.PeriodWeekly,
+				ResetsAt:    resetIn(1*24*time.Hour + 23*time.Hour),
+			},
+			{
+				Name:        "Claude Design",
+				Model:       "omelette",
+				Utilization: 12,
+				PeriodType:  models.PeriodWeekly,
+				ResetsAt:    resetIn(1*24*time.Hour + 23*time.Hour),
 			},
 		},
 		Overage: &models.OverageUsage{
@@ -149,6 +171,13 @@ func mockCodexSnapshot() models.UsageSnapshot {
 				PeriodType:  models.PeriodWeekly,
 				ResetsAt:    resetIn(6*24*time.Hour + 19*time.Hour),
 			},
+			{
+				Name:        "Code Review",
+				Model:       "code_review",
+				Utilization: 41,
+				PeriodType:  models.PeriodDaily,
+				ResetsAt:    resetIn(6*time.Hour + 15*time.Minute),
+			},
 		},
 	}
 }
@@ -165,6 +194,13 @@ func mockCursorSnapshot() models.UsageSnapshot {
 			{
 				Name:        "Plan Usage",
 				Utilization: 72,
+				PeriodType:  models.PeriodMonthly,
+				ResetsAt:    resetIn(12*24*time.Hour + 6*time.Hour),
+			},
+			{
+				Name:        "Team On-Demand Usage",
+				Model:       "team_on_demand",
+				Utilization: 18,
 				PeriodType:  models.PeriodMonthly,
 				ResetsAt:    resetIn(12*24*time.Hour + 6*time.Hour),
 			},
