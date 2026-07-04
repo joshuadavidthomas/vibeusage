@@ -1,9 +1,14 @@
 package claude
 
 import (
+	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -527,16 +532,123 @@ func stubKeychainEmpty(t *testing.T) {
 	}
 }
 
-// writeClaudeCLICreds writes a Claude CLI credentials file to ~/.claude.
-func writeClaudeCLICreds(t *testing.T, home string) {
+func writeClaudeAuth(t *testing.T, home, content string) {
 	t.Helper()
 	dir := filepath.Join(home, ".claude")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	content := `{"claudeAiOauth":{"accessToken":"cli-tok","refreshToken":"cli-ref","expiresAt":4102444800000}}`
 	if err := os.WriteFile(filepath.Join(dir, ".credentials.json"), []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+// writeClaudeCLICreds writes a Claude CLI credentials file to ~/.claude.
+func writeClaudeCLICreds(t *testing.T, home string) {
+	t.Helper()
+	writeClaudeAuth(t, home, `{"claudeAiOauth":{"accessToken":"cli-tok","refreshToken":"cli-ref","expiresAt":4102444800000}}`)
+}
+
+func prependFakeClaude(t *testing.T, script string) {
+	t.Helper()
+	binDir := filepath.Join(t.TempDir(), "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	bin := filepath.Join(binDir, "claude")
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func setClaudeOAuthEndpoints(t *testing.T, usageURL, accountURL string) {
+	t.Helper()
+	oldUsage := oauthUsageEndpoint
+	oldAccount := oauthAccountEndpoint
+	oauthUsageEndpoint = usageURL
+	oauthAccountEndpoint = accountURL
+	t.Cleanup(func() {
+		oauthUsageEndpoint = oldUsage
+		oauthAccountEndpoint = oldAccount
+	})
+}
+
+func cacheClaudeIdentity(t *testing.T) {
+	t.Helper()
+	snap := models.UsageSnapshot{
+		Provider:  "claude",
+		FetchedAt: time.Now().UTC(),
+		Identity:  &models.ProviderIdentity{Email: "u@example.com", Plan: "Max"},
+	}
+	if err := config.CacheSnapshot(snap); err != nil {
+		t.Fatalf("CacheSnapshot: %v", err)
+	}
+}
+
+func TestFetch_UsesExpiredMetadataTokenBeforeRefreshing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubKeychainEmpty(t)
+	cacheClaudeIdentity(t)
+	writeClaudeAuth(t, home, `{"claudeAiOauth":{"accessToken":"still-valid","refreshToken":"ref","expiresAt":1}}`)
+	prependFakeClaude(t, "#!/usr/bin/env sh\nexit 42\n")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer still-valid" {
+			t.Errorf("Authorization = %q, want Bearer still-valid", got)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"five_hour":{"utilization":10}}`))
+	}))
+	defer server.Close()
+	setClaudeOAuthEndpoints(t, server.URL+"/usage", server.URL+"/account")
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+}
+
+func TestFetch_RefreshesAfterUnauthorized(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubKeychainEmpty(t)
+	cacheClaudeIdentity(t)
+	writeClaudeAuth(t, home, `{"claudeAiOauth":{"accessToken":"stale","refreshToken":"ref","expiresAt":1}}`)
+	prependFakeClaude(t, "#!/usr/bin/env sh\ncat > "+strconv.Quote(filepath.Join(home, ".claude", ".credentials.json"))+" <<'JSON'\n{\"claudeAiOauth\":{\"accessToken\":\"fresh\",\"refreshToken\":\"ref\",\"expiresAt\":4102444800000}}\nJSON\n")
+
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		switch r.Header.Get("Authorization") {
+		case "Bearer stale":
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		case "Bearer fresh":
+			_, _ = w.Write([]byte(`{"five_hour":{"utilization":10}}`))
+		default:
+			t.Errorf("unexpected Authorization header: %q", r.Header.Get("Authorization"))
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		}
+	}))
+	defer server.Close()
+	setClaudeOAuthEndpoints(t, server.URL+"/usage", server.URL+"/account")
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+	if got := requests.Load(); got != 2 {
+		t.Errorf("usage requests = %d, want 2", got)
 	}
 }
 

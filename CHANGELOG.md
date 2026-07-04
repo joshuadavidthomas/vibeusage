@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed Claude and Codex usage fetches incorrectly failing before trying still-valid OAuth access tokens when external CLI credentials had missing or stale expiry metadata.
+
 ## [0.9.0]
 
 ### Changed

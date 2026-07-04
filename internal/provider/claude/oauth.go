@@ -30,6 +30,11 @@ const (
 	accountReuseTTL = 24 * time.Hour
 )
 
+var (
+	oauthUsageEndpoint   = oauthUsageURL
+	oauthAccountEndpoint = oauthAccountURL
+)
+
 var readKeychainSecret = keychain.ReadGenericPassword
 
 // OAuthStrategy fetches Claude usage using OAuth credentials.
@@ -56,29 +61,39 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFatal("Invalid OAuth credentials: missing access_token"), nil
 	}
 
-	if creds.NeedsRefresh() {
-		refreshed := oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
-			BinaryName: "claude",
-			Args: []string{
-				"-p", "ok",
-				"--model", "haiku",
-				"--output-format", "json",
-				"--no-session-persistence",
-				"--permission-mode", "plan",
-				"--allowed-tools", "",
-				"--max-budget-usd", "0.001",
-			},
-			LoadCredentials: func() *oauth.Credentials {
-				return s.loadCredentials()
-			},
-		})
-		if refreshed == nil {
-			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with the Claude CLI."), nil
-		}
-		creds = refreshed
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
+	result, unauthorized, err := s.fetchWithCredentials(ctx, client, creds)
+	if err != nil || !unauthorized || creds.RefreshToken == "" {
+		return result, err
 	}
 
-	client := httpclient.NewFromConfig(s.HTTPTimeout)
+	refreshed := s.refreshViaCLI(ctx)
+	if refreshed == nil {
+		return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with the Claude CLI."), nil
+	}
+	result, _, err = s.fetchWithCredentials(ctx, client, refreshed)
+	return result, err
+}
+
+func (s *OAuthStrategy) refreshViaCLI(ctx context.Context) *oauth.Credentials {
+	return oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
+		BinaryName: "claude",
+		Args: []string{
+			"-p", "ok",
+			"--model", "haiku",
+			"--output-format", "json",
+			"--no-session-persistence",
+			"--permission-mode", "plan",
+			"--allowed-tools", "",
+			"--max-budget-usd", "0.001",
+		},
+		LoadCredentials: func() *oauth.Credentials {
+			return s.loadCredentials()
+		},
+	})
+}
+
+func (s *OAuthStrategy) fetchWithCredentials(ctx context.Context, client *httpclient.Client, creds *oauth.Credentials) (fetch.FetchResult, bool, error) {
 	authOpts := []httpclient.RequestOption{
 		httpclient.WithBearer(creds.AccessToken),
 		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
@@ -104,7 +119,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 	go func() {
 		var usageResp OAuthUsageResponse
-		resp, err := client.GetJSONCtx(ctx, oauthUsageURL, &usageResp, authOpts...)
+		resp, err := client.GetJSONCtx(ctx, oauthUsageEndpoint, &usageResp, authOpts...)
 		if err != nil {
 			usageCh <- usageOutcome{err: err}
 			return
@@ -117,7 +132,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	} else {
 		go func() {
 			var acctResp OAuthAccountResponse
-			resp, err := client.GetJSONCtx(ctx, oauthAccountURL, &acctResp, authOpts...)
+			resp, err := client.GetJSONCtx(ctx, oauthAccountEndpoint, &acctResp, authOpts...)
 			if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
 				accountCh <- accountOutcome{}
 				return
@@ -130,23 +145,23 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	account := <-accountCh
 
 	if usage.err != nil {
-		return fetch.ResultFail("Request failed: " + usage.err.Error()), nil
+		return fetch.ResultFail("Request failed: " + usage.err.Error()), false, nil
 	}
 	if usage.status == 401 {
-		return fetch.ResultFatal("OAuth token expired or invalid. Re-authenticate with the Claude CLI."), nil
+		return fetch.ResultFatal("OAuth token expired or invalid. Re-authenticate with the Claude CLI."), true, nil
 	}
 	if usage.status == 403 {
-		return fetch.ResultFatal("Not authorized to access usage."), nil
+		return fetch.ResultFatal("Not authorized to access usage."), false, nil
 	}
 	if usage.status == 429 {
 		retryAt := parseRetryAfter(usage.header, time.Now().UTC())
-		return fetch.ResultThrottled("Rate limited by Anthropic", retryAt), nil
+		return fetch.ResultThrottled("Rate limited by Anthropic", retryAt), false, nil
 	}
 	if usage.status != 200 {
-		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", usage.status)), nil
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", usage.status)), false, nil
 	}
 	if usage.jsonErr != nil {
-		return fetch.ResultFail(fmt.Sprintf("Invalid response from usage endpoint: %v", usage.jsonErr)), nil
+		return fetch.ResultFail(fmt.Sprintf("Invalid response from usage endpoint: %v", usage.jsonErr)), false, nil
 	}
 
 	snapshot := s.parseOAuthUsageResponse(usage.resp)
@@ -157,7 +172,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		enrichWithAccount(snapshot, account.resp)
 	}
 
-	return fetch.ResultOK(*snapshot), nil
+	return fetch.ResultOK(*snapshot), false, nil
 }
 
 // loadCachedIdentity returns the cached Claude identity if the on-disk
