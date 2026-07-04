@@ -139,6 +139,39 @@ func TestOAuthUsageResponse_UnmarshalEmptyResponse(t *testing.T) {
 	}
 }
 
+func TestOAuthUsageResponse_UnmarshalStructuredLimitsAndUnknownPeriods(t *testing.T) {
+	raw := `{
+		"five_hour": {"utilization": 1.0, "resets_at": "2026-07-02T07:40:00Z"},
+		"limits": [
+			{"group":"session","kind":"session","percent":1,"resets_at":"2026-07-02T07:40:00Z","scope":null},
+			{"group":"weekly","kind":"weekly_scoped","percent":34,"resets_at":"2026-07-02T08:00:00Z","scope":{"model":{"display_name":"Fable","id":"claude-fable-5"},"surface":null}}
+		],
+		"amber_ladder": {"utilization": 12.0, "resets_at": "2026-07-02T08:00:00Z"},
+		"member_dashboard_available": false
+	}`
+
+	var resp OAuthUsageResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+
+	if len(resp.Limits) != 2 {
+		t.Fatalf("len(limits) = %d, want 2", len(resp.Limits))
+	}
+	if resp.Limits[1].Scope == nil || resp.Limits[1].Scope.Model == nil {
+		t.Fatal("expected model-scoped limit")
+	}
+	if resp.Limits[1].Scope.Model.DisplayName != "Fable" {
+		t.Errorf("model display_name = %q, want Fable", resp.Limits[1].Scope.Model.DisplayName)
+	}
+	if resp.AdditionalPeriods["amber_ladder"].Utilization != 12.0 {
+		t.Errorf("amber_ladder utilization = %v, want 12", resp.AdditionalPeriods["amber_ladder"].Utilization)
+	}
+	if _, ok := resp.AdditionalPeriods["member_dashboard_available"]; ok {
+		t.Error("non-period field captured as AdditionalPeriods")
+	}
+}
+
 func TestOAuthUsageResponse_PeriodWithoutResetsAt(t *testing.T) {
 	raw := `{
 		"five_hour": {"utilization": 50.0}
@@ -243,11 +276,8 @@ func TestOAuthUsageResponse_UnmarshalNewPeriodFields(t *testing.T) {
 		t.Errorf("seven_day_cowork utilization = %v, want 30.0", resp.SevenDayCowork.Utilization)
 	}
 
-	if resp.IguanaNecktie == nil {
-		t.Fatal("expected iguana_necktie to be present")
-	}
-	if resp.IguanaNecktie.Utilization != 5.0 {
-		t.Errorf("iguana_necktie utilization = %v, want 5.0", resp.IguanaNecktie.Utilization)
+	if resp.AdditionalPeriods["iguana_necktie"].Utilization != 5.0 {
+		t.Errorf("additional iguana_necktie utilization = %v, want 5.0", resp.AdditionalPeriods["iguana_necktie"].Utilization)
 	}
 }
 
@@ -270,8 +300,8 @@ func TestOAuthUsageResponse_NullNewFieldsAreNil(t *testing.T) {
 	if resp.SevenDayCowork != nil {
 		t.Error("expected seven_day_cowork to be nil")
 	}
-	if resp.IguanaNecktie != nil {
-		t.Error("expected iguana_necktie to be nil")
+	if _, ok := resp.AdditionalPeriods["iguana_necktie"]; ok {
+		t.Error("expected null iguana_necktie not to be captured")
 	}
 }
 

@@ -61,6 +61,11 @@ func TestUserResponse_UnmarshalFullResponse(t *testing.T) {
 				"remaining": 0,
 				"unlimited": true,
 				"timestamp_utc": "2025-02-20T12:00:00.000Z"
+			},
+			"custom_feature": {
+				"entitlement": 20,
+				"remaining": 5,
+				"unlimited": false
 			}
 		},
 		"quota_reset_date_utc": "2025-03-01T00:00:00Z"
@@ -169,6 +174,12 @@ func TestUserResponse_UnmarshalFullResponse(t *testing.T) {
 	}
 	if !resp.QuotaSnapshots.Completions.Unlimited {
 		t.Error("expected completions unlimited to be true")
+	}
+	if resp.QuotaSnapshots.Additional["custom_feature"] == nil {
+		t.Fatal("expected custom_feature additional quota")
+	}
+	if resp.QuotaSnapshots.Additional["custom_feature"].Remaining != 5 {
+		t.Errorf("custom_feature remaining = %v, want 5", resp.QuotaSnapshots.Additional["custom_feature"].Remaining)
 	}
 }
 

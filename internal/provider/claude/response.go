@@ -28,16 +28,80 @@ type ExtraUsageResponse struct {
 // endpoint (/api/oauth/usage) and the web session endpoint
 // (/api/organizations/{orgID}/usage).
 type OAuthUsageResponse struct {
-	FiveHour            *UsagePeriodResponse `json:"five_hour,omitempty"`
-	SevenDay            *UsagePeriodResponse `json:"seven_day,omitempty"`
-	SevenDaySonnet      *UsagePeriodResponse `json:"seven_day_sonnet,omitempty"`
-	SevenDayOpus        *UsagePeriodResponse `json:"seven_day_opus,omitempty"`
-	SevenDayOAuthApps   *UsagePeriodResponse `json:"seven_day_oauth_apps,omitempty"`
-	SevenDayCowork      *UsagePeriodResponse `json:"seven_day_cowork,omitempty"`
-	SevenDayOmelette    *UsagePeriodResponse `json:"seven_day_omelette,omitempty"`
-	OmelettePromotional *UsagePeriodResponse `json:"omelette_promotional,omitempty"`
-	IguanaNecktie       *UsagePeriodResponse `json:"iguana_necktie,omitempty"`
-	ExtraUsage          *ExtraUsageResponse  `json:"extra_usage,omitempty"`
+	FiveHour            *UsagePeriodResponse           `json:"five_hour,omitempty"`
+	SevenDay            *UsagePeriodResponse           `json:"seven_day,omitempty"`
+	SevenDaySonnet      *UsagePeriodResponse           `json:"seven_day_sonnet,omitempty"`
+	SevenDayOpus        *UsagePeriodResponse           `json:"seven_day_opus,omitempty"`
+	SevenDayOAuthApps   *UsagePeriodResponse           `json:"seven_day_oauth_apps,omitempty"`
+	SevenDayCowork      *UsagePeriodResponse           `json:"seven_day_cowork,omitempty"`
+	SevenDayOmelette    *UsagePeriodResponse           `json:"seven_day_omelette,omitempty"`
+	OmelettePromotional *UsagePeriodResponse           `json:"omelette_promotional,omitempty"`
+	ExtraUsage          *ExtraUsageResponse            `json:"extra_usage,omitempty"`
+	Limits              []OAuthLimitResponse           `json:"limits,omitempty"`
+	AdditionalPeriods   map[string]UsagePeriodResponse `json:"-"`
+}
+
+// OAuthLimitResponse represents the structured limits[] entries Anthropic
+// started returning alongside the legacy top-level usage buckets.
+type OAuthLimitResponse struct {
+	Group    string           `json:"group,omitempty"`
+	Kind     string           `json:"kind,omitempty"`
+	Percent  float64          `json:"percent"`
+	ResetsAt string           `json:"resets_at,omitempty"`
+	Scope    *OAuthLimitScope `json:"scope,omitempty"`
+}
+
+type OAuthLimitScope struct {
+	Model   *OAuthLimitScopeItem `json:"model,omitempty"`
+	Surface *OAuthLimitScopeItem `json:"surface,omitempty"`
+}
+
+type OAuthLimitScopeItem struct {
+	DisplayName string `json:"display_name,omitempty"`
+	ID          string `json:"id,omitempty"`
+}
+
+func (r *OAuthUsageResponse) UnmarshalJSON(data []byte) error {
+	type knownResponse OAuthUsageResponse
+	var known knownResponse
+	if err := json.Unmarshal(data, &known); err != nil {
+		return err
+	}
+	*r = OAuthUsageResponse(known)
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	knownKeys := map[string]bool{
+		"five_hour": true, "seven_day": true, "seven_day_sonnet": true,
+		"seven_day_opus": true, "seven_day_oauth_apps": true,
+		"seven_day_cowork": true, "seven_day_omelette": true,
+		"omelette_promotional": true,
+		"extra_usage":          true, "limits": true,
+	}
+	for key, msg := range raw {
+		if knownKeys[key] || string(msg) == "null" {
+			continue
+		}
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal(msg, &fields); err != nil {
+			continue
+		}
+		if _, ok := fields["utilization"]; !ok {
+			continue
+		}
+		var period UsagePeriodResponse
+		if err := json.Unmarshal(msg, &period); err != nil {
+			continue
+		}
+		if r.AdditionalPeriods == nil {
+			r.AdditionalPeriods = make(map[string]UsagePeriodResponse)
+		}
+		r.AdditionalPeriods[key] = period
+	}
+	return nil
 }
 
 // ClaudeCLIOAuth represents the nested OAuth data inside Claude CLI credentials.

@@ -274,6 +274,21 @@ func TestParseUsageSnapshot_AllRequestLimitFields(t *testing.T) {
 	if snapshot.Periods[0].PeriodType != models.PeriodMonthly {
 		t.Errorf("period type = %v, want monthly", snapshot.Periods[0].PeriodType)
 	}
+	if len(snapshot.Periods) != 3 {
+		t.Fatalf("period count = %d, want 3", len(snapshot.Periods))
+	}
+	if snapshot.Periods[1].Name != "Voice Requests" {
+		t.Errorf("period[1].name = %q, want Voice Requests", snapshot.Periods[1].Name)
+	}
+	if snapshot.Periods[1].Used == nil || *snapshot.Periods[1].Used != 0 {
+		t.Errorf("voice request used = %v, want 0", snapshot.Periods[1].Used)
+	}
+	if snapshot.Periods[1].Limit == nil || *snapshot.Periods[1].Limit != 10000 {
+		t.Errorf("voice request limit = %v, want 10000", snapshot.Periods[1].Limit)
+	}
+	if snapshot.Periods[2].Name != "Voice Tokens" {
+		t.Errorf("period[2].name = %q, want Voice Tokens", snapshot.Periods[2].Name)
+	}
 }
 
 func TestFetchUsage_AuthFailure(t *testing.T) {
