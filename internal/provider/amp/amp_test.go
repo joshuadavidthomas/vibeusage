@@ -61,6 +61,24 @@ func TestParseDisplayBalance_MultilineWithIdentity(t *testing.T) {
 	}
 }
 
+func TestParseDisplayBalance_MultipleQuotas(t *testing.T) {
+	result := balanceResult{DisplayText: "Free quota: $6.00 / $10.00 daily. Team quota: $25 / $50 daily."}
+
+	snapshot, err := parseDisplayBalance(result, "provider_cli")
+	if err != nil {
+		t.Fatalf("parseDisplayBalance() error = %v", err)
+	}
+	if len(snapshot.Periods) != 2 {
+		t.Fatalf("period count = %d, want 2", len(snapshot.Periods))
+	}
+	if snapshot.Periods[0].Name != "Free quota" || snapshot.Periods[0].Utilization != 40 {
+		t.Errorf("period[0] = %#v, want Free quota at 40%%", snapshot.Periods[0])
+	}
+	if snapshot.Periods[1].Name != "Team quota" || snapshot.Periods[1].Utilization != 50 {
+		t.Errorf("period[1] = %#v, want Team quota at 50%%", snapshot.Periods[1])
+	}
+}
+
 func TestParseDisplayBalance_CreditsOnly(t *testing.T) {
 	result := balanceResult{DisplayText: "Credits: $12.34"}
 

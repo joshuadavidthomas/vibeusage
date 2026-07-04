@@ -85,6 +85,46 @@ func TestParseTypedUsageResponse_FullResponse(t *testing.T) {
 	}
 }
 
+func TestParseTypedUsageResponse_AdditionalQuotaSnapshotWithQuotaID(t *testing.T) {
+	resp := UserResponse{
+		QuotaResetDateUTC: "2025-03-01T00:00:00Z",
+		QuotaSnapshots: &QuotaSnapshots{
+			Additional: map[string]*Quota{
+				"some_key": {QuotaID: "custom_feature", Entitlement: 100, Remaining: 25},
+			},
+		},
+	}
+
+	snapshot := (&DeviceFlowStrategy{}).parseTypedUsageResponse(resp)
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
+	if len(snapshot.Periods) != 1 {
+		t.Fatalf("len(periods) = %d, want 1", len(snapshot.Periods))
+	}
+	period := snapshot.Periods[0]
+	if period.Name != "Monthly (Custom Feature)" {
+		t.Errorf("period name = %q, want Monthly (Custom Feature)", period.Name)
+	}
+	if period.Utilization != 75 {
+		t.Errorf("period utilization = %d, want 75", period.Utilization)
+	}
+}
+
+func TestParseTypedUsageResponse_SuppressesUnidentifiedAdditionalQuotaSnapshot(t *testing.T) {
+	resp := UserResponse{
+		QuotaSnapshots: &QuotaSnapshots{
+			Additional: map[string]*Quota{
+				"custom_feature": {Entitlement: 100, Remaining: 25},
+			},
+		},
+	}
+
+	if snapshot := (&DeviceFlowStrategy{}).parseTypedUsageResponse(resp); snapshot != nil {
+		t.Fatalf("expected nil snapshot for unidentified additional quota, got %#v", snapshot)
+	}
+}
+
 func TestParseTypedUsageResponse_NoQuotas(t *testing.T) {
 	resp := UserResponse{
 		CopilotPlan: "free",

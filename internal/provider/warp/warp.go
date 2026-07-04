@@ -272,6 +272,7 @@ func parseUsageSnapshot(resp GraphQLResponse) (*models.UsageSnapshot, error) {
 	}
 
 	periods := []models.UsagePeriod{primary}
+	periods = appendVoicePeriods(periods, info, periodType)
 
 	// Combine user-level and workspace-level bonus grants
 	bonus := combineBonusGrants(userUnion.User)
@@ -306,6 +307,37 @@ func parseUsageSnapshot(resp GraphQLResponse) (*models.UsageSnapshot, error) {
 		},
 		Source: "api_key",
 	}, nil
+}
+
+func appendVoicePeriods(periods []models.UsagePeriod, info *RequestLimitInfo, periodType models.PeriodType) []models.UsagePeriod {
+	if info.IsUnlimitedVoice {
+		return periods
+	}
+	if info.VoiceRequestLimit > 0 {
+		used := info.VoiceRequestsUsedSinceLastRefresh
+		limit := info.VoiceRequestLimit
+		periods = append(periods, models.UsagePeriod{
+			Name:        "Voice Requests",
+			Utilization: models.ClampPct((used * 100) / limit),
+			PeriodType:  periodType,
+			ResetsAt:    models.ParseRFC3339Ptr(info.NextRefreshTime),
+			Used:        &used,
+			Limit:       &limit,
+		})
+	}
+	if info.VoiceTokenLimit > 0 {
+		used := info.VoiceTokensUsedSinceLastRefresh
+		limit := info.VoiceTokenLimit
+		periods = append(periods, models.UsagePeriod{
+			Name:        "Voice Tokens",
+			Utilization: models.ClampPct((used * 100) / limit),
+			PeriodType:  periodType,
+			ResetsAt:    models.ParseRFC3339Ptr(info.NextRefreshTime),
+			Used:        &used,
+			Limit:       &limit,
+		})
+	}
+	return periods
 }
 
 type bonusSummary struct {

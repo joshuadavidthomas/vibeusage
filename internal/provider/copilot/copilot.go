@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/device"
@@ -220,6 +222,24 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 				})
 			}
 		}
+
+		keys := make([]string, 0, len(resp.QuotaSnapshots.Additional))
+		for key := range resp.QuotaSnapshots.Additional {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			quota := resp.QuotaSnapshots.Additional[key]
+			if quota == nil || !quota.HasUsage() || quota.QuotaID == "" {
+				continue
+			}
+			periods = append(periods, models.UsagePeriod{
+				Name:        "Monthly (" + humanizeQuotaKey(quota.QuotaID) + ")",
+				Utilization: quota.Utilization(),
+				PeriodType:  models.PeriodMonthly,
+				ResetsAt:    resetsAt,
+			})
+		}
 	}
 
 	if len(periods) == 0 {
@@ -239,4 +259,15 @@ func (s *DeviceFlowStrategy) parseTypedUsageResponse(resp UserResponse) *models.
 		Identity:  identity,
 		Source:    "device_flow",
 	}
+}
+
+func humanizeQuotaKey(key string) string {
+	parts := strings.Fields(strings.ReplaceAll(key, "_", " "))
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(part[:1]) + part[1:]
+	}
+	return strings.Join(parts, " ")
 }

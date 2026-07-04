@@ -86,6 +86,32 @@ func TestParseTypedResponse_FullResponse(t *testing.T) {
 	}
 }
 
+func TestParseTypedResponse_TeamOnDemandUsage(t *testing.T) {
+	usage := UsageSummaryResponse{
+		BillingCycleEnd: "2026-03-14T21:47:25.853Z",
+		TeamUsage: &TeamUsage{OnDemand: &OnDemandUsage{
+			Enabled: boolPtr(true),
+			Used:    3000,
+			Limit:   float64Ptr(50000),
+		}},
+	}
+
+	snapshot := (&WebStrategy{}).parseTypedResponse(usage, nil)
+	if snapshot == nil {
+		t.Fatal("expected non-nil snapshot")
+	}
+	if len(snapshot.Periods) != 1 {
+		t.Fatalf("len(periods) = %d, want 1", len(snapshot.Periods))
+	}
+	period := snapshot.Periods[0]
+	if period.Name != "Team On-Demand" {
+		t.Errorf("period name = %q, want Team On-Demand", period.Name)
+	}
+	if period.Utilization != 6 {
+		t.Errorf("period utilization = %d, want 6", period.Utilization)
+	}
+}
+
 func TestParseTypedResponse_NoPlanUsage(t *testing.T) {
 	usage := UsageSummaryResponse{}
 

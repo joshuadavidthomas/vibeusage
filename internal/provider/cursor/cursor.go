@@ -178,6 +178,12 @@ func (s *WebStrategy) parseTypedResponse(usageResp UsageSummaryResponse, userRes
 		}
 	}
 
+	if usageResp.TeamUsage != nil && usageResp.TeamUsage.OnDemand != nil {
+		if p := onDemandPeriod("Team On-Demand", usageResp.TeamUsage.OnDemand, resetsAt); p != nil {
+			periods = append(periods, *p)
+		}
+	}
+
 	// Identity: prefer membershipType from usage-summary, email from user/me response
 	membershipType := usageResp.MembershipType
 	var identity *models.ProviderIdentity
@@ -204,5 +210,22 @@ func (s *WebStrategy) parseTypedResponse(usageResp UsageSummaryResponse, userRes
 		Overage:   overage,
 		Identity:  identity,
 		Source:    "web",
+	}
+}
+
+func onDemandPeriod(name string, od *OnDemandUsage, resetsAt *time.Time) *models.UsagePeriod {
+	if od == nil || od.Limit == nil || *od.Limit <= 0 {
+		return nil
+	}
+	enabled := od.Enabled == nil || *od.Enabled
+	if !enabled {
+		return nil
+	}
+	utilization := int((od.Used / *od.Limit) * 100)
+	return &models.UsagePeriod{
+		Name:        name,
+		Utilization: models.ClampPct(utilization),
+		PeriodType:  models.PeriodMonthly,
+		ResetsAt:    resetsAt,
 	}
 }

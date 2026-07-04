@@ -1,5 +1,7 @@
 package copilot
 
+import "encoding/json"
+
 // UserResponse represents the response from the Copilot user API endpoint.
 type UserResponse struct {
 	Login                 string          `json:"login,omitempty"`
@@ -30,9 +32,43 @@ type Endpoints struct {
 
 // QuotaSnapshots contains quota information for different interaction types.
 type QuotaSnapshots struct {
-	PremiumInteractions *Quota `json:"premium_interactions,omitempty"`
-	Chat                *Quota `json:"chat,omitempty"`
-	Completions         *Quota `json:"completions,omitempty"`
+	PremiumInteractions *Quota            `json:"premium_interactions,omitempty"`
+	Chat                *Quota            `json:"chat,omitempty"`
+	Completions         *Quota            `json:"completions,omitempty"`
+	Additional          map[string]*Quota `json:"-"`
+}
+
+func (q *QuotaSnapshots) UnmarshalJSON(data []byte) error {
+	type knownQuotaSnapshots QuotaSnapshots
+	var known knownQuotaSnapshots
+	if err := json.Unmarshal(data, &known); err != nil {
+		return err
+	}
+	*q = QuotaSnapshots(known)
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	knownKeys := map[string]bool{
+		"premium_interactions": true,
+		"chat":                 true,
+		"completions":          true,
+	}
+	for key, msg := range raw {
+		if knownKeys[key] || string(msg) == "null" {
+			continue
+		}
+		var quota Quota
+		if err := json.Unmarshal(msg, &quota); err != nil {
+			continue
+		}
+		if q.Additional == nil {
+			q.Additional = make(map[string]*Quota)
+		}
+		q.Additional[key] = &quota
+	}
+	return nil
 }
 
 // Quota represents a single quota type with entitlement, remaining, and unlimited status.

@@ -94,8 +94,11 @@ func parseDisplayBalance(result balanceResult, source string) (*models.UsageSnap
 
 	periods := make([]models.UsagePeriod, 0, 1)
 
-	quotaMatch := quotaPattern.FindStringSubmatch(text)
-	if len(quotaMatch) == 4 {
+	quotaMatches := quotaPattern.FindAllStringSubmatch(text, -1)
+	for _, quotaMatch := range quotaMatches {
+		if len(quotaMatch) != 4 {
+			continue
+		}
 		remaining, err := strconv.ParseFloat(quotaMatch[2], 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse remaining quota: %w", err)

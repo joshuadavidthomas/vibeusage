@@ -152,6 +152,65 @@ func TestParseOAuthUsageResponse_FullResponse(t *testing.T) {
 	}
 }
 
+func TestParseOAuthUsageResponse_StructuredLimitsDisplayFable(t *testing.T) {
+	resp := OAuthUsageResponse{
+		FiveHour: &UsagePeriodResponse{Utilization: 1.0},
+		SevenDay: &UsagePeriodResponse{Utilization: 20.0},
+		Limits: []OAuthLimitResponse{
+			{Group: "session", Kind: "session", Percent: 1},
+			{Group: "weekly", Kind: "weekly_all", Percent: 20},
+			{
+				Group:   "weekly",
+				Kind:    "weekly_scoped",
+				Percent: 34,
+				Scope: &OAuthLimitScope{Model: &OAuthLimitScopeItem{
+					DisplayName: "Fable",
+					ID:          "claude-fable-5",
+				}},
+			},
+		},
+	}
+
+	snapshot := (&OAuthStrategy{}).parseOAuthUsageResponse(resp)
+	periodByName := make(map[string]models.UsagePeriod)
+	for _, p := range snapshot.Periods {
+		periodByName[p.Name] = p
+	}
+
+	if len(snapshot.Periods) != 3 {
+		t.Fatalf("len(periods) = %d, want 3", len(snapshot.Periods))
+	}
+	fable, ok := periodByName["Fable"]
+	if !ok {
+		t.Fatal("missing Fable period")
+	}
+	if fable.Utilization != 34 {
+		t.Errorf("Fable utilization = %d, want 34", fable.Utilization)
+	}
+	if fable.Model != "claude-fable-5" {
+		t.Errorf("Fable model = %q, want claude-fable-5", fable.Model)
+	}
+}
+
+func TestParseOAuthUsageResponse_SuppressesOpaqueTopLevelCodenames(t *testing.T) {
+	resp := OAuthUsageResponse{
+		FiveHour: &UsagePeriodResponse{Utilization: 1.0},
+		AdditionalPeriods: map[string]UsagePeriodResponse{
+			"amber_ladder": {Utilization: 12.0},
+		},
+	}
+
+	snapshot := (&OAuthStrategy{}).parseOAuthUsageResponse(resp)
+	for _, p := range snapshot.Periods {
+		if p.Name == "Amber Ladder" {
+			t.Fatal("opaque codename should not be displayed as a user-facing usage period")
+		}
+	}
+	if len(snapshot.Periods) != 1 {
+		t.Fatalf("len(periods) = %d, want only known five_hour period", len(snapshot.Periods))
+	}
+}
+
 func TestParseOAuthUsageResponse_MinimalResponse(t *testing.T) {
 	resp := OAuthUsageResponse{
 		FiveHour: &UsagePeriodResponse{
@@ -272,7 +331,6 @@ func TestParseOAuthUsageResponse_NewPeriodFields(t *testing.T) {
 		SevenDay:          &UsagePeriodResponse{Utilization: 2.0},
 		SevenDayOAuthApps: &UsagePeriodResponse{Utilization: 15.0},
 		SevenDayCowork:    &UsagePeriodResponse{Utilization: 30.0},
-		IguanaNecktie:     &UsagePeriodResponse{Utilization: 5.0},
 	}
 
 	s := OAuthStrategy{}
@@ -303,17 +361,6 @@ func TestParseOAuthUsageResponse_NewPeriodFields(t *testing.T) {
 	}
 	if cowork.Model != "cowork" {
 		t.Errorf("Cowork model = %q, want %q", cowork.Model, "cowork")
-	}
-
-	iguana, ok := periodByName["Iguana Necktie"]
-	if !ok {
-		t.Fatal("missing Iguana Necktie period")
-	}
-	if iguana.Utilization != 5 {
-		t.Errorf("Iguana Necktie utilization = %d, want 5", iguana.Utilization)
-	}
-	if iguana.Model != "iguana_necktie" {
-		t.Errorf("Iguana Necktie model = %q, want %q", iguana.Model, "iguana_necktie")
 	}
 }
 
