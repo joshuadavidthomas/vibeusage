@@ -2,11 +2,16 @@ package codex
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -261,16 +266,45 @@ func stubCodexKeychainEmpty(t *testing.T) {
 	}
 }
 
-func writeCodexCLICreds(t *testing.T, home string) {
+func writeCodexAuth(t *testing.T, home, content string) {
 	t.Helper()
 	dir := filepath.Join(home, ".codex")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	content := `{"tokens":{"access_token":"cli-tok","refresh_token":"cli-ref"}}`
 	if err := os.WriteFile(filepath.Join(dir, "auth.json"), []byte(content), 0o600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
+}
+
+func writeCodexCLICreds(t *testing.T, home string) {
+	t.Helper()
+	writeCodexAuth(t, home, `{"tokens":{"access_token":"cli-tok","refresh_token":"cli-ref"}}`)
+}
+
+func writeCodexConfig(t *testing.T, home, usageURL string) {
+	t.Helper()
+	dir := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	content := "usage_url = " + strconv.Quote(usageURL) + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(content), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+}
+
+func prependFakeCodex(t *testing.T, script string) {
+	t.Helper()
+	binDir := filepath.Join(t.TempDir(), "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	bin := filepath.Join(binDir, "codex")
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
 func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T) {
@@ -314,6 +348,101 @@ func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
 	}
 	if !config.HasCredential("codex", "oauth") {
 		t.Error("orphan should not be deleted when no canonical source is found")
+	}
+}
+
+func TestFetch_UsesNoExpiryTokenBeforeRefreshing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+	writeCodexAuth(t, home, `{"tokens":{"access_token":"still-valid","refresh_token":"ref"}}`)
+	prependFakeCodex(t, "#!/usr/bin/env sh\nexit 0\n")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer still-valid" {
+			t.Errorf("Authorization = %q, want Bearer still-valid", got)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"plan_type":"pro","rate_limit":{"primary_window":{"used_percent":10}}}`))
+	}))
+	defer server.Close()
+	writeCodexConfig(t, home, server.URL)
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+}
+
+func TestFetch_UsesExpiredMetadataTokenBeforeRefreshing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+	writeCodexAuth(t, home, `{"tokens":{"access_token":"still-valid","refresh_token":"ref","expires_at":"2020-01-01T00:00:00Z"}}`)
+	prependFakeCodex(t, "#!/usr/bin/env sh\nexit 42\n")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer still-valid" {
+			t.Errorf("Authorization = %q, want Bearer still-valid", got)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"plan_type":"pro","rate_limit":{"primary_window":{"used_percent":10}}}`))
+	}))
+	defer server.Close()
+	writeCodexConfig(t, home, server.URL)
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+}
+
+func TestFetch_RefreshesNoExpiryTokenAfterUnauthorized(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+	writeCodexAuth(t, home, `{"tokens":{"access_token":"stale","refresh_token":"ref"}}`)
+	prependFakeCodex(t, "#!/usr/bin/env sh\ncat > \"$HOME/.codex/auth.json\" <<'JSON'\n{\"tokens\":{\"access_token\":\"fresh\",\"refresh_token\":\"ref\"}}\nJSON\n")
+
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		switch r.Header.Get("Authorization") {
+		case "Bearer stale":
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		case "Bearer fresh":
+			_, _ = w.Write([]byte(`{"plan_type":"pro","rate_limit":{"primary_window":{"used_percent":10}}}`))
+		default:
+			t.Errorf("unexpected Authorization header: %q", r.Header.Get("Authorization"))
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		}
+	}))
+	defer server.Close()
+	writeCodexConfig(t, home, server.URL)
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+	if got := requests.Load(); got != 2 {
+		t.Errorf("usage requests = %d, want 2", got)
 	}
 }
 

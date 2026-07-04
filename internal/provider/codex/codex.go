@@ -109,60 +109,62 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		return fetch.ResultFail("Invalid credentials: missing access_token"), nil
 	}
 
-	// The Codex CLI stores credentials without expires_at, so the shared
-	// NeedsRefresh() can't detect expiry. When a refresh token is present,
-	// always defer to the Codex CLI to refresh — it owns the rotating chain,
-	// and any direct refresh from here would invalidate the CLI's copy.
-	if creds.NeedsRefresh() || (creds.ExpiresAt == "" && creds.RefreshToken != "") {
-		refreshed := oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
-			BinaryName: "codex",
-			Args: []string{
-				"exec", "say ok",
-				"--skip-git-repo-check",
-				"--sandbox", "read-only",
-			},
-			LoadCredentials: func() *oauth.Credentials {
-				return s.loadCredentials()
-			},
-		})
-		if refreshed == nil {
-			return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with `codex login`."), nil
-		}
-		creds = refreshed
-	}
-
 	usageURL := s.getUsageURL()
 	client := httpclient.NewFromConfig(s.HTTPTimeout)
 
-	return s.fetchUsage(ctx, client, usageURL, creds)
+	result, unauthorized, err := s.fetchUsage(ctx, client, usageURL, creds)
+	if err != nil || !unauthorized || creds.RefreshToken == "" {
+		return result, err
+	}
+
+	refreshed := s.refreshViaCLI(ctx)
+	if refreshed == nil {
+		return fetch.ResultFatal("OAuth token expired and could not be refreshed. Re-authenticate with `codex login`."), nil
+	}
+	result, _, err = s.fetchUsage(ctx, client, usageURL, refreshed)
+	return result, err
 }
 
-func (s *OAuthStrategy) fetchUsage(ctx context.Context, client *httpclient.Client, usageURL string, creds *oauth.Credentials) (fetch.FetchResult, error) {
+func (s *OAuthStrategy) refreshViaCLI(ctx context.Context) *oauth.Credentials {
+	return oauth.RefreshViaCLI(ctx, oauth.CLIRefreshConfig{
+		BinaryName: "codex",
+		Args: []string{
+			"exec", "say ok",
+			"--skip-git-repo-check",
+			"--sandbox", "read-only",
+		},
+		LoadCredentials: func() *oauth.Credentials {
+			return s.loadCredentials()
+		},
+	})
+}
+
+func (s *OAuthStrategy) fetchUsage(ctx context.Context, client *httpclient.Client, usageURL string, creds *oauth.Credentials) (fetch.FetchResult, bool, error) {
 	var usageResp UsageResponse
 	resp, err := client.GetJSONCtx(ctx, usageURL, &usageResp, httpclient.WithBearer(creds.AccessToken))
 	if err != nil {
-		return fetch.ResultFail("Request failed: " + err.Error()), nil
+		return fetch.ResultFail("Request failed: " + err.Error()), false, nil
 	}
 
 	if resp.StatusCode == 401 {
-		return fetch.ResultFatal("OAuth token expired or invalid. Re-authenticate with `codex login`."), nil
+		return fetch.ResultFatal("OAuth token expired or invalid. Re-authenticate with `codex login`."), true, nil
 	}
 	if resp.StatusCode == 403 {
-		return fetch.ResultFail("Not authorized. Account may not have ChatGPT Plus/Pro subscription."), nil
+		return fetch.ResultFail("Not authorized. Account may not have ChatGPT Plus/Pro subscription."), false, nil
 	}
 	if resp.StatusCode != 200 {
-		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), nil
+		return fetch.ResultFail(fmt.Sprintf("Usage request failed: %d", resp.StatusCode)), false, nil
 	}
 	if resp.JSONErr != nil {
-		return fetch.ResultFail(fmt.Sprintf("Invalid response from usage endpoint: %v", resp.JSONErr)), nil
+		return fetch.ResultFail(fmt.Sprintf("Invalid response from usage endpoint: %v", resp.JSONErr)), false, nil
 	}
 
 	snapshot := s.parseTypedUsageResponse(usageResp)
 	if snapshot == nil {
-		return fetch.ResultFail("Failed to parse usage response"), nil
+		return fetch.ResultFail("Failed to parse usage response"), false, nil
 	}
 
-	return fetch.ResultOK(*snapshot), nil
+	return fetch.ResultOK(*snapshot), false, nil
 }
 
 func (s *OAuthStrategy) externalPaths() []string {
