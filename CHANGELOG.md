@@ -20,6 +20,8 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+## [0.10.0]
+
 ### Fixed
 
 - Fixed Claude and Codex usage fetches incorrectly failing before trying still-valid OAuth access tokens when external CLI credentials had missing or stale expiry metadata.
@@ -208,7 +210,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Josh Thomas <josh@joshthomas.dev> (maintainer)
 
-[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.9.0...HEAD
+[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.10.0...HEAD
 [0.1.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.0
 [0.1.1]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.1
 [0.2.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.2.0
@@ -219,3 +221,4 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 [0.7.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.7.0
 [0.8.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.8.0
 [0.9.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.9.0
+[0.10.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.10.0
