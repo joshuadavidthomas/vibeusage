@@ -295,6 +295,63 @@ func TestSnapshotToJSON_Periods(t *testing.T) {
 	}
 }
 
+func TestSnapshotToJSON_WithResetCredits(t *testing.T) {
+	expires := time.Date(2026, time.July, 17, 0, 0, 0, 0, time.UTC)
+	lastReset := time.Date(2026, time.July, 21, 16, 47, 15, 0, time.UTC)
+	outcome := fetch.FetchOutcome{
+		ProviderID: "codex",
+		Success:    true,
+		Snapshot: &models.UsageSnapshot{
+			Provider: "codex",
+			UsageLimitResets: &models.UsageLimitResets{
+				AvailableCount: 2,
+				Resets: []models.UsageLimitReset{{
+					Title:     "Full reset",
+					ExpiresAt: &expires,
+				}},
+				Activity: &models.UsageLimitResetActivity{
+					LastResetAt:         lastReset,
+					AverageIntervalDays: 8.8,
+					Source:              "https://codex-resets.com",
+				},
+			},
+		},
+	}
+
+	data := marshalSnapshotToJSON(t, outcome)
+	resets, ok := data["usage_limit_resets"].(map[string]any)
+	if !ok {
+		t.Fatal("expected usage_limit_resets to be set")
+	}
+	if resets["available_count"] != float64(2) {
+		t.Errorf("usage_limit_resets.available_count = %v, want 2", resets["available_count"])
+	}
+	details, ok := resets["resets"].([]any)
+	if !ok || len(details) != 1 {
+		t.Fatalf("usage_limit_resets.resets = %v, want one reset", resets["resets"])
+	}
+	reset := details[0].(map[string]any)
+	if reset["title"] != "Full reset" {
+		t.Errorf("reset.title = %q, want Full reset", reset["title"])
+	}
+	if _, ok := reset["expires_at"]; !ok {
+		t.Error("reset should include expires_at")
+	}
+	activity, ok := resets["activity"].(map[string]any)
+	if !ok {
+		t.Fatal("expected usage_limit_resets.activity to be set")
+	}
+	if activity["average_interval_days"] != 8.8 {
+		t.Errorf("activity.average_interval_days = %v, want 8.8", activity["average_interval_days"])
+	}
+	if activity["source"] != "https://codex-resets.com" {
+		t.Errorf("activity.source = %q, want codex-resets.com", activity["source"])
+	}
+	if _, ok := activity["last_reset_at"]; !ok {
+		t.Error("activity should include last_reset_at")
+	}
+}
+
 func TestSnapshotToJSON_WithOverage(t *testing.T) {
 	outcome := fetch.FetchOutcome{
 		ProviderID: "claude",

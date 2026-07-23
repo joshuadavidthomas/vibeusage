@@ -33,8 +33,9 @@ func TestParseUsageResponse_FullResponse(t *testing.T) {
 				ResetAt:     1740100000,
 			},
 		},
-		Credits:  &Credits{HasCredits: true, RawBalance: json.RawMessage(`50.0`)},
-		PlanType: "plus",
+		Credits:               &Credits{HasCredits: true, RawBalance: json.RawMessage(`50.0`)},
+		RateLimitResetCredits: &RateLimitResetCreditsSummary{AvailableCount: 2},
+		PlanType:              "plus",
 	}
 
 	s := OAuthStrategy{}
@@ -91,6 +92,13 @@ func TestParseUsageResponse_FullResponse(t *testing.T) {
 	}
 	if !snapshot.Overage.IsEnabled {
 		t.Error("expected overage to be enabled")
+	}
+
+	if snapshot.UsageLimitResets == nil {
+		t.Fatal("expected usage limit resets")
+	}
+	if snapshot.UsageLimitResets.AvailableCount != 2 {
+		t.Errorf("available usage limit resets = %d, want 2", snapshot.UsageLimitResets.AvailableCount)
 	}
 
 	if snapshot.Identity == nil {
@@ -377,6 +385,215 @@ func TestFetch_UsesNoExpiryTokenBeforeRefreshing(t *testing.T) {
 	}
 	if !result.Success {
 		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+}
+
+func TestFetch_IncludesResetActivityWhenNoCreditsAreAvailable(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+	writeCodexAuth(t, home, `{"tokens":{"access_token":"tok"}}`)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/usage":
+			_, _ = w.Write([]byte(`{
+				"rate_limit":{"primary_window":{"used_percent":10}},
+				"rate_limit_reset_credits":{"available_count":0}
+			}`))
+		case "/rate-limit-reset-credits":
+			_, _ = w.Write([]byte(`{"available_count":0,"credits":[]}`))
+		case "/api/resets":
+			_, _ = w.Write([]byte(`{"stats":{"last_reset_at":"2026-07-21T16:47:15Z","avg_interval_days":8.8}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	oldResetActivityURL := resetActivityURL
+	resetActivityURL = server.URL + "/api/resets"
+	t.Cleanup(func() { resetActivityURL = oldResetActivityURL })
+	writeCodexConfig(t, home, server.URL+"/usage")
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+	if result.Snapshot.UsageLimitResets == nil {
+		t.Fatal("expected usage limit reset summary")
+	}
+	if result.Snapshot.UsageLimitResets.AvailableCount != 0 {
+		t.Errorf("available count = %d, want 0", result.Snapshot.UsageLimitResets.AvailableCount)
+	}
+	if result.Snapshot.UsageLimitResets.Activity == nil {
+		t.Fatal("expected reset activity with no available credits")
+	}
+}
+
+func TestFetch_IncludesAvailableResetCreditDetails(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+	writeCodexAuth(t, home, `{"tokens":{"access_token":"tok","refresh_token":"ref"}}`)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("method = %s, want GET", r.Method)
+		}
+		if got := r.Header.Get("Authorization"); r.URL.Path == "/api/resets" {
+			if got != "" {
+				t.Errorf("public reset tracker Authorization = %q, want empty", got)
+			}
+		} else if got != "Bearer tok" {
+			t.Errorf("Authorization = %q, want Bearer tok", got)
+		}
+		switch r.URL.Path {
+		case "/backend-api/wham/usage":
+			_, _ = w.Write([]byte(`{
+				"account_id":"account-123",
+				"rate_limit":{"primary_window":{"used_percent":10}}
+			}`))
+		case "/backend-api/wham/rate-limit-reset-credits":
+			if got := r.Header.Get("ChatGPT-Account-Id"); got != "account-123" {
+				t.Errorf("ChatGPT-Account-Id = %q, want account-123", got)
+			}
+			_, _ = w.Write([]byte(`{
+				"available_count":2,
+				"credits":[
+					{"id":"later","reset_type":"codex_rate_limits","status":"available","granted_at":"2026-06-18T00:00:00Z","expires_at":null},
+					{"id":"redeemed","reset_type":"codex_rate_limits","status":"redeemed","granted_at":"2026-06-01T00:00:00Z","expires_at":"2026-06-10T00:00:00Z"},
+					{"id":"sooner","reset_type":"codex_rate_limits","status":"available","granted_at":"2026-06-17T00:00:00Z","expires_at":"2026-07-17T00:00:00Z","title":"Full reset (Weekly + 5 hr)","description":"Ready to redeem"}
+				]
+			}`))
+		case "/api/resets":
+			_, _ = w.Write([]byte(`{
+				"stats":{
+					"last_reset_at":"2026-07-21T16:47:15.000Z",
+					"avg_interval_days":8.8
+				}
+			}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	oldResetActivityURL := resetActivityURL
+	resetActivityURL = server.URL + "/api/resets"
+	t.Cleanup(func() { resetActivityURL = oldResetActivityURL })
+	writeCodexConfig(t, home, server.URL+"/backend-api/wham/usage")
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+	if result.Snapshot.UsageLimitResets == nil {
+		t.Fatal("expected usage limit resets")
+	}
+	resets := result.Snapshot.UsageLimitResets
+	if resets.AvailableCount != 2 {
+		t.Errorf("available usage limit resets = %d, want 2", resets.AvailableCount)
+	}
+	if len(resets.Resets) != 2 {
+		t.Fatalf("usage limit reset details = %d, want 2", len(resets.Resets))
+	}
+	if resets.Resets[0].Title != "Full reset (Weekly + 5 hr)" {
+		t.Errorf("first title = %q, want expiring reset first", resets.Resets[0].Title)
+	}
+	if resets.Resets[0].ExpiresAt == nil || resets.Resets[0].ExpiresAt.Format(time.RFC3339) != "2026-07-17T00:00:00Z" {
+		t.Errorf("first expiry = %v, want 2026-07-17T00:00:00Z", resets.Resets[0].ExpiresAt)
+	}
+	if resets.Resets[1].Title != "Full reset" {
+		t.Errorf("second title = %q, want fallback title", resets.Resets[1].Title)
+	}
+	if resets.Resets[1].ExpiresAt != nil {
+		t.Errorf("second expiry = %v, want nil", resets.Resets[1].ExpiresAt)
+	}
+	if resets.Activity == nil {
+		t.Fatal("expected public reset activity")
+	}
+	if got := resets.Activity.LastResetAt.Format(time.RFC3339); got != "2026-07-21T16:47:15Z" {
+		t.Errorf("last public reset = %s, want 2026-07-21T16:47:15Z", got)
+	}
+	if resets.Activity.AverageIntervalDays != 8.8 {
+		t.Errorf("average interval = %v, want 8.8", resets.Activity.AverageIntervalDays)
+	}
+	if resets.Activity.Source != resetActivitySource {
+		t.Errorf("activity source = %q, want %q", resets.Activity.Source, resetActivitySource)
+	}
+}
+
+func TestUsageLimitResetsFromDetails_PreservesSummaryAndSortsExpirations(t *testing.T) {
+	later := "2026-08-12T00:00:00Z"
+	sooner := "2026-07-31T00:00:00Z"
+	details := &RateLimitResetCreditsResponse{
+		Credits: []RateLimitResetCredit{
+			{Status: "available", ExpiresAt: &later},
+			{Status: "redeemed", ExpiresAt: &sooner},
+			{Status: "available", ExpiresAt: &sooner},
+		},
+	}
+
+	resets := usageLimitResetsFromDetails(2, details)
+	if resets.AvailableCount != 2 {
+		t.Errorf("available count = %d, want summary count 2", resets.AvailableCount)
+	}
+	if len(resets.Resets) != 2 {
+		t.Fatalf("reset details = %d, want 2 available resets", len(resets.Resets))
+	}
+	if got := resets.Resets[0].ExpiresAt.Format(time.RFC3339); got != sooner {
+		t.Errorf("first expiry = %s, want %s", got, sooner)
+	}
+	if got := resets.Resets[1].ExpiresAt.Format(time.RFC3339); got != later {
+		t.Errorf("second expiry = %s, want %s", got, later)
+	}
+}
+
+func TestFetch_ResetCreditDetailFailureKeepsSummaryCount(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	stubCodexKeychainEmpty(t)
+	writeCodexAuth(t, home, `{"tokens":{"access_token":"tok"}}`)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/usage" {
+			_, _ = w.Write([]byte(`{"rate_limit":{"primary_window":{"used_percent":10}},"rate_limit_reset_credits":{"available_count":2}}`))
+			return
+		}
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	oldResetActivityURL := resetActivityURL
+	resetActivityURL = server.URL + "/api/resets"
+	t.Cleanup(func() { resetActivityURL = oldResetActivityURL })
+	writeCodexConfig(t, home, server.URL+"/usage")
+
+	result, err := (&OAuthStrategy{HTTPTimeout: 2}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch() err = %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("Fetch() success = false, error = %q", result.Error)
+	}
+	if result.Snapshot.UsageLimitResets == nil || result.Snapshot.UsageLimitResets.AvailableCount != 2 {
+		t.Fatalf("usage limit resets = %+v, want summary count 2", result.Snapshot.UsageLimitResets)
+	}
+	if len(result.Snapshot.UsageLimitResets.Resets) != 0 {
+		t.Errorf("details length = %d, want 0 after detail failure", len(result.Snapshot.UsageLimitResets.Resets))
+	}
+	if result.Snapshot.UsageLimitResets.Activity != nil {
+		t.Errorf("activity = %+v, want nil after activity failure", result.Snapshot.UsageLimitResets.Activity)
 	}
 }
 

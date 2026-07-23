@@ -89,6 +89,28 @@ type BillingDetail struct {
 	AutoReload *bool    `json:"auto_reload,omitempty"` // nil = unknown
 }
 
+// UsageLimitReset is one available reset for the provider's usage limits.
+type UsageLimitReset struct {
+	Title     string     `json:"title"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+// UsageLimitResetActivity summarizes public announcements of provider-wide
+// usage-limit resets.
+type UsageLimitResetActivity struct {
+	LastResetAt         time.Time `json:"last_reset_at"`
+	AverageIntervalDays float64   `json:"average_interval_days"`
+	Source              string    `json:"source"`
+}
+
+// UsageLimitResets reports the available reset count, expiration details, and
+// optional public reset activity.
+type UsageLimitResets struct {
+	AvailableCount int                      `json:"available_count"`
+	Resets         []UsageLimitReset        `json:"resets,omitempty"`
+	Activity       *UsageLimitResetActivity `json:"activity,omitempty"`
+}
+
 type OverageUsage struct {
 	Used      float64    `json:"used"`
 	Limit     float64    `json:"limit"`
@@ -170,14 +192,15 @@ func (s ProviderStatus) DisplayDescription() string {
 }
 
 type UsageSnapshot struct {
-	Provider  string            `json:"provider"`
-	FetchedAt time.Time         `json:"fetched_at"`
-	Periods   []UsagePeriod     `json:"periods"`
-	Overage   *OverageUsage     `json:"overage,omitempty"`
-	Billing   *BillingDetail    `json:"billing,omitempty"`
-	Identity  *ProviderIdentity `json:"identity,omitempty"`
-	Status    *ProviderStatus   `json:"status,omitempty"`
-	Source    string            `json:"source,omitempty"`
+	Provider         string            `json:"provider"`
+	FetchedAt        time.Time         `json:"fetched_at"`
+	Periods          []UsagePeriod     `json:"periods"`
+	Overage          *OverageUsage     `json:"overage,omitempty"`
+	Billing          *BillingDetail    `json:"billing,omitempty"`
+	UsageLimitResets *UsageLimitResets `json:"usage_limit_resets,omitempty"`
+	Identity         *ProviderIdentity `json:"identity,omitempty"`
+	Status           *ProviderStatus   `json:"status,omitempty"`
+	Source           string            `json:"source,omitempty"`
 }
 
 func (s UsageSnapshot) PrimaryPeriod() *UsagePeriod {

@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Added
+
+- Added available Codex usage-limit resets to the dashboard, detail view, and JSON output, with expiry timing and public reset activity from codex-resets.com.
+
 ## [0.10.0]
 
 ### Fixed

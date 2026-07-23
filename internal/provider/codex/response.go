@@ -10,16 +10,47 @@ import (
 // UsageResponse represents the response from the Codex/ChatGPT usage endpoint.
 // The API uses alternate key names: "rate_limit" vs "rate_limits".
 type UsageResponse struct {
-	UserID               string                `json:"user_id,omitempty"`
-	AccountID            string                `json:"account_id,omitempty"`
-	Email                string                `json:"email,omitempty"`
-	PlanType             string                `json:"plan_type,omitempty"`
-	RateLimit            *RateLimits           `json:"rate_limit,omitempty"`
-	RateLimits           *RateLimits           `json:"rate_limits,omitempty"`
-	CodeReviewRateLimit  *RateLimits           `json:"code_review_rate_limit,omitempty"`
-	AdditionalRateLimits []AdditionalRateLimit `json:"additional_rate_limits,omitempty"`
-	Credits              *Credits              `json:"credits,omitempty"`
-	Promo                json.RawMessage       `json:"promo,omitempty"`
+	UserID                string                        `json:"user_id,omitempty"`
+	AccountID             string                        `json:"account_id,omitempty"`
+	Email                 string                        `json:"email,omitempty"`
+	PlanType              string                        `json:"plan_type,omitempty"`
+	RateLimit             *RateLimits                   `json:"rate_limit,omitempty"`
+	RateLimits            *RateLimits                   `json:"rate_limits,omitempty"`
+	CodeReviewRateLimit   *RateLimits                   `json:"code_review_rate_limit,omitempty"`
+	AdditionalRateLimits  []AdditionalRateLimit         `json:"additional_rate_limits,omitempty"`
+	Credits               *Credits                      `json:"credits,omitempty"`
+	RateLimitResetCredits *RateLimitResetCreditsSummary `json:"rate_limit_reset_credits,omitempty"`
+	Promo                 json.RawMessage               `json:"promo,omitempty"`
+}
+
+// RateLimitResetCreditsSummary is the reset-credit count embedded in the
+// standard usage response.
+type RateLimitResetCreditsSummary struct {
+	AvailableCount int `json:"available_count"`
+}
+
+// RateLimitResetCreditsResponse is returned by the reset-credit detail endpoint.
+type RateLimitResetCreditsResponse struct {
+	Credits        []RateLimitResetCredit `json:"credits"`
+	AvailableCount *int                   `json:"available_count"`
+}
+
+// RateLimitResetCredit contains the fields used to report one reset credit.
+type RateLimitResetCredit struct {
+	Status    string  `json:"status"`
+	ExpiresAt *string `json:"expires_at"`
+	Title     *string `json:"title"`
+}
+
+// ResetActivityResponse is the public reset-announcement summary returned by
+// codex-resets.com.
+type ResetActivityResponse struct {
+	Stats ResetActivityStats `json:"stats"`
+}
+
+type ResetActivityStats struct {
+	LastResetAt         string  `json:"last_reset_at"`
+	AverageIntervalDays float64 `json:"avg_interval_days"`
 }
 
 // AdditionalRateLimit represents a named, model-specific rate limit entry.

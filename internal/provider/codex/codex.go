@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -80,11 +81,16 @@ func init() {
 }
 
 const (
-	defaultUsageURL    = "https://chatgpt.com/backend-api/wham/usage"
-	codexKeychainLabel = "Codex Auth"
+	defaultUsageURL      = "https://chatgpt.com/backend-api/wham/usage"
+	resetActivitySource  = "https://codex-resets.com"
+	resetActivityTimeout = 1500 * time.Millisecond
+	codexKeychainLabel   = "Codex Auth"
 )
 
-var readKeychainSecret = keychain.ReadGenericPassword
+var (
+	readKeychainSecret = keychain.ReadGenericPassword
+	resetActivityURL   = resetActivitySource + "/api/resets"
+)
 
 type OAuthStrategy struct {
 	HTTPTimeout float64
@@ -164,7 +170,61 @@ func (s *OAuthStrategy) fetchUsage(ctx context.Context, client *httpclient.Clien
 		return fetch.ResultFail("Failed to parse usage response"), false, nil
 	}
 
+	availableCount := 0
+	if snapshot.UsageLimitResets != nil {
+		availableCount = snapshot.UsageLimitResets.AvailableCount
+	}
+	if details := s.fetchResetCreditDetails(ctx, client, usageURL, creds, usageResp.AccountID); details != nil {
+		snapshot.UsageLimitResets = usageLimitResetsFromDetails(availableCount, details)
+	}
+	if resets := snapshot.UsageLimitResets; resets != nil {
+		resets.Activity = s.fetchResetActivity(ctx, client)
+	}
+
 	return fetch.ResultOK(*snapshot), false, nil
+}
+
+func (s *OAuthStrategy) fetchResetCreditDetails(ctx context.Context, client *httpclient.Client, usageURL string, creds *oauth.Credentials, accountID string) *RateLimitResetCreditsResponse {
+	if !strings.HasSuffix(usageURL, "/usage") {
+		return nil
+	}
+
+	resetCreditsURL := strings.TrimSuffix(usageURL, "/usage") + "/rate-limit-reset-credits"
+	opts := []httpclient.RequestOption{httpclient.WithBearer(creds.AccessToken)}
+	if accountID != "" {
+		opts = append(opts, httpclient.WithHeader("ChatGPT-Account-Id", accountID))
+	}
+
+	var details RateLimitResetCreditsResponse
+	resp, err := client.GetJSONCtx(ctx, resetCreditsURL, &details, opts...)
+	if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
+		return nil
+	}
+	if details.AvailableCount == nil && details.Credits == nil {
+		return nil
+	}
+	return &details
+}
+
+func (s *OAuthStrategy) fetchResetActivity(ctx context.Context, client *httpclient.Client) *models.UsageLimitResetActivity {
+	activityCtx, cancel := context.WithTimeout(ctx, resetActivityTimeout)
+	defer cancel()
+
+	var activityResp ResetActivityResponse
+	resp, err := client.GetJSONCtx(activityCtx, resetActivityURL, &activityResp)
+	if err != nil || resp.StatusCode != 200 || resp.JSONErr != nil {
+		return nil
+	}
+
+	lastResetAt, err := time.Parse(time.RFC3339, activityResp.Stats.LastResetAt)
+	if err != nil {
+		return nil
+	}
+	return &models.UsageLimitResetActivity{
+		LastResetAt:         lastResetAt,
+		AverageIntervalDays: activityResp.Stats.AverageIntervalDays,
+		Source:              resetActivitySource,
+	}
 }
 
 func (s *OAuthStrategy) externalPaths() []string {
@@ -312,6 +372,11 @@ func (s *OAuthStrategy) parseTypedUsageResponse(resp UsageResponse) *models.Usag
 		}
 	}
 
+	var usageLimitResets *models.UsageLimitResets
+	if resp.RateLimitResetCredits != nil {
+		usageLimitResets = &models.UsageLimitResets{AvailableCount: max(0, resp.RateLimitResetCredits.AvailableCount)}
+	}
+
 	var identity *models.ProviderIdentity
 	if resp.PlanType != "" {
 		identity = &models.ProviderIdentity{Plan: resp.PlanType}
@@ -319,13 +384,64 @@ func (s *OAuthStrategy) parseTypedUsageResponse(resp UsageResponse) *models.Usag
 
 	now := time.Now().UTC()
 	return &models.UsageSnapshot{
-		Provider:  "codex",
-		FetchedAt: now,
-		Periods:   periods,
-		Overage:   overage,
-		Identity:  identity,
-		Source:    "oauth",
+		Provider:         "codex",
+		FetchedAt:        now,
+		Periods:          periods,
+		Overage:          overage,
+		UsageLimitResets: usageLimitResets,
+		Identity:         identity,
+		Source:           "oauth",
 	}
+}
+
+func usageLimitResetsFromDetails(summaryCount int, details *RateLimitResetCreditsResponse) *models.UsageLimitResets {
+	availableCount := max(0, summaryCount)
+	if details.AvailableCount != nil {
+		availableCount = max(0, *details.AvailableCount)
+	}
+	resets := make([]models.UsageLimitReset, 0, min(availableCount, len(details.Credits)))
+
+	for _, detail := range details.Credits {
+		if !strings.EqualFold(detail.Status, "available") {
+			continue
+		}
+
+		title := "Full reset"
+		if detail.Title != nil && strings.TrimSpace(*detail.Title) != "" {
+			title = strings.TrimSpace(*detail.Title)
+		}
+
+		reset := models.UsageLimitReset{Title: title}
+		if detail.ExpiresAt != nil {
+			reset.ExpiresAt = parseResetCreditTime(*detail.ExpiresAt)
+		}
+		resets = append(resets, reset)
+	}
+
+	sort.SliceStable(resets, func(i, j int) bool {
+		left, right := resets[i].ExpiresAt, resets[j].ExpiresAt
+		switch {
+		case left == nil:
+			return false
+		case right == nil:
+			return true
+		default:
+			return left.Before(*right)
+		}
+	})
+	if len(resets) > availableCount {
+		resets = resets[:availableCount]
+	}
+
+	return &models.UsageLimitResets{AvailableCount: availableCount, Resets: resets}
+}
+
+func parseResetCreditTime(value string) *time.Time {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil
+	}
+	return &parsed
 }
 
 // rateLimitPeriods extracts UsagePeriod entries from a RateLimits struct.

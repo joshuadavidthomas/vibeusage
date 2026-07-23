@@ -155,6 +155,214 @@ func formatBalance(billing *models.BillingDetail) string {
 	return fmt.Sprintf("Balance: $%.2f", bal)
 }
 
+func formatResetCount(resets *models.UsageLimitResets) string {
+	if resets == nil {
+		return ""
+	}
+	if resets.AvailableCount == 1 {
+		return "1 reset"
+	}
+	return fmt.Sprintf("%d resets", resets.AvailableCount)
+}
+
+func renderResetsPanel(resets *models.UsageLimitResets) string {
+	if resets == nil {
+		return ""
+	}
+
+	const minTableWidth = 30
+
+	type resetRow struct {
+		title  string
+		expiry string
+		color  string
+	}
+
+	now := time.Now()
+	dayWidth := max(resetExpiryDayWidth(resets.Resets, now), resetActivityDayWidth(resets.Activity, now))
+	leftWidth := lipgloss.Width("Type")
+	timeWidth := lipgloss.Width("Expires")
+	resetRows := make([]resetRow, 0, len(resets.Resets))
+	for _, reset := range resets.Resets {
+		expiry := formatResetExpiry(reset.ExpiresAt, now, dayWidth)
+		resetRows = append(resetRows, resetRow{
+			title:  reset.Title,
+			expiry: expiry,
+			color:  resetExpiryColor(reset.ExpiresAt, now),
+		})
+		leftWidth = max(leftWidth, lipgloss.Width(reset.Title))
+		timeWidth = max(timeWidth, lipgloss.Width(expiry))
+	}
+
+	activitySource, activityRows := resetActivityRows(resets.Activity, now, dayWidth)
+	suffixWidth := 0
+	for _, row := range activityRows {
+		leftWidth = max(leftWidth, lipgloss.Width(row[0]))
+		timeWidth = max(timeWidth, lipgloss.Width(row[1]))
+		suffixWidth = max(suffixWidth, lipgloss.Width(row[2]))
+	}
+
+	panelWidth := max(minTableWidth, leftWidth+timeWidth+3)
+	if suffixWidth > 0 {
+		panelWidth = max(panelWidth, leftWidth+timeWidth+suffixWidth+4)
+	}
+	if activitySource != "" {
+		panelWidth = max(panelWidth, lipgloss.Width("The Button ")+lipgloss.Width(activitySource))
+	}
+
+	separatorCount := 1
+	if suffixWidth > 0 {
+		separatorCount++
+	}
+	leftColWidth := panelWidth - timeWidth - suffixWidth - separatorCount
+	var sections []string
+	if len(resetRows) > 0 {
+		headerStyle := dimStyle.Bold(true)
+		rows := [][]string{{headerStyle.Render("Type"), headerStyle.Render("Expires")}}
+		for _, row := range resetRows {
+			rows = append(rows, []string{row.title, colorStyle(row.color).Render(row.expiry)})
+		}
+		if suffixWidth > 0 {
+			for i := range rows {
+				rows[i] = append(rows[i], "")
+			}
+		}
+
+		resetTable := table.New().
+			Border(lipgloss.HiddenBorder()).
+			StyleFunc(resetGridStyle(leftColWidth, timeWidth, suffixWidth, lipgloss.NewStyle())).
+			Rows(rows...)
+		sections = append(sections, cleanPeriodTableOutput(resetTable.Render()))
+	}
+
+	if len(activityRows) > 0 {
+		activityStyle := dimStyle
+		heading := activityStyle.Bold(true).Render("The Button")
+		if activitySource != "" {
+			heading += " " + activityStyle.Render(activitySource)
+		}
+		activityLines := []string{heading}
+
+		activityTable := table.New().
+			Border(lipgloss.HiddenBorder()).
+			StyleFunc(resetGridStyle(leftColWidth, timeWidth, suffixWidth, activityStyle)).
+			Rows(activityRows...)
+		activityLines = append(activityLines, cleanPeriodTableOutput(activityTable.Render()))
+		sections = append(sections, strings.Join(activityLines, "\n"))
+	}
+
+	available := fmt.Sprintf("%d available", resets.AvailableCount)
+	return renderTitledPanel(titleStyle.Render("Resets"), available, strings.Join(sections, "\n\n"), panelWidth)
+}
+
+func resetGridStyle(leftWidth int, timeWidth int, suffixWidth int, style lipgloss.Style) func(int, int) lipgloss.Style {
+	return func(_ int, col int) lipgloss.Style {
+		switch col {
+		case 0:
+			return style.Width(leftWidth)
+		case 1:
+			return style.Width(timeWidth).Align(lipgloss.Right)
+		default:
+			return style.Width(suffixWidth)
+		}
+	}
+}
+
+func resetActivityRows(activity *models.UsageLimitResetActivity, now time.Time, dayWidth int) (string, [][]string) {
+	if activity == nil {
+		return "", nil
+	}
+
+	source := strings.TrimSuffix(strings.TrimPrefix(activity.Source, "https://"), "/")
+	age, suffix := formatResetActivityAge(activity.LastResetAt, now, dayWidth)
+	rows := [][]string{{"Last pressed", age, suffix}}
+	if activity.AverageIntervalDays > 0 {
+		rows = append(rows, []string{"Average interval", formatResetActivityInterval(activity.AverageIntervalDays, dayWidth), ""})
+	}
+	return source, rows
+}
+
+func resetActivityDayWidth(activity *models.UsageLimitResetActivity, now time.Time) int {
+	if activity == nil {
+		return 1
+	}
+
+	width := 1
+	if age := now.Sub(activity.LastResetAt); age > 0 {
+		width = max(width, durationDayWidth(age))
+	}
+	if activity.AverageIntervalDays > 0 {
+		interval := time.Duration(activity.AverageIntervalDays * 24 * float64(time.Hour))
+		width = max(width, durationDayWidth(interval))
+	}
+	return width
+}
+
+func formatResetActivityAge(lastResetAt time.Time, now time.Time, dayWidth int) (string, string) {
+	age := now.Sub(lastResetAt)
+	if age <= 0 {
+		return "just now", ""
+	}
+	return formatDaysHours(age, dayWidth), "ago"
+}
+
+func formatResetActivityInterval(days float64, dayWidth int) string {
+	interval := time.Duration(days * 24 * float64(time.Hour))
+	return formatDaysHours(interval, dayWidth)
+}
+
+func durationDayWidth(d time.Duration) int {
+	days := int(d/time.Hour) / 24
+	return len(fmt.Sprintf("%d", days))
+}
+
+func formatDaysHours(d time.Duration, dayWidth int) string {
+	totalHours := int(d / time.Hour)
+	days := totalHours / 24
+	hours := totalHours % 24
+	hourText := fmt.Sprintf("%dh", hours)
+	if totalHours == 0 {
+		hourText = "<1h"
+	}
+	return fmt.Sprintf("%*dd %3s", dayWidth, days, hourText)
+}
+
+func resetExpiryDayWidth(resets []models.UsageLimitReset, now time.Time) int {
+	width := 1
+	for _, reset := range resets {
+		if reset.ExpiresAt == nil || !reset.ExpiresAt.After(now) {
+			continue
+		}
+		width = max(width, durationDayWidth(reset.ExpiresAt.Sub(now)))
+	}
+	return width
+}
+
+func formatResetExpiry(expiresAt *time.Time, now time.Time, dayWidth int) string {
+	if expiresAt == nil {
+		return "Never"
+	}
+	remaining := expiresAt.Sub(now)
+	if remaining <= 0 {
+		return "now"
+	}
+	return formatDaysHours(remaining, dayWidth)
+}
+
+func resetExpiryColor(expiresAt *time.Time, now time.Time) string {
+	if expiresAt == nil {
+		return "green"
+	}
+	remaining := expiresAt.Sub(now)
+	if remaining <= 7*24*time.Hour {
+		return "red"
+	}
+	if remaining <= 30*24*time.Hour {
+		return "yellow"
+	}
+	return "green"
+}
+
 // formatBillingDetail renders a compact sub-line with supplemental billing
 // info (reset date, prepaid balance, auto-reload). Returns empty string when
 // no billing details are available.
@@ -238,6 +446,11 @@ func RenderSingleProvider(snapshot models.UsageSnapshot, cached bool, opts Detai
 	// Usage panel
 	out.WriteByte('\n')
 	out.WriteString(renderUsagePanel(snapshot))
+
+	if resetsPanel := renderResetsPanel(snapshot.UsageLimitResets); resetsPanel != "" {
+		out.WriteString("\n\n")
+		out.WriteString(resetsPanel)
+	}
 
 	return out.String()
 }
@@ -366,7 +579,7 @@ func renderUsagePanel(snapshot models.UsageSnapshot) string {
 		b.WriteString(bal)
 	}
 
-	return renderTitledPanel(titleStyle.Render("Usage"), b.String(), 0)
+	return renderTitledPanel(titleStyle.Render("Usage"), "", b.String(), 0)
 }
 
 // PeriodColWidths holds pre-computed column widths used to ensure consistent
@@ -624,10 +837,14 @@ func RenderProviderPanel(snapshot models.UsageSnapshot, cached bool, cw PeriodCo
 	if cached {
 		title += dimStyle.Render(" (" + formatAge(time.Since(snapshot.FetchedAt)) + " ago)")
 	}
-	return renderTitledPanel(title, b.String(), cw.RowWidth())
+	return renderTitledPanel(title, formatResetCount(snapshot.UsageLimitResets), b.String(), cw.RowWidth())
 }
 
-func renderTitledPanel(title string, body string, minWidth int) string {
+func renderTitledPanel(title string, badge string, body string, minWidth int) string {
+	if badge != "" {
+		badge = dimStyle.Render(badge)
+	}
+
 	lines := strings.Split(body, "\n")
 	if len(lines) == 0 {
 		lines = []string{""}
@@ -638,8 +855,19 @@ func renderTitledPanel(title string, body string, minWidth int) string {
 		bodyWidth = max(bodyWidth, lipgloss.Width(line))
 	}
 
-	innerWidth := max(bodyWidth+2, lipgloss.Width(title)+1)
-	top := separatorStyle.Render("╭─") + title + separatorStyle.Render(strings.Repeat("─", max(0, innerWidth-lipgloss.Width(title)-1))+"╮")
+	titleWidth := lipgloss.Width(title)
+	badgeWidth := lipgloss.Width(badge)
+	innerWidth := max(bodyWidth+2, titleWidth+1)
+	if badge != "" {
+		innerWidth = max(innerWidth, titleWidth+badgeWidth+3)
+	}
+
+	var top string
+	if badge == "" {
+		top = separatorStyle.Render("╭─") + title + separatorStyle.Render(strings.Repeat("─", max(0, innerWidth-titleWidth-1))+"╮")
+	} else {
+		top = separatorStyle.Render("╭─") + title + separatorStyle.Render(strings.Repeat("─", max(0, innerWidth-titleWidth-badgeWidth-2))) + badge + separatorStyle.Render("─╮")
+	}
 	bottom := separatorStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
 
 	rows := make([]string, 0, len(lines)+2)
