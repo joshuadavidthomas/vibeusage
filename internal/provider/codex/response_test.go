@@ -199,6 +199,7 @@ func TestUsageResponse_UnmarshalFullLiveShape(t *testing.T) {
 			"approx_local_messages": [0, 0],
 			"approx_cloud_messages": [0, 0]
 		},
+		"rate_limit_reset_credits": {"available_count": 2},
 		"promo": null
 	}`
 
@@ -311,6 +312,54 @@ func TestUsageResponse_UnmarshalFullLiveShape(t *testing.T) {
 	}
 	if resp.Credits.ApproxCloudMessages == nil {
 		t.Error("expected approx_cloud_messages to be present")
+	}
+
+	if resp.RateLimitResetCredits == nil {
+		t.Fatal("expected rate_limit_reset_credits")
+	}
+	if resp.RateLimitResetCredits.AvailableCount != 2 {
+		t.Errorf("available reset credits = %d, want 2", resp.RateLimitResetCredits.AvailableCount)
+	}
+}
+
+func TestRateLimitResetCreditsResponse_Unmarshal(t *testing.T) {
+	raw := `{
+		"credits": [
+			{
+				"id": "credit-1",
+				"reset_type": "codex_rate_limits",
+				"status": "available",
+				"granted_at": "2026-06-17T00:00:00Z",
+				"expires_at": "2026-07-17T00:00:00Z",
+				"title": "Full reset (Weekly + 5 hr)",
+				"description": "Ready to redeem"
+			},
+			{
+				"id": "credit-2",
+				"reset_type": "codex_rate_limits",
+				"status": "available",
+				"granted_at": "2026-06-18T00:00:00Z",
+				"expires_at": null
+			}
+		],
+		"available_count": 2
+	}`
+
+	var details RateLimitResetCreditsResponse
+	if err := json.Unmarshal([]byte(raw), &details); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if details.AvailableCount == nil || *details.AvailableCount != 2 {
+		t.Errorf("available_count = %v, want 2", details.AvailableCount)
+	}
+	if len(details.Credits) != 2 {
+		t.Fatalf("credits length = %d, want 2", len(details.Credits))
+	}
+	if details.Credits[0].ExpiresAt == nil || *details.Credits[0].ExpiresAt != "2026-07-17T00:00:00Z" {
+		t.Errorf("credit[0].expires_at = %v, want 2026-07-17T00:00:00Z", details.Credits[0].ExpiresAt)
+	}
+	if details.Credits[1].ExpiresAt != nil {
+		t.Errorf("credit[1].expires_at = %v, want nil", details.Credits[1].ExpiresAt)
 	}
 }
 
@@ -525,6 +574,29 @@ func TestAdditionalRateLimits_Unmarshal(t *testing.T) {
 	}
 	if second.RateLimit.EffectiveSecondary() != nil {
 		t.Error("expected second secondary window to be nil")
+	}
+}
+
+func TestResetActivityResponse_Unmarshal(t *testing.T) {
+	raw := `{
+		"events": [],
+		"stats": {
+			"total": 36,
+			"last_reset_at": "2026-07-21T16:47:15.000Z",
+			"days_since_last": 2.1,
+			"avg_interval_days": 8.8
+		}
+	}`
+
+	var resp ResetActivityResponse
+	if err := json.Unmarshal([]byte(raw), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if resp.Stats.LastResetAt != "2026-07-21T16:47:15.000Z" {
+		t.Errorf("last_reset_at = %q", resp.Stats.LastResetAt)
+	}
+	if resp.Stats.AverageIntervalDays != 8.8 {
+		t.Errorf("avg_interval_days = %v, want 8.8", resp.Stats.AverageIntervalDays)
 	}
 }
 

@@ -314,19 +314,19 @@ vibeusage auth minimax
 
 #### OpenAI Codex
 
-[chatgpt.com](https://chatgpt.com) — OpenAI's ChatGPT and Codex. Reports session and weekly usage periods. Shows your subscription tier (Plus, Pro, etc.).
+[chatgpt.com](https://chatgpt.com) — OpenAI's ChatGPT and Codex. Reports session, weekly, code review, and model-specific limits. It also shows available usage-limit resets and their expiration dates. The detail view checks [codex-resets.com](https://codex-resets.com) for the last public reset and the average interval between reset announcements; that section disappears if the tracker is unavailable.
 
-If you have the Codex CLI installed, vibeusage reads its OAuth credentials automatically — from `~/.codex/auth.json` or macOS Keychain (when configured) — including token refresh. This is the recommended path:
+Vibeusage reads OAuth credentials managed by the Codex CLI from `~/.codex/auth.json` or macOS Keychain, including refreshed tokens:
 
 ```bash
 # Authenticate with the Codex CLI first
-codex auth login
+codex login
 
 # Then vibeusage picks it up automatically
 vibeusage usage codex
 ```
 
-As a fallback, `vibeusage auth codex` lets you paste a bearer token manually, though those don't auto-refresh.
+Run `vibeusage auth codex` to check for Codex CLI credentials and get setup instructions when none are found.
 
 #### OpenRouter
 

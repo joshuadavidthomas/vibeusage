@@ -259,6 +259,134 @@ func TestRenderSingleProvider_WithOverage(t *testing.T) {
 	}
 }
 
+func TestRenderSingleProvider_ResetCreditDetails(t *testing.T) {
+	expires := time.Now().Add(8 * 24 * time.Hour)
+	lastReset := time.Now().Add(-50 * time.Hour)
+	snap := models.UsageSnapshot{
+		Provider: "codex",
+		Periods:  []models.UsagePeriod{{Name: "Session", Utilization: 10, PeriodType: models.PeriodSession}},
+		UsageLimitResets: &models.UsageLimitResets{
+			AvailableCount: 2,
+			Resets: []models.UsageLimitReset{
+				{Title: "Full reset (Weekly + 5 hr)", ExpiresAt: &expires},
+				{Title: "Full reset"},
+			},
+			Activity: &models.UsageLimitResetActivity{
+				LastResetAt:         lastReset,
+				AverageIntervalDays: 8.8,
+				Source:              "https://codex-resets.com",
+			},
+		},
+	}
+
+	result := stripANSI(RenderSingleProvider(snap, false, DetailOptions{}))
+	if got := strings.Count(result, "╭─"); got != 2 {
+		t.Errorf("expected separate Usage and Resets panels, got %d panels: %q", got, result)
+	}
+	for _, want := range []string{
+		"Resets",
+		"2 available",
+		"Type",
+		"Expires",
+		"Full reset (Weekly + 5 hr)",
+		"Full reset",
+		"Never",
+		"The Button codex-resets.com",
+		"Last pressed",
+		"ago",
+		"Average interval",
+		"8d 19h",
+	} {
+		if !strings.Contains(result, want) {
+			t.Errorf("expected %q in reset-credit details, got: %q", want, result)
+		}
+	}
+	if strings.Contains(result, "does not expire") || strings.Contains(result, "expires Jul") {
+		t.Errorf("reset table should use compact expiry values, got: %q", result)
+	}
+	if strings.Contains(result, "·") {
+		t.Errorf("reset activity should use the table grid instead of inline separators, got: %q", result)
+	}
+	lines := strings.Split(result, "\n")
+	buttonLine := -1
+	sourceLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, "The Button") {
+			buttonLine = i
+		}
+		if strings.Contains(line, "codex-resets.com") {
+			sourceLine = i
+		}
+	}
+	if sourceLine != buttonLine {
+		t.Errorf("source should appear beside The Button, got: %q", result)
+	}
+}
+
+func TestFormatResetActivity(t *testing.T) {
+	now := time.Date(2026, time.July, 23, 12, 0, 0, 0, time.UTC)
+	lastReset := now.Add(-51 * time.Hour)
+	age, suffix := formatResetActivityAge(lastReset, now, 2)
+	if age != " 2d  3h" {
+		t.Errorf("activity age = %q, want %q", age, " 2d  3h")
+	}
+	if suffix != "ago" {
+		t.Errorf("activity age suffix = %q, want %q", suffix, "ago")
+	}
+	if got := formatResetActivityInterval(8.8, 2); got != " 8d 19h" {
+		t.Errorf("formatResetActivityInterval() = %q, want %q", got, " 8d 19h")
+	}
+}
+
+func TestResetExpiryColor(t *testing.T) {
+	now := time.Date(2026, time.July, 23, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name      string
+		expiresAt *time.Time
+		want      string
+	}{
+		{name: "never expires", want: "green"},
+		{name: "one week", expiresAt: timePtr(now.Add(7 * 24 * time.Hour)), want: "red"},
+		{name: "eight days", expiresAt: timePtr(now.Add(8 * 24 * time.Hour)), want: "yellow"},
+		{name: "thirty days", expiresAt: timePtr(now.Add(30 * 24 * time.Hour)), want: "yellow"},
+		{name: "more than thirty days", expiresAt: timePtr(now.Add(31 * 24 * time.Hour)), want: "green"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resetExpiryColor(tt.expiresAt, now); got != tt.want {
+				t.Errorf("resetExpiryColor() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatResetExpiry_AlignsDaysAndHours(t *testing.T) {
+	now := time.Date(2026, time.July, 23, 12, 0, 0, 0, time.UTC)
+	eightDays := now.Add(8 * 24 * time.Hour)
+	nineteenDays := now.Add(19 * 24 * time.Hour)
+	resets := []models.UsageLimitReset{{ExpiresAt: &eightDays}, {ExpiresAt: &nineteenDays}}
+	dayWidth := resetExpiryDayWidth(resets, now)
+
+	eight := formatResetExpiry(&eightDays, now, dayWidth)
+	nineteen := formatResetExpiry(&nineteenDays, now, dayWidth)
+	if eight != " 8d  0h" {
+		t.Errorf("eight-day expiry = %q, want %q", eight, " 8d  0h")
+	}
+	if nineteen != "19d  0h" {
+		t.Errorf("nineteen-day expiry = %q, want %q", nineteen, "19d  0h")
+	}
+	if strings.Index(eight, "8") != strings.Index(nineteen, "9") {
+		t.Errorf("day digits should align: %q vs %q", eight, nineteen)
+	}
+	if strings.LastIndex(eight, "h") != strings.LastIndex(nineteen, "h") {
+		t.Errorf("hour units should align: %q vs %q", eight, nineteen)
+	}
+	if got := formatResetExpiry(nil, now, dayWidth); got != "Never" {
+		t.Errorf("formatResetExpiry(nil) = %q, want %q", got, "Never")
+	}
+}
+
 func TestRenderSingleProvider_NoOverageWhenDisabled(t *testing.T) {
 	snap := models.UsageSnapshot{
 		Provider: "claude",
@@ -415,6 +543,38 @@ func TestRenderProviderPanel_WithOverage(t *testing.T) {
 	}
 	if !strings.Contains(result, "$10.00") {
 		t.Errorf("expected '$10.00' in overage, got: %q", result)
+	}
+}
+
+func TestRenderProviderPanel_ResetCount(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider:         "codex",
+		Periods:          []models.UsagePeriod{{Name: "Session", Utilization: 10, PeriodType: models.PeriodSession}},
+		UsageLimitResets: &models.UsageLimitResets{AvailableCount: 2},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+	lines := strings.Split(result, "\n")
+	if !strings.Contains(lines[0], "2 resets") {
+		t.Errorf("expected reset count in top border, got: %q", result)
+	}
+	for _, line := range lines[1 : len(lines)-1] {
+		if strings.Contains(line, "2 resets") {
+			t.Errorf("reset count should not consume a body row, got: %q", result)
+		}
+	}
+}
+
+func TestRenderProviderPanel_OneResetUsesSingular(t *testing.T) {
+	snap := models.UsageSnapshot{
+		Provider:         "codex",
+		Periods:          []models.UsagePeriod{{Name: "Session", Utilization: 10, PeriodType: models.PeriodSession}},
+		UsageLimitResets: &models.UsageLimitResets{AvailableCount: 1},
+	}
+
+	result := stripANSI(RenderProviderPanel(snap, false, GlobalPeriodColWidths([]models.UsageSnapshot{snap})))
+	if !strings.Contains(result, "1 reset") || strings.Contains(result, "1 resets") {
+		t.Errorf("expected singular reset count, got: %q", result)
 	}
 }
 
