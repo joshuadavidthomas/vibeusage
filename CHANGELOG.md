@@ -20,13 +20,15 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
-### Added
-
-- Added available Codex usage-limit resets to the dashboard, detail view, and JSON output, with expiry timing and public reset activity from codex-resets.com.
-
 ### Fixed
 
 - Fixed providers removed through `vibeusage auth` returning on the next run when credentials were still available from a provider CLI or environment variable. Removal now disables the provider across usage, routing, and statusline output until it is re-enabled through auth.
+
+## [0.11.0]
+
+### Added
+
+- Added available Codex usage-limit resets to the dashboard, detail view, and JSON output, with expiry timing and public reset activity from codex-resets.com.
 
 ## [0.10.0]
 
@@ -218,7 +220,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Josh Thomas <josh@joshthomas.dev> (maintainer)
 
-[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.10.0...HEAD
+[unreleased]: https://github.com/joshuadavidthomas/vibeusage/compare/v0.11.0...HEAD
 [0.1.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.0
 [0.1.1]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.1.1
 [0.2.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.2.0
@@ -230,3 +232,4 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 [0.8.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.8.0
 [0.9.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.9.0
 [0.10.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.10.0
+[0.11.0]: https://github.com/joshuadavidthomas/vibeusage/releases/tag/v0.11.0
