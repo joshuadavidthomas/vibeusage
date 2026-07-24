@@ -174,22 +174,25 @@ func DeleteCredential(providerID, credType string) bool {
 }
 
 // DeleteProviderCredentials removes all credentials for a provider.
-// Returns true if any credentials were removed.
-func DeleteProviderCredentials(providerID string) bool {
+// It reports whether any credentials were removed.
+func DeleteProviderCredentials(providerID string) (bool, error) {
 	credentialsMu.Lock()
 	defer credentialsMu.Unlock()
 
 	store, err := loadCredentialsStore()
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	if _, ok := store[providerID]; !ok {
-		return false
+		return false, nil
 	}
 
 	delete(store, providerID)
-	return saveCredentialsStore(store) == nil
+	if err := saveCredentialsStore(store); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // HasCredential reports whether a credential exists for a provider and credential type.

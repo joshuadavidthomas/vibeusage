@@ -616,6 +616,48 @@ func TestDisplayMultipleSnapshots_NoDataWithErrors_ShowsProviderErrors(t *testin
 	}
 }
 
+func TestFetchAndDisplayProvider_RejectsDisabledProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+
+	cfg := config.DefaultConfig()
+	disabled := false
+	cfg.Providers["gemini"] = config.ProviderConfig{Enabled: &disabled}
+	config.Override(t, cfg)
+
+	err := fetchAndDisplayProvider(context.Background(), "gemini")
+	if err == nil {
+		t.Fatal("expected disabled provider error")
+	}
+	if !strings.Contains(err.Error(), "Gemini is disabled") || !strings.Contains(err.Error(), "vibeusage auth") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunStatusline_RejectsDisabledExplicitProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+
+	cfg := config.DefaultConfig()
+	disabled := false
+	cfg.Providers["gemini"] = config.ProviderConfig{Enabled: &disabled}
+	config.Override(t, cfg)
+
+	oldProviders := statuslineProviders
+	statuslineProviders = []string{"gemini"}
+	defer func() { statuslineProviders = oldProviders }()
+
+	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
+	err := runStatusline(cmd, nil)
+	if err == nil {
+		t.Fatal("expected disabled provider error")
+	}
+	if !strings.Contains(err.Error(), "Gemini is disabled") || !strings.Contains(err.Error(), "vibeusage auth") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestDisplayMultipleSnapshots_NoDataNoErrors_ShowsConfigureHint(t *testing.T) {
 	ctx, _ := logging.NewTestContext(logging.Flags{})
 

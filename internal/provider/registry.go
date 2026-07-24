@@ -61,11 +61,14 @@ func ListIDs() []string {
 	return ids
 }
 
-// ConfiguredIDs filters a list of provider IDs to only those that are
-// registered and have at least one available fetch strategy.
-func ConfiguredIDs(providerIDs []string) []string {
+// ConfiguredIDs filters a list of provider IDs to only those that are enabled,
+// registered, and have at least one available fetch strategy.
+func ConfiguredIDs(providerIDs []string, cfg config.Config) []string {
 	var result []string
 	for _, pid := range providerIDs {
+		if !cfg.IsProviderEnabled(pid) {
+			continue
+		}
 		p, ok := Get(pid)
 		if !ok {
 			continue

@@ -183,7 +183,11 @@ func runDefaultUsage(cmd *cobra.Command, args []string) error {
 
 	cfg := config.Get()
 	if len(provider.AvailableIDs(cfg)) == 0 && !jsonOutput && !quiet {
-		showFirstRunMessage()
+		if provider.CountConfigured() > 0 {
+			showNoProvidersEnabledMessage()
+		} else {
+			showFirstRunMessage()
+		}
 		return nil
 	}
 
@@ -350,6 +354,9 @@ func fetchAndDisplayProvider(ctx context.Context, providerID string) error {
 	if !ok {
 		return fmt.Errorf("unknown provider: %s. Available: %s", providerID, strings.Join(provider.ListIDs(), ", "))
 	}
+	if !config.Get().IsProviderEnabled(providerID) {
+		return fmt.Errorf("%s is disabled. Run `vibeusage auth` to re-enable it", provider.DisplayName(providerID))
+	}
 
 	start := time.Now()
 
@@ -446,6 +453,15 @@ func showFirstRunMessage() {
 	outln("Track your usage across AI providers in one place.")
 	outln()
 	outln("Get started with:")
+	outln("  vibeusage auth")
+	outln()
+}
+
+func showNoProvidersEnabledMessage() {
+	outln()
+	outln("No providers are enabled.")
+	outln()
+	outln("Re-enable a provider with:")
 	outln("  vibeusage auth")
 	outln()
 }

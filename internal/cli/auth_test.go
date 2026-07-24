@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -240,6 +242,140 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	}
 }
 
+func TestAuthSetup_DisablesAndReenablesExternalCredentials(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	t.Setenv("HOME", tmpDir)
+	for _, envVar := range []string{
+		"ANTIGRAVITY_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+		"GEMINI_API_KEY", "GITHUB_TOKEN", "CURSOR_API_KEY",
+		"KIMI_CODE_API_KEY", "MINIMAX_API_KEY", "ZAI_API_KEY",
+	} {
+		t.Setenv(envVar, "")
+	}
+	config.Override(t, config.DefaultConfig())
+
+	credentialPath := filepath.Join(tmpDir, ".gemini", "oauth_creds.json")
+	if err := os.MkdirAll(filepath.Dir(credentialPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(credentialPath, []byte(`{"access_token":"external"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	call := 0
+	mock := &prompt.Mock{
+		MultiSelectFunc: func(cfg prompt.MultiSelectConfig) ([]string, error) {
+			call++
+			var geminiSelected bool
+			for _, option := range cfg.Options {
+				if option.Value == "gemini" {
+					geminiSelected = option.Selected
+					break
+				}
+			}
+			if call == 1 {
+				if !geminiSelected {
+					t.Error("externally detected Gemini should start selected")
+				}
+				if cfg.Validate != nil {
+					t.Error("provider selection should allow removing the last provider")
+				}
+				return nil, nil
+			}
+			if geminiSelected {
+				t.Error("disabled Gemini should start unselected")
+			}
+			return []string{"gemini"}, nil
+		},
+	}
+
+	old := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(old)
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	if err := authSetup(); err != nil {
+		t.Fatalf("authSetup remove error: %v", err)
+	}
+	if config.Get().IsProviderEnabled("gemini") {
+		t.Fatal("Gemini should be disabled after deselection")
+	}
+	if _, err := os.Stat(credentialPath); err != nil {
+		t.Fatalf("external credential should remain untouched: %v", err)
+	}
+	if hasCreds, _ := provider.CheckCredentials("gemini"); !hasCreds {
+		t.Fatal("external Gemini credential should still be detectable")
+	}
+	if ids := provider.AvailableIDs(config.Get()); slicesContain(ids, "gemini") {
+		t.Fatalf("disabled Gemini should not be available, got %v", ids)
+	}
+
+	buf.Reset()
+	if err := authSetup(); err != nil {
+		t.Fatalf("authSetup re-enable error: %v", err)
+	}
+	if !config.Get().IsProviderEnabled("gemini") {
+		t.Fatal("Gemini should be enabled after reselection")
+	}
+	if ids := provider.AvailableIDs(config.Get()); !slicesContain(ids, "gemini") {
+		t.Fatalf("re-enabled Gemini should be available, got %v", ids)
+	}
+	if len(mock.InputCalls) != 0 || len(mock.ConfirmCalls) != 0 {
+		t.Fatal("re-enabling detected external credentials should not run auth")
+	}
+}
+
+func TestAuthSetup_FailedAuthKeepsProviderDisabled(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("CURSOR_API_KEY", "")
+
+	cfg := config.DefaultConfig()
+	disabled := false
+	cfg.Providers["cursor"] = config.ProviderConfig{Enabled: &disabled}
+	config.Override(t, cfg)
+
+	mock := &prompt.Mock{
+		MultiSelectFunc: func(prompt.MultiSelectConfig) ([]string, error) {
+			return []string{"cursor"}, nil
+		},
+		InputFunc: func(prompt.InputConfig) (string, error) {
+			return "", errors.New("test auth failure")
+		},
+	}
+	old := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(old)
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	if err := authSetup(); err != nil {
+		t.Fatalf("authSetup error: %v", err)
+	}
+	if config.Get().IsProviderEnabled("cursor") {
+		t.Fatal("failed auth should leave Cursor disabled")
+	}
+	if len(mock.InputCalls) != 1 {
+		t.Fatalf("expected one auth attempt, got %d", len(mock.InputCalls))
+	}
+}
+
+func slicesContain(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 // --delete flag tests
 
 func TestAuthDelete_RemovesCredentialsAndDisables(t *testing.T) {
@@ -276,6 +412,16 @@ func TestAuthDelete_RemovesCredentialsAndDisables(t *testing.T) {
 	data, _ := config.ReadCredential("claude", "session")
 	if data != nil {
 		t.Error("credential should have been deleted")
+	}
+	if config.Get().IsProviderEnabled("claude") {
+		t.Error("provider should have been disabled")
+	}
+	persisted, loadErr := config.Load("")
+	if loadErr != nil {
+		t.Fatalf("Load config: %v", loadErr)
+	}
+	if persisted.IsProviderEnabled("claude") {
+		t.Error("provider disablement should be persisted")
 	}
 
 	if len(mock.ConfirmCalls) != 1 {
@@ -322,7 +468,10 @@ func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("CURSOR_API_KEY", "")
-	config.Override(t, config.DefaultConfig())
+	cfg := config.DefaultConfig()
+	disabled := false
+	cfg.Providers["cursor"] = config.ProviderConfig{Enabled: &disabled}
+	config.Override(t, cfg)
 
 	var buf bytes.Buffer
 	outWriter = &buf
@@ -347,6 +496,9 @@ func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
 	hasCreds, _ := provider.CheckCredentials("cursor")
 	if !hasCreds {
 		t.Error("cursor should have credentials after auth")
+	}
+	if !config.Get().IsProviderEnabled("cursor") {
+		t.Error("cursor should be enabled after auth")
 	}
 }
 

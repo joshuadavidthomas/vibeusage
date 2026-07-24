@@ -115,6 +115,53 @@ func (c Config) IsProviderEnabled(providerID string) bool {
 	return *pc.Enabled
 }
 
+// SetProviderEnabled persists whether a provider joins automatic
+// multi-provider operations. Enabling clears the override because providers
+// are enabled by default; disabling records an exclusion so externally
+// detected credentials stay ignored.
+func SetProviderEnabled(providerID string, enabled bool) error {
+	return SetProvidersEnabled(map[string]bool{providerID: enabled})
+}
+
+// SetProvidersEnabled persists provider enablement changes in one config write.
+func SetProvidersEnabled(states map[string]bool) error {
+	cfg := Get()
+	changed := false
+	for providerID, enabled := range states {
+		pc, exists := cfg.Providers[providerID]
+		if enabled {
+			if !exists || pc.Enabled == nil {
+				continue
+			}
+			pc.Enabled = nil
+			if pc == (ProviderConfig{}) {
+				delete(cfg.Providers, providerID)
+			} else {
+				cfg.Providers[providerID] = pc
+			}
+			changed = true
+			continue
+		}
+
+		if exists && pc.Enabled != nil && !*pc.Enabled {
+			continue
+		}
+		disabled := false
+		pc.Enabled = &disabled
+		cfg.Providers[providerID] = pc
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	if err := Save(cfg, ""); err != nil {
+		return err
+	}
+	SetGlobal(cfg)
+	return nil
+}
+
 func (c Config) GetRole(name string) (RoleConfig, bool) {
 	r, ok := c.Roles[name]
 	return r, ok

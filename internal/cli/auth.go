@@ -71,7 +71,7 @@ var providerDescriptions = map[string]string{
 
 func init() {
 	authCmd.Flags().Bool("status", false, "Show authentication status")
-	authCmd.Flags().Bool("delete", false, "Delete credentials for a provider")
+	authCmd.Flags().Bool("delete", false, "Remove a provider and its vibeusage-stored credentials")
 	authCmd.Flags().String("token", "", "Set a credential non-interactively")
 }
 
@@ -86,11 +86,16 @@ func authSetup() error {
 	allProviders := provider.ListIDs()
 	sort.Strings(allProviders)
 
+	cfg := config.Get()
+	detectedSet := make(map[string]bool)
 	configuredSet := make(map[string]bool)
 	for _, pid := range allProviders {
 		hasCreds, _ := provider.CheckCredentials(pid)
 		if hasCreds {
-			configuredSet[pid] = true
+			detectedSet[pid] = true
+			if cfg.IsProviderEnabled(pid) {
+				configuredSet[pid] = true
+			}
 		}
 	}
 
@@ -123,12 +128,6 @@ func authSetup() error {
 		Title:       title,
 		Description: "Space to select, Enter to confirm, Esc to cancel",
 		Options:     options,
-		Validate: func(selected []string) error {
-			if len(selected) == 0 {
-				return errors.New("select at least one provider (use Space to toggle)")
-			}
-			return nil
-		},
 	})
 	if err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
@@ -145,16 +144,29 @@ func authSetup() error {
 
 	var newProviders []string
 	for _, pid := range selected {
-		if !configuredSet[pid] {
+		if !detectedSet[pid] {
 			newProviders = append(newProviders, pid)
 		}
 	}
 
-	// Remove credentials for deselected providers.
+	states := make(map[string]bool, len(detectedSet))
+	for pid := range detectedSet {
+		states[pid] = selectedSet[pid]
+	}
+	if err := config.SetProvidersEnabled(states); err != nil {
+		return fmt.Errorf("saving provider selection: %w", err)
+	}
+
+	// Remove vibeusage-owned credentials and cached data for deselected
+	// providers. External CLI and environment credentials remain in place but
+	// the persisted exclusion keeps them out of automatic fetches.
 	var removed []string
 	for pid := range configuredSet {
 		if !selectedSet[pid] {
-			config.DeleteProviderCredentials(pid)
+			if _, err := config.DeleteProviderCredentials(pid); err != nil {
+				return fmt.Errorf("removing stored credentials for %s: %w", pid, err)
+			}
+			config.ClearProviderCache(pid)
 			removed = append(removed, pid)
 		}
 	}
@@ -176,9 +188,10 @@ func authSetup() error {
 	// Summary
 	outln()
 	var configured []string
+	cfg = config.Get()
 	for _, pid := range allProviders {
 		hasCreds, _ := provider.CheckCredentials(pid)
-		if hasCreds {
+		if hasCreds && cfg.IsProviderEnabled(pid) {
 			configured = append(configured, pid)
 		}
 	}
@@ -286,7 +299,7 @@ func authProvider(providerID string, p provider.Provider) error {
 	if skip, err := offerExistingCredentials(providerID, verify); err != nil {
 		return err
 	} else if skip {
-		return nil
+		return enableProvider(providerID)
 	}
 
 	// Run the flow.
@@ -310,7 +323,10 @@ func authProvider(providerID string, p provider.Provider) error {
 		return authGeneric(providerID)
 	}
 
-	return err
+	if err != nil {
+		return err
+	}
+	return enableProvider(providerID)
 }
 
 // offerExistingCredentials checks for detected credentials and asks the user
@@ -423,7 +439,7 @@ func authGeneric(providerID string) error {
 			out("✓ %s is already authenticated (%s)\n",
 				provider.DisplayName(providerID), sourceToLabel(source))
 		}
-		return nil
+		return enableProvider(providerID)
 	}
 
 	if quiet {
@@ -447,8 +463,18 @@ func authGeneric(providerID string) error {
 		return fmt.Errorf("error saving credential: %w", err)
 	}
 
+	if err := enableProvider(providerID); err != nil {
+		return err
+	}
 	if !quiet {
 		out("✓ %s credential saved\n", provider.DisplayName(providerID))
+	}
+	return nil
+}
+
+func enableProvider(providerID string) error {
+	if err := config.SetProviderEnabled(providerID, true); err != nil {
+		return fmt.Errorf("enabling %s: %w", providerID, err)
 	}
 	return nil
 }
@@ -457,7 +483,7 @@ func authGeneric(providerID string) error {
 func authDeleteProvider(providerID string) error {
 	if !quiet {
 		ok, err := prompt.Default.Confirm(prompt.ConfirmConfig{
-			Title: fmt.Sprintf("Delete %s credentials?", provider.DisplayName(providerID)),
+			Title: fmt.Sprintf("Remove %s from vibeusage?", provider.DisplayName(providerID)),
 		})
 		if err != nil {
 			return err
@@ -467,11 +493,16 @@ func authDeleteProvider(providerID string) error {
 		}
 	}
 
-	config.DeleteProviderCredentials(providerID)
+	if err := config.SetProviderEnabled(providerID, false); err != nil {
+		return fmt.Errorf("disabling %s: %w", providerID, err)
+	}
+	if _, err := config.DeleteProviderCredentials(providerID); err != nil {
+		return fmt.Errorf("removing stored credentials for %s: %w", providerID, err)
+	}
 	config.ClearProviderCache(providerID)
 
 	if !quiet {
-		out("✓ Deleted credentials for %s\n", provider.DisplayName(providerID))
+		out("✓ Removed %s from vibeusage\n", provider.DisplayName(providerID))
 	}
 	return nil
 }
@@ -503,6 +534,9 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 					return fmt.Errorf("error saving credential: %w", err)
 				}
 			}
+			if err := enableProvider(providerID); err != nil {
+				return err
+			}
 			if !quiet {
 				out("✓ %s credential saved\n", provider.DisplayName(providerID))
 			}
@@ -518,6 +552,9 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 				if err := acceptor.AcceptToken(token); err != nil {
 					return fmt.Errorf("error saving credential: %w", err)
 				}
+				if err := enableProvider(providerID); err != nil {
+					return err
+				}
 				if !quiet {
 					out("✓ %s credential saved\n", provider.DisplayName(providerID))
 				}
@@ -531,6 +568,9 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 	credData, _ := json.Marshal(map[string]string{"api_key": token})
 	if err := config.WriteCredential(providerID, "apikey", credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
+	}
+	if err := enableProvider(providerID); err != nil {
+		return err
 	}
 	if !quiet {
 		out("✓ %s credential saved\n", provider.DisplayName(providerID))

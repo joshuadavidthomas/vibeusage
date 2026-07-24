@@ -173,7 +173,7 @@ func doRouteModel(ctx context.Context, query string) (routing.Recommendation, er
 		return routing.Recommendation{}, fmt.Errorf("unknown model %q. Use 'vibeusage route --list' to see available models", query)
 	}
 
-	configuredIDs := provider.ConfiguredIDs(info.Providers)
+	configuredIDs := provider.ConfiguredIDs(info.Providers, config.Get())
 	if len(configuredIDs) == 0 {
 		return routing.Recommendation{}, fmt.Errorf(
 			"%s is available from %s, but none are configured.\nSet up a provider with: vibeusage auth <provider>",
@@ -222,6 +222,7 @@ func displayRecommendation(rec routing.Recommendation) error {
 }
 
 func listModels(providerFilter string) error {
+	cfg := config.Get()
 	var allModels []catalog.ModelInfo
 
 	if providerFilter != "" {
@@ -237,7 +238,7 @@ func listModels(providerFilter string) error {
 	// and only show configured providers in the list.
 	var filtered []catalog.ModelInfo
 	for _, m := range allModels {
-		configured := provider.ConfiguredIDs(m.Providers)
+		configured := provider.ConfiguredIDs(m.Providers, cfg)
 		if len(configured) > 0 {
 			m.Providers = configured
 			filtered = append(filtered, m)
@@ -253,7 +254,6 @@ func listModels(providerFilter string) error {
 	}
 
 	// Build a reverse map: model ID → role names.
-	cfg := config.Get()
 	roles := make(map[string][]string)
 	for name, role := range cfg.Roles {
 		roles[name] = role.Models
@@ -363,7 +363,7 @@ func doRouteByRole(ctx context.Context, roleName string) (routing.RoleRecommenda
 		}
 
 		best := matches[0]
-		configured := provider.ConfiguredIDs(best.Providers)
+		configured := provider.ConfiguredIDs(best.Providers, cfg)
 		if len(configured) == 0 {
 			continue
 		}

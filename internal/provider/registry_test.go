@@ -64,7 +64,7 @@ func TestConfiguredIDs_FiltersToRegisteredAndAvailable(t *testing.T) {
 	})
 	// "gamma" is not registered at all.
 
-	got := ConfiguredIDs([]string{"alpha", "beta", "gamma"})
+	got := ConfiguredIDs([]string{"alpha", "beta", "gamma"}, config.DefaultConfig())
 
 	if len(got) != 1 {
 		t.Fatalf("expected 1 configured, got %d: %v", len(got), got)
@@ -79,7 +79,7 @@ func TestConfiguredIDs_Empty(t *testing.T) {
 	registry = map[string]Provider{}
 	defer func() { registry = orig }()
 
-	got := ConfiguredIDs([]string{"anything"})
+	got := ConfiguredIDs([]string{"anything"}, config.DefaultConfig())
 	if len(got) != 0 {
 		t.Errorf("expected 0, got %d", len(got))
 	}
@@ -98,12 +98,31 @@ func TestConfiguredIDs_MultipleStrategiesOnlyNeedsOne(t *testing.T) {
 		},
 	})
 
-	got := ConfiguredIDs([]string{"multi"})
+	got := ConfiguredIDs([]string{"multi"}, config.DefaultConfig())
 	if len(got) != 1 {
 		t.Fatalf("expected 1, got %d", len(got))
 	}
 	if got[0] != "multi" {
 		t.Errorf("got %q, want multi", got[0])
+	}
+}
+
+func TestConfiguredIDs_ExcludesDisabledProvider(t *testing.T) {
+	orig := registry
+	registry = map[string]Provider{}
+	defer func() { registry = orig }()
+
+	Register(&stubProvider{
+		id:         "alpha",
+		strategies: []fetch.Strategy{&stubStrategy{available: true}},
+	})
+
+	cfg := config.DefaultConfig()
+	disabled := false
+	cfg.Providers["alpha"] = config.ProviderConfig{Enabled: &disabled}
+
+	if got := ConfiguredIDs([]string{"alpha"}, cfg); len(got) != 0 {
+		t.Errorf("expected disabled provider to be excluded, got %v", got)
 	}
 }
 

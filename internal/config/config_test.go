@@ -145,6 +145,57 @@ func TestIsProviderEnabled(t *testing.T) {
 	}
 }
 
+func TestSetProviderEnabled_SkipsNoopWrite(t *testing.T) {
+	setupTempDir(t)
+	SetGlobal(DefaultConfig())
+
+	if err := SetProviderEnabled("gemini", true); err != nil {
+		t.Fatalf("SetProviderEnabled(true) error: %v", err)
+	}
+	if _, err := os.Stat(ConfigFile()); !os.IsNotExist(err) {
+		t.Fatalf("no-op enable should not create config file, stat error: %v", err)
+	}
+}
+
+func TestSetProviderEnabled_PersistsExclusionAndReenable(t *testing.T) {
+	setupTempDir(t)
+	cfg := DefaultConfig()
+	cfg.Display.ResetFormat = "relative"
+	SetGlobal(cfg)
+
+	if err := SetProviderEnabled("gemini", false); err != nil {
+		t.Fatalf("SetProviderEnabled(false) error: %v", err)
+	}
+	if Get().IsProviderEnabled("gemini") {
+		t.Fatal("gemini should be disabled in memory")
+	}
+
+	loaded, err := Load("")
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if loaded.IsProviderEnabled("gemini") {
+		t.Fatal("gemini should be disabled on disk")
+	}
+	if loaded.Display.ResetFormat != "relative" {
+		t.Errorf("unrelated config changed: reset_format = %q", loaded.Display.ResetFormat)
+	}
+
+	if err := SetProviderEnabled("gemini", true); err != nil {
+		t.Fatalf("SetProviderEnabled(true) error: %v", err)
+	}
+	loaded, err = Load("")
+	if err != nil {
+		t.Fatalf("Load() after re-enable error: %v", err)
+	}
+	if !loaded.IsProviderEnabled("gemini") {
+		t.Fatal("gemini should be enabled again")
+	}
+	if _, ok := loaded.Providers["gemini"]; ok {
+		t.Error("re-enabling should clear the redundant provider override")
+	}
+}
+
 // Load and Save
 
 func TestLoad_MissingFile_ReturnsDefaults(t *testing.T) {
@@ -1059,8 +1110,12 @@ func TestDeleteProviderCredentials(t *testing.T) {
 	_ = WriteCredential("testprov", "oauth", []byte(`{"a":"1"}`))
 	_ = WriteCredential("testprov", "session", []byte(`{"b":"2"}`))
 
-	if !DeleteProviderCredentials("testprov") {
-		t.Error("DeleteProviderCredentials() should return true")
+	removed, err := DeleteProviderCredentials("testprov")
+	if err != nil {
+		t.Fatalf("DeleteProviderCredentials() error: %v", err)
+	}
+	if !removed {
+		t.Error("DeleteProviderCredentials() should report a removal")
 	}
 
 	data1, _ := ReadCredential("testprov", "oauth")

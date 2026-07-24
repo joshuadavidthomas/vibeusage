@@ -58,6 +58,9 @@ func runStatusline(cmd *cobra.Command, args []string) error {
 			if _, ok := provider.Get(pid); !ok {
 				return fmt.Errorf("unknown provider: %s", pid)
 			}
+			if !cfg.IsProviderEnabled(pid) {
+				return fmt.Errorf("%s is disabled. Run `vibeusage auth` to re-enable it", provider.DisplayName(pid))
+			}
 			providersToFetch = append(providersToFetch, pid)
 		}
 	} else {
@@ -70,7 +73,7 @@ func runStatusline(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(providersToFetch) == 0 {
-		return fmt.Errorf("no providers configured. Run 'vibeusage auth <provider>' to set up a provider")
+		return fmt.Errorf("no providers are enabled. Run `vibeusage auth` to enable a provider")
 	}
 
 	filteredMap := make(map[string][]fetch.Strategy)
