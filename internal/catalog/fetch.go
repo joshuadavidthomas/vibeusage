@@ -31,25 +31,42 @@ type modelsDevModel struct {
 }
 
 // loadModelsDevData returns the parsed models.dev data, using the cache when
-// fresh and fetching from the network otherwise. Returns nil on any failure.
-func loadModelsDevData() map[string]modelsDevProvider {
-	path := config.ModelsFile()
-
-	if data := readCacheIfFresh(path); data != nil {
-		return data
+// fresh and fetching from the network otherwise. Ordinary fetch failures are
+// best-effort and may return stale or empty data; caller cancellation is
+// returned so the load can be retried.
+func loadModelsDevData(ctx context.Context) (map[string]modelsDevProvider, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("loading models.dev data: %w", err)
 	}
 
-	raw, err := fetchModelsDevAPI()
+	path := config.ModelsFile()
+	if data := readCacheIfFresh(path); data != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("loading models.dev data: %w", err)
+		}
+		return data, nil
+	}
+
+	raw, err := fetchModelsDevAPI(ctx)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("loading models.dev data: %w", ctxErr)
+		}
 		// Network failed — serve stale cache if it exists.
 		if data := readCache(path); data != nil {
-			return data
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, fmt.Errorf("loading models.dev data: %w", ctxErr)
+			}
+			return data, nil
 		}
-		return nil
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("loading models.dev data: %w", ctxErr)
+		}
+		return nil, nil
 	}
 
 	_ = writeCache(path, raw)
-	return parseModelsDevJSON(raw)
+	return parseModelsDevJSON(raw), nil
 }
 
 func readCacheIfFresh(path string) map[string]modelsDevProvider {
@@ -78,9 +95,9 @@ func writeCache(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func fetchModelsDevAPI() ([]byte, error) {
+func fetchModelsDevAPI(ctx context.Context) ([]byte, error) {
 	client := httpclient.NewWithTimeout(15 * time.Second)
-	resp, err := client.DoCtx(context.Background(), "GET", modelsDevURL, nil)
+	resp, err := client.DoCtx(ctx, "GET", modelsDevURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fetching models.dev: %w", err)
 	}

@@ -33,7 +33,9 @@ Use "vibeusage route --list-roles" to see configured roles and their models.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Preload model registry data explicitly so any network fetch happens
 		// here (with optional spinner) rather than silently on first Lookup.
-		preloadModelData(cmd.Context())
+		if err := preloadModelData(cmd.Context()); err != nil {
+			return err
+		}
 
 		listFlag, _ := cmd.Flags().GetBool("list")
 		listRolesFlag, _ := cmd.Flags().GetBool("list-roles")
@@ -77,22 +79,29 @@ func init() {
 // is likely (cache stale or absent) and a spinner is appropriate, a brief
 // spinner is shown so the user knows what is happening. Once data is cached on
 // disk the call returns near-instantly with no visible output.
-func preloadModelData(ctx context.Context) {
+func preloadModelData(ctx context.Context) error {
 	if catalog.CacheIsFresh() {
 		// Fast path: data is on disk and within TTL — load silently.
-		catalog.Preload(ctx)
-		return
+		return catalog.Preload(ctx)
 	}
 
 	if !display.SpinnerShouldShow(quiet, jsonOutput, !isTerminal()) {
-		catalog.Preload(ctx)
-		return
+		return catalog.Preload(ctx)
 	}
 
-	_ = display.SpinnerRun([]string{"models.dev"}, func(onComplete func(display.CompletionInfo)) {
-		catalog.Preload(ctx)
-		onComplete(display.CompletionInfo{ProviderID: "models.dev", Success: true})
+	var preloadErr error
+	spinnerErr := display.SpinnerRun([]string{"models.dev"}, func(onComplete func(display.CompletionInfo)) {
+		preloadErr = catalog.Preload(ctx)
+		completion := display.CompletionInfo{ProviderID: "models.dev", Success: preloadErr == nil}
+		if preloadErr != nil {
+			completion.Error = preloadErr.Error()
+		}
+		onComplete(completion)
 	})
+	if preloadErr != nil {
+		return preloadErr
+	}
+	return spinnerErr
 }
 
 // fetchAllWithSpinner fetches usage from all providers in the strategy map,

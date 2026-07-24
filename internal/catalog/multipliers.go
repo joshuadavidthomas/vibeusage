@@ -26,24 +26,70 @@ type ModelMultiplier struct {
 }
 
 var (
-	multipliersOnce   sync.Once
-	multipliersByName map[string]ModelMultiplier
+	multipliersMu      sync.Mutex
+	multipliersLoaded  bool
+	multipliersLoading chan struct{}
+	multipliersByName  map[string]ModelMultiplier
+	multipliersLoader  = loadMultipliers
 )
 
-func ensureMultipliersLoaded() {
-	multipliersOnce.Do(func() {
-		multipliersByName = loadMultipliers()
-		if multipliersByName == nil {
-			multipliersByName = make(map[string]ModelMultiplier)
+func ensureMultipliersLoaded(ctx context.Context) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("loading copilot multipliers: %w", err)
 		}
-	})
+
+		multipliersMu.Lock()
+		if multipliersLoaded {
+			multipliersMu.Unlock()
+			return nil
+		}
+		if done := multipliersLoading; done != nil {
+			multipliersMu.Unlock()
+			select {
+			case <-done:
+				continue
+			case <-ctx.Done():
+				return fmt.Errorf("waiting for copilot multipliers: %w", ctx.Err())
+			}
+		}
+
+		done := make(chan struct{})
+		multipliersLoading = done
+		loader := multipliersLoader
+		multipliersMu.Unlock()
+
+		data, err := loader(ctx)
+		if err == nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				err = fmt.Errorf("loading copilot multipliers: %w", ctxErr)
+			}
+		}
+		if err == nil && data == nil {
+			data = make(map[string]ModelMultiplier)
+		}
+
+		multipliersMu.Lock()
+		if err == nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				err = fmt.Errorf("loading copilot multipliers: %w", ctxErr)
+			} else {
+				multipliersByName = data
+				multipliersLoaded = true
+			}
+		}
+		multipliersLoading = nil
+		close(done)
+		multipliersMu.Unlock()
+		return err
+	}
 }
 
 // LookupMultiplier returns the paid-plan multiplier for a model on copilot.
 // Returns nil if the model has no multiplier data (non-copilot provider or
 // unknown model). Returns a pointer to 0 for free models (0x cost).
 func LookupMultiplier(modelName string) *float64 {
-	ensureMultipliersLoaded()
+	_ = ensureMultipliersLoaded(context.Background())
 
 	// Try exact match first.
 	if m, ok := multipliersByName[modelName]; ok {
@@ -62,34 +108,77 @@ func LookupMultiplier(modelName string) *float64 {
 }
 
 // ResetMultipliersForTesting clears cached multiplier data.
+// Only use in serial tests.
 func ResetMultipliersForTesting() {
-	multipliersOnce = sync.Once{}
-	multipliersByName = nil
+	setMultipliersLoaderForTesting(nil, false)
 }
 
-func loadMultipliers() map[string]ModelMultiplier {
-	path := config.MultipliersFile()
+// SetMultipliersLoaderForTesting overrides the multiplier loader for tests.
+// Returns a cleanup function that restores the original loader.
+func SetMultipliersLoaderForTesting(loader func(context.Context) (map[string]ModelMultiplier, error)) func() {
+	old := setMultipliersLoaderForTesting(loader, true)
+	return func() {
+		setMultipliersLoaderForTesting(old, true)
+	}
+}
 
-	if data := readMultipliersCacheIfFresh(path); data != nil {
-		return data
+func setMultipliersLoaderForTesting(loader func(context.Context) (map[string]ModelMultiplier, error), replace bool) func(context.Context) (map[string]ModelMultiplier, error) {
+	for {
+		multipliersMu.Lock()
+		if done := multipliersLoading; done != nil {
+			multipliersMu.Unlock()
+			<-done
+			continue
+		}
+		old := multipliersLoader
+		if replace {
+			multipliersLoader = loader
+		}
+		multipliersLoaded = false
+		multipliersByName = nil
+		multipliersMu.Unlock()
+		return old
+	}
+}
+
+func loadMultipliers(ctx context.Context) (map[string]ModelMultiplier, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("loading copilot multipliers: %w", err)
 	}
 
-	raw, err := fetchMultipliersYAML()
+	path := config.MultipliersFile()
+	if data := readMultipliersCacheIfFresh(path); data != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("loading copilot multipliers: %w", err)
+		}
+		return data, nil
+	}
+
+	raw, err := fetchMultipliersYAML(ctx)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("loading copilot multipliers: %w", ctxErr)
+		}
 		// Network failed — serve stale cache.
 		if data := readMultipliersCache(path); data != nil {
-			return data
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, fmt.Errorf("loading copilot multipliers: %w", ctxErr)
+			}
+			return data, nil
 		}
-		return nil
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("loading copilot multipliers: %w", ctxErr)
+		}
+		return nil, nil
 	}
 
 	entries := parseMultipliersYAML(raw)
 	if entries == nil {
-		return nil
+		return nil, nil
 	}
 
 	_ = writeMultipliersCache(path, entries)
-	return indexByName(entries)
+	return indexByName(entries), nil
 }
 
 func readMultipliersCacheIfFresh(path string) map[string]ModelMultiplier {
@@ -126,9 +215,9 @@ func writeMultipliersCache(path string, entries []ModelMultiplier) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func fetchMultipliersYAML() (string, error) {
+func fetchMultipliersYAML(ctx context.Context) (string, error) {
 	client := httpclient.NewWithTimeout(15 * time.Second)
-	resp, err := client.DoCtx(context.Background(), "GET", multipliersURL, nil)
+	resp, err := client.DoCtx(ctx, "GET", multipliersURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("fetching copilot multipliers: %w", err)
 	}

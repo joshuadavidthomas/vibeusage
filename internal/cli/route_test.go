@@ -2,14 +2,43 @@ package cli
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/catalog"
 	"github.com/joshuadavidthomas/vibeusage/internal/display"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/routing"
 )
+
+func TestPreloadModelDataReturnsCancellationWithoutSpinner(t *testing.T) {
+	catalog.ResetForTesting()
+	catalog.ResetMultipliersForTesting()
+	t.Cleanup(catalog.ResetForTesting)
+	t.Cleanup(catalog.ResetMultipliersForTesting)
+
+	oldQuiet := quiet
+	quiet = true
+	t.Cleanup(func() { quiet = oldQuiet })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := preloadModelData(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("preloadModelData() error = %v, want context.Canceled", err)
+	}
+
+	cmd := &cobra.Command{}
+	cmd.SetContext(ctx)
+	if err := routeCmd.RunE(cmd, nil); !errors.Is(err, context.Canceled) {
+		t.Fatalf("route command error = %v, want context.Canceled", err)
+	}
+}
 
 func TestDisplayRecommendation_NoBest(t *testing.T) {
 	rec := routing.Recommendation{

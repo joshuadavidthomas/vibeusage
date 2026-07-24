@@ -2,14 +2,16 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
 
 // testData returns a minimal models.dev-shaped fixture for testing.
-func testData() map[string]modelsDevProvider {
+func testData(context.Context) (map[string]modelsDevProvider, error) {
 	return map[string]modelsDevProvider{
 		"anthropic": {
 			ID:   "anthropic",
@@ -73,7 +75,7 @@ func testData() map[string]modelsDevProvider {
 				"glm-4.7": {ID: "glm-4.7", Name: "GLM-4.7", Family: "glm"},
 			},
 		},
-	}
+	}, nil
 }
 
 func setupTest(t *testing.T) {
@@ -309,7 +311,9 @@ func TestListModelsForProvider_Unknown(t *testing.T) {
 
 func TestRegistryConsistency(t *testing.T) {
 	setupTest(t)
-	ensureLoaded()
+	if err := ensureLoaded(context.Background()); err != nil {
+		t.Fatalf("ensureLoaded() error = %v", err)
+	}
 
 	// Every alias should resolve to a valid canonical model.
 	for alias, canonical := range registryAlias {
@@ -392,8 +396,8 @@ func TestInferredProviders(t *testing.T) {
 }
 
 func TestEmptyData(t *testing.T) {
-	cleanup := SetLoaderForTesting(func() map[string]modelsDevProvider {
-		return nil
+	cleanup := SetLoaderForTesting(func(context.Context) (map[string]modelsDevProvider, error) {
+		return nil, nil
 	})
 	t.Cleanup(cleanup)
 
@@ -412,7 +416,14 @@ func TestPreload_MakesDataAvailable(t *testing.T) {
 	cleanup := SetLoaderForTesting(testData)
 	t.Cleanup(cleanup)
 
-	Preload(context.Background())
+	multipliersCleanup := SetMultipliersLoaderForTesting(func(context.Context) (map[string]ModelMultiplier, error) {
+		return nil, nil
+	})
+	t.Cleanup(multipliersCleanup)
+
+	if err := Preload(context.Background()); err != nil {
+		t.Fatalf("Preload() error = %v", err)
+	}
 
 	if len(ListModels()) == 0 {
 		t.Error("expected models to be available after Preload")
@@ -423,11 +434,171 @@ func TestPreload_Idempotent(t *testing.T) {
 	cleanup := SetLoaderForTesting(testData)
 	t.Cleanup(cleanup)
 
-	Preload(context.Background())
-	Preload(context.Background()) // second call must not panic or reset data
+	multipliersCleanup := SetMultipliersLoaderForTesting(func(context.Context) (map[string]ModelMultiplier, error) {
+		return nil, nil
+	})
+	t.Cleanup(multipliersCleanup)
+
+	if err := Preload(context.Background()); err != nil {
+		t.Fatalf("first Preload() error = %v", err)
+	}
+	if err := Preload(context.Background()); err != nil {
+		t.Fatalf("second Preload() error = %v", err)
+	}
 
 	if len(ListModels()) == 0 {
 		t.Error("expected models to remain available after double Preload")
+	}
+}
+
+func TestPreload_CanceledLoadRetries(t *testing.T) {
+	started := make(chan struct{})
+	calls := 0
+	cleanup := SetLoaderForTesting(func(ctx context.Context) (map[string]modelsDevProvider, error) {
+		calls++
+		if calls == 1 {
+			close(started)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		return testData(ctx)
+	})
+	t.Cleanup(cleanup)
+
+	multiplierCalls := 0
+	multipliersCleanup := SetMultipliersLoaderForTesting(func(context.Context) (map[string]ModelMultiplier, error) {
+		multiplierCalls++
+		return nil, nil
+	})
+	t.Cleanup(multipliersCleanup)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Preload(ctx)
+	}()
+	<-started
+	cancel()
+
+	if err := <-errCh; !errors.Is(err, context.Canceled) {
+		t.Fatalf("first Preload() error = %v, want context.Canceled", err)
+	}
+
+	registryMu.Lock()
+	loaded := registryLoaded
+	models := registryModels
+	registryMu.Unlock()
+	if loaded || models != nil {
+		t.Fatalf("canceled load published registry: loaded=%v models=%v", loaded, models)
+	}
+	if multiplierCalls != 0 {
+		t.Fatalf("multiplier loader calls after model cancellation = %d, want 0", multiplierCalls)
+	}
+
+	if err := Preload(context.Background()); err != nil {
+		t.Fatalf("second Preload() error = %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("model loader calls = %d, want 2", calls)
+	}
+	if multiplierCalls != 1 {
+		t.Fatalf("multiplier loader calls = %d, want 1", multiplierCalls)
+	}
+	if Lookup("claude-sonnet-4-6") == nil {
+		t.Fatal("second preload did not publish model data")
+	}
+}
+
+func TestPreload_CanceledMultiplierLoadRetries(t *testing.T) {
+	cleanup := SetLoaderForTesting(testData)
+	t.Cleanup(cleanup)
+
+	started := make(chan struct{})
+	calls := 0
+	multipliersCleanup := SetMultipliersLoaderForTesting(func(ctx context.Context) (map[string]ModelMultiplier, error) {
+		calls++
+		if calls == 1 {
+			close(started)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		return map[string]ModelMultiplier{"GPT-4o": {Name: "GPT-4o"}}, nil
+	})
+	t.Cleanup(multipliersCleanup)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- Preload(ctx)
+	}()
+	<-started
+	cancel()
+
+	if err := <-errCh; !errors.Is(err, context.Canceled) {
+		t.Fatalf("first Preload() error = %v, want context.Canceled", err)
+	}
+
+	multipliersMu.Lock()
+	loaded := multipliersLoaded
+	data := multipliersByName
+	multipliersMu.Unlock()
+	if loaded || data != nil {
+		t.Fatalf("canceled load published multipliers: loaded=%v data=%v", loaded, data)
+	}
+
+	if err := Preload(context.Background()); err != nil {
+		t.Fatalf("second Preload() error = %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("multiplier loader calls = %d, want 2", calls)
+	}
+}
+
+func TestConcurrentLazyLoadPublishesOnce(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	calls := 0
+	cleanup := SetLoaderForTesting(func(ctx context.Context) (map[string]modelsDevProvider, error) {
+		calls++
+		close(started)
+		select {
+		case <-release:
+			return testData(ctx)
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	})
+	t.Cleanup(cleanup)
+
+	const waiters = 16
+	var wg sync.WaitGroup
+	wg.Add(waiters)
+	for range waiters {
+		go func() {
+			defer wg.Done()
+			if Lookup("claude-sonnet-4-6") == nil {
+				t.Error("Lookup() = nil after concurrent load")
+			}
+		}()
+	}
+	<-started
+	close(release)
+	wg.Wait()
+
+	if calls != 1 {
+		t.Fatalf("loader calls = %d, want 1", calls)
+	}
+}
+
+func TestFetchHelpersHonorCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := fetchModelsDevAPI(ctx); !errors.Is(err, context.Canceled) {
+		t.Errorf("fetchModelsDevAPI() error = %v, want context.Canceled", err)
+	}
+	if _, err := fetchMultipliersYAML(ctx); !errors.Is(err, context.Canceled) {
+		t.Errorf("fetchMultipliersYAML() error = %v, want context.Canceled", err)
 	}
 }
 

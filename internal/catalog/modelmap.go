@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -22,57 +23,125 @@ type ModelInfo struct {
 }
 
 var (
-	initOnce       sync.Once
-	registryModels map[string]ModelInfo
-	registryAlias  map[string]string
+	registryMu      sync.Mutex
+	registryLoaded  bool
+	registryLoading chan struct{}
+	registryModels  map[string]ModelInfo
+	registryAlias   map[string]string
 
 	// dataLoader is the function that loads models.dev data.
 	// Tests can override this to avoid network calls.
 	dataLoader = loadModelsDevData
 )
 
-func ensureLoaded() {
-	initOnce.Do(func() {
-		data := dataLoader()
-		if data != nil {
-			registryModels, registryAlias = buildRegistry(data)
+func ensureLoaded(ctx context.Context) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("loading model registry: %w", err)
 		}
-		if registryModels == nil {
-			registryModels = make(map[string]ModelInfo)
+
+		registryMu.Lock()
+		if registryLoaded {
+			registryMu.Unlock()
+			return nil
 		}
-		if registryAlias == nil {
-			registryAlias = make(map[string]string)
+		if done := registryLoading; done != nil {
+			registryMu.Unlock()
+			select {
+			case <-done:
+				continue
+			case <-ctx.Done():
+				return fmt.Errorf("waiting for model registry: %w", ctx.Err())
+			}
 		}
-	})
+
+		done := make(chan struct{})
+		registryLoading = done
+		loader := dataLoader
+		registryMu.Unlock()
+
+		data, err := loader(ctx)
+		if err == nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				err = fmt.Errorf("loading model registry: %w", ctxErr)
+			}
+		}
+
+		var models map[string]ModelInfo
+		var aliases map[string]string
+		if err == nil && data != nil {
+			models, aliases = buildRegistry(data)
+		}
+		if err == nil {
+			if models == nil {
+				models = make(map[string]ModelInfo)
+			}
+			if aliases == nil {
+				aliases = make(map[string]string)
+			}
+		}
+
+		registryMu.Lock()
+		if err == nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				err = fmt.Errorf("loading model registry: %w", ctxErr)
+			} else {
+				registryModels = models
+				registryAlias = aliases
+				registryLoaded = true
+			}
+		}
+		registryLoading = nil
+		close(done)
+		registryMu.Unlock()
+		return err
+	}
 }
 
 // ResetForTesting clears the cached registry so the next call re-initializes.
-// Only use in tests.
+// Only use in serial tests.
 func ResetForTesting() {
-	initOnce = sync.Once{}
-	registryModels = nil
-	registryAlias = nil
+	setLoaderForTesting(nil, false)
 }
 
 // SetLoaderForTesting overrides the data loader for tests.
 // Returns a cleanup function that restores the original loader.
-func SetLoaderForTesting(loader func() map[string]modelsDevProvider) func() {
-	old := dataLoader
-	dataLoader = loader
-	ResetForTesting()
+func SetLoaderForTesting(loader func(context.Context) (map[string]modelsDevProvider, error)) func() {
+	old := setLoaderForTesting(loader, true)
 	return func() {
-		dataLoader = old
-		ResetForTesting()
+		setLoaderForTesting(old, true)
+	}
+}
+
+func setLoaderForTesting(loader func(context.Context) (map[string]modelsDevProvider, error), replace bool) func(context.Context) (map[string]modelsDevProvider, error) {
+	for {
+		registryMu.Lock()
+		if done := registryLoading; done != nil {
+			registryMu.Unlock()
+			<-done
+			continue
+		}
+		old := dataLoader
+		if replace {
+			dataLoader = loader
+		}
+		registryLoaded = false
+		registryModels = nil
+		registryAlias = nil
+		registryMu.Unlock()
+		return old
 	}
 }
 
 // Preload explicitly loads model registry data and Copilot multipliers, making
 // the network fetch (if needed) happen at a known point instead of silently on
-// the first Lookup call. Safe to call multiple times — subsequent calls are
-// no-ops. ctx is accepted for future cancellation support.
-func Preload(_ context.Context) {
-	ensureLoaded()
-	ensureMultipliersLoaded()
+// the first Lookup call. Successful loads are idempotent. Canceled or timed-out
+// loads remain retryable.
+func Preload(ctx context.Context) error {
+	if err := ensureLoaded(ctx); err != nil {
+		return err
+	}
+	return ensureMultipliersLoaded(ctx)
 }
 
 // CacheIsFresh reports whether both model-data cache files exist and are within
@@ -93,7 +162,7 @@ func cacheFileFresh(path string) bool {
 // Lookup resolves a model query (canonical ID or alias) to a ModelInfo.
 // Returns nil if the model is not found.
 func Lookup(query string) *ModelInfo {
-	ensureLoaded()
+	_ = ensureLoaded(context.Background())
 	q := normalize(query)
 
 	// Direct canonical match.
@@ -114,7 +183,7 @@ func Lookup(query string) *ModelInfo {
 // Search returns all models whose ID or name contains the query substring.
 // Useful for fuzzy "did you mean?" suggestions.
 func Search(query string) []ModelInfo {
-	ensureLoaded()
+	_ = ensureLoaded(context.Background())
 	q := normalize(query)
 	var results []ModelInfo
 
@@ -150,7 +219,7 @@ func Search(query string) []ModelInfo {
 // This is useful for expanding "claude-opus-4-5" to include dated variants
 // like "claude-opus-4-5-20251101".
 func MatchPrefix(query string) []ModelInfo {
-	ensureLoaded()
+	_ = ensureLoaded(context.Background())
 	q := normalize(query)
 	if q == "" {
 		return nil
@@ -190,7 +259,7 @@ func ProvidersForModel(query string) []string {
 
 // ListModels returns all known models, sorted by ID.
 func ListModels() []ModelInfo {
-	ensureLoaded()
+	_ = ensureLoaded(context.Background())
 	var result []ModelInfo
 	for _, info := range registryModels {
 		result = append(result, info)
@@ -203,7 +272,7 @@ func ListModels() []ModelInfo {
 
 // ListModelsForProvider returns all models available through a given provider.
 func ListModelsForProvider(providerID string) []ModelInfo {
-	ensureLoaded()
+	_ = ensureLoaded(context.Background())
 	var result []ModelInfo
 	for _, info := range registryModels {
 		for _, pid := range info.Providers {
