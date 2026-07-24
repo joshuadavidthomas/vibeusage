@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -25,7 +26,15 @@ var (
 	yellow = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	dim    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	bold   = lipgloss.NewStyle().Bold(true)
+
+	stdinEnterWaiter = enterWaiter{reader: os.Stdin}
 )
+
+type enterWaiter struct {
+	reader io.Reader
+	mu     sync.Mutex
+	done   chan struct{}
+}
 
 // OpenBrowser tries to open a URL in the default browser.
 func OpenBrowser(url string) {
@@ -74,32 +83,54 @@ func WriteOpening(w io.Writer, url string) {
 	OpenBrowser(url)
 }
 
-// PollContext returns a context that is cancelled on SIGINT or after
+// PollContext returns a child of parent that is cancelled on SIGINT or after
 // PollTimeout, whichever comes first. Call cancel to clean up.
-func PollContext() (context.Context, context.CancelFunc) {
-	sigCtx, sigCancel := signal.NotifyContext(context.Background(), os.Interrupt)
+func PollContext(parent context.Context) (context.Context, context.CancelFunc) {
+	sigCtx, sigCancel := signal.NotifyContext(parent, os.Interrupt)
 	ctx, cancel := context.WithTimeout(sigCtx, PollTimeout)
 	return ctx, func() { cancel(); sigCancel() }
 }
 
-// WaitForEnter blocks until the user presses Enter or SIGINT is received.
-// Returns nil on Enter, or a context.Canceled error on interrupt.
-func WaitForEnter() error {
-	sigCtx, sigCancel := signal.NotifyContext(context.Background(), os.Interrupt)
+// WaitForEnter blocks until the user presses Enter, the parent context is
+// cancelled, or SIGINT is received.
+func WaitForEnter(ctx context.Context) error {
+	sigCtx, sigCancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer sigCancel()
+	return stdinEnterWaiter.wait(sigCtx)
+}
 
-	done := make(chan struct{}, 1)
-	go func() {
-		_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
-		done <- struct{}{}
-	}()
-
+func (w *enterWaiter) wait(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	done := w.nextRead()
 	select {
-	case <-sigCtx.Done():
-		return context.Canceled
+	case <-ctx.Done():
+		return ctx.Err()
 	case <-done:
 		return nil
 	}
+}
+
+func (w *enterWaiter) nextRead() <-chan struct{} {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.done != nil {
+		return w.done
+	}
+
+	done := make(chan struct{})
+	w.done = done
+	go func() {
+		_, _ = bufio.NewReader(w.reader).ReadBytes('\n')
+		w.mu.Lock()
+		close(done)
+		if w.done == done {
+			w.done = nil
+		}
+		w.mu.Unlock()
+	}()
+	return done
 }
 
 // PollWait sleeps for the given interval or until the context is cancelled.

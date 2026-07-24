@@ -38,7 +38,10 @@ func (s *DeviceFlowStrategy) IsAvailable() bool {
 }
 
 func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	creds := s.loadCredentials()
+	creds, err := s.loadCredentials()
+	if err != nil {
+		return fetch.FetchResult{}, err
+	}
 	if creds == nil {
 		return fetch.ResultFail("No OAuth credentials found. Run `vibeusage auth kimicode` to authenticate."), nil
 	}
@@ -58,10 +61,13 @@ func (s *DeviceFlowStrategy) Fetch(ctx context.Context) (fetch.FetchResult, erro
 	return fetchUsage(ctx, creds.AccessToken, "device_flow", s.HTTPTimeout)
 }
 
-func (s *DeviceFlowStrategy) loadCredentials() *oauth.Credentials {
+func (s *DeviceFlowStrategy) loadCredentials() (*oauth.Credentials, error) {
 	data, err := config.ReadCredential("kimicode", "oauth")
-	if err != nil || data == nil {
-		return nil
+	if err != nil {
+		return nil, fmt.Errorf("read kimicode credentials: %w", err)
+	}
+	if data == nil {
+		return nil, nil
 	}
 
 	// Try current RFC3339 format first
@@ -70,19 +76,22 @@ func (s *DeviceFlowStrategy) loadCredentials() *oauth.Credentials {
 		// If ExpiresAt looks like a number string, it might be a
 		// partially-migrated legacy credential; skip to migration.
 		if _, parseErr := time.Parse(time.RFC3339, creds.ExpiresAt); creds.ExpiresAt == "" || parseErr == nil {
-			return &creds
+			return &creds, nil
 		}
 	}
 
 	// Try legacy float64 timestamp format and migrate
 	if migrated := migrateCredentials(data); migrated != nil {
-		// Write back in the new format so future loads are fast
-		if content, err := json.Marshal(migrated); err == nil {
-			_ = config.WriteCredential("kimicode", "oauth", content)
+		content, err := json.Marshal(migrated)
+		if err != nil {
+			return nil, fmt.Errorf("encode migrated kimicode credentials: %w", err)
 		}
-		return migrated
+		if err := config.WriteCredential("kimicode", "oauth", content); err != nil {
+			return nil, fmt.Errorf("save migrated kimicode credentials: %w", err)
+		}
+		return migrated, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func (s *DeviceFlowStrategy) refreshToken(ctx context.Context, creds *oauth.Credentials) *oauth.Credentials {

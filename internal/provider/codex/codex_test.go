@@ -663,6 +663,51 @@ func TestFetch_RefreshesNoExpiryTokenAfterUnauthorized(t *testing.T) {
 	}
 }
 
+func TestAuth_ReturnsParentCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	flow := Codex{}.Auth().(provider.CustomAuthFlow)
+	_, err := flow.RunFlow(ctx, &bytes.Buffer{}, true)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunFlow() error = %v, want wrapped context.Canceled", err)
+	}
+	if err == context.Canceled {
+		t.Fatal("RunFlow() should add credential-check context to the cancellation error")
+	}
+}
+
+func TestAuth_ReturnsCancellationDuringCredentialCheck(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CODEX_HOME", "")
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+
+	old := readKeychainSecret
+	t.Cleanup(func() { readKeychainSecret = old })
+	started := make(chan struct{})
+	release := make(chan struct{})
+	readKeychainSecret = func(string, string) (string, error) {
+		close(started)
+		<-release
+		return "", errors.New("no entry")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		flow := Codex{}.Auth().(provider.CustomAuthFlow)
+		_, err := flow.RunFlow(ctx, &bytes.Buffer{}, true)
+		errCh <- err
+	}()
+	<-started
+	cancel()
+	close(release)
+
+	if err := <-errCh; !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunFlow() error = %v, want wrapped context.Canceled", err)
+	}
+}
+
 func TestAuth_FailsWhenNoCanonicalSource(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("CODEX_HOME", "")
@@ -675,7 +720,7 @@ func TestAuth_FailsWhenNoCanonicalSource(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	success, err := flow.RunFlow(&buf, false)
+	success, err := flow.RunFlow(context.Background(), &buf, false)
 	if success {
 		t.Error("RunFlow() success = true, want false (no creds detected)")
 	}
@@ -696,7 +741,7 @@ func TestAuth_SucceedsWhenCanonicalSourcePresent(t *testing.T) {
 	writeCodexCLICreds(t, home)
 
 	flow := Codex{}.Auth().(provider.CustomAuthFlow)
-	success, err := flow.RunFlow(&bytes.Buffer{}, true)
+	success, err := flow.RunFlow(context.Background(), &bytes.Buffer{}, true)
 	if err != nil {
 		t.Fatalf("RunFlow() err = %v", err)
 	}

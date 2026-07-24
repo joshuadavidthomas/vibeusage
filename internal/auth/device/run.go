@@ -1,6 +1,7 @@
 package device
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -75,15 +76,19 @@ type oauthCredentials struct {
 	ExpiresAt    string `json:"expires_at,omitempty"`
 }
 
-// Run executes a standard OAuth device code flow.
-// Returns true on success, false on user cancellation or timeout.
-func Run(w io.Writer, quiet bool, cfg Config) (bool, error) {
+// Run executes a standard OAuth device code flow. It returns true on success
+// and false on authorization denial, interrupt, or the internal poll timeout.
+// Parent cancellation is returned as a wrapped context error.
+func Run(ctx context.Context, w io.Writer, quiet bool, cfg Config) (bool, error) {
 	client := httpclient.NewFromConfig(cfg.HTTPTimeout)
 
 	// Request device code.
 	var dcResp deviceCodeResponse
-	resp, err := client.PostForm(cfg.DeviceCodeURL, cfg.DeviceCodeParams, &dcResp, cfg.HTTPOptions...)
+	resp, err := client.PostFormCtx(ctx, cfg.DeviceCodeURL, cfg.DeviceCodeParams, &dcResp, cfg.HTTPOptions...)
 	if err != nil {
+		if ctx.Err() != nil {
+			return false, fmt.Errorf("failed to request device code: %w", ctx.Err())
+		}
 		return false, fmt.Errorf("failed to request device code: %w", err)
 	}
 	if resp.JSONErr != nil {
@@ -119,7 +124,10 @@ func Run(w io.Writer, quiet bool, cfg Config) (bool, error) {
 		if cfg.ManualCodeEntry {
 			_, _ = fmt.Fprintf(w, "Copy this code: %s\n", displayCode)
 			_, _ = fmt.Fprintf(w, "Press Enter to open %s", openURI)
-			if err := WaitForEnter(); err != nil {
+			if err := WaitForEnter(ctx); err != nil {
+				if ctx.Err() != nil {
+					return false, fmt.Errorf("waiting to open authorization page: %w", ctx.Err())
+				}
 				return false, nil
 			}
 			WriteOpening(w, openURI)
@@ -140,22 +148,28 @@ func Run(w io.Writer, quiet bool, cfg Config) (bool, error) {
 	}
 	tokenParams["device_code"] = deviceCode
 
-	ctx, cancel := PollContext()
+	pollCtx, cancel := PollContext(ctx)
 	defer cancel()
 
 	// Poll for token.
 	first := true
 	for {
 		if !first {
-			if !PollWait(ctx, interval) {
+			if !PollWait(pollCtx, interval) {
 				break
 			}
 		}
 		first = false
 
 		var tokenResp tokenResponse
-		pollResp, err := client.PostForm(cfg.TokenURL, tokenParams, &tokenResp, cfg.HTTPOptions...)
+		pollResp, err := client.PostFormCtx(pollCtx, cfg.TokenURL, tokenParams, &tokenResp, cfg.HTTPOptions...)
 		if err != nil {
+			if ctx.Err() != nil {
+				return false, fmt.Errorf("polling for access token: %w", ctx.Err())
+			}
+			if pollCtx.Err() != nil {
+				break
+			}
 			continue
 		}
 		if pollResp.JSONErr != nil {
@@ -163,17 +177,9 @@ func Run(w io.Writer, quiet bool, cfg Config) (bool, error) {
 		}
 
 		if tokenResp.AccessToken != "" {
-			creds := oauthCredentials{
-				AccessToken:  tokenResp.AccessToken,
-				RefreshToken: tokenResp.RefreshToken,
+			if err := saveCredentials(cfg, tokenResp); err != nil {
+				return false, err
 			}
-			if tokenResp.ExpiresIn > 0 {
-				creds.ExpiresAt = time.Now().UTC().Add(
-					time.Duration(tokenResp.ExpiresIn) * time.Second,
-				).Format(time.RFC3339)
-			}
-			content, _ := json.Marshal(creds)
-			_ = config.WriteCredential(cfg.ProviderID, cfg.CredType, content)
 
 			if !quiet {
 				WriteSuccess(w)
@@ -211,8 +217,32 @@ func Run(w io.Writer, quiet bool, cfg Config) (bool, error) {
 		}
 	}
 
+	if ctx.Err() != nil {
+		return false, fmt.Errorf("polling for access token: %w", ctx.Err())
+	}
 	if !quiet {
 		WriteTimeout(w)
 	}
 	return false, nil
+}
+
+func saveCredentials(cfg Config, tokenResp tokenResponse) error {
+	creds := oauthCredentials{
+		AccessToken:  tokenResp.AccessToken,
+		RefreshToken: tokenResp.RefreshToken,
+	}
+	if tokenResp.ExpiresIn > 0 {
+		creds.ExpiresAt = time.Now().UTC().Add(
+			time.Duration(tokenResp.ExpiresIn) * time.Second,
+		).Format(time.RFC3339)
+	}
+
+	content, err := json.Marshal(creds)
+	if err != nil {
+		return fmt.Errorf("encode %s credentials: %w", cfg.ProviderID, err)
+	}
+	if err := config.WriteCredential(cfg.ProviderID, cfg.CredType, content); err != nil {
+		return fmt.Errorf("save %s credentials: %w", cfg.ProviderID, err)
+	}
+	return nil
 }

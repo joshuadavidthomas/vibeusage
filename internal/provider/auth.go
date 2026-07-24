@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,7 +30,7 @@ func (DeviceAuthFlow) authFlow() {}
 // CustomAuthFlow wraps a provider-specific auth function that doesn't fit
 // the standard device code or manual key patterns (e.g. localhost OAuth redirect).
 type CustomAuthFlow struct {
-	RunFlow func(w io.Writer, quiet bool) (bool, error)
+	RunFlow func(ctx context.Context, w io.Writer, quiet bool) (bool, error)
 }
 
 func (CustomAuthFlow) authFlow() {}

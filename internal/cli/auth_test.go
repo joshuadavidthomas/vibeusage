@@ -2,8 +2,10 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +17,44 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
+
+type contextAuthProvider struct {
+	provider.Provider
+	flow provider.CustomAuthFlow
+}
+
+func (p contextAuthProvider) Auth() provider.AuthFlow {
+	return p.flow
+}
+
+type authContextKey struct{}
+
+func TestAuthProvider_PassesCallerContextToCustomFlow(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	oldQuiet := quiet
+	quiet = true
+	defer func() { quiet = oldQuiet }()
+
+	marker := &struct{}{}
+	ctx := context.WithValue(context.Background(), authContextKey{}, marker)
+	var received context.Context
+	p := contextAuthProvider{flow: provider.CustomAuthFlow{
+		RunFlow: func(ctx context.Context, _ io.Writer, _ bool) (bool, error) {
+			received = ctx
+			return true, nil
+		},
+	}}
+
+	if err := authProvider(ctx, "context-test", p); err != nil {
+		t.Fatalf("authProvider error: %v", err)
+	}
+	if received == nil || received.Value(authContextKey{}) != marker {
+		t.Fatal("custom auth flow did not receive the caller context")
+	}
+}
 
 func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	mock := &prompt.Mock{
@@ -62,7 +102,7 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	p, _ := provider.Get("claude")
-	err := authProvider("claude", p)
+	err := authProvider(context.Background(), "claude", p)
 	if err != nil {
 		t.Fatalf("authProvider(claude) error: %v", err)
 	}
@@ -106,7 +146,7 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	p, _ := provider.Get("cursor")
-	err := authProvider("cursor", p)
+	err := authProvider(context.Background(), "cursor", p)
 	if err != nil {
 		t.Fatalf("authProvider(cursor) error: %v", err)
 	}
@@ -211,7 +251,7 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 
 	// Stub verify so it doesn't make real network calls
 	oldVerify := verifyCredentialsFn
-	verifyCredentialsFn = func(string) bool { return true }
+	verifyCredentialsFn = func(context.Context, string) bool { return true }
 	defer func() { verifyCredentialsFn = oldVerify }()
 
 	mock := &prompt.Mock{
@@ -232,7 +272,7 @@ func TestAuthCopilot_UsesConfirmForReauth(t *testing.T) {
 	config.Override(t, config.DefaultConfig())
 
 	p, _ := provider.Get("copilot")
-	err := authProvider("copilot", p)
+	err := authProvider(context.Background(), "copilot", p)
 	if err != nil {
 		t.Fatalf("authProvider(copilot) error: %v", err)
 	}
@@ -298,7 +338,7 @@ func TestAuthSetup_DisablesAndReenablesExternalCredentials(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	if err := authSetup(); err != nil {
+	if err := authSetup(context.Background()); err != nil {
 		t.Fatalf("authSetup remove error: %v", err)
 	}
 	if config.Get().IsProviderEnabled("gemini") {
@@ -315,7 +355,7 @@ func TestAuthSetup_DisablesAndReenablesExternalCredentials(t *testing.T) {
 	}
 
 	buf.Reset()
-	if err := authSetup(); err != nil {
+	if err := authSetup(context.Background()); err != nil {
 		t.Fatalf("authSetup re-enable error: %v", err)
 	}
 	if !config.Get().IsProviderEnabled("gemini") {
@@ -356,7 +396,7 @@ func TestAuthSetup_FailedAuthKeepsProviderDisabled(t *testing.T) {
 	outWriter = &buf
 	defer func() { outWriter = os.Stdout }()
 
-	if err := authSetup(); err != nil {
+	if err := authSetup(context.Background()); err != nil {
 		t.Fatalf("authSetup error: %v", err)
 	}
 	if config.Get().IsProviderEnabled("cursor") {

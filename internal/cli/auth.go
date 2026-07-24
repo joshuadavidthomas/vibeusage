@@ -31,7 +31,7 @@ var authCmd = &cobra.Command{
 		}
 
 		if len(args) == 0 {
-			return authSetup()
+			return authSetup(cmd.Context())
 		}
 
 		providerID := args[0]
@@ -50,7 +50,7 @@ var authCmd = &cobra.Command{
 			return authSetToken(providerID, p, token)
 		}
 
-		return authProvider(providerID, p)
+		return authProvider(cmd.Context(), providerID, p)
 	},
 }
 
@@ -77,7 +77,7 @@ func init() {
 
 // authSetup runs an interactive multi-select to pick and authenticate
 // providers. Used when `vibeusage auth` is run with no configured providers.
-func authSetup() error {
+func authSetup(ctx context.Context) error {
 	if quiet {
 		outln("Use 'vibeusage auth <provider>' to set up providers")
 		return nil
@@ -179,7 +179,10 @@ func authSetup() error {
 		if !ok {
 			continue
 		}
-		if err := authProvider(pid, p); err != nil {
+		if err := authProvider(ctx, pid, p); err != nil {
+			if ctx.Err() != nil {
+				return err
+			}
 			out("✗ %s: %v\n", pid, err)
 			failed = append(failed, pid)
 		}
@@ -274,7 +277,7 @@ func authStatusCommand() error {
 
 // authProvider dispatches to the appropriate auth flow based on what the
 // provider declares via the Authenticator interface.
-func authProvider(providerID string, p provider.Provider) error {
+func authProvider(ctx context.Context, providerID string, p provider.Provider) error {
 	auth, ok := p.(provider.Authenticator)
 	if !ok {
 		return authGeneric(providerID)
@@ -296,7 +299,7 @@ func authProvider(providerID string, p provider.Provider) error {
 	_, isDevice := flow.(provider.DeviceAuthFlow)
 	_, isCustom := flow.(provider.CustomAuthFlow)
 	verify := isDevice || isCustom
-	if skip, err := offerExistingCredentials(providerID, verify); err != nil {
+	if skip, err := offerExistingCredentials(ctx, providerID, verify); err != nil {
 		return err
 	} else if skip {
 		return enableProvider(providerID)
@@ -307,13 +310,13 @@ func authProvider(providerID string, p provider.Provider) error {
 	switch f := flow.(type) {
 	case provider.DeviceAuthFlow:
 		var success bool
-		success, err = device.Run(outWriter, quiet, f.Config)
+		success, err = device.Run(ctx, outWriter, quiet, f.Config)
 		if err == nil && !success {
 			err = fmt.Errorf("authentication failed")
 		}
 	case provider.CustomAuthFlow:
 		var success bool
-		success, err = f.RunFlow(outWriter, quiet)
+		success, err = f.RunFlow(ctx, outWriter, quiet)
 		if err == nil && !success {
 			err = fmt.Errorf("authentication failed")
 		}
@@ -333,7 +336,7 @@ func authProvider(providerID string, p provider.Provider) error {
 // whether to reuse them. When verify is true, credentials are tested via a
 // real fetch before accepting. Returns (true, nil) if the caller should skip
 // the auth flow.
-func offerExistingCredentials(providerID string, verify bool) (bool, error) {
+func offerExistingCredentials(ctx context.Context, providerID string, verify bool) (bool, error) {
 	hasCreds, source := provider.CheckCredentials(providerID)
 	if !hasCreds || quiet {
 		return false, nil
@@ -356,7 +359,7 @@ func offerExistingCredentials(providerID string, verify bool) (bool, error) {
 	}
 
 	if verify {
-		if verifyCredentialsFn(providerID) {
+		if verifyCredentialsFn(ctx, providerID) {
 			return true, nil
 		}
 		if !quiet {
@@ -373,12 +376,12 @@ func offerExistingCredentials(providerID string, verify bool) (bool, error) {
 // the CLI is refactored away from package-level state.
 var verifyCredentialsFn = verifyCredentialsDefault
 
-func verifyCredentialsDefault(providerID string) bool {
+func verifyCredentialsDefault(parent context.Context, providerID string) bool {
 	p, ok := provider.Get(providerID)
 	if !ok {
 		return false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
 	for _, s := range p.FetchStrategies() {
 		if !s.IsAvailable() {

@@ -112,7 +112,7 @@ func vscdbPath() string {
 }
 
 func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	creds, source := s.loadCredentials()
+	creds, source := s.loadCredentials(ctx)
 	if creds == nil {
 		return fetch.ResultFail("No OAuth credentials found"), nil
 	}
@@ -185,7 +185,7 @@ const (
 	sourceUnmarkedSlot
 )
 
-func (s *OAuthStrategy) loadCredentials() (*oauth.Credentials, credSource) {
+func (s *OAuthStrategy) loadCredentials(ctx context.Context) (*oauth.Credentials, credSource) {
 	// Read the vibeusage slot first, but distinguish legitimately-minted
 	// credentials (carrying the vibeusage_owned marker, written by
 	// RunAuthFlow / saveAntigravityCredentials) from buggy-era residue (the
@@ -210,7 +210,7 @@ func (s *OAuthStrategy) loadCredentials() (*oauth.Credentials, credSource) {
 	}
 
 	// Try reading from Antigravity's VS Code state database.
-	if result := loadFromVSCDB(); result != nil {
+	if result := loadFromVSCDB(ctx); result != nil {
 		s.vscdb = result
 		if slotCreds != nil {
 			config.DeleteCredential("antigravity", "oauth")
@@ -304,7 +304,7 @@ type vscdbResult struct {
 // "antigravityAuthStatus" key. The apiKey field contains a Google OAuth
 // access token (ya29.*), and the userStatusProtoBinaryBase64 field contains
 // a protobuf blob with subscription tier info.
-func loadFromVSCDB() *vscdbResult {
+func loadFromVSCDB(ctx context.Context) *vscdbResult {
 	dbPath := vscdbPath()
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil
@@ -312,7 +312,7 @@ func loadFromVSCDB() *vscdbResult {
 
 	// Use sqlite3 CLI to read the auth status — avoids adding a heavy
 	// SQLite library dependency for reading a single key.
-	out, err := exec.Command(
+	out, err := exec.CommandContext(ctx,
 		"sqlite3", dbPath,
 		"SELECT value FROM ItemTable WHERE key = 'antigravityAuthStatus';",
 	).Output()

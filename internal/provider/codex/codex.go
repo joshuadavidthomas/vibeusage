@@ -55,13 +55,21 @@ func (c Codex) FetchStatus(ctx context.Context) models.ProviderStatus {
 // pasted access tokens never refreshed and silently broke once expired.
 func (c Codex) Auth() provider.AuthFlow {
 	return provider.CustomAuthFlow{
-		RunFlow: func(w io.Writer, quiet bool) (bool, error) {
+		RunFlow: func(ctx context.Context, w io.Writer, quiet bool) (bool, error) {
+			if err := ctx.Err(); err != nil {
+				return false, fmt.Errorf("checking Codex CLI credentials: %w", err)
+			}
+
 			// We can only detect what the Codex CLI has already written. If a
 			// canonical source is present, accept it as success; otherwise
 			// instruct the user and return failure so the auth command exits
 			// non-zero (instead of silently no-oping).
 			s := &OAuthStrategy{}
-			if s.IsAvailable() {
+			available := s.IsAvailable()
+			if err := ctx.Err(); err != nil {
+				return false, fmt.Errorf("checking Codex CLI credentials: %w", err)
+			}
+			if available {
 				if !quiet {
 					_, _ = fmt.Fprintln(w, "✓ Codex CLI credentials detected.")
 				}

@@ -353,7 +353,7 @@ func TestLoadCredentials_OwnedSlotWinsOverFile(t *testing.T) {
 	writeAntigravityOwnedSlot(t)
 
 	s := &OAuthStrategy{}
-	creds, source := s.loadCredentials()
+	creds, source := s.loadCredentials(context.Background())
 	if creds == nil {
 		t.Fatal("loadCredentials() returned nil creds")
 	}
@@ -371,7 +371,7 @@ func TestLoadCredentials_UnmarkedSlotMigrates_FilePresent(t *testing.T) {
 	writeAntigravityUnmarkedSlot(t)
 
 	s := &OAuthStrategy{}
-	creds, source := s.loadCredentials()
+	creds, source := s.loadCredentials(context.Background())
 	if creds == nil {
 		t.Fatal("loadCredentials() returned nil creds")
 	}
@@ -391,7 +391,7 @@ func TestLoadCredentials_UnmarkedSlotSurfacesAsBuggyResidue(t *testing.T) {
 	writeAntigravityUnmarkedSlot(t)
 
 	s := &OAuthStrategy{}
-	creds, source := s.loadCredentials()
+	creds, source := s.loadCredentials(context.Background())
 	if creds == nil {
 		t.Fatal("loadCredentials() returned nil creds")
 	}
@@ -431,7 +431,7 @@ func TestLoadCredentials_FileSourceWhenNoSlot(t *testing.T) {
 	writeAntigravityFileCreds(t, cfg)
 
 	s := &OAuthStrategy{}
-	creds, source := s.loadCredentials()
+	creds, source := s.loadCredentials(context.Background())
 	if creds == nil {
 		t.Fatal("loadCredentials() returned nil creds")
 	}
@@ -447,7 +447,7 @@ func TestLoadCredentials_NoneWhenNothingPresent(t *testing.T) {
 	applyAntigravityTestEnv(t)
 
 	s := &OAuthStrategy{}
-	creds, source := s.loadCredentials()
+	creds, source := s.loadCredentials(context.Background())
 	if creds != nil {
 		t.Errorf("creds = %+v, want nil", creds)
 	}
@@ -469,7 +469,7 @@ func TestSaveAntigravityCredentials_RoundTripsAsOwnedSlot(t *testing.T) {
 	}
 
 	s := &OAuthStrategy{}
-	got, source := s.loadCredentials()
+	got, source := s.loadCredentials(context.Background())
 	if got == nil {
 		t.Fatal("loadCredentials() = nil after save")
 	}

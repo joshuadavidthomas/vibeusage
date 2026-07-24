@@ -3,6 +3,8 @@ package kimicode
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
@@ -45,7 +47,11 @@ func TestAPIKeyStrategy_Fetch_NoKey(t *testing.T) {
 
 func TestDeviceFlowStrategy_Fetch_NoCredentials(t *testing.T) {
 	s := &DeviceFlowStrategy{}
-	if s.loadCredentials() != nil {
+	creds, err := s.loadCredentials()
+	if err != nil {
+		t.Fatalf("loadCredentials: %v", err)
+	}
+	if creds != nil {
 		t.Skip("credential file present — skipping no-cred test")
 	}
 
@@ -55,6 +61,28 @@ func TestDeviceFlowStrategy_Fetch_NoCredentials(t *testing.T) {
 	}
 	if result.Success {
 		t.Error("expected non-successful result when no credentials")
+	}
+}
+
+func TestDeviceFlowStrategy_LoadCredentials_MigrationWriteFailure(t *testing.T) {
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	legacy := []byte(`{"access_token":"tok","refresh_token":"rt","expires_at":1740000000}`)
+	if err := config.WriteCredential("kimicode", "oauth", legacy); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+	if err := os.Mkdir(config.CredentialsFile()+".tmp", 0o755); err != nil {
+		t.Fatalf("Mkdir temp blocker: %v", err)
+	}
+
+	creds, err := (&DeviceFlowStrategy{}).loadCredentials()
+	if err == nil {
+		t.Fatal("loadCredentials() should return the migration write error")
+	}
+	if creds != nil {
+		t.Errorf("loadCredentials() credentials = %+v, want nil after failed migration", creds)
+	}
+	if !strings.Contains(err.Error(), "save migrated kimicode credentials") {
+		t.Errorf("error should identify the failed migration save, got: %v", err)
 	}
 }
 
