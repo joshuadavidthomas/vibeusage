@@ -24,6 +24,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Added available Codex usage-limit resets to the dashboard, detail view, and JSON output, with expiry timing and public reset activity from codex-resets.com.
 
+### Fixed
+
+- Fixed providers removed through `vibeusage auth` returning on the next run when credentials were still available from a provider CLI or environment variable. Removal now disables the provider across usage, routing, and statusline output until it is re-enabled through auth.
+
 ## [0.10.0]
 
 ### Fixed
