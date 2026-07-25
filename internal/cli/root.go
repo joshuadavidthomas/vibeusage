@@ -29,6 +29,7 @@ import (
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/gemini"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/kimicode"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/minimax"
+	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/opencode"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/openrouter"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/warp"
 	_ "github.com/joshuadavidthomas/vibeusage/internal/provider/zai"
@@ -48,7 +49,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:          "vibeusage",
 	Short:        "Track usage across agentic LLM providers",
-	Long:         "A unified CLI tool that aggregates usage statistics from Amp, Antigravity, Claude, Codex, Copilot, Cursor, Gemini, Kimi Code, Minimax, OpenRouter, Warp, and Z.ai.",
+	Long:         "A unified CLI tool that aggregates usage statistics from Amp, Antigravity, Claude, Codex, Copilot, Cursor, Gemini, Kimi Code, Minimax, OpenCode, OpenRouter, Warp, and Z.ai.",
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if verbose && quiet {
