@@ -15,8 +15,8 @@ func TestMeta(t *testing.T) {
 	if m.ID != "opencode" {
 		t.Errorf("id = %q, want %q", m.ID, "opencode")
 	}
-	if m.Name != "OpenCode" {
-		t.Errorf("name = %q, want %q", m.Name, "OpenCode")
+	if m.Name != "OpenCode Go" {
+		t.Errorf("name = %q, want %q", m.Name, "OpenCode Go")
 	}
 	if m.Homepage != "https://opencode.ai" {
 		t.Errorf("homepage = %q, want %q", m.Homepage, "https://opencode.ai")
