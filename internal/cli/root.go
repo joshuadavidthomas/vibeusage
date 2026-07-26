@@ -61,9 +61,9 @@ var rootCmd = &cobra.Command{
 		ctx := logging.WithLogger(cmd.Context(), l)
 		cmd.SetContext(ctx)
 
-		// Load config from disk so malformed files surface a warning.
+		// Load config from disk so invalid files surface a warning.
 		if _, err := config.Init(); err != nil {
-			l.Warn("config file is malformed, using defaults", "err", err)
+			l.Warn("config file is invalid, using defaults", "err", err)
 		}
 
 		// Migrate legacy per-file credentials to consolidated format.

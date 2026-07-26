@@ -63,30 +63,22 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 
 		anyAttempted = true
 
-		resultCh := make(chan fetchAttemptResult, 1)
-		go func() {
-			result, err := strategy.Fetch(ctx)
-			resultCh <- fetchAttemptResult{result: result, err: err}
-		}()
+		attemptCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+		result, fetchErr := strategy.Fetch(attemptCtx)
+		attemptErr := attemptCtx.Err()
+		cancel()
 
-		var result FetchResult
-		var fetchErr error
-
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return FetchOutcome{
 				ProviderID: providerID,
 				Success:    false,
 				Error:      "Context cancelled",
 			}
-		case <-time.After(cfg.Timeout):
+		}
+		if attemptErr == context.DeadlineExceeded {
 			lastErr = "Fetch timed out"
 			continue
-		case r := <-resultCh:
-			result = r.result
-			fetchErr = r.err
 		}
-
 		if fetchErr != nil {
 			lastErr = fetchErr.Error()
 			continue
@@ -152,11 +144,6 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 		Success:    false,
 		Error:      lastErr,
 	}
-}
-
-type fetchAttemptResult struct {
-	result FetchResult
-	err    error
 }
 
 func hasAvailableStrategy(strategies []Strategy) bool {

@@ -233,6 +233,38 @@ func TestLoad_MalformedTOML_ReturnsDefaultsAndError(t *testing.T) {
 	}
 }
 
+func TestLoad_InvalidTimeout_ReturnsDefaultsAndError(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{name: "zero", content: "[fetch]\ntimeout = 0\n"},
+		{name: "negative", content: "[fetch]\ntimeout = -5\n"},
+		{name: "not a number", content: "[fetch]\ntimeout = nan\n"},
+		{name: "infinite", content: "[fetch]\ntimeout = inf\n"},
+		{name: "duration overflow", content: "[fetch]\ntimeout = 1e20\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := setupTempDir(t)
+			path := filepath.Join(dir, "invalid-timeout.toml")
+			writeTestFile(t, path, []byte(tt.content))
+
+			cfg, err := Load(path)
+			if err == nil {
+				t.Fatal("Load() should reject an invalid fetch timeout")
+			}
+			if !strings.Contains(err.Error(), "fetch.timeout must be a finite positive number of seconds") {
+				t.Errorf("error should explain the valid timeout range, got: %v", err)
+			}
+			if cfg.Fetch.Timeout != DefaultConfig().Fetch.Timeout {
+				t.Errorf("Fetch.Timeout = %v, want default %v", cfg.Fetch.Timeout, DefaultConfig().Fetch.Timeout)
+			}
+		})
+	}
+}
+
 func TestLoad_PartialTOML_MergesWithDefaults(t *testing.T) {
 	dir := setupTempDir(t)
 	path := filepath.Join(dir, "partial.toml")

@@ -2,10 +2,12 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -193,7 +195,7 @@ func Get() Config {
 }
 
 // Init loads config from disk and sets the global. Call once at startup.
-// Returns the loaded config and any parse error (defaults are used on error).
+// Returns the loaded config and any config error (defaults are used on error).
 func Init() (Config, error) {
 	c, err := Load("")
 	configMu.Lock()
@@ -223,6 +225,10 @@ func Load(path string) (Config, error) {
 
 	if _, err := toml.Decode(string(data), &cfg); err != nil {
 		return DefaultConfig(), fmt.Errorf("parsing config %s: %w", path, err)
+	}
+	maxTimeoutSeconds := float64(time.Duration(1<<63-1) / time.Second)
+	if cfg.Fetch.Timeout <= 0 || math.IsNaN(cfg.Fetch.Timeout) || math.IsInf(cfg.Fetch.Timeout, 0) || cfg.Fetch.Timeout > maxTimeoutSeconds {
+		return DefaultConfig(), fmt.Errorf("loading config %s: fetch.timeout must be a finite positive number of seconds within the supported duration range", path)
 	}
 
 	// Ensure maps are initialized

@@ -5,7 +5,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
@@ -183,12 +182,14 @@ func TestFetchAllProviders_OnCompleteCallback(t *testing.T) {
 
 func TestFetchAllProviders_ContextCancellation(t *testing.T) {
 	cfg := defaultTestOrchestratorCfg()
+	started := make(chan struct{})
 
 	providerMap := map[string][]Strategy{
 		"blocking": {
 			&mockStrategy{
 				available: true,
 				fetchFn: func(ctx context.Context) (FetchResult, error) {
+					close(started)
 					<-ctx.Done()
 					return ResultFail("cancelled"), ctx.Err()
 				},
@@ -197,12 +198,13 @@ func TestFetchAllProviders_ContextCancellation(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	outcomesCh := make(chan map[string]FetchOutcome, 1)
 	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
+		outcomesCh <- FetchAllProviders(ctx, providerMap, false, cfg, nil)
 	}()
-
-	outcomes := FetchAllProviders(ctx, providerMap, false, cfg, nil)
+	<-started
+	cancel()
+	outcomes := <-outcomesCh
 
 	o, ok := outcomes["blocking"]
 	if !ok {
@@ -221,6 +223,8 @@ func TestFetchAllProviders_ConcurrencyLimit(t *testing.T) {
 
 	var concurrentCount atomic.Int32
 	var maxConcurrent atomic.Int32
+	entered := make(chan struct{}, 5)
+	release := make(chan struct{})
 
 	makeStrategy := func(pid string) []Strategy {
 		return []Strategy{
@@ -235,7 +239,8 @@ func TestFetchAllProviders_ConcurrencyLimit(t *testing.T) {
 							break
 						}
 					}
-					time.Sleep(50 * time.Millisecond)
+					entered <- struct{}{}
+					<-release
 					concurrentCount.Add(-1)
 					return ResultOK(testSnapshot(pid, "s", 10)), nil
 				},
@@ -252,7 +257,14 @@ func TestFetchAllProviders_ConcurrencyLimit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	outcomes := FetchAllProviders(ctx, providerMap, false, cfg, nil)
+	outcomesCh := make(chan map[string]FetchOutcome, 1)
+	go func() {
+		outcomesCh <- FetchAllProviders(ctx, providerMap, false, cfg, nil)
+	}()
+	<-entered
+	<-entered
+	close(release)
+	outcomes := <-outcomesCh
 
 	if len(outcomes) != 5 {
 		t.Fatalf("expected 5 outcomes, got %d", len(outcomes))

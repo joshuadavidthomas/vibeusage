@@ -105,22 +105,25 @@ func testSnapshot(provider, source string, utilization int) models.UsageSnapshot
 }
 
 func TestExecutePipeline_ContextCancellation(t *testing.T) {
+	started := make(chan struct{})
 	strategy := &mockStrategy{
 		available: true,
 		fetchFn: func(ctx context.Context) (FetchResult, error) {
+			close(started)
 			<-ctx.Done()
 			return ResultFail("cancelled"), ctx.Err()
 		},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
-	}()
-
 	cfg := defaultTestPipelineCfg()
-	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
+	outcomeCh := make(chan FetchOutcome, 1)
+	go func() {
+		outcomeCh <- ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, cfg)
+	}()
+	<-started
+	cancel()
+	outcome := <-outcomeCh
 	if outcome.Success {
 		t.Error("expected failure for cancelled context")
 	}
@@ -292,16 +295,15 @@ func TestExecutePipeline_EmptyStrategies(t *testing.T) {
 
 func TestExecutePipeline_Timeout(t *testing.T) {
 	cfg := PipelineConfig{
-		Timeout: 50 * time.Millisecond,
-
-		Cache: newMemCache(),
+		Timeout: 10 * time.Millisecond,
+		Cache:   newMemCache(),
 	}
 
 	strategy := &mockStrategy{
 		available: true,
 		fetchFn: func(ctx context.Context) (FetchResult, error) {
-			time.Sleep(500 * time.Millisecond)
-			return ResultOK(testSnapshot("test", "slow", 50)), nil
+			<-ctx.Done()
+			return FetchResult{}, ctx.Err()
 		},
 	}
 
@@ -316,28 +318,41 @@ func TestExecutePipeline_Timeout(t *testing.T) {
 	}
 }
 
-func TestExecutePipeline_TimeoutFallsBackToNextStrategy(t *testing.T) {
+func TestExecutePipeline_TimeoutCancelsBeforeFallingBack(t *testing.T) {
 	type fastStrategy struct{ mockStrategy }
 
 	cfg := PipelineConfig{
-		Timeout: 50 * time.Millisecond,
-
-		Cache: newMemCache(),
+		Timeout: 10 * time.Millisecond,
+		Cache:   newMemCache(),
 	}
+
+	firstCanceled := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	defer close(releaseFirst)
 
 	snap := testSnapshot("test", "fast", 42)
 	strategies := []Strategy{
 		&mockStrategy{
 			available: true,
 			fetchFn: func(ctx context.Context) (FetchResult, error) {
-				time.Sleep(500 * time.Millisecond)
-				return ResultOK(testSnapshot("test", "slow", 0)), nil
+				select {
+				case <-ctx.Done():
+					close(firstCanceled)
+					return FetchResult{}, ctx.Err()
+				case <-releaseFirst:
+					return ResultFail("first strategy released without cancellation"), nil
+				}
 			},
 		},
 		&fastStrategy{mockStrategy{
 			available: true,
 			fetchFn: func(ctx context.Context) (FetchResult, error) {
-				return ResultOK(snap), nil
+				select {
+				case <-firstCanceled:
+					return ResultOK(snap), nil
+				default:
+					return ResultFatal("fallback overlapped timed-out attempt"), nil
+				}
 			},
 		}},
 	}
