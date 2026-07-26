@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -13,6 +14,7 @@ import (
 // invocations before any live fetch is attempted. All configuration is
 // provided via cfg rather than read from a global singleton.
 func ExecutePipeline(ctx context.Context, providerID string, strategies []Strategy, useCache bool, cfg PipelineConfig) FetchOutcome {
+	logger := logging.FromContext(ctx)
 	anyAttempted := false
 	lastErr := ""
 
@@ -20,9 +22,19 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 	// Within the window, serve cache if present; otherwise surface the
 	// cooldown as the error so the user sees why nothing fetched.
 	if useCache && cfg.Throttles != nil && hasAvailableStrategy(strategies) {
-		if marker := cfg.Throttles.Load(providerID); marker != nil {
+		marker, err := cfg.Throttles.Load(providerID)
+		if err != nil {
+			logger.Warn("loading throttle marker failed", "provider", providerID, "err", err)
+			marker = nil
+		}
+		if marker != nil {
 			if cfg.Cache != nil {
-				if cached := cfg.Cache.Load(providerID); cached != nil {
+				cached, err := cfg.Cache.Load(providerID)
+				if err != nil {
+					logger.Warn("loading cached snapshot failed", "provider", providerID, "err", err)
+					cached = nil
+				}
+				if cached != nil {
 					return FetchOutcome{
 						ProviderID: providerID,
 						Success:    true,
@@ -45,7 +57,12 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 	}
 
 	if useCache && cfg.Cache != nil && cfg.FreshCacheTTL > 0 && hasAvailableStrategy(strategies) {
-		if cached := cfg.Cache.Load(providerID); isFreshSnapshot(cached, cfg.FreshCacheTTL) {
+		cached, err := cfg.Cache.Load(providerID)
+		if err != nil {
+			logger.Warn("loading cached snapshot failed", "provider", providerID, "err", err)
+			cached = nil
+		}
+		if isFreshSnapshot(cached, cfg.FreshCacheTTL) {
 			return FetchOutcome{
 				ProviderID: providerID,
 				Success:    true,
@@ -89,15 +106,21 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 			if reason == "" {
 				reason = "Rate limited"
 			}
-			_ = cfg.Throttles.Save(providerID, ThrottleMarker{RetryAt: *result.RetryAfter, Reason: reason})
+			if err := cfg.Throttles.Save(providerID, ThrottleMarker{RetryAt: *result.RetryAfter, Reason: reason}); err != nil {
+				logger.Warn("saving throttle marker failed", "provider", providerID, "err", err)
+			}
 		}
 
 		if result.Success && result.Snapshot != nil {
 			if cfg.Cache != nil {
-				_ = cfg.Cache.Save(*result.Snapshot)
+				if err := cfg.Cache.Save(*result.Snapshot); err != nil {
+					logger.Warn("saving cached snapshot failed", "provider", providerID, "err", err)
+				}
 			}
 			if cfg.Throttles != nil {
-				cfg.Throttles.Clear(providerID)
+				if err := cfg.Throttles.Clear(providerID); err != nil {
+					logger.Warn("clearing throttle marker failed", "provider", providerID, "err", err)
+				}
 			}
 
 			return FetchOutcome{
@@ -124,7 +147,12 @@ func ExecutePipeline(ctx context.Context, providerID string, strategies []Strate
 	// the API failed. This provides resilience when services are down
 	// without misleading unconfigured users with old data.
 	if useCache && cfg.Cache != nil {
-		if cached := cfg.Cache.Load(providerID); cached != nil && anyAttempted {
+		cached, err := cfg.Cache.Load(providerID)
+		if err != nil {
+			logger.Warn("loading cached snapshot failed", "provider", providerID, "err", err)
+			cached = nil
+		}
+		if cached != nil && anyAttempted {
 			return FetchOutcome{
 				ProviderID: providerID,
 				Success:    true,

@@ -8,12 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
@@ -543,7 +546,10 @@ func TestLoadCachedIdentity(t *testing.T) {
 			testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 			tt.setup(t)
 
-			got := loadCachedIdentity()
+			got, err := loadCachedIdentity()
+			if err != nil {
+				t.Fatalf("loadCachedIdentity() error: %v", err)
+			}
 			if tt.wantNil && got != nil {
 				t.Errorf("loadCachedIdentity() = %+v, want nil", got)
 			}
@@ -551,6 +557,52 @@ func TestLoadCachedIdentity(t *testing.T) {
 				t.Error("loadCachedIdentity() = nil, want non-nil")
 			}
 		})
+	}
+}
+
+func TestFetchWithCredentials_CorruptIdentityCacheWarnsAndFetchesLive(t *testing.T) {
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	path := config.SnapshotPath("claude")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("{not json}"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/usage":
+			_, _ = w.Write([]byte(`{"five_hour":{"utilization":10}}`))
+		case "/account":
+			_, _ = w.Write([]byte(`{"email_address":"u@example.com"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	setClaudeOAuthEndpoints(t, server.URL+"/usage", server.URL+"/account")
+	ctx, logs := logging.NewTestContext(logging.Flags{NoColor: true})
+
+	result, _, err := (&OAuthStrategy{}).fetchWithCredentials(
+		ctx,
+		httpclient.NewFromConfig(2),
+		&oauth.Credentials{AccessToken: "token"},
+	)
+
+	if err != nil {
+		t.Fatalf("fetchWithCredentials() error: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("fetchWithCredentials() result: %+v", result)
+	}
+	if result.Snapshot == nil || result.Snapshot.Identity == nil || result.Snapshot.Identity.Email != "u@example.com" {
+		t.Fatalf("expected live account identity, got %+v", result.Snapshot)
+	}
+	for _, want := range []string{"loading cached Claude identity failed", "parsing cached snapshot for claude"} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("log output %q does not contain %q", logs.String(), want)
+		}
 	}
 }
 

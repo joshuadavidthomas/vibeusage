@@ -14,7 +14,7 @@ import (
 // on the filesystem or config package directly.
 type Cache interface {
 	Save(snapshot models.UsageSnapshot) error
-	Load(providerID string) *models.UsageSnapshot
+	Load(providerID string) (*models.UsageSnapshot, error)
 }
 
 // ThrottleMarker is a persisted record that a provider asked us to stop
@@ -29,9 +29,9 @@ type ThrottleMarker struct {
 // Load must return nil once RetryAt has passed, so callers don't need to
 // compare times themselves.
 type ThrottleStore interface {
-	Load(providerID string) *ThrottleMarker
+	Load(providerID string) (*ThrottleMarker, error)
 	Save(providerID string, marker ThrottleMarker) error
-	Clear(providerID string)
+	Clear(providerID string) error
 }
 
 // PipelineConfig holds the parameters that ExecutePipeline needs,

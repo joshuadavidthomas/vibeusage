@@ -62,6 +62,15 @@ func writeTestFile(t *testing.T, path string, content []byte) {
 	}
 }
 
+func mustLoadCachedSnapshot(t *testing.T, providerID string) *models.UsageSnapshot {
+	t.Helper()
+	snapshot, err := LoadCachedSnapshot(providerID)
+	if err != nil {
+		t.Fatalf("LoadCachedSnapshot(%q) error: %v", providerID, err)
+	}
+	return snapshot
+}
+
 // DefaultConfig
 
 func TestDefaultConfig_Values(t *testing.T) {
@@ -721,7 +730,7 @@ func TestCacheSnapshot_LoadCachedSnapshot_Roundtrip(t *testing.T) {
 		t.Fatalf("CacheSnapshot() error: %v", err)
 	}
 
-	loaded := LoadCachedSnapshot("claude")
+	loaded := mustLoadCachedSnapshot(t, "claude")
 	if loaded == nil {
 		t.Fatal("LoadCachedSnapshot() returned nil")
 	}
@@ -745,28 +754,40 @@ func TestCacheSnapshot_LoadCachedSnapshot_Roundtrip(t *testing.T) {
 
 func TestLoadCachedSnapshot_MissingFile_ReturnsNil(t *testing.T) {
 	setupTempDir(t)
-	if got := LoadCachedSnapshot("nonexistent"); got != nil {
+	got, err := LoadCachedSnapshot("nonexistent")
+	if err != nil {
+		t.Fatalf("LoadCachedSnapshot() error: %v", err)
+	}
+	if got != nil {
 		t.Errorf("LoadCachedSnapshot() = %+v, want nil", got)
 	}
 }
 
-func TestLoadCachedSnapshot_MalformedJSON_ReturnsNil(t *testing.T) {
+func TestLoadCachedSnapshot_MalformedJSON_ReturnsError(t *testing.T) {
 	setupTempDir(t)
 	path := SnapshotPath("broken")
 	writeTestFile(t, path, []byte("{not json}"))
 
-	if got := LoadCachedSnapshot("broken"); got != nil {
+	got, err := LoadCachedSnapshot("broken")
+	if got != nil {
 		t.Errorf("LoadCachedSnapshot() = %+v, want nil for malformed JSON", got)
+	}
+	if err == nil || !strings.Contains(err.Error(), "parsing cached snapshot for broken") {
+		t.Errorf("LoadCachedSnapshot() error = %v, want parsing context", err)
 	}
 }
 
-func TestLoadCachedSnapshot_EmptyFile_ReturnsNil(t *testing.T) {
+func TestLoadCachedSnapshot_EmptyFile_ReturnsError(t *testing.T) {
 	setupTempDir(t)
 	path := SnapshotPath("empty")
 	writeTestFile(t, path, []byte(""))
 
-	if got := LoadCachedSnapshot("empty"); got != nil {
+	got, err := LoadCachedSnapshot("empty")
+	if got != nil {
 		t.Errorf("LoadCachedSnapshot() = %+v, want nil for empty file", got)
+	}
+	if err == nil || !strings.Contains(err.Error(), "parsing cached snapshot for empty") {
+		t.Errorf("LoadCachedSnapshot() error = %v, want parsing context", err)
 	}
 }
 
@@ -826,10 +847,10 @@ func TestClearSnapshotCache_SpecificProvider(t *testing.T) {
 
 	ClearSnapshotCache("claude")
 
-	if LoadCachedSnapshot("claude") != nil {
+	if mustLoadCachedSnapshot(t, "claude") != nil {
 		t.Error("claude snapshot should be cleared")
 	}
-	if LoadCachedSnapshot("copilot") == nil {
+	if mustLoadCachedSnapshot(t, "copilot") == nil {
 		t.Error("copilot snapshot should still exist")
 	}
 }
@@ -848,10 +869,10 @@ func TestClearSnapshotCache_AllProviders(t *testing.T) {
 
 	ClearSnapshotCache("")
 
-	if LoadCachedSnapshot("claude") != nil {
+	if mustLoadCachedSnapshot(t, "claude") != nil {
 		t.Error("claude snapshot should be cleared")
 	}
-	if LoadCachedSnapshot("copilot") != nil {
+	if mustLoadCachedSnapshot(t, "copilot") != nil {
 		t.Error("copilot snapshot should be cleared")
 	}
 }
@@ -909,7 +930,7 @@ func TestClearProviderCache_RemovesBoth(t *testing.T) {
 
 	ClearProviderCache("claude")
 
-	if LoadCachedSnapshot("claude") != nil {
+	if mustLoadCachedSnapshot(t, "claude") != nil {
 		t.Error("claude snapshot should be cleared")
 	}
 	if LoadCachedOrgID("claude") != "" {
@@ -937,13 +958,13 @@ func TestClearAllCache_SpecificProvider(t *testing.T) {
 
 	ClearAllCache("claude")
 
-	if LoadCachedSnapshot("claude") != nil {
+	if mustLoadCachedSnapshot(t, "claude") != nil {
 		t.Error("claude snapshot should be cleared")
 	}
 	if LoadCachedOrgID("claude") != "" {
 		t.Error("claude org ID should be cleared")
 	}
-	if LoadCachedSnapshot("copilot") == nil {
+	if mustLoadCachedSnapshot(t, "copilot") == nil {
 		t.Error("copilot snapshot should still exist")
 	}
 	if LoadCachedOrgID("copilot") != "org-2" {
@@ -971,10 +992,10 @@ func TestClearAllCache_AllProviders(t *testing.T) {
 
 	ClearAllCache("")
 
-	if LoadCachedSnapshot("claude") != nil {
+	if mustLoadCachedSnapshot(t, "claude") != nil {
 		t.Error("claude snapshot should be cleared")
 	}
-	if LoadCachedSnapshot("copilot") != nil {
+	if mustLoadCachedSnapshot(t, "copilot") != nil {
 		t.Error("copilot snapshot should be cleared")
 	}
 	if LoadCachedOrgID("claude") != "" {
@@ -1294,7 +1315,7 @@ func TestCacheSnapshot_OverwritesExisting(t *testing.T) {
 		t.Fatalf("CacheSnapshot(v2) error: %v", err)
 	}
 
-	loaded := LoadCachedSnapshot("claude")
+	loaded := mustLoadCachedSnapshot(t, "claude")
 	if loaded == nil {
 		t.Fatal("LoadCachedSnapshot() returned nil")
 	}
@@ -1314,7 +1335,7 @@ func TestCacheSnapshot_MultipleProviders(t *testing.T) {
 	}
 
 	for _, id := range []string{"claude", "copilot", "gemini"} {
-		loaded := LoadCachedSnapshot(id)
+		loaded := mustLoadCachedSnapshot(t, id)
 		if loaded == nil {
 			t.Errorf("LoadCachedSnapshot(%q) returned nil", id)
 			continue
@@ -1362,7 +1383,7 @@ func TestCacheSnapshot_PreservesComplexData(t *testing.T) {
 		t.Fatalf("CacheSnapshot() error: %v", err)
 	}
 
-	loaded := LoadCachedSnapshot("claude")
+	loaded := mustLoadCachedSnapshot(t, "claude")
 	if loaded == nil {
 		t.Fatal("LoadCachedSnapshot() returned nil")
 	}
@@ -1424,6 +1445,113 @@ func TestCacheSnapshot_WritesValidJSON(t *testing.T) {
 	}
 	if !json.Valid(data) {
 		t.Errorf("snapshot file is not valid JSON: %s", data)
+	}
+}
+
+func TestJSONCacheWritesAreAtomic(t *testing.T) {
+	tests := []struct {
+		name string
+		path func() string
+		save func() error
+	}{
+		{
+			name: "snapshot",
+			path: func() string { return SnapshotPath("claude") },
+			save: func() error {
+				return CacheSnapshot(models.UsageSnapshot{Provider: "claude"})
+			},
+		},
+		{
+			name: "throttle",
+			path: func() string { return ThrottlePath("claude") },
+			save: func() error {
+				return SaveThrottle("claude", fetch.ThrottleMarker{RetryAt: time.Now().Add(time.Minute)})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupTempDir(t)
+			path := tt.path()
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatalf("MkdirAll: %v", err)
+			}
+			if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+				t.Fatalf("WriteFile old value: %v", err)
+			}
+			before, err := os.Stat(path)
+			if err != nil {
+				t.Fatalf("Stat() before save: %v", err)
+			}
+
+			if err := tt.save(); err != nil {
+				t.Fatalf("save error: %v", err)
+			}
+
+			after, err := os.Stat(path)
+			if err != nil {
+				t.Fatalf("Stat() after save: %v", err)
+			}
+			if os.SameFile(before, after) {
+				t.Error("save rewrote the destination inode instead of publishing a replacement")
+			}
+			if got := after.Mode().Perm(); got != 0o600 {
+				t.Errorf("file permissions = %o, want preserved mode 0600", got)
+			}
+			pattern := filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+			tempFiles, err := filepath.Glob(pattern)
+			if err != nil {
+				t.Fatalf("Glob() error: %v", err)
+			}
+			if len(tempFiles) != 0 {
+				t.Errorf("temporary files remain after save: %v", tempFiles)
+			}
+		})
+	}
+}
+
+func TestJSONCacheWritesCleanUpTempFileOnRenameFailure(t *testing.T) {
+	tests := []struct {
+		name string
+		path func() string
+		save func() error
+	}{
+		{
+			name: "snapshot",
+			path: func() string { return SnapshotPath("claude") },
+			save: func() error {
+				return CacheSnapshot(models.UsageSnapshot{Provider: "claude"})
+			},
+		},
+		{
+			name: "throttle",
+			path: func() string { return ThrottlePath("claude") },
+			save: func() error {
+				return SaveThrottle("claude", fetch.ThrottleMarker{RetryAt: time.Now().Add(time.Minute)})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupTempDir(t)
+			if err := os.MkdirAll(tt.path(), 0o755); err != nil {
+				t.Fatalf("MkdirAll destination: %v", err)
+			}
+			if err := tt.save(); err == nil {
+				t.Fatal("save succeeded with a directory at the destination path")
+			}
+
+			pattern := filepath.Join(filepath.Dir(tt.path()), "."+filepath.Base(tt.path())+".tmp-*")
+			tempFiles, err := filepath.Glob(pattern)
+			if err != nil {
+				t.Fatalf("Glob() error: %v", err)
+			}
+			if len(tempFiles) != 0 {
+				t.Errorf("temporary files remain after failed save: %v", tempFiles)
+			}
+		})
 	}
 }
 
@@ -1568,7 +1696,10 @@ func TestSaveAndLoadThrottle(t *testing.T) {
 		t.Fatalf("SaveThrottle error: %v", err)
 	}
 
-	loaded := LoadThrottle("claude")
+	loaded, err := LoadThrottle("claude")
+	if err != nil {
+		t.Fatalf("LoadThrottle error: %v", err)
+	}
 	if loaded == nil {
 		t.Fatal("expected throttle marker to load")
 	}
@@ -1588,7 +1719,11 @@ func TestLoadThrottle_ExpiredIsDeleted(t *testing.T) {
 		t.Fatalf("SaveThrottle error: %v", err)
 	}
 
-	if m := LoadThrottle("claude"); m != nil {
+	m, err := LoadThrottle("claude")
+	if err != nil {
+		t.Fatalf("LoadThrottle error: %v", err)
+	}
+	if m != nil {
 		t.Errorf("expected nil for expired marker, got %+v", m)
 	}
 
@@ -1599,8 +1734,25 @@ func TestLoadThrottle_ExpiredIsDeleted(t *testing.T) {
 
 func TestLoadThrottle_MissingReturnsNil(t *testing.T) {
 	setupTempDir(t)
-	if m := LoadThrottle("claude"); m != nil {
+	m, err := LoadThrottle("claude")
+	if err != nil {
+		t.Fatalf("LoadThrottle error: %v", err)
+	}
+	if m != nil {
 		t.Errorf("expected nil for missing marker, got %+v", m)
+	}
+}
+
+func TestLoadThrottle_MalformedJSONReturnsError(t *testing.T) {
+	setupTempDir(t)
+	writeTestFile(t, ThrottlePath("broken"), []byte("{not json}"))
+
+	marker, err := LoadThrottle("broken")
+	if marker != nil {
+		t.Errorf("LoadThrottle() = %+v, want nil", marker)
+	}
+	if err == nil || !strings.Contains(err.Error(), "parsing throttle for broken") {
+		t.Errorf("LoadThrottle() error = %v, want parsing context", err)
 	}
 }
 
@@ -1612,7 +1764,9 @@ func TestClearThrottle(t *testing.T) {
 		t.Fatalf("SaveThrottle error: %v", err)
 	}
 
-	ClearThrottle("claude")
+	if err := ClearThrottle("claude"); err != nil {
+		t.Fatalf("ClearThrottle error: %v", err)
+	}
 
 	if _, err := os.Stat(ThrottlePath("claude")); !os.IsNotExist(err) {
 		t.Error("expected throttle file to be removed after ClearThrottle")
@@ -1629,13 +1783,22 @@ func TestFileThrottleStore_ImplementsInterface(t *testing.T) {
 		t.Fatalf("Save error: %v", err)
 	}
 
-	loaded := store.Load("claude")
+	loaded, err := store.Load("claude")
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
 	if loaded == nil || !loaded.RetryAt.Equal(retryAt) {
 		t.Errorf("Load mismatch: got %+v, want RetryAt=%v", loaded, retryAt)
 	}
 
-	store.Clear("claude")
-	if store.Load("claude") != nil {
+	if err := store.Clear("claude"); err != nil {
+		t.Fatalf("Clear error: %v", err)
+	}
+	loaded, err = store.Load("claude")
+	if err != nil {
+		t.Fatalf("Load after Clear error: %v", err)
+	}
+	if loaded != nil {
 		t.Error("expected nil after Clear")
 	}
 }

@@ -24,23 +24,68 @@ func CacheSnapshot(snapshot models.UsageSnapshot) error {
 	if err != nil {
 		return fmt.Errorf("caching snapshot for %s: %w", snapshot.Provider, err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := atomicWriteFile(path, data); err != nil {
 		return fmt.Errorf("caching snapshot for %s: %w", snapshot.Provider, err)
 	}
 	return nil
 }
 
-func LoadCachedSnapshot(providerID string) *models.UsageSnapshot {
+func LoadCachedSnapshot(providerID string) (*models.UsageSnapshot, error) {
 	path := SnapshotPath(providerID)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading cached snapshot for %s: %w", providerID, err)
 	}
 	var snap models.UsageSnapshot
 	if err := json.Unmarshal(data, &snap); err != nil {
-		return nil
+		return nil, fmt.Errorf("parsing cached snapshot for %s: %w", providerID, err)
 	}
-	return &snap
+	return &snap, nil
+}
+
+func atomicWriteFile(path string, data []byte) (err error) {
+	var (
+		existingMode os.FileMode
+		pathExists   bool
+	)
+	if info, statErr := os.Stat(path); statErr == nil {
+		existingMode = info.Mode().Perm()
+		pathExists = true
+	} else if !os.IsNotExist(statErr) {
+		return statErr
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		if err != nil {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if pathExists {
+		if err = tmp.Chmod(existingMode); err != nil {
+			_ = tmp.Close()
+			return err
+		}
+	}
+	if _, err = tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	if err = os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Org ID caching
@@ -81,7 +126,7 @@ func ClearOrgIDCache(providerID string) {
 func ClearProviderCache(providerID string) {
 	_ = os.Remove(SnapshotPath(providerID))
 	_ = os.Remove(OrgIDPath(providerID))
-	_ = os.Remove(ThrottlePath(providerID))
+	_ = ClearThrottle(providerID)
 }
 
 func ClearSnapshotCache(providerID string) {
@@ -108,7 +153,7 @@ func SaveThrottle(providerID string, marker fetch.ThrottleMarker) error {
 	if err != nil {
 		return fmt.Errorf("saving throttle for %s: %w", providerID, err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := atomicWriteFile(path, data); err != nil {
 		return fmt.Errorf("saving throttle for %s: %w", providerID, err)
 	}
 	return nil
@@ -117,25 +162,33 @@ func SaveThrottle(providerID string, marker fetch.ThrottleMarker) error {
 // LoadThrottle returns the persisted throttle marker for the provider,
 // or nil if none exists or it has expired. Expired markers are deleted
 // lazily so the on-disk state stays tidy.
-func LoadThrottle(providerID string) *fetch.ThrottleMarker {
+func LoadThrottle(providerID string) (*fetch.ThrottleMarker, error) {
 	path := ThrottlePath(providerID)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading throttle for %s: %w", providerID, err)
 	}
 	var m fetch.ThrottleMarker
 	if err := json.Unmarshal(data, &m); err != nil {
-		return nil
+		return nil, fmt.Errorf("parsing throttle for %s: %w", providerID, err)
 	}
 	if time.Now().After(m.RetryAt) {
-		_ = os.Remove(path)
-		return nil
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("deleting expired throttle for %s: %w", providerID, err)
+		}
+		return nil, nil
 	}
-	return &m
+	return &m, nil
 }
 
-func ClearThrottle(providerID string) {
-	_ = os.Remove(ThrottlePath(providerID))
+func ClearThrottle(providerID string) error {
+	if err := os.Remove(ThrottlePath(providerID)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("clearing throttle for %s: %w", providerID, err)
+	}
+	return nil
 }
 
 func ClearModelsCache() {
@@ -170,7 +223,7 @@ func (FileCache) Save(snapshot models.UsageSnapshot) error {
 	return CacheSnapshot(snapshot)
 }
 
-func (FileCache) Load(providerID string) *models.UsageSnapshot {
+func (FileCache) Load(providerID string) (*models.UsageSnapshot, error) {
 	return LoadCachedSnapshot(providerID)
 }
 
@@ -178,7 +231,7 @@ func (FileCache) Load(providerID string) *models.UsageSnapshot {
 // filesystem-based throttle marker helpers.
 type FileThrottleStore struct{}
 
-func (FileThrottleStore) Load(providerID string) *fetch.ThrottleMarker {
+func (FileThrottleStore) Load(providerID string) (*fetch.ThrottleMarker, error) {
 	return LoadThrottle(providerID)
 }
 
@@ -186,6 +239,6 @@ func (FileThrottleStore) Save(providerID string, marker fetch.ThrottleMarker) er
 	return SaveThrottle(providerID, marker)
 }
 
-func (FileThrottleStore) Clear(providerID string) {
-	ClearThrottle(providerID)
+func (FileThrottleStore) Clear(providerID string) error {
+	return ClearThrottle(providerID)
 }

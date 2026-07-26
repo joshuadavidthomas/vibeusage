@@ -2,12 +2,14 @@ package fetch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -22,8 +24,10 @@ func (m *mockStrategy) Fetch(ctx context.Context) (FetchResult, error) { return 
 
 // memCache is a thread-safe in-memory Cache for testing, replacing filesystem deps.
 type memCache struct {
-	mu   sync.Mutex
-	data map[string]models.UsageSnapshot
+	mu      sync.Mutex
+	data    map[string]models.UsageSnapshot
+	loadErr error
+	saveErr error
 }
 
 func newMemCache() *memCache {
@@ -33,57 +37,76 @@ func newMemCache() *memCache {
 func (c *memCache) Save(snap models.UsageSnapshot) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.saveErr != nil {
+		return c.saveErr
+	}
 	c.data[snap.Provider] = snap
 	return nil
 }
 
-func (c *memCache) Load(providerID string) *models.UsageSnapshot {
+func (c *memCache) Load(providerID string) (*models.UsageSnapshot, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.loadErr != nil {
+		return nil, c.loadErr
+	}
 	s, ok := c.data[providerID]
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	return &s
+	return &s, nil
 }
 
 // memThrottles is a thread-safe in-memory ThrottleStore for testing.
 // Load respects RetryAt — callers see nil once the cooldown has passed,
 // matching the filesystem implementation.
 type memThrottles struct {
-	mu   sync.Mutex
-	data map[string]ThrottleMarker
+	mu       sync.Mutex
+	data     map[string]ThrottleMarker
+	loadErr  error
+	saveErr  error
+	clearErr error
 }
 
 func newMemThrottles() *memThrottles {
 	return &memThrottles{data: make(map[string]ThrottleMarker)}
 }
 
-func (t *memThrottles) Load(providerID string) *ThrottleMarker {
+func (t *memThrottles) Load(providerID string) (*ThrottleMarker, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.loadErr != nil {
+		return nil, t.loadErr
+	}
 	m, ok := t.data[providerID]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	if time.Now().After(m.RetryAt) {
 		delete(t.data, providerID)
-		return nil
+		return nil, nil
 	}
-	return &m
+	return &m, nil
 }
 
 func (t *memThrottles) Save(providerID string, marker ThrottleMarker) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.saveErr != nil {
+		return t.saveErr
+	}
 	t.data[providerID] = marker
 	return nil
 }
 
-func (t *memThrottles) Clear(providerID string) {
+func (t *memThrottles) Clear(providerID string) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.clearErr != nil {
+		return t.clearErr
+	}
 	delete(t.data, providerID)
+	return nil
 }
 
 func defaultTestPipelineCfg() PipelineConfig {
@@ -838,7 +861,10 @@ func TestExecutePipeline_SuccessCachesResult(t *testing.T) {
 		t.Fatalf("expected success, got error: %s", outcome.Error)
 	}
 
-	cached := cache.Load("cache-test-provider")
+	cached, err := cache.Load("cache-test-provider")
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
 	if cached == nil {
 		t.Fatal("expected snapshot to be cached after successful fetch")
 	}
@@ -1214,5 +1240,76 @@ func TestExecutePipeline_ExpiredThrottleMarkerIgnored(t *testing.T) {
 	}
 	if !fetchCalled {
 		t.Error("expected live fetch once throttle window expired")
+	}
+}
+
+func TestExecutePipeline_PersistenceErrorsWarnAndPreserveLiveSuccess(t *testing.T) {
+	cache := newMemCache()
+	cache.loadErr = errors.New("cache read failed")
+	cache.saveErr = errors.New("cache write failed")
+	throttles := newMemThrottles()
+	throttles.loadErr = errors.New("throttle read failed")
+	throttles.clearErr = errors.New("throttle clear failed")
+
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(context.Context) (FetchResult, error) {
+			return ResultOK(testSnapshot("test-provider", "mock", 44)), nil
+		},
+	}
+	ctx, logs := logging.NewTestContext(logging.Flags{NoColor: true})
+	cfg := PipelineConfig{
+		Timeout:       30 * time.Second,
+		Cache:         cache,
+		Throttles:     throttles,
+		FreshCacheTTL: time.Minute,
+	}
+
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, true, cfg)
+
+	if !outcome.Success || outcome.Cached {
+		t.Fatalf("expected live success despite persistence errors, got %+v", outcome)
+	}
+	for _, want := range []string{
+		"loading throttle marker failed",
+		"throttle read failed",
+		"loading cached snapshot failed",
+		"cache read failed",
+		"saving cached snapshot failed",
+		"cache write failed",
+		"clearing throttle marker failed",
+		"throttle clear failed",
+		"test-provider",
+	} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("log output %q does not contain %q", logs.String(), want)
+		}
+	}
+}
+
+func TestExecutePipeline_ThrottleSaveErrorWarns(t *testing.T) {
+	throttles := newMemThrottles()
+	throttles.saveErr = errors.New("throttle write failed")
+	retryAt := time.Now().Add(time.Minute)
+	strategy := &mockStrategy{
+		available: true,
+		fetchFn: func(context.Context) (FetchResult, error) {
+			return ResultThrottled("rate limited", retryAt), nil
+		},
+	}
+	ctx, logs := logging.NewTestContext(logging.Flags{NoColor: true})
+
+	outcome := ExecutePipeline(ctx, "test-provider", []Strategy{strategy}, false, PipelineConfig{
+		Timeout:   30 * time.Second,
+		Throttles: throttles,
+	})
+
+	if outcome.Success {
+		t.Fatal("expected throttled fetch to fail")
+	}
+	for _, want := range []string{"saving throttle marker failed", "throttle write failed", "test-provider"} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("log output %q does not contain %q", logs.String(), want)
+		}
 	}
 }

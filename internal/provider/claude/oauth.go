@@ -14,6 +14,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/keychain"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 )
 
@@ -99,7 +100,10 @@ func (s *OAuthStrategy) fetchWithCredentials(ctx context.Context, client *httpcl
 		httpclient.WithHeader("anthropic-beta", anthropicBetaTag),
 	}
 
-	cachedIdentity := loadCachedIdentity()
+	cachedIdentity, err := loadCachedIdentity()
+	if err != nil {
+		logging.FromContext(ctx).Warn("loading cached Claude identity failed", "provider", "claude", "err", err)
+	}
 
 	// Fetch usage, and (when no recent cached identity) account concurrently.
 	// Account enrichment is best-effort — failures are silently ignored.
@@ -176,21 +180,24 @@ func (s *OAuthStrategy) fetchWithCredentials(ctx context.Context, client *httpcl
 }
 
 // loadCachedIdentity returns the cached Claude identity if the on-disk
-// snapshot is within accountReuseTTL and has a populated Identity. Returns
-// nil otherwise, signalling that /oauth/account should be fetched.
-func loadCachedIdentity() *models.ProviderIdentity {
-	cached := config.LoadCachedSnapshot("claude")
+// snapshot is within accountReuseTTL and has a populated Identity. It returns
+// cache errors so the caller can warn, then fetch /oauth/account.
+func loadCachedIdentity() (*models.ProviderIdentity, error) {
+	cached, err := config.LoadCachedSnapshot("claude")
+	if err != nil {
+		return nil, err
+	}
 	if cached == nil || cached.Identity == nil {
-		return nil
+		return nil, nil
 	}
 	if time.Since(cached.FetchedAt) > accountReuseTTL {
-		return nil
+		return nil, nil
 	}
 	id := cached.Identity
 	if id.Email == "" && id.Plan == "" && id.Organization == "" {
-		return nil
+		return nil, nil
 	}
-	return id
+	return id, nil
 }
 
 func (s *OAuthStrategy) externalPaths() []string {
