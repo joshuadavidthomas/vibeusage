@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/log v0.4.2
 	github.com/charmbracelet/x/term v0.2.1
-	github.com/mattn/go-isatty v0.0.20
+	github.com/mattn/go-isatty v0.0.23
 	github.com/muesli/termenv v0.16.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/mod v0.17.0
