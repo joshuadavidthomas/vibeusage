@@ -22,7 +22,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Added
 
-- Added OpenCode Go usage with manual browser-cookie authentication and workspace selection, reporting rolling 5-hour and weekly limits.
+- Added OpenCode Go usage with manual browser-cookie authentication and workspace selection, reporting rolling 5-hour and weekly limits ([#174](https://github.com/joshuadavidthomas/vibeusage/pull/174) by [@streber42](https://github.com/streber42)).
 
 ### Fixed
 
@@ -34,7 +34,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### New Contributors
 
-- [@streber42](https://github.com/streber42) added OpenCode Go support in [#174](https://github.com/joshuadavidthomas/vibeusage/pull/174).
+- [@streber42](https://github.com/streber42)
 
 ## [0.11.0]
 
