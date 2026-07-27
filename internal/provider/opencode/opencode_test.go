@@ -4,15 +4,19 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
+
+const openCodeUsageBody = `rollingUsage:{status:"ok",resetInSec:3600,usagePercent:10},weeklyUsage:{status:"ok",resetInSec:7200,usagePercent:20}`
 
 func isolateOpenCodeTest(t *testing.T) {
 	t.Helper()
@@ -33,8 +37,8 @@ func TestMeta(t *testing.T) {
 	if m.ID != "opencode" {
 		t.Errorf("id = %q, want %q", m.ID, "opencode")
 	}
-	if m.Name != "OpenCode Go" {
-		t.Errorf("name = %q, want %q", m.Name, "OpenCode Go")
+	if m.Name != "OpenCode" {
+		t.Errorf("name = %q, want %q", m.Name, "OpenCode")
 	}
 	if m.Homepage != "https://opencode.ai" {
 		t.Errorf("homepage = %q, want %q", m.Homepage, "https://opencode.ai")
@@ -140,25 +144,201 @@ func TestFetch_NoToken(t *testing.T) {
 	}
 }
 
-func TestFetch_MissingWorkspace(t *testing.T) {
+func TestFetch_DiscoversWorkspaceAndZenBalance(t *testing.T) {
 	isolateOpenCodeTest(t)
 	writeSessionCredential(t, `{"session_token":"session-value"}`)
 	config.Override(t, config.DefaultConfig())
 
-	result, err := (&WebStrategy{}).Fetch(context.Background())
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("auth")
+		if err != nil || cookie.Value != "session-value" {
+			t.Errorf("auth cookie = %#v, %v", cookie, err)
+		}
+		switch r.URL.Path {
+		case "/auth":
+			http.Redirect(w, r, "/workspace/wrk_discovered", http.StatusFound)
+		case "/workspace/wrk_discovered":
+			_, _ = w.Write([]byte(`{customerID:"cus_123",balance:$R[2]=2375000000,reload:!1}`))
+		case "/workspace/wrk_discovered/go":
+			_, _ = w.Write([]byte(`<html>workspace has Zen but no Go subscription</html>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	result, err := (&WebStrategy{baseURL: srv.URL}).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Success || result.ShouldFallback {
-		t.Fatalf("result = %#v, want fatal configuration failure", result)
+	if !result.Success || result.Snapshot == nil {
+		t.Fatalf("result = %#v, want successful discovered workspace fetch", result)
 	}
-	if !strings.Contains(result.Error, "workspace ID is required") {
-		t.Errorf("error = %q, want workspace configuration hint", result.Error)
+	if result.Snapshot.Billing == nil || result.Snapshot.Billing.Balance == nil {
+		t.Fatal("expected Zen balance")
+	}
+	if got := *result.Snapshot.Billing.Balance; got != 23.75 {
+		t.Errorf("Zen balance = %v, want 23.75", got)
+	}
+	if len(result.Snapshot.Periods) != 0 {
+		t.Errorf("periods = %#v, want none without a Go subscription", result.Snapshot.Periods)
+	}
+}
+
+func TestFetch_ConfigWorkspaceOverridesDiscovery(t *testing.T) {
+	isolateOpenCodeTest(t)
+	writeSessionCredential(t, `{"session_token":"session-value"}`)
+	cfg := config.DefaultConfig()
+	cfg.Providers["opencode"] = config.ProviderConfig{WorkspaceID: "wrk_config"}
+	config.Override(t, cfg)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth":
+			t.Error("workspace discovery should not run with a configured workspace")
+		case "/workspace/wrk_config":
+			_, _ = w.Write([]byte(`{customerID:"cus_123",balance:0}`))
+		case "/workspace/wrk_config/go":
+			_, _ = w.Write([]byte(openCodeUsageBody))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	result, err := (&WebStrategy{baseURL: srv.URL}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success || result.Snapshot == nil {
+		t.Fatalf("result = %#v, want successful configured workspace fetch", result)
+	}
+	if result.Snapshot.Billing == nil || result.Snapshot.Billing.Balance == nil || *result.Snapshot.Billing.Balance != 0 {
+		t.Errorf("billing = %#v, want zero Zen balance", result.Snapshot.Billing)
+	}
+}
+
+func TestFetch_DiscoveryFailures(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      http.HandlerFunc
+		wantFallback bool
+		wantError    string
+	}{
+		{
+			name: "invalid session",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/auth" {
+					http.Redirect(w, r, "/auth/authorize", http.StatusFound)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			},
+			wantError: "auth opencode",
+		},
+		{
+			name: "server failure",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+			},
+			wantFallback: true,
+			wantError:    "HTTP 500",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isolateOpenCodeTest(t)
+			writeSessionCredential(t, `{"session_token":"session-value"}`)
+			config.Override(t, config.DefaultConfig())
+			srv := httptest.NewServer(tt.handler)
+			defer srv.Close()
+
+			result, err := (&WebStrategy{baseURL: srv.URL}).Fetch(context.Background())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.Success || result.ShouldFallback != tt.wantFallback {
+				t.Fatalf("result = %#v, want fallback = %t", result, tt.wantFallback)
+			}
+			if !strings.Contains(result.Error, tt.wantError) {
+				t.Errorf("error = %q, want substring %q", result.Error, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestFetch_ZenFailureDoesNotDiscardUsage(t *testing.T) {
+	isolateOpenCodeTest(t)
+	writeSessionCredential(t, `{"session_token":"session-value"}`)
+	cfg := config.DefaultConfig()
+	cfg.Providers["opencode"] = config.ProviderConfig{WorkspaceID: "wrk_config"}
+	config.Override(t, cfg)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/workspace/wrk_config":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/workspace/wrk_config/go":
+			_, _ = w.Write([]byte(openCodeUsageBody))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	result, err := (&WebStrategy{baseURL: srv.URL}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success || result.Snapshot == nil {
+		t.Fatalf("result = %#v, want successful usage fetch", result)
+	}
+	if result.Snapshot.Billing != nil {
+		t.Errorf("billing = %#v, want nil after supplemental request failure", result.Snapshot.Billing)
+	}
+}
+
+func TestFetch_SlowZenRequestDoesNotDiscardUsage(t *testing.T) {
+	isolateOpenCodeTest(t)
+	writeSessionCredential(t, `{"session_token":"session-value"}`)
+	cfg := config.DefaultConfig()
+	cfg.Providers["opencode"] = config.ProviderConfig{WorkspaceID: "wrk_config"}
+	config.Override(t, cfg)
+
+	billingStopped := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/workspace/wrk_config":
+			<-r.Context().Done()
+			close(billingStopped)
+		case "/workspace/wrk_config/go":
+			_, _ = w.Write([]byte(openCodeUsageBody))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	outcome := fetch.ExecutePipeline(
+		context.Background(),
+		"opencode",
+		[]fetch.Strategy{&WebStrategy{HTTPTimeout: 30, baseURL: srv.URL}},
+		false,
+		fetch.PipelineConfig{Timeout: 400 * time.Millisecond},
+	)
+	if !outcome.Success || outcome.Snapshot == nil {
+		t.Fatalf("outcome = %#v, want fresh usage despite slow Zen request", outcome)
+	}
+	select {
+	case <-billingStopped:
+	default:
+		t.Fatal("supplemental Zen request still running after fetch returned")
 	}
 }
 
 func TestFetchUsage_ClassifiesResponses(t *testing.T) {
-	usageBody := `rollingUsage:{status:"ok",resetInSec:3600,usagePercent:10},weeklyUsage:{status:"ok",resetInSec:7200,usagePercent:20}`
+	usageBody := openCodeUsageBody
 	tests := []struct {
 		name         string
 		status       int
@@ -192,7 +372,8 @@ func TestFetchUsage_ClassifiesResponses(t *testing.T) {
 			result := (&WebStrategy{}).fetchUsage(
 				context.Background(),
 				httpclient.New(),
-				srv.URL,
+				srv.URL+"/workspace/wrk_test/go",
+				"wrk_test",
 				"session-value",
 			)
 			if result.Success != tt.wantSuccess {
@@ -208,17 +389,142 @@ func TestFetchUsage_ClassifiesResponses(t *testing.T) {
 	}
 }
 
+func TestFetchUsage_RejectsRedirectsOutsideRequestedWorkspace(t *testing.T) {
+	tests := []struct {
+		name      string
+		target    string
+		wantError string
+	}{
+		{name: "authentication", target: "/auth/authorize", wantError: "auth opencode"},
+		{name: "other workspace", target: "/workspace/wrk_other/go", wantError: "different workspace"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/workspace/wrk_test/go" {
+					http.Redirect(w, r, tt.target, http.StatusFound)
+					return
+				}
+				if r.URL.Path != tt.target {
+					http.NotFound(w, r)
+					return
+				}
+				_, _ = w.Write([]byte(openCodeUsageBody))
+			}))
+			defer srv.Close()
+
+			result := (&WebStrategy{}).fetchUsage(
+				context.Background(),
+				httpclient.New(),
+				srv.URL+"/workspace/wrk_test/go",
+				"wrk_test",
+				"session-value",
+			)
+			if result.Success || result.ShouldFallback {
+				t.Fatalf("result = %#v, want fatal redirect failure", result)
+			}
+			if !strings.Contains(result.Error, tt.wantError) {
+				t.Errorf("error = %q, want substring %q", result.Error, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestFetchUsage_RejectsRedirectToAnotherOrigin(t *testing.T) {
+	otherOrigin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(openCodeUsageBody))
+	}))
+	defer otherOrigin.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, otherOrigin.URL+"/workspace/wrk_test/go", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	result := (&WebStrategy{}).fetchUsage(
+		context.Background(),
+		httpclient.New(),
+		srv.URL+"/workspace/wrk_test/go",
+		"wrk_test",
+		"session-value",
+	)
+	if result.Success || result.ShouldFallback {
+		t.Fatalf("result = %#v, want fatal origin failure", result)
+	}
+	if !strings.Contains(result.Error, "unexpected origin") {
+		t.Errorf("error = %q, want unexpected origin", result.Error)
+	}
+}
+
 func TestFetchUsage_NetworkFailureAllowsCacheFallback(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	url := srv.URL
+	url := srv.URL + "/workspace/wrk_test/go"
 	srv.Close()
 
-	result := (&WebStrategy{}).fetchUsage(context.Background(), httpclient.New(), url, "session-value")
+	result := (&WebStrategy{}).fetchUsage(context.Background(), httpclient.New(), url, "wrk_test", "session-value")
 	if result.Success || !result.ShouldFallback {
 		t.Fatalf("result = %#v, want fallback-eligible network failure", result)
 	}
 	if !strings.Contains(result.Error, "OpenCode request failed") {
 		t.Errorf("error = %q, want request failure context", result.Error)
+	}
+}
+
+func TestWorkspaceIDFromURL(t *testing.T) {
+	tests := []struct {
+		rawURL string
+		want   string
+	}{
+		{rawURL: "https://opencode.ai/workspace/wrk_default", want: "wrk_default"},
+		{rawURL: "https://opencode.ai/en/workspace/wrk_localized", want: "wrk_localized"},
+		{rawURL: "https://opencode.ai/auth/authorize"},
+		{rawURL: "https://opencode.ai/workspace/not-a-workspace"},
+	}
+
+	for _, tt := range tests {
+		parsed, err := url.Parse(tt.rawURL)
+		if err != nil {
+			t.Fatalf("parse test URL: %v", err)
+		}
+		if got := workspaceIDFromURL(parsed); got != tt.want {
+			t.Errorf("workspaceIDFromURL(%q) = %q, want %q", tt.rawURL, got, tt.want)
+		}
+	}
+}
+
+func TestParseZenBillingFromSSR(t *testing.T) {
+	tests := []struct {
+		name             string
+		body             string
+		wantBalance      float64
+		wantBalanceFound bool
+	}{
+		{name: "serialized reference", body: `{customerID:"cus_123",balance:$R[2]=2375000000,reload:!1}`, wantBalance: 23.75, wantBalanceFound: true},
+		{name: "quoted fields", body: `{"customerID":"cus_123","balance":0}`, wantBalanceFound: true},
+		{name: "overspent", body: `{customerID:"cus_123",balance:-125000000}`, wantBalance: -1.25, wantBalanceFound: true},
+		{name: "no billing data", body: `{rollingUsage:{usagePercent:10}}`},
+		{name: "balance without customer", body: `{balance:500000000}`},
+		{name: "similarly named field", body: `{customerID:"cus_123",credit_balance:500000000}`},
+		{name: "unrelated balance first", body: `{balance:500000000},{customerID:"cus_123",balance:2375000000}`, wantBalance: 23.75, wantBalanceFound: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			billing := parseZenBillingFromSSR(tt.body)
+			if !tt.wantBalanceFound {
+				if billing != nil {
+					t.Fatalf("billing = %#v, want nil", billing)
+				}
+				return
+			}
+			if billing == nil || billing.Balance == nil {
+				t.Fatal("expected billing balance")
+			}
+			if *billing.Balance != tt.wantBalance {
+				t.Errorf("balance = %v, want %v", *billing.Balance, tt.wantBalance)
+			}
+		})
 	}
 }
 

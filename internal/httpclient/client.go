@@ -16,13 +16,14 @@ type Client struct {
 	http *http.Client
 }
 
-// Response wraps the status code, body bytes, and optional JSON decode error
-// from a completed HTTP request. The underlying http.Response body is already
-// closed; callers read from Body instead.
+// Response wraps the status code, body bytes, final URL, and optional JSON
+// decode error from a completed HTTP request. The underlying http.Response body
+// is already closed; callers read from Body instead.
 type Response struct {
 	StatusCode int
 	Body       []byte
 	Header     http.Header
+	URL        *url.URL
 	JSONErr    error
 }
 
@@ -74,7 +75,13 @@ func (c *Client) DoCtx(ctx context.Context, method, rawURL string, body io.Reade
 		return nil, err
 	}
 
-	return &Response{StatusCode: resp.StatusCode, Body: respBody, Header: resp.Header.Clone()}, nil
+	finalURL := *resp.Request.URL
+	return &Response{
+		StatusCode: resp.StatusCode,
+		Body:       respBody,
+		Header:     resp.Header.Clone(),
+		URL:        &finalURL,
+	}, nil
 }
 
 // Do sends an HTTP request with the given method and URL, applies options, reads

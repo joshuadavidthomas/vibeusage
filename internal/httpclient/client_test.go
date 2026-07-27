@@ -327,6 +327,28 @@ func TestDoCtx_WithOptions(t *testing.T) {
 	}
 }
 
+func TestDoCtx_RecordsFinalURLAfterRedirects(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/start" {
+			http.Redirect(w, r, "/final", http.StatusFound)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	resp, err := New().DoCtx(context.Background(), http.MethodGet, srv.URL+"/start", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.URL == nil {
+		t.Fatal("expected final response URL")
+	}
+	if resp.URL.Path != "/final" {
+		t.Errorf("final URL path = %q, want /final", resp.URL.Path)
+	}
+}
+
 func TestGetJSONCtx_Success(t *testing.T) {
 	type resp struct {
 		Name string `json:"name"`
