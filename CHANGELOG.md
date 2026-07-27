@@ -34,7 +34,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### New Contributors
 
-- [Sean Murphy](https://github.com/streber42) added OpenCode Go support in [#174](https://github.com/joshuadavidthomas/vibeusage/pull/174).
+- [@streber42](https://github.com/streber42) added OpenCode Go support in [#174](https://github.com/joshuadavidthomas/vibeusage/pull/174).
 
 ## [0.11.0]
 
