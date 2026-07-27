@@ -26,7 +26,6 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ### Fixed
 
-- Refined OpenCode failure handling so credential, workspace, and response schema errors fail with a clear message while transient network and server failures remain eligible for cached fallback.
 - Enforced fetch attempt timeouts without starting fallback while an abandoned attempt was still running.
 - Made cache snapshot and throttle marker writes atomic and surfaced persistence failures in verbose logs.
 - Made authentication wait for saved credentials before reporting success and stop device and browser callback flows when canceled.
