@@ -2,12 +2,30 @@ package opencode
 
 import (
 	"context"
-	"regexp"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
+	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
+
+func isolateOpenCodeTest(t *testing.T) {
+	t.Helper()
+	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
+	t.Setenv("OPENCODE_WORKSPACE_ID", "")
+}
+
+func writeSessionCredential(t *testing.T, content string) {
+	t.Helper()
+	if err := config.WriteCredential("opencode", "session", []byte(content)); err != nil {
+		t.Fatalf("write session credential: %v", err)
+	}
+}
 
 func TestMeta(t *testing.T) {
 	o := Opencode{}
@@ -32,28 +50,175 @@ func TestAuth(t *testing.T) {
 }
 
 func TestCredentialSources(t *testing.T) {
-	o := Opencode{}
-	cs := o.CredentialSources()
-	if len(cs.EnvVars) == 0 {
-		t.Error("expected at least one env var")
+	cs := (Opencode{}).CredentialSources()
+	if len(cs.EnvVars) != 0 || len(cs.CLIPaths) != 0 {
+		t.Errorf("credential sources = %#v, want none", cs)
 	}
 }
 
 func TestWebStrategy_IsAvailable_NoCredential(t *testing.T) {
-	s := WebStrategy{}
-	if s.IsAvailable() {
+	isolateOpenCodeTest(t)
+
+	if (&WebStrategy{}).IsAvailable() {
 		t.Error("expected IsAvailable to be false without credential")
 	}
 }
 
+func TestLoadSessionToken_ExactShape(t *testing.T) {
+	isolateOpenCodeTest(t)
+	writeSessionCredential(t, `{"session_token":"  session-value  "}`)
+
+	token, err := (&WebStrategy{}).loadSessionToken()
+	if err != nil {
+		t.Fatalf("loadSessionToken() error = %v", err)
+	}
+	if token != "session-value" {
+		t.Errorf("loadSessionToken() = %q, want session-value", token)
+	}
+}
+
+func TestLoadSessionToken_RejectsAlias(t *testing.T) {
+	isolateOpenCodeTest(t)
+	writeSessionCredential(t, `{"token":"legacy-value"}`)
+
+	token, err := (&WebStrategy{}).loadSessionToken()
+	if err != nil {
+		t.Fatalf("loadSessionToken() error = %v", err)
+	}
+	if token != "" {
+		t.Errorf("loadSessionToken() = %q, want empty token", token)
+	}
+}
+
+func TestLoadSessionToken_ReportsParseError(t *testing.T) {
+	isolateOpenCodeTest(t)
+	writeSessionCredential(t, `"not-an-object"`)
+
+	_, err := (&WebStrategy{}).loadSessionToken()
+	if err == nil {
+		t.Fatal("expected credential parse error")
+	}
+	if !strings.Contains(err.Error(), "parsing OpenCode session credential") {
+		t.Errorf("error = %q, want credential parse context", err)
+	}
+}
+
+func TestWorkspaceID_ConfigPrecedesEnvironment(t *testing.T) {
+	isolateOpenCodeTest(t)
+	t.Setenv("OPENCODE_WORKSPACE_ID", "wrk_env")
+	cfg := config.DefaultConfig()
+	cfg.Providers["opencode"] = config.ProviderConfig{WorkspaceID: "  wrk_config  "}
+	config.Override(t, cfg)
+
+	if got := workspaceID(); got != "wrk_config" {
+		t.Errorf("workspaceID() = %q, want wrk_config", got)
+	}
+}
+
+func TestWorkspaceID_EnvironmentFallback(t *testing.T) {
+	isolateOpenCodeTest(t)
+	t.Setenv("OPENCODE_WORKSPACE_ID", "  wrk_env  ")
+	config.Override(t, config.DefaultConfig())
+
+	if got := workspaceID(); got != "wrk_env" {
+		t.Errorf("workspaceID() = %q, want wrk_env", got)
+	}
+}
+
 func TestFetch_NoToken(t *testing.T) {
-	s := WebStrategy{}
-	result, err := s.Fetch(context.Background())
+	isolateOpenCodeTest(t)
+
+	result, err := (&WebStrategy{}).Fetch(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Success {
-		t.Fatal("expected failure")
+	if result.Success || result.ShouldFallback {
+		t.Fatalf("result = %#v, want fatal credential failure", result)
+	}
+	if !strings.Contains(result.Error, "auth opencode") {
+		t.Errorf("error = %q, want auth hint", result.Error)
+	}
+}
+
+func TestFetch_MissingWorkspace(t *testing.T) {
+	isolateOpenCodeTest(t)
+	writeSessionCredential(t, `{"session_token":"session-value"}`)
+	config.Override(t, config.DefaultConfig())
+
+	result, err := (&WebStrategy{}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success || result.ShouldFallback {
+		t.Fatalf("result = %#v, want fatal configuration failure", result)
+	}
+	if !strings.Contains(result.Error, "workspace ID is required") {
+		t.Errorf("error = %q, want workspace configuration hint", result.Error)
+	}
+}
+
+func TestFetchUsage_ClassifiesResponses(t *testing.T) {
+	usageBody := `rollingUsage:{status:"ok",resetInSec:3600,usagePercent:10},weeklyUsage:{status:"ok",resetInSec:7200,usagePercent:20}`
+	tests := []struct {
+		name         string
+		status       int
+		body         string
+		wantSuccess  bool
+		wantFallback bool
+		wantError    string
+	}{
+		{name: "success", status: http.StatusOK, body: usageBody, wantSuccess: true},
+		{name: "invalid session", status: http.StatusUnauthorized, wantError: "auth opencode"},
+		{name: "missing workspace", status: http.StatusNotFound, wantError: "workspace not found"},
+		{name: "server failure", status: http.StatusInternalServerError, wantFallback: true, wantError: "HTTP 500"},
+		{name: "schema drift", status: http.StatusOK, body: `<html>changed</html>`, wantError: "parsing OpenCode usage"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				cookie, err := r.Cookie("auth")
+				if err != nil || cookie.Value != "session-value" {
+					t.Errorf("auth cookie = %#v, %v", cookie, err)
+				}
+				if got := r.Header.Get("User-Agent"); got != "Mozilla/5.0" {
+					t.Errorf("User-Agent = %q, want Mozilla/5.0", got)
+				}
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			result := (&WebStrategy{}).fetchUsage(
+				context.Background(),
+				httpclient.New(),
+				srv.URL,
+				"session-value",
+			)
+			if result.Success != tt.wantSuccess {
+				t.Errorf("Success = %t, want %t", result.Success, tt.wantSuccess)
+			}
+			if result.ShouldFallback != tt.wantFallback {
+				t.Errorf("ShouldFallback = %t, want %t", result.ShouldFallback, tt.wantFallback)
+			}
+			if tt.wantError != "" && !strings.Contains(result.Error, tt.wantError) {
+				t.Errorf("Error = %q, want substring %q", result.Error, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestFetchUsage_NetworkFailureAllowsCacheFallback(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := srv.URL
+	srv.Close()
+
+	result := (&WebStrategy{}).fetchUsage(context.Background(), httpclient.New(), url, "session-value")
+	if result.Success || !result.ShouldFallback {
+		t.Fatalf("result = %#v, want fallback-eligible network failure", result)
+	}
+	if !strings.Contains(result.Error, "OpenCode request failed") {
+		t.Errorf("error = %q, want request failure context", result.Error)
 	}
 }
 
@@ -110,6 +275,9 @@ func TestParseUsageFromSSR_NoData(t *testing.T) {
 	_, err := parseUsageFromSSR(html)
 	if err == nil {
 		t.Fatal("expected error for no usage data")
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "session") {
+		t.Errorf("parse error = %q, should not suggest an auth failure", err)
 	}
 }
 
@@ -198,17 +366,5 @@ func TestParseUsageFromSSR_ClampPct(t *testing.T) {
 		if snapshot.Periods[0].Utilization != tt.expected {
 			t.Errorf("utilization = %d, want %d", snapshot.Periods[0].Utilization, tt.expected)
 		}
-	}
-}
-
-func TestDiscoverWorkspaceID_FromWorkspaceLink(t *testing.T) {
-	body := `<a href="/workspace/wrk_01KYC68MEBCSSKQ3Y8D1MG67TG">Default</a>`
-	re := regexp.MustCompile(`/workspace/(wrk_[a-zA-Z0-9]+)`)
-	matches := re.FindStringSubmatch(body)
-	if len(matches) < 2 {
-		t.Fatal("expected workspace ID match")
-	}
-	if matches[1] != "wrk_01KYC68MEBCSSKQ3Y8D1MG67TG" {
-		t.Errorf("id = %q", matches[1])
 	}
 }

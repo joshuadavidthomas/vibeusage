@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"regexp"
 	"strconv"
@@ -31,9 +32,7 @@ func (o Opencode) Meta() provider.Metadata {
 }
 
 func (o Opencode) CredentialSources() provider.CredentialInfo {
-	return provider.CredentialInfo{
-		EnvVars: []string{"OPENCODE_SESSION_TOKEN"},
-	}
+	return provider.CredentialInfo{}
 }
 
 func (o Opencode) FetchStrategies() []fetch.Strategy {
@@ -72,75 +71,93 @@ type WebStrategy struct {
 	HTTPTimeout float64
 }
 
-func (s *WebStrategy) IsAvailable() bool {
-	return config.HasCredential("opencode", "session")
+type sessionCredentials struct {
+	SessionToken string `json:"session_token"`
 }
 
-func (s *WebStrategy) loadSessionToken() string {
+func (s *WebStrategy) IsAvailable() bool {
 	data, err := config.ReadCredential("opencode", "session")
-	if err != nil || data == nil {
-		return ""
+	return err != nil || data != nil
+}
+
+func (s *WebStrategy) loadSessionToken() (string, error) {
+	data, err := config.ReadCredential("opencode", "session")
+	if err != nil {
+		return "", fmt.Errorf("reading OpenCode session credential: %w", err)
 	}
-	var raw map[string]string
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return ""
+	if data == nil {
+		return "", nil
 	}
-	for _, key := range []string{"session_token", "token", "session_key", "session"} {
-		if v := raw[key]; v != "" {
-			return v
-		}
+
+	var credentials sessionCredentials
+	if err := json.Unmarshal(data, &credentials); err != nil {
+		return "", fmt.Errorf("parsing OpenCode session credential: %w", err)
 	}
-	return ""
+	return strings.TrimSpace(credentials.SessionToken), nil
+}
+
+func workspaceID() string {
+	if id := strings.TrimSpace(config.Get().Providers["opencode"].WorkspaceID); id != "" {
+		return id
+	}
+	return strings.TrimSpace(os.Getenv("OPENCODE_WORKSPACE_ID"))
 }
 
 func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
-	sessionToken := s.loadSessionToken()
-	if sessionToken == "" {
-		return fetch.ResultFail("No session token found. Run `vibeusage auth opencode` to set one up."), nil
-	}
-
-	client := httpclient.NewFromConfig(s.HTTPTimeout)
-	sessionCookie := httpclient.WithCookie("auth", sessionToken)
-	userAgent := httpclient.WithHeader("User-Agent", "Mozilla/5.0")
-
-	wsID := config.Get().Providers["opencode"].WorkspaceID
-	if wsID == "" {
-		wsID = os.Getenv("OPENCODE_WORKSPACE_ID")
-	}
-	if wsID == "" {
-		return fetch.ResultFatal("workspace ID is required. Set it via `vibeusage config edit` under [providers.opencode] workspace_id = \"...\" or set OPENCODE_WORKSPACE_ID"), nil
-	}
-
-	usageURL := fmt.Sprintf("https://opencode.ai/workspace/%s/go", wsID)
-	result, err := s.fetchUsage(ctx, client, usageURL, sessionCookie, userAgent)
+	sessionToken, err := s.loadSessionToken()
 	if err != nil {
 		return fetch.ResultFatal(err.Error()), nil
 	}
-	return fetch.ResultOK(*result), nil
+	if sessionToken == "" {
+		return fetch.ResultFatal("no OpenCode session token found; run `vibeusage auth opencode` to set one up"), nil
+	}
+
+	wsID := workspaceID()
+	if wsID == "" {
+		return fetch.ResultFatal("workspace ID is required; set it via `vibeusage config edit` under [providers.opencode] workspace_id = \"...\" or set OPENCODE_WORKSPACE_ID"), nil
+	}
+
+	client := httpclient.NewFromConfig(s.HTTPTimeout)
+	usageURL := fmt.Sprintf("https://opencode.ai/workspace/%s/go", wsID)
+	return s.fetchUsage(ctx, client, usageURL, sessionToken), nil
 }
 
-func (s *WebStrategy) fetchUsage(ctx context.Context, client *httpclient.Client, url string, sessionCookie, userAgent httpclient.RequestOption) (*models.UsageSnapshot, error) {
-	resp, err := client.DoCtx(ctx, "GET", url, nil, sessionCookie, userAgent)
+func (s *WebStrategy) fetchUsage(ctx context.Context, client *httpclient.Client, url, sessionToken string) fetch.FetchResult {
+	resp, err := client.DoCtx(
+		ctx,
+		http.MethodGet,
+		url,
+		nil,
+		httpclient.WithCookie("auth", sessionToken),
+		httpclient.WithHeader("User-Agent", "Mozilla/5.0"),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return fetch.ResultFail(fmt.Sprintf("OpenCode request failed: %v", err))
 	}
 
-	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return nil, fmt.Errorf("session token expired or invalid. Run `vibeusage auth opencode` to re-authenticate")
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("OpenCode request failed: HTTP %d", resp.StatusCode)
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
+		return fetch.ResultFatal("OpenCode session token expired or invalid; run `vibeusage auth opencode` to re-authenticate")
+	case resp.StatusCode == http.StatusNotFound:
+		return fetch.ResultFatal("OpenCode workspace not found; check workspace_id in `vibeusage config edit` or OPENCODE_WORKSPACE_ID")
+	case resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError:
+		return fetch.ResultFail(fmt.Sprintf("OpenCode request failed: HTTP %d", resp.StatusCode))
+	case resp.StatusCode != http.StatusOK:
+		return fetch.ResultFatal(fmt.Sprintf("OpenCode request failed: HTTP %d", resp.StatusCode))
 	}
 
-	body := string(resp.Body)
-	return parseUsageFromSSR(body)
+	snapshot, err := parseUsageFromSSR(string(resp.Body))
+	if err != nil {
+		return fetch.ResultFatal(fmt.Sprintf("parsing OpenCode usage: %v", err))
+	}
+	return fetch.ResultOK(*snapshot)
 }
 
 func parseUsageFromSSR(body string) (*models.UsageSnapshot, error) {
 	re := regexp.MustCompile(`(rollingUsage|weeklyUsage|monthlyUsage):(?:\$R\[\d+\]=)?\{status:"[^"]+",resetInSec:(\d+),usagePercent:(\d+)\}`)
 	matches := re.FindAllStringSubmatch(body, -1)
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no usage data found in SSR response. The workspace may not have a Go subscription, or the session is invalid")
+		return nil, fmt.Errorf("no usage data found in SSR response; the page schema may have changed or the workspace may not have a Go subscription")
 	}
 
 	var periods []models.UsagePeriod
