@@ -37,7 +37,7 @@ jobs:
       - name: Run tests
         run: go test ./... -race
 
-  goreleaser: # zizmor: ignore[anonymous-definition]
+  goreleaser:
     needs: test
     runs-on: ubuntu-latest
     environment: release
@@ -83,7 +83,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  attest: # zizmor: ignore[anonymous-definition]
+  attest:
     needs: goreleaser
     runs-on: ubuntu-latest
     permissions:
