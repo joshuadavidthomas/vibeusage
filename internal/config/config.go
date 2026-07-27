@@ -25,7 +25,8 @@ type CredentialsConfig struct {
 }
 
 type ProviderConfig struct {
-	Enabled *bool `toml:"enabled,omitempty" json:"enabled,omitempty"`
+	Enabled     *bool  `toml:"enabled,omitempty" json:"enabled,omitempty"`
+	WorkspaceID string `toml:"workspace_id,omitempty" json:"workspace_id,omitempty"`
 }
 
 type RoleConfig struct {

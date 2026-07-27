@@ -53,7 +53,9 @@ func (o Opencode) Auth() provider.AuthFlow {
 			"  3. Go to Application → Cookies → https://opencode.ai\n" +
 			"  4. Find the cookie named 'auth' and copy its value\n" +
 			"  5. Paste it below\n\n" +
-			"Optionally set OPENCODE_WORKSPACE_ID to select a specific workspace.",
+			"After auth, set your workspace ID in the config:\n" +
+			"  vibeusage config edit\n" +
+			"  Then add under [providers.opencode]: workspace_id = \"wrk_...\"",
 		Placeholder: "paste auth cookie value here",
 		Validate:    provider.ValidateNotEmpty,
 		ProviderID:  "opencode",
@@ -101,9 +103,12 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 	sessionCookie := httpclient.WithCookie("auth", sessionToken)
 	userAgent := httpclient.WithHeader("User-Agent", "Mozilla/5.0")
 
-	wsID := os.Getenv("OPENCODE_WORKSPACE_ID")
+	wsID := config.Get().Providers["opencode"].WorkspaceID
 	if wsID == "" {
-		return fetch.ResultFatal("OPENCODE_WORKSPACE_ID is required. Find your workspace ID in the URL when visiting https://opencode.ai/workspace/{id}/go"), nil
+		wsID = os.Getenv("OPENCODE_WORKSPACE_ID")
+	}
+	if wsID == "" {
+		return fetch.ResultFatal("workspace ID is required. Set it via `vibeusage config edit` under [providers.opencode] workspace_id = \"...\" or set OPENCODE_WORKSPACE_ID"), nil
 	}
 
 	usageURL := fmt.Sprintf("https://opencode.ai/workspace/%s/go", wsID)
