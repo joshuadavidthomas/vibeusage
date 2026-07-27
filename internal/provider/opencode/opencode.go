@@ -103,13 +103,13 @@ func (s *WebStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 
 	wsID := os.Getenv("OPENCODE_WORKSPACE_ID")
 	if wsID == "" {
-		return fetch.ResultFail("OPENCODE_WORKSPACE_ID is required. Find your workspace ID in the URL when visiting https://opencode.ai/workspace/{id}/go"), nil
+		return fetch.ResultFatal("OPENCODE_WORKSPACE_ID is required. Find your workspace ID in the URL when visiting https://opencode.ai/workspace/{id}/go"), nil
 	}
 
 	usageURL := fmt.Sprintf("https://opencode.ai/workspace/%s/go", wsID)
 	result, err := s.fetchUsage(ctx, client, usageURL, sessionCookie, userAgent)
 	if err != nil {
-		return fetch.ResultFail(err.Error()), nil
+		return fetch.ResultFatal(err.Error()), nil
 	}
 	return fetch.ResultOK(*result), nil
 }
@@ -121,7 +121,7 @@ func (s *WebStrategy) fetchUsage(ctx context.Context, client *httpclient.Client,
 	}
 
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return nil, fmt.Errorf("session token expired or invalid. Run `vibeusage auth opencode` to re-authenticate.")
+		return nil, fmt.Errorf("session token expired or invalid. Run `vibeusage auth opencode` to re-authenticate")
 	}
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("OpenCode request failed: HTTP %d", resp.StatusCode)

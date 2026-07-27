@@ -166,7 +166,7 @@ func TestParseUsageFromSSR_ResetsAtInFuture(t *testing.T) {
 }
 
 func TestParseUsageFromSSR_IdentityPlanGo(t *testing.T) {
-	html := `some content lite.subscription.get some content rollingUsage:{status:"ok",resetInSec:3600,usagePercent:10}`
+	html := `subscription:null lite.subscription.get some content rollingUsage:{status:"ok",resetInSec:3600,usagePercent:10}`
 
 	snapshot, err := parseUsageFromSSR(html)
 	if err != nil {
