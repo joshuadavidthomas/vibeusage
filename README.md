@@ -328,6 +328,26 @@ vibeusage usage codex
 
 Run `vibeusage auth codex` to check for Codex CLI credentials and get setup instructions when none are found.
 
+#### OpenCode Go
+
+[opencode.ai](https://opencode.ai) — OpenCode's subscription for low-cost coding models. Reports rolling 5-hour and weekly usage.
+
+OpenCode Go requires the `auth` cookie from your browser session and the workspace ID from your Go dashboard URL:
+
+```bash
+vibeusage auth opencode
+vibeusage config edit
+```
+
+Add the workspace ID shown in `https://opencode.ai/workspace/wrk_.../go`:
+
+```toml
+[providers.opencode]
+workspace_id = "wrk_..."
+```
+
+You can set `OPENCODE_WORKSPACE_ID` instead of adding it to the config file. Run `vibeusage auth opencode` again when the browser session expires.
+
 #### OpenRouter
 
 [openrouter.ai](https://openrouter.ai) — Unified model gateway. Reports credit usage (dollars spent vs. total credits).
@@ -424,6 +444,7 @@ vibeusage route --role coding
 | `KIMI_CODE_API_KEY` | Kimi API key |
 | `MINIMAX_API_KEY` | Minimax Coding Plan API key |
 | `OPENAI_API_KEY` | OpenAI API key |
+| `OPENCODE_WORKSPACE_ID` | OpenCode workspace used for Go usage |
 | `OPENROUTER_API_KEY` | OpenRouter API key |
 | `VIBEUSAGE_CACHE_DIR` | Override cache directory |
 | `VIBEUSAGE_CONFIG_DIR` | Override config directory |
