@@ -62,6 +62,9 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 			if cfg.Title == "" {
 				t.Error("Input title should not be empty")
 			}
+			if !cfg.Secret {
+				t.Error("Claude credential input should be masked")
+			}
 			if cfg.Validate == nil {
 				t.Error("Claude auth should have a validation function")
 			}
@@ -121,6 +124,9 @@ func TestAuthClaude_UsesInputWithValidation(t *testing.T) {
 func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 	mock := &prompt.Mock{
 		InputFunc: func(cfg prompt.InputConfig) (string, error) {
+			if !cfg.Secret {
+				t.Error("Cursor credential input should be masked")
+			}
 			if cfg.Validate == nil {
 				t.Error("Cursor auth should have a validation function")
 			}
@@ -153,6 +159,88 @@ func TestAuthCursor_UsesInputWithValidation(t *testing.T) {
 
 	if len(mock.InputCalls) != 1 {
 		t.Fatalf("expected 1 Input call, got %d", len(mock.InputCalls))
+	}
+}
+
+func TestAuthManualKey_ValidatesReturnedValueBeforeSaving(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	mock := &prompt.Mock{InputFunc: func(prompt.InputConfig) (string, error) {
+		return "auth=session-value", nil
+	}}
+	oldPrompt := prompt.Default
+	prompt.SetDefault(mock)
+	defer prompt.SetDefault(oldPrompt)
+
+	oldWriter := outWriter
+	outWriter = io.Discard
+	defer func() { outWriter = oldWriter }()
+
+	p, _ := provider.Get("opencode")
+	if err := authProvider(context.Background(), "opencode", p); err == nil {
+		t.Fatal("expected malformed cookie returned by prompt to be rejected")
+	}
+	if config.HasCredential("opencode", "session") {
+		t.Fatal("rejected credential must not be stored")
+	}
+}
+
+func TestAuthSetCredential_PreservesManualProviderStorageContracts(t *testing.T) {
+	tests := []struct {
+		providerID string
+		credType   string
+		jsonKey    string
+		credential string
+		want       string
+	}{
+		{providerID: "amp", credType: "apikey", jsonKey: "api_key", credential: "  amp-secret  ", want: "amp-secret"},
+		{providerID: "claude", credType: "session", jsonKey: "session_key", credential: "  sk-ant-" + "sid01-test123  ", want: "sk-ant-" + "sid01-test123"},
+		{providerID: "cursor", credType: "session", jsonKey: "session_token", credential: "  cursor-secret  ", want: "cursor-secret"},
+		{providerID: "gemini", credType: "api_key", jsonKey: "api_key", credential: "  gemini-secret  ", want: "gemini-secret"},
+		{providerID: "minimax", credType: "apikey", jsonKey: "api_key", credential: "  sk-" + "cp-test123  ", want: "sk-" + "cp-test123"},
+		{providerID: "opencode", credType: "session", jsonKey: "session_token", credential: "  opencode-secret  ", want: "opencode-secret"},
+		{providerID: "openrouter", credType: "apikey", jsonKey: "api_key", credential: "  openrouter-secret  ", want: "openrouter-secret"},
+		{providerID: "warp", credType: "apikey", jsonKey: "api_key", credential: "  wk-secret  ", want: "wk-secret"},
+		{providerID: "zai", credType: "apikey", jsonKey: "api_key", credential: "  zai-secret  ", want: "zai-secret"},
+	}
+
+	oldWriter := outWriter
+	outWriter = io.Discard
+	defer func() { outWriter = oldWriter }()
+
+	for _, tt := range tests {
+		t.Run(tt.providerID, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			testenv.ApplySameDir(t.Setenv, tmpDir)
+			cfg := config.DefaultConfig()
+			disabled := false
+			cfg.Providers[tt.providerID] = config.ProviderConfig{Enabled: &disabled}
+			config.Override(t, cfg)
+
+			p, ok := provider.Get(tt.providerID)
+			if !ok {
+				t.Fatalf("provider %s is not registered", tt.providerID)
+			}
+			if err := authSetCredential(tt.providerID, p, tt.credential); err != nil {
+				t.Fatalf("authSetCredential() error: %v", err)
+			}
+			data, err := config.ReadCredential(tt.providerID, tt.credType)
+			if err != nil {
+				t.Fatalf("ReadCredential() error: %v", err)
+			}
+			var stored map[string]string
+			if err := json.Unmarshal(data, &stored); err != nil {
+				t.Fatalf("unmarshal credential: %v", err)
+			}
+			if got := stored[tt.jsonKey]; got != tt.want {
+				t.Errorf("stored %s = %q, want %q", tt.jsonKey, got, tt.want)
+			}
+			if !config.Get().IsProviderEnabled(tt.providerID) {
+				t.Fatal("provider was not enabled")
+			}
+		})
 	}
 }
 
@@ -502,9 +590,9 @@ func TestAuthDelete_UserDeclinesConfirm(t *testing.T) {
 	}
 }
 
-// --token flag tests
+// --token tests
 
-func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
+func TestAuthSetCredential_SavesCredentialAndEnables(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("CURSOR_API_KEY", "")
@@ -518,9 +606,9 @@ func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	p, _ := provider.Get("cursor")
-	err := authSetToken("cursor", p, "my-session-token")
+	err := authSetCredential("cursor", p, "my-session-token")
 	if err != nil {
-		t.Fatalf("authSetToken error: %v", err)
+		t.Fatalf("authSetCredential error: %v", err)
 	}
 
 	// Credential should be saved in consolidated file
@@ -542,7 +630,7 @@ func TestAuthSetToken_SavesCredentialAndEnables(t *testing.T) {
 	}
 }
 
-func TestAuthSetToken_ValidatesInput(t *testing.T) {
+func TestAuthSetCredential_ValidatesInput(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("ANTHROPIC_API_KEY", "")
@@ -555,13 +643,13 @@ func TestAuthSetToken_ValidatesInput(t *testing.T) {
 	p, _ := provider.Get("claude")
 
 	// Claude requires sk-ant-sid01- prefix
-	err := authSetToken("claude", p, "bad-key")
+	err := authSetCredential("claude", p, "bad-key")
 	if err == nil {
 		t.Error("expected validation error for bad key")
 	}
 }
 
-func TestAuthSetToken_RejectsEmpty(t *testing.T) {
+func TestAuthSetCredential_RejectsEmpty(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	config.Override(t, config.DefaultConfig())
@@ -571,16 +659,15 @@ func TestAuthSetToken_RejectsEmpty(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	p, _ := provider.Get("cursor")
-	err := authSetToken("cursor", p, "  ")
+	err := authSetCredential("cursor", p, "  ")
 	if err == nil {
-		t.Error("expected error for empty/whitespace token")
+		t.Error("expected error for empty/whitespace credential")
 	}
 }
 
-func TestAuthSetToken_RejectsCustomAuthFlowProvider(t *testing.T) {
-	// Codex now uses a CustomAuthFlow that defers to the Codex CLI; --token
-	// has no usable destination and previously fell through to a generic
-	// apikey slot that fetch ignored. authSetToken must refuse instead.
+func TestAuthSetCredential_RejectsCustomAuthFlowProvider(t *testing.T) {
+	// Codex uses a CustomAuthFlow that defers to the Codex CLI; --token has no
+	// usable destination and must not write a credential fetch ignores.
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	config.Override(t, config.DefaultConfig())
@@ -590,7 +677,7 @@ func TestAuthSetToken_RejectsCustomAuthFlowProvider(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	p, _ := provider.Get("codex")
-	err := authSetToken("codex", p, "some-token")
+	err := authSetCredential("codex", p, "some-token")
 	if err == nil {
 		t.Fatal("expected --token to be rejected for codex (CustomAuthFlow)")
 	}
@@ -602,10 +689,9 @@ func TestAuthSetToken_RejectsCustomAuthFlowProvider(t *testing.T) {
 	}
 }
 
-func TestAuthSetToken_AcceptsKimiCodeViaTokenAcceptor(t *testing.T) {
+func TestAuthSetCredential_AcceptsKimiCodeViaCredentialAcceptor(t *testing.T) {
 	// KimiCode advertises a DeviceAuthFlow but also supports a stored API
-	// key via APIKeyStrategy; it implements provider.TokenAcceptor so
-	// --token routes to the apikey slot instead of being rejected.
+	// key via APIKeyStrategy; CredentialAcceptor routes stdin to the apikey slot.
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("KIMI_CODE_API_KEY", "")
@@ -616,8 +702,8 @@ func TestAuthSetToken_AcceptsKimiCodeViaTokenAcceptor(t *testing.T) {
 	defer func() { outWriter = os.Stdout }()
 
 	p, _ := provider.Get("kimicode")
-	if err := authSetToken("kimicode", p, "my-api-key"); err != nil {
-		t.Fatalf("authSetToken error: %v", err)
+	if err := authSetCredential("kimicode", p, "my-api-key"); err != nil {
+		t.Fatalf("authSetCredential error: %v", err)
 	}
 	data, err := config.ReadCredential("kimicode", "apikey")
 	if err != nil || data == nil {
@@ -629,6 +715,114 @@ func TestAuthSetToken_AcceptsKimiCodeViaTokenAcceptor(t *testing.T) {
 	}
 	if payload["api_key"] != "my-api-key" {
 		t.Errorf("api_key = %q, want my-api-key", payload["api_key"])
+	}
+}
+
+func TestReadCredential(t *testing.T) {
+	value, err := readCredential(strings.NewReader("  secret-value\n"))
+	if err != nil {
+		t.Fatalf("readCredential error: %v", err)
+	}
+	if value != "  secret-value\n" {
+		t.Errorf("value = %q, want raw stdin content", value)
+	}
+
+	if _, err := readCredential(strings.NewReader(strings.Repeat("x", maxCredentialSize+1))); err == nil {
+		t.Fatal("expected oversized credential to be rejected")
+	}
+}
+
+func TestAuthSetCredential_RejectsCookieAssignment(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	config.Override(t, config.DefaultConfig())
+
+	p, _ := provider.Get("opencode")
+	if err := authSetCredential("opencode", p, "auth=session-value"); err == nil {
+		t.Fatal("expected full cookie assignment to be rejected")
+	}
+	if config.HasCredential("opencode", "session") {
+		t.Fatal("rejected cookie assignment must not be stored")
+	}
+}
+
+func TestAuthCredentialFlagReadsFromStdin(t *testing.T) {
+	if authCmd.Flags().Lookup("token") == nil {
+		t.Fatal("--token flag is not registered")
+	}
+	if authCmd.Flags().Lookup("token-stdin") != nil {
+		t.Fatal("obsolete --token-stdin flag is still registered")
+	}
+
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	t.Setenv("OPENROUTER_API_KEY", "")
+	config.Override(t, config.DefaultConfig())
+
+	tokenFlag := authCmd.Flags().Lookup("token")
+	if err := authCmd.Flags().Set("token", tokenFromStdin); err != nil {
+		t.Fatalf("setting token: %v", err)
+	}
+	defer func() {
+		_ = tokenFlag.Value.Set("")
+		tokenFlag.Changed = false
+		authCmd.SetIn(nil)
+	}()
+	authCmd.SetIn(strings.NewReader("test-openrouter-value\n"))
+
+	var buf bytes.Buffer
+	oldWriter := outWriter
+	outWriter = &buf
+	defer func() { outWriter = oldWriter }()
+
+	if err := authCmd.RunE(authCmd, []string{"openrouter"}); err != nil {
+		t.Fatalf("auth command error: %v", err)
+	}
+	data, err := config.ReadCredential("openrouter", "apikey")
+	if err != nil || data == nil {
+		t.Fatalf("openrouter credential not stored: data=%q err=%v", data, err)
+	}
+	if strings.Contains(buf.String(), "test-openrouter-value") {
+		t.Fatal("command output exposed the credential")
+	}
+}
+
+func TestAuthCredentialFlagAcceptsDirectValue(t *testing.T) {
+	tmpDir := t.TempDir()
+	testenv.ApplySameDir(t.Setenv, tmpDir)
+	t.Setenv("OPENROUTER_API_KEY", "")
+	config.Override(t, config.DefaultConfig())
+
+	tokenFlag := authCmd.Flags().Lookup("token")
+	if err := authCmd.Flags().Set("token", tokenFromStdin); err != nil {
+		t.Fatalf("setting token: %v", err)
+	}
+	defer func() {
+		_ = tokenFlag.Value.Set("")
+		tokenFlag.Changed = false
+	}()
+	args := []string{"openrouter", "test-direct-value"}
+	if err := authCmd.Args(authCmd, args); err != nil {
+		t.Fatalf("direct token argument rejected: %v", err)
+	}
+
+	oldWriter := outWriter
+	outWriter = io.Discard
+	defer func() { outWriter = oldWriter }()
+
+	if err := authCmd.RunE(authCmd, args); err != nil {
+		t.Fatalf("auth command error: %v", err)
+	}
+	data, err := config.ReadCredential("openrouter", "apikey")
+	if err != nil {
+		t.Fatalf("ReadCredential() error: %v", err)
+	}
+	var stored map[string]string
+	if err := json.Unmarshal(data, &stored); err != nil {
+		t.Fatalf("unmarshal credential: %v", err)
+	}
+	if got := stored["api_key"]; got != "test-direct-value" {
+		t.Errorf("stored credential = %q, want test-direct-value", got)
 	}
 }
 

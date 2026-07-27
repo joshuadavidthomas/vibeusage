@@ -188,10 +188,16 @@ Remove credentials for a provider:
 vibeusage auth claude --delete
 ```
 
-Set credentials non-interactively (useful for CI or dotfiles):
+Set credentials noninteractively. Piping keeps the value out of shell history and process arguments:
 
 ```bash
-vibeusage auth openrouter --token sk-or-...
+printf '%s' "$OPENROUTER_API_KEY" | vibeusage auth openrouter --token
+```
+
+You can also pass the value directly:
+
+```bash
+vibeusage auth openrouter --token="$OPENROUTER_API_KEY"
 ```
 
 Providers with existing CLI credentials (Claude Code, Codex CLI, Gemini CLI, etc.) are detected automatically and offered for reuse.
@@ -250,7 +256,7 @@ Cursor requires a browser session token:
 vibeusage auth cursor
 ```
 
-The prompt walks you through extracting your session cookie from https://cursor.com (DevTools → Application → Cookies). You can also set it directly with `vibeusage auth cursor --token <value>`.
+The prompt walks you through extracting your session cookie from https://cursor.com (DevTools → Application → Cookies). For noninteractive setup, pass the cookie with `--token=<value>` or pipe it to `vibeusage auth cursor --token`.
 
 #### Google Antigravity
 

@@ -22,11 +22,21 @@ type credentialsStore map[string]map[string]json.RawMessage
 
 func loadCredentialsStore() (credentialsStore, error) {
 	path := CredentialsFile()
-	data, err := os.ReadFile(path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return make(credentialsStore), nil
 		}
+		return nil, fmt.Errorf("reading credentials file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("reading credentials file: %s is not a regular file", path)
+	}
+	if err := repairCredentialPermissions(path); err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return nil, fmt.Errorf("reading credentials file: %w", err)
 	}
 	var store credentialsStore
@@ -39,21 +49,43 @@ func loadCredentialsStore() (credentialsStore, error) {
 	return store, nil
 }
 
-func saveCredentialsStore(store credentialsStore) error {
+func saveCredentialsStore(store credentialsStore) (err error) {
 	path := CredentialsFile()
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err = os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("writing credentials: %w", err)
+	}
+	if err = secureCredentialDirectory(dir); err != nil {
 		return fmt.Errorf("writing credentials: %w", err)
 	}
 	data, err := json.Marshal(store)
 	if err != nil {
 		return fmt.Errorf("writing credentials: %w", err)
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	tmp, err := os.CreateTemp(dir, ".credentials.json.tmp-*")
+	if err != nil {
 		return fmt.Errorf("writing credentials: %w", err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	tmpPath := tmp.Name()
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+	if err = secureCredentialFile(tmpPath); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing credentials: %w", err)
+	}
+	if _, err = tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing credentials: %w", err)
+	}
+	if err = tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing credentials: %w", err)
+	}
+	if err = tmp.Close(); err != nil {
+		return fmt.Errorf("writing credentials: %w", err)
+	}
+	if err = os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("writing credentials: %w", err)
 	}
 	return nil

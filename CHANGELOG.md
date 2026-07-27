@@ -24,6 +24,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Added OpenCode support with manual browser-cookie authentication, automatic workspace discovery, and Zen credit balance. Go subscribers also see rolling 5-hour and weekly limits ([#174](https://github.com/joshuadavidthomas/vibeusage/pull/174) by [@streber42](https://github.com/streber42)).
 
+### Changed
+
+- Let `vibeusage auth <provider> --token` read a credential from standard input when no value is passed, while continuing to accept direct values.
+
 ### Fixed
 
 - Enforced fetch attempt timeouts without starting fallback while an abandoned attempt was still running.
@@ -31,6 +35,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 - Made authentication wait for saved credentials before reporting success and stop device and browser callback flows when canceled.
 - Made catalog loading stop on cancellation and retry on the next request.
 - Fixed providers removed through `vibeusage auth` returning on the next run when credentials were still available from a provider CLI or environment variable. Removal now disables the provider across usage, routing, and statusline output until it is re-enabled through auth.
+
+### Security
+
+- Masked manual credential prompts, rejected cookie headers and malformed cookie values, and restricted vibeusage credential storage to the current user.
 
 ### New Contributors
 

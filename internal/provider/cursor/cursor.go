@@ -58,6 +58,7 @@ func (c Cursor) Auth() provider.AuthFlow {
 			"  5. Copy its value",
 		Placeholder: "paste token here",
 		Validate:    provider.ValidateNotEmpty,
+		CookieNames: []string{"WorkosCursorSessionToken", "__Secure-next-auth.session-token"},
 		ProviderID:  "cursor",
 		CredType:    "session",
 		JSONKey:     "session_token",

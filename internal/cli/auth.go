@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/device"
@@ -20,9 +23,12 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
 
+const tokenFromStdin = "-"
+
 var authCmd = &cobra.Command{
 	Use:   "auth [provider]",
 	Short: "Authenticate with a provider or show auth status",
+	Args:  validateAuthArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		showStatus, _ := cmd.Flags().GetBool("status")
 
@@ -45,9 +51,22 @@ var authCmd = &cobra.Command{
 			return authDeleteProvider(providerID)
 		}
 
-		token, _ := cmd.Flags().GetString("token")
-		if token != "" {
-			return authSetToken(providerID, p, token)
+		if cmd.Flags().Changed("token") {
+			value, _ := cmd.Flags().GetString("token")
+			if value == tokenFromStdin && len(args) == 2 {
+				value = args[1]
+			} else if value == tokenFromStdin {
+				reader := cmd.InOrStdin()
+				if file, ok := reader.(*os.File); ok && (isatty.IsTerminal(file.Fd()) || isatty.IsCygwinTerminal(file.Fd())) {
+					return errors.New("--token has no value or piped input; pass a value or omit the flag for a masked prompt")
+				}
+				var err error
+				value, err = readCredential(reader)
+				if err != nil {
+					return err
+				}
+			}
+			return authSetCredential(providerID, p, value)
 		}
 
 		return authProvider(cmd.Context(), providerID, p)
@@ -73,7 +92,19 @@ var providerDescriptions = map[string]string{
 func init() {
 	authCmd.Flags().Bool("status", false, "Show authentication status")
 	authCmd.Flags().Bool("delete", false, "Remove a provider and its vibeusage-stored credentials")
-	authCmd.Flags().String("token", "", "Set a credential non-interactively")
+	authCmd.Flags().String("token", "", "Set a credential; omit the value to read from standard input")
+	authCmd.Flags().Lookup("token").NoOptDefVal = tokenFromStdin
+}
+
+func validateAuthArgs(cmd *cobra.Command, args []string) error {
+	if len(args) <= 1 {
+		return nil
+	}
+	value, _ := cmd.Flags().GetString("token")
+	if len(args) == 2 && cmd.Flags().Changed("token") && value == tokenFromStdin {
+		return nil
+	}
+	return cobra.MaximumNArgs(1)(cmd, args)
 }
 
 // authSetup runs an interactive multi-select to pick and authenticate
@@ -412,27 +443,42 @@ func authManualKey(providerID string, flow provider.ManualKeyAuthFlow) error {
 	value, err := prompt.Default.Input(prompt.InputConfig{
 		Title:       title,
 		Placeholder: flow.Placeholder,
-		Validate:    flow.Validate,
+		Validate: func(value string) error {
+			_, err := flow.Prepare(value)
+			return err
+		},
+		Secret: true,
 	})
 	if err != nil {
 		return err
 	}
+	value, err = flow.Prepare(value)
+	if err != nil {
+		return err
+	}
 
-	if flow.Save != nil {
-		if err := flow.Save(value); err != nil {
-			return fmt.Errorf("error saving credential: %w", err)
-		}
-	} else {
-		credData, _ := json.Marshal(map[string]string{flow.JSONKey: value})
-		if err := config.WriteCredential(flow.ProviderID, flow.CredType, credData); err != nil {
-			return fmt.Errorf("error saving credential: %w", err)
-		}
+	if err := saveManualCredential(flow, value); err != nil {
+		return fmt.Errorf("error saving credential: %w", err)
 	}
 
 	if !quiet {
 		out("✓ %s credential saved\n", provider.DisplayName(providerID))
 	}
 	return nil
+}
+
+func saveManualCredential(flow provider.ManualKeyAuthFlow, credential string) error {
+	if flow.Save != nil {
+		return flow.Save(credential)
+	}
+	if flow.ProviderID == "" || flow.CredType == "" || flow.JSONKey == "" {
+		return errors.New("manual credential flow has no storage destination")
+	}
+	credData, err := json.Marshal(map[string]string{flow.JSONKey: credential})
+	if err != nil {
+		return err
+	}
+	return config.WriteCredential(flow.ProviderID, flow.CredType, credData)
 }
 
 func authGeneric(providerID string) error {
@@ -456,8 +502,16 @@ func authGeneric(providerID string) error {
 	value, err := prompt.Default.Input(prompt.InputConfig{
 		Title:       fmt.Sprintf("%s credential", provider.DisplayName(providerID)),
 		Placeholder: "paste credential here",
-		Validate:    provider.ValidateNotEmpty,
+		Validate: func(value string) error {
+			_, err := provider.PrepareCredential(value)
+			return err
+		},
+		Secret: true,
 	})
+	if err != nil {
+		return err
+	}
+	value, err = provider.PrepareCredential(value)
 	if err != nil {
 		return err
 	}
@@ -511,32 +565,31 @@ func authDeleteProvider(providerID string) error {
 	return nil
 }
 
-// authSetToken sets a credential non-interactively via --token and enables
-// the provider. Uses the provider's ManualKeyAuthFlow if available for
-// proper validation and storage, otherwise falls back to generic storage.
-func authSetToken(providerID string, p provider.Provider, token string) error {
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return fmt.Errorf("credential cannot be empty")
-	}
+const maxCredentialSize = 64 * 1024
 
+func readCredential(r io.Reader) (string, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxCredentialSize+1))
+	if err != nil {
+		return "", fmt.Errorf("reading credential from stdin: %w", err)
+	}
+	if len(data) > maxCredentialSize {
+		return "", fmt.Errorf("credential from stdin exceeds %d bytes", maxCredentialSize)
+	}
+	return string(data), nil
+}
+
+// authSetCredential validates and saves a credential read from stdin, then
+// enables the provider.
+func authSetCredential(providerID string, p provider.Provider, credential string) error {
 	if auth, ok := p.(provider.Authenticator); ok {
 		switch f := auth.Auth().(type) {
 		case provider.ManualKeyAuthFlow:
-			if f.Validate != nil {
-				if err := f.Validate(token); err != nil {
-					return err
-				}
+			credential, err := f.Prepare(credential)
+			if err != nil {
+				return err
 			}
-			if f.Save != nil {
-				if err := f.Save(token); err != nil {
-					return fmt.Errorf("error saving credential: %w", err)
-				}
-			} else if f.JSONKey != "" {
-				credData, _ := json.Marshal(map[string]string{f.JSONKey: token})
-				if err := config.WriteCredential(f.ProviderID, f.CredType, credData); err != nil {
-					return fmt.Errorf("error saving credential: %w", err)
-				}
+			if err := saveManualCredential(f, credential); err != nil {
+				return fmt.Errorf("error saving credential: %w", err)
 			}
 			if err := enableProvider(providerID); err != nil {
 				return err
@@ -546,14 +599,17 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 			}
 			return nil
 		default:
-			// The provider's primary flow doesn't accept a manually pasted
-			// token (e.g. device flow, browser redirect, or a CLI-owned
+			// The provider's primary flow doesn't accept a manually supplied
+			// credential (e.g. device flow, browser redirect, or a CLI-owned
 			// chain). Some such providers still expose a secondary stored
-			// credential path — they opt in via TokenAcceptor. Without that
-			// opt-in we refuse rather than write a credential fetch will
-			// silently ignore.
-			if acceptor, ok := p.(provider.TokenAcceptor); ok {
-				if err := acceptor.AcceptToken(token); err != nil {
+			// credential path through CredentialAcceptor. Without that opt-in
+			// we refuse rather than write a credential fetch will silently ignore.
+			if acceptor, ok := p.(provider.CredentialAcceptor); ok {
+				credential, err := provider.PrepareCredential(credential)
+				if err != nil {
+					return err
+				}
+				if err := acceptor.AcceptCredential(credential); err != nil {
 					return fmt.Errorf("error saving credential: %w", err)
 				}
 				if err := enableProvider(providerID); err != nil {
@@ -569,7 +625,11 @@ func authSetToken(providerID string, p provider.Provider, token string) error {
 	}
 
 	// Provider doesn't implement Authenticator at all — generic apikey fallback.
-	credData, _ := json.Marshal(map[string]string{"api_key": token})
+	credential, err := provider.PrepareCredential(credential)
+	if err != nil {
+		return err
+	}
+	credData, _ := json.Marshal(map[string]string{"api_key": credential})
 	if err := config.WriteCredential(providerID, "apikey", credData); err != nil {
 		return fmt.Errorf("error saving credential: %w", err)
 	}

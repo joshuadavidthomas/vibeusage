@@ -53,6 +53,7 @@ func (c Claude) Auth() provider.AuthFlow {
 			"  5. Copy its value (starts with sk-ant-sid01-)",
 		Placeholder: "sk-ant-sid01-...",
 		Validate:    provider.ValidateAnyPrefix("sk-ant-sid01-"),
+		CookieNames: []string{"sessionKey"},
 		Save:        saveClaudeCredential,
 	}
 }

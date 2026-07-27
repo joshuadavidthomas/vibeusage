@@ -10,6 +10,7 @@ type InputConfig struct {
 	Title       string
 	Placeholder string
 	Validate    func(string) error
+	Secret      bool
 }
 
 // ConfirmConfig holds configuration for a yes/no confirmation prompt.
@@ -64,6 +65,9 @@ func (h *Huh) Input(cfg InputConfig) (string, error) {
 
 	if cfg.Placeholder != "" {
 		input.Placeholder(cfg.Placeholder)
+	}
+	if cfg.Secret {
+		input.EchoMode(huh.EchoModePassword)
 	}
 	if cfg.Validate != nil {
 		input.Validate(cfg.Validate)

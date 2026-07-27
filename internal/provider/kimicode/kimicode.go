@@ -46,12 +46,12 @@ func (k KimiCode) FetchStatus(ctx context.Context) models.ProviderStatus {
 	return provider.FetchStatuspageStatus(ctx, "https://status.moonshot.cn")
 }
 
-// AcceptToken stores a manually pasted KimiCode API key in the apikey slot.
-// KimiCode supports both an OAuth device flow (Auth()) and a stored API key
-// (APIKeyStrategy); --token routes to the API-key path since OAuth
-// credentials can't be obtained via paste.
-func (k KimiCode) AcceptToken(token string) error {
-	credData, err := json.Marshal(map[string]string{"api_key": token})
+// AcceptCredential stores a KimiCode API key from stdin in the apikey slot.
+// KimiCode supports both an OAuth device flow and a stored API key. Piped
+// credentials use the API-key path because OAuth credentials cannot be
+// obtained this way.
+func (k KimiCode) AcceptCredential(credential string) error {
+	credData, err := json.Marshal(map[string]string{"api_key": credential})
 	if err != nil {
 		return fmt.Errorf("marshal kimicode api key: %w", err)
 	}

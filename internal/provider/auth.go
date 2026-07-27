@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
+	"unicode"
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/device"
 )
@@ -50,6 +52,10 @@ type ManualKeyAuthFlow struct {
 	CredType string
 	// JSONKey is the key name used in the JSON credential file (e.g. "session_key").
 	JSONKey string
+	// CookieNames marks the credential as a browser cookie value and lists the
+	// cookie names users may copy it from. Cookie headers and assignments are
+	// rejected so only the value is stored.
+	CookieNames []string
 	// Save optionally overrides how credentials are persisted. If nil, the CLI
 	// writes {JSONKey: value} to the consolidated credentials file.
 	Save func(value string) error
@@ -64,14 +70,60 @@ type Authenticator interface {
 	Auth() AuthFlow
 }
 
-// TokenAcceptor is an optional interface for providers whose primary Auth()
-// flow isn't a ManualKeyAuthFlow but still accept a manually pasted
-// credential via the `--token` flag (e.g. KimiCode advertises a device flow
-// for OAuth but also supports a stored API key). Providers that do not
-// implement this interface reject `--token` so vibeusage doesn't write a
-// credential its fetch strategies will silently ignore.
-type TokenAcceptor interface {
-	AcceptToken(token string) error
+// CredentialAcceptor is an optional interface for providers whose primary
+// Auth() flow isn't a ManualKeyAuthFlow but still accepts a credential from
+// stdin (e.g. KimiCode advertises a device flow for OAuth but also supports a
+// stored API key). Providers that do not implement this interface reject
+// --token so vibeusage doesn't write a credential its fetch strategies will
+// silently ignore.
+type CredentialAcceptor interface {
+	AcceptCredential(credential string) error
+}
+
+// PrepareCredential trims surrounding whitespace and rejects empty values and
+// embedded control characters before a credential reaches provider storage.
+func PrepareCredential(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", errors.New("credential cannot be empty")
+	}
+	if strings.ContainsFunc(value, unicode.IsControl) {
+		return "", errors.New("credential cannot contain control characters")
+	}
+	return value, nil
+}
+
+// Prepare validates and normalizes a value according to the manual flow.
+func (f ManualKeyAuthFlow) Prepare(value string) (string, error) {
+	value, err := PrepareCredential(value)
+	if err != nil {
+		return "", err
+	}
+	if len(f.CookieNames) > 0 {
+		if field, _, found := strings.Cut(value, ":"); found {
+			field = strings.TrimSpace(field)
+			if strings.EqualFold(field, "cookie") || strings.EqualFold(field, "set-cookie") {
+				return "", errors.New("paste only the cookie value, without a Cookie or Set-Cookie header")
+			}
+		}
+		if field, _, found := strings.Cut(value, "="); found {
+			field = strings.TrimSpace(field)
+			for _, name := range f.CookieNames {
+				if strings.EqualFold(field, name) {
+					return "", fmt.Errorf("paste only the %s cookie value, without %s=", name, name)
+				}
+			}
+		}
+		if err := (&http.Cookie{Name: "credential", Value: value}).Valid(); err != nil {
+			return "", errors.New("paste only the cookie value, without a Cookie header or other cookies")
+		}
+	}
+	if f.Validate != nil {
+		if err := f.Validate(value); err != nil {
+			return "", err
+		}
+	}
+	return value, nil
 }
 
 // ValidateNotEmpty returns an error if the string is empty or whitespace-only.

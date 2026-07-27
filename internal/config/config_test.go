@@ -1080,6 +1080,43 @@ func TestWriteCredential_ReadCredential_Roundtrip(t *testing.T) {
 	}
 }
 
+func TestWriteCredential_PreservesOtherProviders(t *testing.T) {
+	setupTempDir(t)
+	original := map[string]struct {
+		credType string
+		content  string
+	}{
+		"claude":   {credType: "oauth", content: `{"access_token":"claude-token"}`},
+		"cursor":   {credType: "session", content: `{"session_token":"cursor-token"}`},
+		"opencode": {credType: "session", content: `{"session_token":"opencode-token"}`},
+	}
+	for providerID, credential := range original {
+		if err := WriteCredential(providerID, credential.credType, []byte(credential.content)); err != nil {
+			t.Fatalf("seed %s credential: %v", providerID, err)
+		}
+	}
+	if err := os.Chmod(CredentialsFile(), 0o644); err != nil {
+		t.Fatalf("Chmod credentials file: %v", err)
+	}
+	if err := os.Chmod(filepath.Dir(CredentialsFile()), 0o755); err != nil {
+		t.Fatalf("Chmod credentials directory: %v", err)
+	}
+
+	if err := WriteCredential("openrouter", "apikey", []byte(`{"api_key":"new-token"}`)); err != nil {
+		t.Fatalf("WriteCredential() error: %v", err)
+	}
+
+	for providerID, credential := range original {
+		got, err := ReadCredential(providerID, credential.credType)
+		if err != nil {
+			t.Fatalf("ReadCredential(%s) error: %v", providerID, err)
+		}
+		if string(got) != credential.content {
+			t.Errorf("%s credential = %s, want %s", providerID, got, credential.content)
+		}
+	}
+}
+
 func TestWriteCredential_FilePermissions(t *testing.T) {
 	setupTempDir(t)
 
@@ -1097,6 +1134,114 @@ func TestWriteCredential_FilePermissions(t *testing.T) {
 	}
 }
 
+func TestWriteCredential_DirectoryPermissions(t *testing.T) {
+	setupTempDir(t)
+	dir := DataDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatalf("Chmod() error: %v", err)
+	}
+
+	if err := WriteCredential("testprov", "oauth", []byte(`{"secret":"x"}`)); err != nil {
+		t.Fatalf("WriteCredential() error: %v", err)
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("Stat() error: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o700 {
+		t.Errorf("directory permissions = %o, want 0700", perm)
+	}
+}
+
+func TestReadCredential_RepairsPermissions(t *testing.T) {
+	setupTempDir(t)
+	path := CredentialsFile()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	if err := os.Chmod(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("Chmod directory: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"testprov":{"oauth":{"secret":"x"}}}`), 0o644); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatalf("Chmod file: %v", err)
+	}
+
+	if _, err := ReadCredential("testprov", "oauth"); err != nil {
+		t.Fatalf("ReadCredential() error: %v", err)
+	}
+
+	dirInfo, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatalf("Stat directory: %v", err)
+	}
+	if perm := dirInfo.Mode().Perm(); perm != 0o700 {
+		t.Errorf("directory permissions = %o, want 0700", perm)
+	}
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat file: %v", err)
+	}
+	if perm := fileInfo.Mode().Perm(); perm != 0o600 {
+		t.Errorf("file permissions = %o, want 0600", perm)
+	}
+}
+
+func TestReadCredential_AllowsAlreadyRestrictedReadOnlyPath(t *testing.T) {
+	setupTempDir(t)
+	path := CredentialsFile()
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"testprov":{"oauth":{"secret":"x"}}}`), 0o400); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+	if err := os.Chmod(path, 0o400); err != nil {
+		t.Fatalf("Chmod file: %v", err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("Chmod directory: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(dir, 0o700)
+		_ = os.Chmod(path, 0o600)
+	})
+
+	data, err := ReadCredential("testprov", "oauth")
+	if err != nil {
+		t.Fatalf("ReadCredential() error: %v", err)
+	}
+	if string(data) != `{"secret":"x"}` {
+		t.Errorf("credential = %s, want preserved value", data)
+	}
+}
+
+func TestReadCredential_RejectsSymlink(t *testing.T) {
+	root := setupTempDir(t)
+	path := CredentialsFile()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	target := filepath.Join(root, "other-credentials.json")
+	if err := os.WriteFile(target, []byte(`{"testprov":{"oauth":{"secret":"x"}}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("cannot create symlink: %v", err)
+	}
+
+	if _, err := ReadCredential("testprov", "oauth"); err == nil {
+		t.Fatal("expected symlinked credential file to be rejected")
+	}
+}
+
 func TestWriteCredential_Atomic_NoTmpFileLeft(t *testing.T) {
 	setupTempDir(t)
 
@@ -1104,9 +1249,12 @@ func TestWriteCredential_Atomic_NoTmpFileLeft(t *testing.T) {
 		t.Fatalf("WriteCredential() error: %v", err)
 	}
 
-	tmpPath := CredentialsFile() + ".tmp"
-	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
-		t.Error("temporary file should not remain after WriteCredential")
+	tmpFiles, err := filepath.Glob(filepath.Join(filepath.Dir(CredentialsFile()), ".credentials.json.tmp-*"))
+	if err != nil {
+		t.Fatalf("Glob() error: %v", err)
+	}
+	if len(tmpFiles) != 0 {
+		t.Errorf("temporary credential files remain: %v", tmpFiles)
 	}
 }
 

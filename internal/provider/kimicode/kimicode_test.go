@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -70,9 +71,11 @@ func TestDeviceFlowStrategy_LoadCredentials_MigrationWriteFailure(t *testing.T) 
 	if err := config.WriteCredential("kimicode", "oauth", legacy); err != nil {
 		t.Fatalf("WriteCredential: %v", err)
 	}
-	if err := os.Mkdir(config.CredentialsFile()+".tmp", 0o755); err != nil {
-		t.Fatalf("Mkdir temp blocker: %v", err)
+	dataDir := filepath.Dir(config.CredentialsFile())
+	if err := os.Chmod(dataDir, 0o500); err != nil {
+		t.Fatalf("make credentials directory read-only: %v", err)
 	}
+	t.Cleanup(func() { _ = os.Chmod(dataDir, 0o700) })
 
 	creds, err := (&DeviceFlowStrategy{}).loadCredentials()
 	if err == nil {

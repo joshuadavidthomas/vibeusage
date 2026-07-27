@@ -69,6 +69,7 @@ func (o Opencode) Auth() provider.AuthFlow {
 			"vibeusage will use your most recently opened workspace. You can select a different one with workspace_id under [providers.opencode].",
 		Placeholder: "paste auth cookie value here",
 		Validate:    provider.ValidateNotEmpty,
+		CookieNames: []string{"auth"},
 		ProviderID:  "opencode",
 		CredType:    "session",
 		JSONKey:     "session_token",
