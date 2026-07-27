@@ -32,6 +32,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 - Made catalog loading stop on cancellation and retry on the next request.
 - Fixed providers removed through `vibeusage auth` returning on the next run when credentials were still available from a provider CLI or environment variable. Removal now disables the provider across usage, routing, and statusline output until it is re-enabled through auth.
 
+### New Contributors
+
+- [Sean Murphy](https://github.com/streber42) added OpenCode Go support in [#174](https://github.com/joshuadavidthomas/vibeusage/pull/174).
+
 ## [0.11.0]
 
 ### Added
