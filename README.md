@@ -541,6 +541,8 @@ pre-commit install
 go mod download
 ```
 
+`mise.toml` pins the auxiliary tools shared by local development and CI. Go is pinned in `go.mod`; release-only tools and Actions are pinned in their workflows. Run `mise outdated` when updating the toolchain, update the pins, then run `just check`.
+
 ### Run tests
 
 ```bash

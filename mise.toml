@@ -1,4 +1,7 @@
 [tools]
+"aqua:charmbracelet/freeze" = "0.2.2"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.6.0"
 golangci-lint = "2.10.1"
+just = "1.57.0"
 pre-commit = "4.6.1"
 zizmor = "1.28.0"

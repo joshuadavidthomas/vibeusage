@@ -28,9 +28,9 @@ repos:
           - --allow-owner
           - actions
           - --allow-owner
-          - golangci
-          - --allow-owner
           - goreleaser
+          - --allow-owner
+          - jdx
       - id: lint
         args: [--pedantic]
       - id: validate

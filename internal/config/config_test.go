@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -631,34 +632,38 @@ timeout = 15.0
 // Paths
 
 func TestConfigDir_EnvOverride(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", "/custom/config")
+	want := filepath.Join(t.TempDir(), "custom", "config")
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", want)
 	got := ConfigDir()
-	if got != "/custom/config" {
-		t.Errorf("ConfigDir() = %q, want %q", got, "/custom/config")
+	if got != want {
+		t.Errorf("ConfigDir() = %q, want %q", got, want)
 	}
 }
 
 func TestCacheDir_EnvOverride(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CACHE_DIR", "/custom/cache")
+	want := filepath.Join(t.TempDir(), "custom", "cache")
+	t.Setenv("VIBEUSAGE_CACHE_DIR", want)
 	got := CacheDir()
-	if got != "/custom/cache" {
-		t.Errorf("CacheDir() = %q, want %q", got, "/custom/cache")
+	if got != want {
+		t.Errorf("CacheDir() = %q, want %q", got, want)
 	}
 }
 
 func TestDataDir_EnvOverride(t *testing.T) {
-	t.Setenv("VIBEUSAGE_DATA_DIR", "/custom/data")
+	want := filepath.Join(t.TempDir(), "custom", "data")
+	t.Setenv("VIBEUSAGE_DATA_DIR", want)
 	got := DataDir()
-	if got != "/custom/data" {
-		t.Errorf("DataDir() = %q, want %q", got, "/custom/data")
+	if got != want {
+		t.Errorf("DataDir() = %q, want %q", got, want)
 	}
 }
 
 func TestDataDir_DoesNotFallBackToConfigDirEnv(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", "/custom/config")
+	configDir := filepath.Join(t.TempDir(), "custom", "config")
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", configDir)
 	t.Setenv("VIBEUSAGE_DATA_DIR", "")
 	got := DataDir()
-	if got == "/custom/config" {
+	if got == configDir {
 		t.Fatalf("DataDir() should not fall back to VIBEUSAGE_CONFIG_DIR")
 	}
 	if filepath.Base(got) != "vibeusage" {
@@ -683,20 +688,24 @@ func TestCacheDir_DefaultContainsVibeusage(t *testing.T) {
 }
 
 func TestSubdirectoryPaths(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CONFIG_DIR", "/base/config")
-	t.Setenv("VIBEUSAGE_DATA_DIR", "/base/data")
-	t.Setenv("VIBEUSAGE_CACHE_DIR", "/base/cache")
+	base := t.TempDir()
+	configDir := filepath.Join(base, "config")
+	dataDir := filepath.Join(base, "data")
+	cacheDir := filepath.Join(base, "cache")
+	t.Setenv("VIBEUSAGE_CONFIG_DIR", configDir)
+	t.Setenv("VIBEUSAGE_DATA_DIR", dataDir)
+	t.Setenv("VIBEUSAGE_CACHE_DIR", cacheDir)
 
 	tests := []struct {
 		name string
 		got  string
 		want string
 	}{
-		{"DataDir", DataDir(), "/base/data"},
-		{"CredentialsFile", CredentialsFile(), "/base/data/credentials.json"},
-		{"SnapshotsDir", SnapshotsDir(), "/base/cache/snapshots"},
-		{"OrgIDsDir", OrgIDsDir(), "/base/cache/org-ids"},
-		{"ConfigFile", ConfigFile(), "/base/config/config.toml"},
+		{"DataDir", DataDir(), dataDir},
+		{"CredentialsFile", CredentialsFile(), filepath.Join(dataDir, "credentials.json")},
+		{"SnapshotsDir", SnapshotsDir(), filepath.Join(cacheDir, "snapshots")},
+		{"OrgIDsDir", OrgIDsDir(), filepath.Join(cacheDir, "org-ids")},
+		{"ConfigFile", ConfigFile(), filepath.Join(configDir, "config.toml")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1027,9 +1036,10 @@ func TestClearAllCache_EmptyDirs_NoError(t *testing.T) {
 // Credentials
 
 func TestCredentialsFile_Format(t *testing.T) {
-	t.Setenv("VIBEUSAGE_DATA_DIR", "/base/data")
+	dataDir := filepath.Join(t.TempDir(), "data")
+	t.Setenv("VIBEUSAGE_DATA_DIR", dataDir)
 	got := CredentialsFile()
-	want := "/base/data/credentials.json"
+	want := filepath.Join(dataDir, "credentials.json")
 	if got != want {
 		t.Errorf("CredentialsFile() = %q, want %q", got, want)
 	}
@@ -1041,14 +1051,16 @@ func TestExpandPath(t *testing.T) {
 		t.Skip("cannot determine home directory")
 	}
 
+	absolutePath := filepath.Join(t.TempDir(), "absolute", "path")
+	relativePath := filepath.Join("relative", "path")
 	tests := []struct {
 		name string
 		path string
 		want string
 	}{
-		{"tilde prefix expands", "~/foo/bar", filepath.Join(home, "foo/bar")},
-		{"absolute path unchanged", "/absolute/path", "/absolute/path"},
-		{"relative path unchanged", "relative/path", "relative/path"},
+		{"tilde prefix expands", "~/foo/bar", filepath.Join(home, "foo", "bar")},
+		{"absolute path unchanged", absolutePath, absolutePath},
+		{"relative path unchanged", relativePath, relativePath},
 		{"empty string unchanged", "", ""},
 		{"tilde only not expanded", "~", "~"},
 		{"tilde-user not expanded", "~user/path", "~user/path"},
@@ -1095,11 +1107,13 @@ func TestWriteCredential_PreservesOtherProviders(t *testing.T) {
 			t.Fatalf("seed %s credential: %v", providerID, err)
 		}
 	}
-	if err := os.Chmod(CredentialsFile(), 0o644); err != nil {
-		t.Fatalf("Chmod credentials file: %v", err)
-	}
-	if err := os.Chmod(filepath.Dir(CredentialsFile()), 0o755); err != nil {
-		t.Fatalf("Chmod credentials directory: %v", err)
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(CredentialsFile(), 0o644); err != nil {
+			t.Fatalf("Chmod credentials file: %v", err)
+		}
+		if err := os.Chmod(filepath.Dir(CredentialsFile()), 0o755); err != nil {
+			t.Fatalf("Chmod credentials directory: %v", err)
+		}
 	}
 
 	if err := WriteCredential("openrouter", "apikey", []byte(`{"api_key":"new-token"}`)); err != nil {
@@ -1118,6 +1132,9 @@ func TestWriteCredential_PreservesOtherProviders(t *testing.T) {
 }
 
 func TestWriteCredential_FilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix file permission bits")
+	}
 	setupTempDir(t)
 
 	if err := WriteCredential("testprov", "oauth", []byte(`{"secret":"x"}`)); err != nil {
@@ -1135,6 +1152,9 @@ func TestWriteCredential_FilePermissions(t *testing.T) {
 }
 
 func TestWriteCredential_DirectoryPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix directory permission bits")
+	}
 	setupTempDir(t)
 	dir := DataDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -1158,6 +1178,9 @@ func TestWriteCredential_DirectoryPermissions(t *testing.T) {
 }
 
 func TestReadCredential_RepairsPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires repairing Unix permission bits")
+	}
 	setupTempDir(t)
 	path := CredentialsFile()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -1194,6 +1217,9 @@ func TestReadCredential_RepairsPermissions(t *testing.T) {
 }
 
 func TestReadCredential_AllowsAlreadyRestrictedReadOnlyPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix read-only permission semantics")
+	}
 	setupTempDir(t)
 	path := CredentialsFile()
 	dir := filepath.Dir(path)
@@ -1644,8 +1670,10 @@ func TestJSONCacheWritesAreAtomic(t *testing.T) {
 			if os.SameFile(before, after) {
 				t.Error("save rewrote the destination inode instead of publishing a replacement")
 			}
-			if got := after.Mode().Perm(); got != 0o600 {
-				t.Errorf("file permissions = %o, want preserved mode 0600", got)
+			if runtime.GOOS != "windows" {
+				if got := after.Mode().Perm(); got != 0o600 {
+					t.Errorf("file permissions = %o, want preserved mode 0600", got)
+				}
 			}
 			pattern := filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
 			tempFiles, err := filepath.Glob(pattern)
@@ -1706,8 +1734,12 @@ func TestJSONCacheWritesCleanUpTempFileOnRenameFailure(t *testing.T) {
 // Error wrapping: errors should contain contextual information
 
 func TestSave_ErrorWrapping_MkdirAll(t *testing.T) {
-	// Try to save to a path whose parent can't be created
-	path := filepath.Join("/dev/null", "impossible", "config.toml")
+	// Try to save below a file, where a parent directory can't be created.
+	blockingFile := filepath.Join(t.TempDir(), "blocking-file")
+	if err := os.WriteFile(blockingFile, []byte("x"), 0o644); err != nil {
+		t.Fatalf("setup blocking file: %v", err)
+	}
+	path := filepath.Join(blockingFile, "impossible", "config.toml")
 	err := Save(DefaultConfig(), path)
 	if err == nil {
 		t.Fatal("Save() should return an error for invalid path")
@@ -1735,8 +1767,11 @@ func TestSave_ErrorWrapping_CreateFile(t *testing.T) {
 }
 
 func TestCacheSnapshot_ErrorWrapping(t *testing.T) {
-	// Point cache dir to an impossible location
-	t.Setenv("VIBEUSAGE_CACHE_DIR", "/dev/null/impossible")
+	blockingFile := filepath.Join(t.TempDir(), "blocking-file")
+	if err := os.WriteFile(blockingFile, []byte("x"), 0o644); err != nil {
+		t.Fatalf("setup blocking file: %v", err)
+	}
+	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(blockingFile, "impossible"))
 	configMu.Lock()
 	globalConfig = nil
 	configMu.Unlock()
@@ -1752,7 +1787,11 @@ func TestCacheSnapshot_ErrorWrapping(t *testing.T) {
 }
 
 func TestCacheOrgID_ErrorWrapping(t *testing.T) {
-	t.Setenv("VIBEUSAGE_CACHE_DIR", "/dev/null/impossible")
+	blockingFile := filepath.Join(t.TempDir(), "blocking-file")
+	if err := os.WriteFile(blockingFile, []byte("x"), 0o644); err != nil {
+		t.Fatalf("setup blocking file: %v", err)
+	}
+	t.Setenv("VIBEUSAGE_CACHE_DIR", filepath.Join(blockingFile, "impossible"))
 	configMu.Lock()
 	globalConfig = nil
 	configMu.Unlock()
@@ -1767,6 +1806,9 @@ func TestCacheOrgID_ErrorWrapping(t *testing.T) {
 }
 
 func TestWriteCredential_ErrorWrapping_ReadOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a chmod-induced Unix write failure")
+	}
 	dir := t.TempDir()
 	// Make the data dir read-only so the write will fail
 	readonlyDir := filepath.Join(dir, "readonly")

@@ -9,8 +9,7 @@ trap 'rm -f "$BIN"' EXIT
 
 if ! command -v freeze &>/dev/null; then
     echo "error: freeze is not installed"
-    echo "  go install github.com/charmbracelet/freeze@latest"
-    echo "  or: brew install freeze"
+    echo "  run: mise install"
     exit 1
 fi
 

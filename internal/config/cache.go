@@ -82,7 +82,7 @@ func atomicWriteFile(path string, data []byte) (err error) {
 	if err = tmp.Close(); err != nil {
 		return err
 	}
-	if err = os.Rename(tmpPath, path); err != nil {
+	if err = replaceFile(tmpPath, path); err != nil {
 		return err
 	}
 	return nil

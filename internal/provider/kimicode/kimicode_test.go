@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -66,6 +67,9 @@ func TestDeviceFlowStrategy_Fetch_NoCredentials(t *testing.T) {
 }
 
 func TestDeviceFlowStrategy_LoadCredentials_MigrationWriteFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a chmod-induced Unix credential migration write failure")
+	}
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	legacy := []byte(`{"access_token":"tok","refresh_token":"rt","expires_at":1740000000}`)
 	if err := config.WriteCredential("kimicode", "oauth", legacy); err != nil {

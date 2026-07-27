@@ -374,6 +374,7 @@ func TestAuthSetup_DisablesAndReenablesExternalCredentials(t *testing.T) {
 	tmpDir := t.TempDir()
 	testenv.ApplySameDir(t.Setenv, tmpDir)
 	t.Setenv("HOME", tmpDir)
+	t.Setenv("USERPROFILE", tmpDir)
 	for _, envVar := range []string{
 		"ANTIGRAVITY_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
 		"GEMINI_API_KEY", "GITHUB_TOKEN", "CURSOR_API_KEY",

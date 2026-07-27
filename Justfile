@@ -38,8 +38,12 @@ test *ARGS:
 vet:
     go vet ./...
 
+# Check dependencies for known vulnerabilities
+vuln:
+    govulncheck ./...
+
 # Run all checks
-check: test lint vet tidy
+check: test lint vet vuln tidy
 
 # Tidy go.mod/go.sum
 tidy:

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -650,6 +651,9 @@ func writeClaudeCLICreds(t *testing.T, home string) {
 
 func prependFakeClaude(t *testing.T, script string) {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("requires executing a POSIX shell fake Claude CLI")
+	}
 	binDir := filepath.Join(t.TempDir(), "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
@@ -659,6 +663,12 @@ func prependFakeClaude(t *testing.T, script string) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func setUserHome(t *testing.T, home string) {
+	t.Helper()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 }
 
 func setClaudeOAuthEndpoints(t *testing.T, usageURL, accountURL string) {
@@ -687,12 +697,12 @@ func cacheClaudeIdentity(t *testing.T) {
 
 func TestFetch_UsesExpiredMetadataTokenBeforeRefreshing(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubKeychainEmpty(t)
 	cacheClaudeIdentity(t)
 	writeClaudeAuth(t, home, `{"claudeAiOauth":{"accessToken":"still-valid","refreshToken":"ref","expiresAt":1}}`)
-	prependFakeClaude(t, "#!/usr/bin/env sh\nexit 42\n")
+	t.Setenv("PATH", t.TempDir())
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer still-valid" {
@@ -716,7 +726,7 @@ func TestFetch_UsesExpiredMetadataTokenBeforeRefreshing(t *testing.T) {
 
 func TestFetch_RefreshesAfterUnauthorized(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubKeychainEmpty(t)
 	cacheClaudeIdentity(t)
@@ -753,7 +763,7 @@ func TestFetch_RefreshesAfterUnauthorized(t *testing.T) {
 
 func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubKeychainEmpty(t)
 
@@ -776,7 +786,7 @@ func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T)
 }
 
 func TestLoadCredentials_DeletesOrphanSlotWhenKeychainPresent(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setUserHome(t, t.TempDir())
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 
 	old := readKeychainSecret
@@ -803,7 +813,7 @@ func TestLoadCredentials_DeletesOrphanSlotWhenKeychainPresent(t *testing.T) {
 }
 
 func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setUserHome(t, t.TempDir())
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubKeychainEmpty(t)
 

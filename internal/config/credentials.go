@@ -85,7 +85,7 @@ func saveCredentialsStore(store credentialsStore) (err error) {
 	if err = tmp.Close(); err != nil {
 		return fmt.Errorf("writing credentials: %w", err)
 	}
-	if err = os.Rename(tmpPath, path); err != nil {
+	if err = replaceFile(tmpPath, path); err != nil {
 		return fmt.Errorf("writing credentials: %w", err)
 	}
 	return nil

@@ -11,6 +11,12 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
 
+func setUserHome(t *testing.T, home string) {
+	t.Helper()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+}
+
 func writeGeminiCLICreds(t *testing.T, home string) {
 	t.Helper()
 	dir := filepath.Join(home, ".gemini")
@@ -25,7 +31,7 @@ func writeGeminiCLICreds(t *testing.T, home string) {
 
 func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 
 	writeGeminiCLICreds(t, home)
@@ -47,7 +53,7 @@ func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T)
 }
 
 func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setUserHome(t, t.TempDir())
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 
 	if err := config.WriteCredential("gemini", "oauth", []byte(`{"access_token":"stale"}`)); err != nil {
@@ -65,7 +71,7 @@ func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
 
 func TestFetch_FailsClosedWhenRefreshNeeded(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 
 	// Write Gemini CLI creds with an expired access token so NeedsRefresh()

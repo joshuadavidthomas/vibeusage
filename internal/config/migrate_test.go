@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -113,6 +114,9 @@ func TestMigrateCredentials_SkipsInvalidJSON(t *testing.T) {
 }
 
 func TestMigrateCredentials_PreservesOldDirOnReadError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a chmod-induced Unix directory read failure")
+	}
 	dir := setupTempDir(t)
 
 	// Create old-style credential directory with an unreadable subdirectory

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -246,9 +247,9 @@ func TestLoadKeychainCredentials_Error(t *testing.T) {
 }
 
 func TestCodexKeychainAccount_UsesCodexHome(t *testing.T) {
-	t.Setenv("CODEX_HOME", "/tmp/custom-codex-home")
-	if got := codexKeychainAccount(); got != "cli|19179ea395fa2b90" {
-		t.Errorf("codexKeychainAccount() = %q, want %q", got, "cli|19179ea395fa2b90")
+	t.Setenv("CODEX_HOME", "custom-codex-home")
+	if got := codexKeychainAccount(); got != "cli|e7c7d62dfc6bb56b" {
+		t.Errorf("codexKeychainAccount() = %q, want %q", got, "cli|e7c7d62dfc6bb56b")
 	}
 }
 
@@ -259,7 +260,7 @@ func TestCodexHomeDir_ExpandsTilde(t *testing.T) {
 	}
 	t.Setenv("CODEX_HOME", "~/.custom-codex")
 
-	want := home + "/.custom-codex"
+	want := filepath.Join(home, ".custom-codex")
 	if got := codexHomeDir(); got != want {
 		t.Errorf("codexHomeDir() = %q, want %q", got, want)
 	}
@@ -304,6 +305,9 @@ func writeCodexConfig(t *testing.T, home, usageURL string) {
 
 func prependFakeCodex(t *testing.T, script string) {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("requires executing a POSIX shell fake Codex CLI")
+	}
 	binDir := filepath.Join(t.TempDir(), "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
@@ -315,9 +319,15 @@ func prependFakeCodex(t *testing.T, script string) {
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
+func setUserHome(t *testing.T, home string) {
+	t.Helper()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+}
+
 func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
@@ -341,7 +351,7 @@ func TestLoadCredentials_DeletesOrphanSlotWhenCanonicalFilePresent(t *testing.T)
 }
 
 func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setUserHome(t, t.TempDir())
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
@@ -361,12 +371,12 @@ func TestLoadCredentials_NoCanonicalSource_PreservesOrphan(t *testing.T) {
 
 func TestFetch_UsesNoExpiryTokenBeforeRefreshing(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
 	writeCodexAuth(t, home, `{"tokens":{"access_token":"still-valid","refresh_token":"ref"}}`)
-	prependFakeCodex(t, "#!/usr/bin/env sh\nexit 0\n")
+	t.Setenv("PATH", t.TempDir())
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer still-valid" {
@@ -390,7 +400,7 @@ func TestFetch_UsesNoExpiryTokenBeforeRefreshing(t *testing.T) {
 
 func TestFetch_IncludesResetActivityWhenNoCreditsAreAvailable(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
@@ -437,7 +447,7 @@ func TestFetch_IncludesResetActivityWhenNoCreditsAreAvailable(t *testing.T) {
 
 func TestFetch_IncludesAvailableResetCreditDetails(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
@@ -560,7 +570,7 @@ func TestUsageLimitResetsFromDetails_PreservesSummaryAndSortsExpirations(t *test
 
 func TestFetch_ResetCreditDetailFailureKeepsSummaryCount(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
@@ -599,12 +609,12 @@ func TestFetch_ResetCreditDetailFailureKeepsSummaryCount(t *testing.T) {
 
 func TestFetch_UsesExpiredMetadataTokenBeforeRefreshing(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
 	writeCodexAuth(t, home, `{"tokens":{"access_token":"still-valid","refresh_token":"ref","expires_at":"2020-01-01T00:00:00Z"}}`)
-	prependFakeCodex(t, "#!/usr/bin/env sh\nexit 42\n")
+	t.Setenv("PATH", t.TempDir())
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer still-valid" {
@@ -628,7 +638,7 @@ func TestFetch_UsesExpiredMetadataTokenBeforeRefreshing(t *testing.T) {
 
 func TestFetch_RefreshesNoExpiryTokenAfterUnauthorized(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
@@ -678,7 +688,7 @@ func TestAuth_ReturnsParentCancellation(t *testing.T) {
 }
 
 func TestAuth_ReturnsCancellationDuringCredentialCheck(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setUserHome(t, t.TempDir())
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 
@@ -709,7 +719,7 @@ func TestAuth_ReturnsCancellationDuringCredentialCheck(t *testing.T) {
 }
 
 func TestAuth_FailsWhenNoCanonicalSource(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setUserHome(t, t.TempDir())
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)
@@ -734,7 +744,7 @@ func TestAuth_FailsWhenNoCanonicalSource(t *testing.T) {
 
 func TestAuth_SucceedsWhenCanonicalSourcePresent(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setUserHome(t, home)
 	t.Setenv("CODEX_HOME", "")
 	testenv.ApplyVibeusage(t.Setenv, t.TempDir())
 	stubCodexKeychainEmpty(t)

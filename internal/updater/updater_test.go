@@ -14,8 +14,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCompareVersions(t *testing.T) {
@@ -82,10 +84,20 @@ func TestExtractBinaryFromZip(t *testing.T) {
 }
 
 func TestClientCheckAndApply(t *testing.T) {
-	archive := makeTarGzArchive(t, "vibeusage", []byte("new-binary"))
+	osName := "linux"
+	assetName := "vibeusage_linux_amd64.tar.gz"
+	binaryName := "vibeusage"
+	archive := makeTarGzArchive(t, binaryName, []byte("new-binary"))
+	if runtime.GOOS == "windows" {
+		osName = "windows"
+		assetName = "vibeusage_windows_amd64.zip"
+		binaryName = "vibeusage.exe"
+		archive = makeZipArchive(t, binaryName, []byte("new-binary"))
+	}
+
 	sum := sha256.Sum256(archive)
 	checksum := hex.EncodeToString(sum[:])
-	checksums := fmt.Sprintf("%s  vibeusage_linux_amd64.tar.gz\n", checksum)
+	checksums := fmt.Sprintf("%s  %s\n", checksum, assetName)
 
 	mux := http.NewServeMux()
 	server := httptest.NewServer(mux)
@@ -95,7 +107,7 @@ func TestClientCheckAndApply(t *testing.T) {
 		TagName: "v1.2.3",
 		Name:    "v1.2.3",
 		Assets: []githubReleaseAsset{
-			{Name: "vibeusage_linux_amd64.tar.gz", BrowserDownloadURL: server.URL + "/asset"},
+			{Name: assetName, BrowserDownloadURL: server.URL + "/asset"},
 			{Name: "checksums.txt", BrowserDownloadURL: server.URL + "/checksums"},
 		},
 	}
@@ -116,7 +128,7 @@ func TestClientCheckAndApply(t *testing.T) {
 
 	check, err := client.Check(context.Background(), CheckRequest{
 		CurrentVersion: "v1.0.0",
-		OS:             "linux",
+		OS:             osName,
 		Arch:           "amd64",
 	})
 	if err != nil {
@@ -129,7 +141,7 @@ func TestClientCheckAndApply(t *testing.T) {
 		t.Fatalf("target version = %q, want %q", check.TargetVersion, "v1.2.3")
 	}
 
-	targetPath := filepath.Join(t.TempDir(), "vibeusage")
+	targetPath := filepath.Join(t.TempDir(), binaryName)
 	if err := os.WriteFile(targetPath, []byte("old-binary"), 0o755); err != nil {
 		t.Fatalf("failed to seed target binary: %v", err)
 	}
@@ -140,6 +152,13 @@ func TestClientCheckAndApply(t *testing.T) {
 	}
 	if !apply.Updated {
 		t.Fatal("expected Updated=true")
+	}
+	if runtime.GOOS == "windows" {
+		if !apply.Pending {
+			t.Fatal("expected Pending=true on windows")
+		}
+		waitForFileContents(t, targetPath, []byte("new-binary"))
+		return
 	}
 	if apply.Pending {
 		t.Fatal("expected Pending=false on non-windows")
@@ -152,6 +171,24 @@ func TestClientCheckAndApply(t *testing.T) {
 	if string(updatedBody) != "new-binary" {
 		t.Fatalf("updated binary body = %q, want %q", string(updatedBody), "new-binary")
 	}
+}
+
+func waitForFileContents(t *testing.T, path string, want []byte) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	var lastBody []byte
+	var lastErr error
+	for time.Now().Before(deadline) {
+		lastBody, lastErr = os.ReadFile(path)
+		if lastErr == nil && bytes.Equal(lastBody, want) {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if lastErr != nil {
+		t.Fatalf("replacement script did not update %s: %v", path, lastErr)
+	}
+	t.Fatalf("replacement script left binary body %q, want %q", lastBody, want)
 }
 
 func TestClientApplyRefusesDowngrade(t *testing.T) {
