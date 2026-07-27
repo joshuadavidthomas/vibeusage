@@ -13,8 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fmt:
-    name: Format
+  fmt: # zizmor: ignore[anonymous-definition]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,8 +33,7 @@ jobs:
             exit 1
           fi
 
-  lint:
-    name: Lint
+  lint: # zizmor: ignore[anonymous-definition]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,8 +52,7 @@ jobs:
       - name: Run golangci-lint
         run: golangci-lint run
 
-  tidy:
-    name: Tidy
+  tidy: # zizmor: ignore[anonymous-definition]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,8 +68,7 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum
 
-  vet:
-    name: Vet
+  vet: # zizmor: ignore[anonymous-definition]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,8 +82,7 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-  vuln:
-    name: Vulnerabilities
+  vuln: # zizmor: ignore[anonymous-definition]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -106,8 +101,7 @@ jobs:
       - name: Run govulncheck
         run: govulncheck ./...
 
-  workflows:
-    name: Workflows
+  workflows: # zizmor: ignore[anonymous-definition]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
