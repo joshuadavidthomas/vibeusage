@@ -19,7 +19,7 @@ Assets include:
 - `vibeusage_windows_<arch>.zip` (windows)
 - `checksums.txt`
 
-GoReleaser also updates the Homebrew tap repository with `Formula/vibeusage.rb`.
+GitHub stores a signed provenance attestation for every file listed in `checksums.txt`. GoReleaser also updates the Homebrew tap repository with `Formula/vibeusage.rb`.
 
 ## Prerequisites
 
@@ -37,7 +37,9 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-3. The `release` workflow runs automatically and creates a GitHub Release.
+3. The `release` workflow runs race-enabled tests, `go vet`, and a module-tidiness check.
+4. GoReleaser creates the GitHub Release and updates the Homebrew formula.
+5. GitHub signs and stores provenance attestations for the release artifacts.
 
 ## Version injection
 

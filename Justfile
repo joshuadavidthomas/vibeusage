@@ -18,9 +18,9 @@ coverage *ARGS:
 fmt *ARGS='.':
     gofmt -w {{ ARGS }}
 
-# Run linter
-lint *ARGS:
-    golangci-lint run {{ ARGS }}
+# Run all pre-commit hooks
+lint:
+    pre-commit run --all-files
 
 # CLI
 run *ARGS:
@@ -33,6 +33,13 @@ screenshots:
 # Run tests
 test *ARGS:
     go test ./... -race {{ ARGS }}
+
+# Run static analysis
+vet:
+    go vet ./...
+
+# Run all checks
+check: test lint vet tidy
 
 # Tidy go.mod/go.sum
 tidy:

@@ -1,7 +1,9 @@
 ## Commands
 
 - `just test`: Run tests
-- `just lint`: Run linter
+- `just lint`: Run all pre-commit hooks
+- `just vet`: Run Go static analysis
+- `just check`: Run tests, pre-commit hooks, Go static analysis, and module tidying
 - `just fmt`: Format code
 - `just build`: Build the binary
 - `just coverage`: Run tests with coverage
@@ -12,7 +14,8 @@
 Run these after implementing to get immediate feedback:
 
 - Tests: `just test`
-- Lint: `just lint`
+- Lint and workflow checks: `just lint`
+- Static analysis: `just vet`
 - Format: `just fmt`
 
 ## Sandbox

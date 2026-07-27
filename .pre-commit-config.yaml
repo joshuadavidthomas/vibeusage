@@ -10,3 +10,27 @@ repos:
     rev: v1.0.0-rc.4
     hooks:
       - id: go-fmt
+  - repo: local
+    hooks:
+      - id: golangci-lint
+        name: Lint Go code
+        entry: golangci-lint run
+        language: system
+        types: [go]
+        pass_filenames: false
+  - repo: https://github.com/joshuadavidthomas/gh-actionkit
+    rev: 35c4cb824d4a6dd81f1d7af18f4821b7357c1e6b # v0.3.0
+    hooks:
+      - id: check
+        args:
+          - --require-sha
+          - --fail-on-unknown
+          - --allow-owner
+          - actions
+          - --allow-owner
+          - golangci
+          - --allow-owner
+          - goreleaser
+      - id: lint
+        args: [--pedantic]
+      - id: validate

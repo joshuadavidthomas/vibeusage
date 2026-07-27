@@ -2,11 +2,6 @@ version: 2
 
 project_name: vibeusage
 
-before:
-  hooks:
-    - go mod tidy
-    - go test ./...
-
 builds:
   - id: vibeusage
     main: ./cmd/vibeusage
@@ -30,7 +25,7 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
 checksum:
   name_template: checksums.txt
