@@ -33,7 +33,7 @@ func (f *fakeUpdaterService) Check(ctx context.Context, req updater.CheckRequest
 func (f *fakeUpdaterService) Apply(ctx context.Context, req updater.ApplyRequest) (updater.ApplyResult, error) {
 	f.applyCalls++
 	if f.applyErr != nil {
-		return updater.ApplyResult{}, f.applyErr
+		return f.applyResult, f.applyErr
 	}
 	return f.applyResult, nil
 }
@@ -178,6 +178,41 @@ func TestRunUpdate_ApplyWithYes(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "Updated vibeusage") {
 		t.Fatalf("expected success output, got: %s", buf.String())
+	}
+}
+
+func TestRunUpdate_ReportsCommittedUpdateWithFinalizationError(t *testing.T) {
+	service := &fakeUpdaterService{
+		checkResult: updater.CheckResult{
+			CurrentVersion:  "v1.0.0",
+			LatestVersion:   "v1.1.0",
+			TargetVersion:   "v1.1.0",
+			UpdateAvailable: true,
+		},
+		applyResult: updater.ApplyResult{Updated: true},
+		applyErr:    errors.New("sync directory"),
+	}
+
+	oldFactory := updaterFactory
+	updaterFactory = func() updater.Service { return service }
+	defer func() { updaterFactory = oldFactory }()
+	oldSupportChecker := selfUpdateSupportChecker
+	selfUpdateSupportChecker = func() error { return nil }
+	defer func() { selfUpdateSupportChecker = oldSupportChecker }()
+	oldCheckOnly, oldYes := updateCheckOnly, updateYes
+	updateCheckOnly, updateYes = false, true
+	defer func() { updateCheckOnly, updateYes = oldCheckOnly, oldYes }()
+
+	var buf bytes.Buffer
+	outWriter = &buf
+	defer func() { outWriter = os.Stdout }()
+
+	err := runUpdate(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "update installed, but finalization failed") {
+		t.Fatalf("runUpdate error = %v, want committed-update warning", err)
+	}
+	if !strings.Contains(buf.String(), "Updated vibeusage") {
+		t.Fatalf("expected committed update output, got: %s", buf.String())
 	}
 }
 

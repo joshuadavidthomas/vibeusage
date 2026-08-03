@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Changed
+
+- Self-updates now use `go-selfupdate` for release selection, asset verification, locking, and executable replacement.
+
 ## [0.13.0]
 
 ### Added

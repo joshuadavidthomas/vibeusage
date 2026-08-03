@@ -1,34 +1,24 @@
 package updater
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"bytes"
-	"compress/gzip"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
+	selfupdate "github.com/joshuadavidthomas/go-selfupdate"
 	"golang.org/x/mod/semver"
 )
 
 const (
-	defaultOwner       = "joshuadavidthomas"
-	defaultRepo        = "vibeusage"
-	defaultAPIBaseURL  = "https://api.github.com"
-	defaultUserAgent   = "vibeusage-updater"
-	projectName        = "vibeusage"
-	checksumsAssetName = "checksums.txt"
+	defaultOwner      = "joshuadavidthomas"
+	defaultRepo       = "vibeusage"
+	defaultAPIBaseURL = "https://api.github.com"
+	defaultUserAgent  = "vibeusage-updater"
+	projectName       = "vibeusage"
 )
 
 // Service is the interface used by the CLI update command.
@@ -37,7 +27,8 @@ type Service interface {
 	Apply(ctx context.Context, req ApplyRequest) (ApplyResult, error)
 }
 
-// Client checks GitHub releases and applies binary updates.
+// Client adapts go-selfupdate to the CLI and performs lightweight release
+// checks used by the update-available header.
 type Client struct {
 	Owner      string
 	Repo       string
@@ -50,8 +41,6 @@ type Client struct {
 type CheckRequest struct {
 	CurrentVersion string
 	TargetVersion  string
-	OS             string
-	Arch           string
 }
 
 // CheckResult describes update availability for this platform.
@@ -65,16 +54,14 @@ type CheckResult struct {
 	ReleaseNotes    string
 	ReleaseURL      string
 	AssetName       string
-	AssetURL        string
-	ChecksumsURL    string
-	OS              string
-	Arch            string
+
+	updater *selfupdate.Updater
+	plan    *selfupdate.Plan
 }
 
 // ApplyRequest controls installation of a previously checked update.
 type ApplyRequest struct {
 	Check          CheckResult
-	BinaryPath     string
 	AllowDowngrade bool
 }
 
@@ -85,21 +72,6 @@ type ApplyResult struct {
 	OldVersion string
 	NewVersion string
 	BinaryPath string
-}
-
-type githubRelease struct {
-	TagName     string               `json:"tag_name"`
-	Name        string               `json:"name"`
-	Body        string               `json:"body"`
-	HTMLURL     string               `json:"html_url"`
-	PublishedAt time.Time            `json:"published_at"`
-	Assets      []githubReleaseAsset `json:"assets"`
-}
-
-type githubReleaseAsset struct {
-	Name               string `json:"name"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-	Size               int64  `json:"size"`
 }
 
 // NewClient creates a GitHub-backed updater client.
@@ -115,69 +87,50 @@ func NewClient() *Client {
 
 // Check checks GitHub releases and returns whether an update is available.
 func (c *Client) Check(ctx context.Context, req CheckRequest) (CheckResult, error) {
-	osName := req.OS
-	if osName == "" {
-		osName = runtime.GOOS
-	}
-	arch := req.Arch
-	if arch == "" {
-		arch = runtime.GOARCH
-	}
-
-	release, err := c.fetchRelease(ctx, req.TargetVersion)
+	targetVersion := normalizeTargetVersion(req.TargetVersion)
+	engine, err := selfupdate.New(selfupdate.Config{
+		Repository:     c.repository(),
+		Command:        projectName,
+		CurrentVersion: req.CurrentVersion,
+		AllowDowngrade: targetVersion != "",
+		HTTPClient:     c.HTTP,
+		GitHubToken:    c.Token,
+	})
 	if err != nil {
 		return CheckResult{}, err
 	}
 
-	assetName, err := expectedAssetName(osName, arch)
-	if err != nil {
-		return CheckResult{}, err
-	}
-
-	asset, ok := findReleaseAsset(release.Assets, assetName, osName, arch)
-	if !ok {
-		return CheckResult{}, fmt.Errorf("release %s does not include an asset for %s/%s", release.TagName, osName, arch)
-	}
-
-	checksums, ok := findChecksumsAsset(release.Assets)
-	if !ok {
-		return CheckResult{}, fmt.Errorf("release %s does not include %s", release.TagName, checksumsAssetName)
-	}
-
-	targetVersion := normalizeVersion(release.TagName)
-	currentVersion := normalizeVersion(req.CurrentVersion)
-	updateAvailable := false
-	isDowngrade := false
-
-	if req.TargetVersion == "" {
-		if cmp, comparable := compareVersions(currentVersion, targetVersion); comparable {
-			updateAvailable = cmp < 0
-		} else {
-			updateAvailable = currentVersion == "" || currentVersion != targetVersion
-		}
+	var plan *selfupdate.Plan
+	if targetVersion == "" {
+		plan, err = engine.Check(ctx)
 	} else {
-		if cmp, comparable := compareVersions(currentVersion, targetVersion); comparable {
-			updateAvailable = cmp != 0
-			isDowngrade = cmp > 0
-		} else {
-			updateAvailable = currentVersion == "" || currentVersion != targetVersion
-		}
+		plan, err = engine.CheckVersion(ctx, targetVersion)
+	}
+	if err != nil {
+		return CheckResult{}, err
+	}
+
+	release := plan.Release()
+	updateAvailable := plan.UpdateAvailable()
+	isDowngrade := false
+	if targetVersion != "" && plan.VersionsComparable() {
+		cmp := semver.Compare(plan.CurrentVersion(), plan.AvailableVersion())
+		updateAvailable = cmp != 0
+		isDowngrade = cmp > 0
 	}
 
 	return CheckResult{
-		CurrentVersion:  req.CurrentVersion,
-		LatestVersion:   release.TagName,
-		TargetVersion:   release.TagName,
+		CurrentVersion:  plan.CurrentVersion(),
+		LatestVersion:   release.Version,
+		TargetVersion:   plan.AvailableVersion(),
 		UpdateAvailable: updateAvailable,
 		IsDowngrade:     isDowngrade,
 		ReleaseName:     release.Name,
-		ReleaseNotes:    release.Body,
-		ReleaseURL:      release.HTMLURL,
-		AssetName:       asset.Name,
-		AssetURL:        asset.BrowserDownloadURL,
-		ChecksumsURL:    checksums.BrowserDownloadURL,
-		OS:              osName,
-		Arch:            arch,
+		ReleaseNotes:    release.Notes,
+		ReleaseURL:      release.URL,
+		AssetName:       plan.AssetName(),
+		updater:         engine,
+		plan:            plan,
 	}, nil
 }
 
@@ -185,63 +138,26 @@ func (c *Client) Check(ctx context.Context, req CheckRequest) (CheckResult, erro
 func (c *Client) Apply(ctx context.Context, req ApplyRequest) (ApplyResult, error) {
 	check := req.Check
 	if !check.UpdateAvailable {
-		return ApplyResult{
-			Updated:    false,
-			OldVersion: check.CurrentVersion,
-			NewVersion: check.TargetVersion,
-		}, nil
+		return ApplyResult{OldVersion: check.CurrentVersion, NewVersion: check.TargetVersion}, nil
 	}
 	if check.IsDowngrade && !req.AllowDowngrade {
 		return ApplyResult{}, fmt.Errorf("refusing downgrade from %s to %s without explicit approval", check.CurrentVersion, check.TargetVersion)
 	}
-
-	checksumsBody, err := c.download(ctx, check.ChecksumsURL)
-	if err != nil {
-		return ApplyResult{}, fmt.Errorf("failed to download checksums: %w", err)
+	if check.updater == nil || check.plan == nil {
+		return ApplyResult{}, fmt.Errorf("update check has no installable plan")
 	}
 
-	expectedChecksum, ok := checksumForAsset(string(checksumsBody), check.AssetName)
-	if !ok {
-		return ApplyResult{}, fmt.Errorf("checksums file does not contain %s", check.AssetName)
-	}
-
-	archiveBody, err := c.download(ctx, check.AssetURL)
-	if err != nil {
-		return ApplyResult{}, fmt.Errorf("failed to download release asset: %w", err)
-	}
-	if err := verifySHA256(archiveBody, expectedChecksum); err != nil {
-		return ApplyResult{}, err
-	}
-
-	binaryBody, err := extractBinaryFromArchive(check.AssetName, archiveBody, binaryNameForOS(check.OS))
-	if err != nil {
-		return ApplyResult{}, fmt.Errorf("failed to extract binary from archive: %w", err)
-	}
-
-	targetPath, err := resolveBinaryPath(req.BinaryPath)
-	if err != nil {
-		return ApplyResult{}, err
-	}
-
-	pending, err := replaceBinary(targetPath, binaryBody)
-	if err != nil {
-		return ApplyResult{}, err
-	}
-
+	result, err := check.updater.Apply(ctx, check.plan)
 	return ApplyResult{
-		Updated:    true,
-		Pending:    pending,
-		OldVersion: check.CurrentVersion,
-		NewVersion: check.TargetVersion,
-		BinaryPath: targetPath,
-	}, nil
+		Updated:    result.Committed,
+		Pending:    result.CleanupPending,
+		OldVersion: result.PreviousVersion,
+		NewVersion: result.Version,
+		BinaryPath: result.Executable,
+	}, err
 }
 
-func (c *Client) fetchRelease(ctx context.Context, targetVersion string) (*githubRelease, error) {
-	apiBase := strings.TrimSuffix(strings.TrimSpace(c.APIBaseURL), "/")
-	if apiBase == "" {
-		apiBase = defaultAPIBaseURL
-	}
+func (c *Client) repository() string {
 	owner := strings.TrimSpace(c.Owner)
 	if owner == "" {
 		owner = defaultOwner
@@ -250,271 +166,15 @@ func (c *Client) fetchRelease(ctx context.Context, targetVersion string) (*githu
 	if repo == "" {
 		repo = defaultRepo
 	}
-
-	endpoint := fmt.Sprintf("%s/repos/%s/%s/releases/latest", apiBase, owner, repo)
-	if targetVersion != "" {
-		tag := targetVersion
-		if !strings.HasPrefix(tag, "v") {
-			tag = "v" + tag
-		}
-		endpoint = fmt.Sprintf("%s/repos/%s/%s/releases/tags/%s", apiBase, owner, repo, url.PathEscape(tag))
-	}
-
-	body, err := c.getJSON(ctx, endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	var rel githubRelease
-	if err := json.Unmarshal(body, &rel); err != nil {
-		return nil, fmt.Errorf("failed to parse release metadata: %w", err)
-	}
-	if rel.TagName == "" {
-		return nil, fmt.Errorf("release metadata missing tag_name")
-	}
-	return &rel, nil
+	return owner + "/" + repo
 }
 
-func (c *Client) getJSON(ctx context.Context, rawURL string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return nil, err
+func normalizeTargetVersion(version string) string {
+	version = strings.TrimSpace(version)
+	if version != "" && !strings.HasPrefix(version, "v") {
+		return "v" + version
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", defaultUserAgent)
-	if c.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-	}
-
-	httpClient := c.HTTP
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 60 * time.Second}
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(body))
-		if len(msg) > 300 {
-			msg = msg[:300]
-		}
-		if msg == "" {
-			msg = resp.Status
-		}
-		return nil, fmt.Errorf("GitHub API request failed (%d): %s", resp.StatusCode, msg)
-	}
-
-	return body, nil
-}
-
-func (c *Client) download(ctx context.Context, rawURL string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", defaultUserAgent)
-	if c.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-	}
-
-	httpClient := c.HTTP
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 60 * time.Second}
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(body))
-		if len(msg) > 300 {
-			msg = msg[:300]
-		}
-		if msg == "" {
-			msg = resp.Status
-		}
-		return nil, fmt.Errorf("download failed (%d): %s", resp.StatusCode, msg)
-	}
-
-	return body, nil
-}
-
-func expectedAssetName(osName, arch string) (string, error) {
-	switch arch {
-	case "amd64", "arm64":
-	default:
-		return "", fmt.Errorf("unsupported architecture for self-update: %s", arch)
-	}
-
-	switch osName {
-	case "linux", "darwin":
-		return fmt.Sprintf("%s_%s_%s.tar.gz", projectName, osName, arch), nil
-	case "windows":
-		return fmt.Sprintf("%s_windows_%s.zip", projectName, arch), nil
-	default:
-		return "", fmt.Errorf("unsupported OS for self-update: %s", osName)
-	}
-}
-
-func findReleaseAsset(assets []githubReleaseAsset, expectedName, osName, arch string) (githubReleaseAsset, bool) {
-	for _, asset := range assets {
-		if asset.Name == expectedName {
-			return asset, true
-		}
-	}
-
-	marker := "_" + osName + "_" + arch
-	var fallback githubReleaseAsset
-	for _, asset := range assets {
-		if !strings.HasPrefix(asset.Name, projectName+"_") {
-			continue
-		}
-		if !strings.Contains(asset.Name, marker) {
-			continue
-		}
-		if strings.HasSuffix(asset.Name, ".tar.gz") || strings.HasSuffix(asset.Name, ".zip") {
-			if fallback.Name == "" {
-				fallback = asset
-			}
-		}
-	}
-	if fallback.Name != "" {
-		return fallback, true
-	}
-
-	return githubReleaseAsset{}, false
-}
-
-func findChecksumsAsset(assets []githubReleaseAsset) (githubReleaseAsset, bool) {
-	for _, asset := range assets {
-		if asset.Name == checksumsAssetName {
-			return asset, true
-		}
-	}
-	for _, asset := range assets {
-		if strings.HasSuffix(asset.Name, "_checksums.txt") {
-			return asset, true
-		}
-	}
-	return githubReleaseAsset{}, false
-}
-
-func checksumForAsset(checksumsContent, assetName string) (string, bool) {
-	for _, line := range strings.Split(checksumsContent, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		hash := strings.TrimSpace(fields[0])
-		name := strings.TrimPrefix(strings.TrimSpace(fields[1]), "*")
-		if name == assetName {
-			return hash, true
-		}
-	}
-	return "", false
-}
-
-func verifySHA256(content []byte, expectedHex string) error {
-	expected := strings.ToLower(strings.TrimSpace(expectedHex))
-	sum := sha256.Sum256(content)
-	actual := hex.EncodeToString(sum[:])
-	if expected != actual {
-		return fmt.Errorf("checksum mismatch for release asset: expected %s, got %s", expected, actual)
-	}
-	return nil
-}
-
-func extractBinaryFromArchive(assetName string, archiveBody []byte, binaryName string) ([]byte, error) {
-	switch {
-	case strings.HasSuffix(assetName, ".tar.gz"):
-		return extractBinaryFromTarGz(archiveBody, binaryName)
-	case strings.HasSuffix(assetName, ".zip"):
-		return extractBinaryFromZip(archiveBody, binaryName)
-	default:
-		return nil, fmt.Errorf("unsupported archive format for asset %s", assetName)
-	}
-}
-
-func extractBinaryFromTarGz(archiveBody []byte, binaryName string) ([]byte, error) {
-	gzReader, err := gzip.NewReader(bytes.NewReader(archiveBody))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = gzReader.Close() }()
-
-	tarReader := tar.NewReader(gzReader)
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		if header.Typeflag != tar.TypeReg {
-			continue
-		}
-		if filepath.Base(header.Name) != binaryName {
-			continue
-		}
-		binaryBody, err := io.ReadAll(tarReader)
-		if err != nil {
-			return nil, err
-		}
-		if len(binaryBody) == 0 {
-			return nil, fmt.Errorf("archive entry %s is empty", header.Name)
-		}
-		return binaryBody, nil
-	}
-	return nil, fmt.Errorf("binary %s not found in tar.gz archive", binaryName)
-}
-
-func extractBinaryFromZip(archiveBody []byte, binaryName string) ([]byte, error) {
-	readerAt := bytes.NewReader(archiveBody)
-	zipReader, err := zip.NewReader(readerAt, int64(len(archiveBody)))
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range zipReader.File {
-		if filepath.Base(file.Name) != binaryName {
-			continue
-		}
-		rc, err := file.Open()
-		if err != nil {
-			return nil, err
-		}
-		binaryBody, readErr := io.ReadAll(rc)
-		_ = rc.Close()
-		if readErr != nil {
-			return nil, readErr
-		}
-		if len(binaryBody) == 0 {
-			return nil, fmt.Errorf("archive entry %s is empty", file.Name)
-		}
-		return binaryBody, nil
-	}
-	return nil, fmt.Errorf("binary %s not found in zip archive", binaryName)
+	return version
 }
 
 func resolveBinaryPath(override string) (string, error) {
@@ -531,29 +191,15 @@ func resolveBinaryPath(override string) (string, error) {
 	return path, nil
 }
 
-func normalizeVersion(v string) string {
-	v = strings.TrimSpace(v)
-	v = strings.TrimPrefix(v, "v")
-	return v
+func normalizeVersion(version string) string {
+	return strings.TrimPrefix(strings.TrimSpace(version), "v")
 }
 
 func compareVersions(current, target string) (int, bool) {
-	current = normalizeVersion(current)
-	target = normalizeVersion(target)
-	if current == "" || target == "" {
+	current = "v" + normalizeVersion(current)
+	target = "v" + normalizeVersion(target)
+	if !semver.IsValid(current) || !semver.IsValid(target) {
 		return 0, false
 	}
-	currentSemver := "v" + current
-	targetSemver := "v" + target
-	if !semver.IsValid(currentSemver) || !semver.IsValid(targetSemver) {
-		return 0, false
-	}
-	return semver.Compare(currentSemver, targetSemver), true
-}
-
-func binaryNameForOS(osName string) string {
-	if osName == "windows" {
-		return projectName + ".exe"
-	}
-	return projectName
+	return semver.Compare(current, target), true
 }

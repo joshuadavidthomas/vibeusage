@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -136,9 +137,45 @@ func AvailableUpdateForVersion(currentVersion string, latest LatestReleaseInfo) 
 // performing the heavier asset validation used by self-update install flows.
 func (c *Client) CheckLatestRelease(ctx context.Context) (LatestReleaseInfo, error) {
 	checkedAt := time.Now().UTC()
-	rel, err := c.fetchRelease(ctx, "")
+	apiBase := strings.TrimSuffix(strings.TrimSpace(c.APIBaseURL), "/")
+	if apiBase == "" {
+		apiBase = defaultAPIBaseURL
+	}
+	endpoint := fmt.Sprintf("%s/repos/%s/releases/latest", apiBase, c.repository())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return LatestReleaseInfo{}, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", defaultUserAgent)
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+	httpClient := c.HTTP
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: time.Second}
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return LatestReleaseInfo{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return LatestReleaseInfo{}, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return LatestReleaseInfo{}, fmt.Errorf("GitHub API request failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var rel struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+	}
+	if err := json.Unmarshal(body, &rel); err != nil {
+		return LatestReleaseInfo{}, fmt.Errorf("failed to parse release metadata: %w", err)
+	}
+	if rel.TagName == "" {
+		return LatestReleaseInfo{}, fmt.Errorf("release metadata missing tag_name")
 	}
 	return LatestReleaseInfo{
 		CheckedAt:     checkedAt,

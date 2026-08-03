@@ -96,12 +96,12 @@ func runUpdate(ctx context.Context) error {
 		Check:          check,
 		AllowDowngrade: updateVersion != "",
 	})
-	if err != nil {
+	if err != nil && !apply.Updated {
 		return fmt.Errorf("failed to apply update: %w", err)
 	}
 
 	if jsonOutput {
-		return display.OutputJSON(outWriter, display.UpdateStatusJSON{
+		outputErr := display.OutputJSON(outWriter, display.UpdateStatusJSON{
 			CurrentVersion:  check.CurrentVersion,
 			LatestVersion:   check.LatestVersion,
 			TargetVersion:   check.TargetVersion,
@@ -111,14 +111,19 @@ func runUpdate(ctx context.Context) error {
 			Applied:         apply.Updated,
 			Pending:         apply.Pending,
 		})
-	}
-
-	if apply.Pending {
-		out("✓ Staged update to %s; restart your shell and rerun vibeusage\n", check.TargetVersion)
+		if outputErr != nil {
+			return outputErr
+		}
+		if err != nil {
+			return fmt.Errorf("update installed, but finalization failed: %w", err)
+		}
 		return nil
 	}
 
 	out("✓ Updated vibeusage %s → %s\n", check.CurrentVersion, check.TargetVersion)
+	if err != nil {
+		return fmt.Errorf("update installed, but finalization failed: %w", err)
+	}
 	return nil
 }
 
