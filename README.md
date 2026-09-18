@@ -357,6 +357,8 @@ The prompt walks you through extracting your session cookie from https://cursor.
 
 vibeusage reads credentials from the local Antigravity IDE state automatically. Just sign into Antigravity and it should work — no manual setup needed.
 
+`vibeusage auth antigravity` mints a vibeusage-owned credential chain for when that IDE state is not readable, and refreshes the chain afterwards. That flow talks to Google with an OAuth client you supply, so set `VIBEUSAGE_ANTIGRAVITY_CLIENT_ID` and `VIBEUSAGE_ANTIGRAVITY_CLIENT_SECRET` (an OAuth client from a Google Cloud project you control) before running it. vibeusage ships no Antigravity client credentials of its own, and the command fails with a clear message when they are missing.
+
 #### Google Gemini CLI
 
 [gemini.google.com](https://gemini.google.com) — Google Gemini AI. Reports daily per-model request quotas. Shows your user tier.
@@ -546,6 +548,8 @@ vibeusage route --role coding
 | `MINIMAX_API_KEY` | Minimax Coding Plan API key |
 | `OPENCODE_WORKSPACE_ID` | OpenCode workspace override |
 | `OPENROUTER_API_KEY` | OpenRouter API key |
+| `VIBEUSAGE_ANTIGRAVITY_CLIENT_ID` | OAuth client ID used by `vibeusage auth antigravity` and its token refresh |
+| `VIBEUSAGE_ANTIGRAVITY_CLIENT_SECRET` | OAuth client secret used by `vibeusage auth antigravity` and its token refresh |
 | `VIBEUSAGE_CACHE_DIR` | Override cache directory |
 | `VIBEUSAGE_CONFIG_DIR` | Override config directory |
 | `VIBEUSAGE_DATA_DIR` | Override data directory (credentials storage) |

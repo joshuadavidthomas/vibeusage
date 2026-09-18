@@ -1,6 +1,7 @@
 package antigravity
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,6 +14,21 @@ import (
 	"testing"
 	"time"
 )
+
+const (
+	testClientID     = "test-client-id"
+	testClientSecret = "test-client-secret"
+)
+
+// setTestClientCredentials configures the OAuth client that the auth flow reads
+// from the environment, and returns the credentials the flow should use.
+func setTestClientCredentials(t *testing.T) oauthClientCredentials {
+	t.Helper()
+
+	t.Setenv(clientIDEnvVar, testClientID)
+	t.Setenv(clientSecretEnvVar, testClientSecret)
+	return oauthClientCredentials{ID: testClientID, Secret: testClientSecret}
+}
 
 func TestRunAuthFlow_ReturnsParentCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -134,14 +150,15 @@ func TestGenerateOAuthMaterialCreatesS256Challenge(t *testing.T) {
 }
 
 func TestTokenExchangeFormIncludesVerifier(t *testing.T) {
-	form := tokenExchangeForm("authorization-code", "http://localhost:8080", "code-verifier")
+	oauthClient := setTestClientCredentials(t)
+	form := tokenExchangeForm("authorization-code", "http://localhost:8080", "code-verifier", oauthClient)
 
 	for key, want := range map[string]string{
 		"grant_type":    "authorization_code",
 		"code":          "authorization-code",
 		"redirect_uri":  "http://localhost:8080",
-		"client_id":     antigravityClientID,
-		"client_secret": antigravityClientSecret,
+		"client_id":     oauthClient.ID,
+		"client_secret": oauthClient.Secret,
 		"code_verifier": "code-verifier",
 	} {
 		if got := form[key]; got != want {
@@ -157,14 +174,15 @@ func TestTokenExchangeFormIncludesVerifier(t *testing.T) {
 }
 
 func TestBuildAuthorizationURLIncludesStateAndPKCE(t *testing.T) {
-	authURL, err := url.Parse(buildAuthorizationURL("http://localhost:8080", "state-value", "challenge-value"))
+	oauthClient := setTestClientCredentials(t)
+	authURL, err := url.Parse(buildAuthorizationURL("http://localhost:8080", "state-value", "challenge-value", oauthClient))
 	if err != nil {
 		t.Fatalf("parse authorization URL: %v", err)
 	}
 
 	query := authURL.Query()
 	for key, want := range map[string]string{
-		"client_id":             antigravityClientID,
+		"client_id":             oauthClient.ID,
 		"redirect_uri":          "http://localhost:8080",
 		"response_type":         "code",
 		"scope":                 oauthScopes,
@@ -193,5 +211,72 @@ func receiveCallbackResult(t *testing.T, resultCh <-chan callbackResult) callbac
 	case <-time.After(time.Second):
 		t.Fatal("callback did not complete")
 		return callbackResult{}
+	}
+}
+
+func TestClientCredentials_RequiresBothValues(t *testing.T) {
+	tests := []struct {
+		name         string
+		clientID     string
+		clientSecret string
+	}{
+		{name: "neither configured"},
+		{name: "only client id", clientID: "client-id"},
+		{name: "only client secret", clientSecret: "client-secret"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(clientIDEnvVar, tt.clientID)
+			t.Setenv(clientSecretEnvVar, tt.clientSecret)
+
+			_, err := clientCredentials()
+			if err == nil {
+				t.Fatal("clientCredentials() error = nil, want an error for incomplete configuration")
+			}
+			for _, envVar := range []string{clientIDEnvVar, clientSecretEnvVar} {
+				if !strings.Contains(err.Error(), envVar) {
+					t.Errorf("clientCredentials() error = %q, want it to name %s", err, envVar)
+				}
+			}
+		})
+	}
+}
+
+func TestClientCredentials_TrimsWhitespace(t *testing.T) {
+	t.Setenv(clientIDEnvVar, "  client-id\n")
+	t.Setenv(clientSecretEnvVar, "\tclient-secret ")
+
+	oauthClient, err := clientCredentials()
+	if err != nil {
+		t.Fatalf("clientCredentials() error = %v", err)
+	}
+	if oauthClient.ID != "client-id" {
+		t.Errorf("client id = %q, want %q", oauthClient.ID, "client-id")
+	}
+	if oauthClient.Secret != "client-secret" {
+		t.Errorf("client secret = %q, want %q", oauthClient.Secret, "client-secret")
+	}
+}
+
+func TestRunAuthFlow_FailsBeforeReachingGoogleWithoutClientCredentials(t *testing.T) {
+	t.Setenv(clientIDEnvVar, "")
+	t.Setenv(clientSecretEnvVar, "")
+
+	var out bytes.Buffer
+	done, err := RunAuthFlow(context.Background(), &out, false)
+	if err == nil {
+		t.Fatal("RunAuthFlow() error = nil, want a missing-credential error")
+	}
+	for _, envVar := range []string{clientIDEnvVar, clientSecretEnvVar} {
+		if !strings.Contains(err.Error(), envVar) {
+			t.Errorf("RunAuthFlow() error = %q, want it to name %s", err, envVar)
+		}
+	}
+	if done {
+		t.Error("RunAuthFlow() reported success without client credentials")
+	}
+	if out.Len() != 0 {
+		t.Errorf("RunAuthFlow() wrote %q, want no output before the credential check", out.String())
 	}
 }

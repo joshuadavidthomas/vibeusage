@@ -62,14 +62,39 @@ func init() {
 }
 
 const (
-	// OAuth client credentials from the Antigravity IDE.
-	antigravityClientID     = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
-	antigravityClientSecret = "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"
+	// Environment variables supplying the Google OAuth client that the
+	// vibeusage-owned Antigravity auth and refresh flows talk to Google with.
+	// These are configuration rather than source: the client the Antigravity
+	// IDE ships is not vibeusage code to publish.
+	clientIDEnvVar     = "VIBEUSAGE_ANTIGRAVITY_CLIENT_ID"
+	clientSecretEnvVar = "VIBEUSAGE_ANTIGRAVITY_CLIENT_SECRET"
 
 	fetchModelsURL       = "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels"
 	loadCodeAssistURL    = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
 	antigravityUserAgent = "antigravity"
 )
+
+// oauthClientCredentials is the Google OAuth client used to exchange an
+// authorization code and to refresh the credentials it mints.
+type oauthClientCredentials struct {
+	ID     string
+	Secret string
+}
+
+// clientCredentials reads the Antigravity OAuth client from the environment.
+// Both values are required: the Google token endpoint rejects an exchange or
+// refresh that omits the client secret, so an incomplete configuration fails
+// here rather than as an opaque HTTP error later.
+func clientCredentials() (oauthClientCredentials, error) {
+	oauthClient := oauthClientCredentials{
+		ID:     strings.TrimSpace(os.Getenv(clientIDEnvVar)),
+		Secret: strings.TrimSpace(os.Getenv(clientSecretEnvVar)),
+	}
+	if oauthClient.ID == "" || oauthClient.Secret == "" {
+		return oauthClientCredentials{}, fmt.Errorf("set %s and %s to an OAuth client you control", clientIDEnvVar, clientSecretEnvVar)
+	}
+	return oauthClient, nil
+}
 
 // OAuthStrategy fetches Antigravity quota using Google OAuth credentials.
 type OAuthStrategy struct {
@@ -141,9 +166,13 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		if source != sourceSlot {
 			return fetch.ResultFail("Token expired. Sign back in via the Antigravity IDE to refresh credentials, or run `vibeusage auth antigravity` for a vibeusage-owned chain."), nil
 		}
+		oauthClient, err := clientCredentials()
+		if err != nil {
+			return fetch.ResultFatal(fmt.Sprintf("Cannot refresh Antigravity credentials: %v. Run `vibeusage auth antigravity` to re-authenticate with it.", err)), nil
+		}
 		refreshed := google.RefreshToken(ctx, creds, google.RefreshConfig{
-			ClientID:     antigravityClientID,
-			ClientSecret: antigravityClientSecret,
+			ClientID:     oauthClient.ID,
+			ClientSecret: oauthClient.Secret,
 			Save:         saveAntigravityCredentials,
 			HTTPTimeout:  s.HTTPTimeout,
 		})

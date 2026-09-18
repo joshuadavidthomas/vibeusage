@@ -36,6 +36,11 @@ func RunAuthFlow(parent context.Context, w io.Writer, quiet bool) (bool, error) 
 		return false, fmt.Errorf("starting authorization flow: %w", err)
 	}
 
+	oauthClient, err := clientCredentials()
+	if err != nil {
+		return false, fmt.Errorf("starting authorization flow: %w", err)
+	}
+
 	state, verifier, challenge, err := generateOAuthMaterial()
 	if err != nil {
 		return false, fmt.Errorf("generating OAuth state and PKCE verifier: %w", err)
@@ -64,7 +69,7 @@ func RunAuthFlow(parent context.Context, w io.Writer, quiet bool) (bool, error) 
 	}()
 
 	// Build the authorization URL.
-	authURL := buildAuthorizationURL(redirectURI, state, challenge)
+	authURL := buildAuthorizationURL(redirectURI, state, challenge, oauthClient)
 
 	if !quiet {
 		device.WriteOpening(w, authURL)
@@ -90,7 +95,7 @@ func RunAuthFlow(parent context.Context, w io.Writer, quiet bool) (bool, error) 
 			}
 			return false, nil
 		}
-		return exchangeCode(parent, w, result.code, redirectURI, verifier, quiet)
+		return exchangeCode(parent, w, result.code, redirectURI, verifier, oauthClient, quiet)
 	case <-pollCtx.Done():
 		if parent.Err() != nil {
 			return false, fmt.Errorf("waiting for authorization callback: %w", parent.Err())
@@ -144,11 +149,11 @@ func newOAuthCallbackHandler(expectedState string, resultCh chan<- callbackResul
 }
 
 // exchangeCode exchanges the authorization code for tokens and saves them.
-func exchangeCode(ctx context.Context, w io.Writer, code, redirectURI, verifier string, quiet bool) (bool, error) {
+func exchangeCode(ctx context.Context, w io.Writer, code, redirectURI, verifier string, oauthClient oauthClientCredentials, quiet bool) (bool, error) {
 	client := httpclient.NewFromConfig(config.Get().Fetch.Timeout)
 
 	var tokenResp google.TokenResponse
-	resp, err := client.PostFormCtx(ctx, google.TokenURL, tokenExchangeForm(code, redirectURI, verifier), &tokenResp)
+	resp, err := client.PostFormCtx(ctx, google.TokenURL, tokenExchangeForm(code, redirectURI, verifier, oauthClient), &tokenResp)
 	if err != nil {
 		if ctx.Err() != nil {
 			return false, fmt.Errorf("token exchange failed: %w", ctx.Err())
@@ -214,21 +219,21 @@ func pkceChallenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
-func tokenExchangeForm(code, redirectURI, verifier string) map[string]string {
+func tokenExchangeForm(code, redirectURI, verifier string, oauthClient oauthClientCredentials) map[string]string {
 	return map[string]string{
 		"grant_type":    "authorization_code",
 		"code":          code,
 		"redirect_uri":  redirectURI,
-		"client_id":     antigravityClientID,
-		"client_secret": antigravityClientSecret,
+		"client_id":     oauthClient.ID,
+		"client_secret": oauthClient.Secret,
 		"code_verifier": verifier,
 	}
 }
 
-func buildAuthorizationURL(redirectURI, state, challenge string) string {
+func buildAuthorizationURL(redirectURI, state, challenge string, oauthClient oauthClientCredentials) string {
 	query := url.Values{
 		"access_type":           {"offline"},
-		"client_id":             {antigravityClientID},
+		"client_id":             {oauthClient.ID},
 		"code_challenge":        {challenge},
 		"code_challenge_method": {"S256"},
 		"prompt":                {"consent"},
