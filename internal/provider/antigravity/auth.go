@@ -18,6 +18,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 )
 
 // Scopes needed for the Antigravity quota and user-info APIs.
@@ -38,6 +39,7 @@ func RunAuthFlow(parent context.Context, w io.Writer, quiet bool) (bool, error) 
 
 	oauthClient, err := clientCredentials()
 	if err != nil {
+		logging.FromContext(parent).Debug("antigravity auth flow blocked by OAuth client configuration", "provider", "antigravity", "err", err)
 		return false, fmt.Errorf("starting authorization flow: %w", err)
 	}
 

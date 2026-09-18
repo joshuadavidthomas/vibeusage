@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 )
 
 const (
@@ -219,10 +221,12 @@ func TestClientCredentials_RequiresBothValues(t *testing.T) {
 		name         string
 		clientID     string
 		clientSecret string
+		wantNamed    []string
+		wantAbsent   []string
 	}{
-		{name: "neither configured"},
-		{name: "only client id", clientID: "client-id"},
-		{name: "only client secret", clientSecret: "client-secret"},
+		{name: "neither configured", wantNamed: []string{clientIDEnvVar, clientSecretEnvVar}},
+		{name: "only client id", clientID: "client-id", wantNamed: []string{clientSecretEnvVar}, wantAbsent: []string{clientIDEnvVar}},
+		{name: "only client secret", clientSecret: "client-secret", wantNamed: []string{clientIDEnvVar}, wantAbsent: []string{clientSecretEnvVar}},
 	}
 
 	for _, tt := range tests {
@@ -234,9 +238,14 @@ func TestClientCredentials_RequiresBothValues(t *testing.T) {
 			if err == nil {
 				t.Fatal("clientCredentials() error = nil, want an error for incomplete configuration")
 			}
-			for _, envVar := range []string{clientIDEnvVar, clientSecretEnvVar} {
+			for _, envVar := range tt.wantNamed {
 				if !strings.Contains(err.Error(), envVar) {
-					t.Errorf("clientCredentials() error = %q, want it to name %s", err, envVar)
+					t.Errorf("clientCredentials() error = %q, want it to name missing %s", err, envVar)
+				}
+			}
+			for _, envVar := range tt.wantAbsent {
+				if strings.Contains(err.Error(), envVar) {
+					t.Errorf("clientCredentials() error = %q, want it to omit configured %s", err, envVar)
 				}
 			}
 		})
@@ -278,5 +287,29 @@ func TestRunAuthFlow_FailsBeforeReachingGoogleWithoutClientCredentials(t *testin
 	}
 	if out.Len() != 0 {
 		t.Errorf("RunAuthFlow() wrote %q, want no output before the credential check", out.String())
+	}
+}
+
+func TestRunAuthFlow_LogsBlockedConfiguration(t *testing.T) {
+	t.Setenv(clientIDEnvVar, "")
+	t.Setenv(clientSecretEnvVar, "")
+
+	ctx, logs := logging.NewTestContext(logging.Flags{Verbose: true})
+	done, err := RunAuthFlow(ctx, io.Discard, true)
+	if err == nil {
+		t.Fatal("RunAuthFlow() error = nil, want a missing-credential error")
+	}
+	if done {
+		t.Error("RunAuthFlow() reported success without client credentials")
+	}
+	for _, want := range []string{
+		"antigravity auth flow blocked by OAuth client configuration",
+		"antigravity",
+		clientIDEnvVar,
+		clientSecretEnvVar,
+	} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("log output %q does not contain %q", logs.String(), want)
+		}
 	}
 }

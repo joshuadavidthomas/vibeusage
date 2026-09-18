@@ -9,6 +9,7 @@ import (
 
 	"github.com/joshuadavidthomas/vibeusage/internal/auth/oauth"
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/testenv"
 )
@@ -430,6 +431,41 @@ func TestFetch_FailsClosedForUnmarkedSlot(t *testing.T) {
 	}
 	if !strings.Contains(res.Error, "vibeusage auth antigravity") {
 		t.Errorf("Fetch error = %q, want guidance to re-auth", res.Error)
+	}
+}
+
+func TestFetch_LogsBlockedRefreshConfiguration(t *testing.T) {
+	applyAntigravityTestEnv(t)
+	t.Setenv(clientIDEnvVar, "")
+	t.Setenv(clientSecretEnvVar, "")
+
+	// An owned slot that needs refreshing, so Fetch reaches the refresh path
+	// that requires the OAuth client from configuration.
+	content := `{"access_token":"slot-tok","refresh_token":"slot-ref","expires_at":"2000-01-01T00:00:00Z","vibeusage_owned":true}`
+	if err := config.WriteCredential("antigravity", "oauth", []byte(content)); err != nil {
+		t.Fatalf("WriteCredential: %v", err)
+	}
+
+	ctx, logs := logging.NewTestContext(logging.Flags{Verbose: true})
+	res, err := (&OAuthStrategy{}).Fetch(ctx)
+	if err != nil {
+		t.Fatalf("Fetch error: %v", err)
+	}
+	if res.Success {
+		t.Fatal("Fetch should fail closed when the OAuth client is unconfigured for an owned refresh")
+	}
+	if res.ShouldFallback {
+		t.Error("Fetch should be fatal so verification during `vibeusage auth` cannot accept stale creds")
+	}
+	for _, want := range []string{
+		"antigravity credential refresh blocked by OAuth client configuration",
+		"antigravity",
+		clientIDEnvVar,
+		clientSecretEnvVar,
+	} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("log output %q does not contain %q", logs.String(), want)
+		}
 	}
 }
 

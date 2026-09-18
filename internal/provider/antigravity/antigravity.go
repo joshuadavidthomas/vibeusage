@@ -16,6 +16,7 @@ import (
 	"github.com/joshuadavidthomas/vibeusage/internal/config"
 	"github.com/joshuadavidthomas/vibeusage/internal/fetch"
 	"github.com/joshuadavidthomas/vibeusage/internal/httpclient"
+	"github.com/joshuadavidthomas/vibeusage/internal/logging"
 	"github.com/joshuadavidthomas/vibeusage/internal/models"
 	"github.com/joshuadavidthomas/vibeusage/internal/provider"
 )
@@ -90,8 +91,15 @@ func clientCredentials() (oauthClientCredentials, error) {
 		ID:     strings.TrimSpace(os.Getenv(clientIDEnvVar)),
 		Secret: strings.TrimSpace(os.Getenv(clientSecretEnvVar)),
 	}
-	if oauthClient.ID == "" || oauthClient.Secret == "" {
-		return oauthClientCredentials{}, fmt.Errorf("set %s and %s to an OAuth client you control", clientIDEnvVar, clientSecretEnvVar)
+	var missing []string
+	if oauthClient.ID == "" {
+		missing = append(missing, clientIDEnvVar)
+	}
+	if oauthClient.Secret == "" {
+		missing = append(missing, clientSecretEnvVar)
+	}
+	if len(missing) > 0 {
+		return oauthClientCredentials{}, fmt.Errorf("set %s to an OAuth client you control", strings.Join(missing, " and "))
 	}
 	return oauthClient, nil
 }
@@ -168,6 +176,7 @@ func (s *OAuthStrategy) Fetch(ctx context.Context) (fetch.FetchResult, error) {
 		}
 		oauthClient, err := clientCredentials()
 		if err != nil {
+			logging.FromContext(ctx).Debug("antigravity credential refresh blocked by OAuth client configuration", "provider", "antigravity", "err", err)
 			return fetch.ResultFatal(fmt.Sprintf("Cannot refresh Antigravity credentials: %v. Run `vibeusage auth antigravity` to re-authenticate with it.", err)), nil
 		}
 		refreshed := google.RefreshToken(ctx, creds, google.RefreshConfig{
